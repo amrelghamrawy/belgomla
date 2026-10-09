@@ -61,10 +61,7 @@ Minimum per endpoint: happy path with exact resource keys, validation dataset, 4
 
 ## Out of scope here (next tasks)
 
-- Task 2 — Pricing: tiers, `PriceResolver`, bulk pricing by filter, cover-price recompute.
-- Task 3 — Inventory: `sku_inventory`, movements, adjustments, BR-INV08, opening stock on product create.
-- Task 4 — Customers + Messaging (OTP WhatsApp/SMS, invitations, cart).
-- Task 5 — Orders/Checkout. Task 6 — Collections + Reports. Task 7 — Storefront UI. Task 8 — Dashboard UI.
+See `tasks/README.md`: 2 Pricing, 3 Inventory, 4 Messaging, 5 Customers, 6 Orders, 7 Collections & Reports, 8 Frontend foundation, 9 Storefront UI, 10 Dashboard UI, 11 Release. In particular `opening_stock` on product create arrives with Task 3 and `sku.tiers` with Task 2.
 
 ## Open questions for the product owner (answer in `06-open-decisions.md` before or during the task)
 
