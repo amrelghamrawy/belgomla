@@ -9,8 +9,8 @@ use App\Support\Http\PaginatedRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * GET /api/dashboard/products: `q, category (id), status, f[key], sort, page, per_page`.
- * `low_stock=1` arrives with Inventory (Task 3).
+ * GET /api/dashboard/products: `q, category (id), status, f[key], low_stock, sort, page, per_page`.
+ * `low_stock=1` keeps products whose SKU is low on stock (D36).
  */
 final class ListDashboardProductsRequest extends PaginatedRequest
 {
@@ -26,7 +26,13 @@ final class ListDashboardProductsRequest extends PaginatedRequest
         return [
             ...parent::rules(),
             ...$this->filterRules(),
+            'low_stock' => ['sometimes', 'boolean'],
             'sort' => ['sometimes', Rule::in(self::SORTS)],
         ];
+    }
+
+    public function lowStock(): bool
+    {
+        return $this->boolean('low_stock');
     }
 }

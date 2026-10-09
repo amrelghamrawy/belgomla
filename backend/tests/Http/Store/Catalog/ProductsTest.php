@@ -10,7 +10,7 @@ use App\Modules\Catalog\Models\ProductImage;
 
 const STORE_PRODUCT_KEYS = [
     'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name'],
-    'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'in_stock'],
+    'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'],
 ];
 
 beforeEach(function (): void {
@@ -27,7 +27,7 @@ beforeEach(function (): void {
 
 test('the store lists visible products in the documented shape with laravel pagination', function (): void {
     $product = $this->inTenant(function (): Product {
-        $product = Product::factory()->withSku(['code' => 'ADW-1', 'cover_price' => '120', 'base_price' => '90', 'moq' => 5, 'conversion_factor' => 20])
+        $product = Product::factory()->withSku(['code' => 'ADW-1', 'cover_price' => '120', 'base_price' => '90', 'moq' => 5, 'conversion_factor' => 20], onHand: 140)
             ->create(['custom_fields' => ['grade' => $this->firstPrep->id]]);
         ProductImage::factory()->for($product)->main()->create();
 
@@ -47,17 +47,18 @@ test('the store lists visible products in the documented shape with laravel pagi
         ->assertJsonPath('data.0.sku.cover_price', '120.00')
         ->assertJsonPath('data.0.sku.base_price', '90.00')
         ->assertJsonPath('data.0.sku.moq', 5)
+        ->assertJsonPath('data.0.sku.available', 140)
         ->assertJsonPath('data.0.sku.in_stock', true)
         ->assertJsonMissingPath('data.0.prices_hidden')
         ->assertJsonMissingPath('data.0.sku.coming_soon')
         ->assertJsonMissingPath('data.0.gallery');
 });
 
-test('BR-P04 inactive products are hidden; coming soon is shown, not in stock', function (): void {
+test('BR-P04 inactive products are hidden; coming soon is shown, not in stock and without available', function (): void {
     $comingSoon = $this->inTenant(function (): Product {
-        Product::factory()->withSku()->inactive()->create();
+        Product::factory()->withSku(onHand: 50)->inactive()->create();
 
-        return Product::factory()->withSku()->comingSoon()->create();
+        return Product::factory()->withSku(onHand: 50)->comingSoon()->create();
     });
 
     $this->tenantJson('GET', '/api/store/products')
@@ -66,7 +67,8 @@ test('BR-P04 inactive products are hidden; coming soon is shown, not in stock', 
         ->assertJsonPath('data.0.id', $comingSoon->id)
         ->assertJsonPath('data.0.status', 'coming_soon')
         ->assertJsonPath('data.0.sku.in_stock', false)
-        ->assertJsonPath('data.0.sku.coming_soon', true);
+        ->assertJsonPath('data.0.sku.coming_soon', true)
+        ->assertJsonMissingPath('data.0.sku.available');
 });
 
 test('BR-P08 custom fields not shown on the storefront and archived fields are left out', function (): void {

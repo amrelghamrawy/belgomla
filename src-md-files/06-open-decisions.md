@@ -26,6 +26,9 @@ Each item below has a **default** already written into the other documents so wo
 | D27 | Rounding of % pricing                                    | Half-up to the piaster (2 decimals), exact bcmath math: 10.10 at 25% → 7.58.                                  | BR-PR10     |
 | D28 | Tier priced above the base price (surcharge)               | Not allowed: `422 invalid_tiers`. A tier equal to the base price is allowed.                                  | BR-PR05     |
 | D34 | Partial pricing input                                      | `PUT …/pricing` without `cover_price` keeps it (null clears it); a percentage sent next to a price wins; a product update without `sku.tiers` keeps the tiers; bulk pricing is %-only and its tiers replace each SKU's tiers. | BR-PR10/PR11 |
+| D35 | Stock adjustments to zero, unchanged values, deleting stocked SKUs | Adjusting On Hand to 0 is allowed when nothing is reserved. Setting the current value again is a no-op (no movement, no audit); in bulk it is skipped as `unchanged`. SKUs are never deleted (products are archived), so stock is never orphaned. | BR-INV08 |
+| D36 | Low-stock threshold | A SKU is low on stock when Available ≤ MOQ × conversion factor, i.e. at most one minimum order left, compared in base units (BR-U03). A SKU without a stock row counts as 0. Used by the inventory list, `products?low_stock=1` and the low-stock report (D5). | BR-INV02, D5 |
+| D37 | Storefront `available` / `in_stock` | `available` is in base units. `in_stock` = product `active` and Available ≥ conversion factor (at least one selling unit can be ordered). `coming_soon` → `in_stock: false`, `available` omitted. | BR-INV02, BR-P04 |
 | D33 | Stationery / hardware templates                            | Filterable selects: stationery = brand, color (6 common colours), size; hardware = brand, material, size. Options other than colour start empty. | BR-P09 |
 
 These are treated as accepted defaults unless the product owner objects.

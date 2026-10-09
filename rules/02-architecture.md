@@ -61,7 +61,7 @@ Cross-module rule: module A may call module B only through B's `Actions`, `Queri
 
 Hard lines:
 
-- **Action vs Service**: writes to the database → Action. Computes or talks to a provider and is called *by* actions → Service. A class that does both is split.
+- **Action vs Service**: writes to the database → Action. Computes or talks to a provider and is called *by* actions → Service. A class that does both is split. One named exception: `Inventory\Services\StockLedger` writes `sku_inventory` and `inventory_movements`, because every stock change in every module (adjustments, checkout, transitions) must go through the same locking code; Inventory's actions and Orders call it, and an arch test makes it the only writer.
 - **Service vs Support**: needs the container, a facade, DB, HTTP, config → Service (injected). Pure input→output → Support (static). Never name anything `Helper`, `Manager`, `Util`, `Handler`.
 - **Action vs Observer**: explicit business steps (reserve stock, write audit, notify merchant) are called from the action, in order, in one transaction. Observers only keep model invariants (slug, materialized path, cache busting). If you need to "react" across modules, call the other module's action explicitly; do not add Events/Listeners.
 - **Query vs Model scope**: a scope is a reusable filter on one model (`Scopes/Active.php`, invokable class). A Query composes scopes, joins, facets and pagination for one screen or report.

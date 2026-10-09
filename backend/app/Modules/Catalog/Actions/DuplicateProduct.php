@@ -8,6 +8,7 @@ use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Inventory\Actions\RecordOpeningStock;
 use App\Modules\Pricing\Actions\UpdateSkuPricing;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Services\PriceResolver;
@@ -16,8 +17,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * BR-P11 / D30: copies name, category, description, custom fields, units, prices, tiers and MOQ into a new
  * `inactive` product with a new SKU code ("{code}-COPY", "-COPY-2", ...) and its own slug. Images,
- * relations and stock are not copied (stock starts at zero with Task 3). Prices and tiers are copied as
- * stored, through Pricing's UpdateSkuPricing. Owns its transaction.
+ * relations and stock are not copied: the copy gets an empty stock row through Inventory's
+ * RecordOpeningStock. Prices and tiers are copied as stored, through Pricing's UpdateSkuPricing. Owns its
+ * transaction.
  */
 final readonly class DuplicateProduct
 {
@@ -26,6 +28,7 @@ final readonly class DuplicateProduct
     public function __construct(
         private PriceResolver $prices,
         private UpdateSkuPricing $pricing,
+        private RecordOpeningStock $openingStock,
         private AuditLogger $audit,
     ) {}
 
@@ -62,13 +65,15 @@ final readonly class DuplicateProduct
             'code' => $this->nextCode($source->code),
         ]);
 
-        $this->pricing->handle($sku, new SkuPricingData(
+        $sku = $this->pricing->handle($sku, new SkuPricingData(
             basePrice: $source->base_price,
             basePricePercent: $source->base_price_percent,
             moq: $source->moq,
             tiers: $this->prices->tiers($source),
             coverPrice: $source->cover_price,
         ));
+
+        $this->openingStock->handle($sku, 0);
     }
 
     private function nextCode(string $code): string

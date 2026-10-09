@@ -105,3 +105,27 @@ function rendered(Illuminate\Http\Resources\Json\JsonResource $resource, Illumin
 
     return $data;
 }
+
+/**
+ * Runs a callback with another database session (`pgsql_session_a|b`, config/database.php) as the default
+ * connection, pointed at this process's test database. That session is outside RefreshDatabase's
+ * transaction: it cannot see the test's uncommitted rows and what it writes is committed, so clean up.
+ *
+ * @template TReturn
+ *
+ * @param  callable(Illuminate\Database\Connection): TReturn  $callback
+ * @return TReturn
+ */
+function onSession(string $connection, callable $callback): mixed
+{
+    config(["database.connections.{$connection}.database" => config()->string('database.connections.pgsql.database')]);
+
+    $previous = Illuminate\Support\Facades\DB::getDefaultConnection();
+    Illuminate\Support\Facades\DB::setDefaultConnection($connection);
+
+    try {
+        return $callback(Illuminate\Support\Facades\DB::connection($connection));
+    } finally {
+        Illuminate\Support\Facades\DB::setDefaultConnection($previous);
+    }
+}

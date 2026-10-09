@@ -57,6 +57,11 @@ dataset('dashboard authenticated routes', [
     'product pricing recompute' => ['POST', '/api/dashboard/products/1/pricing/recompute'],
     'bulk pricing apply' => ['POST', '/api/dashboard/pricing/bulk'],
     'bulk pricing preview' => ['POST', '/api/dashboard/pricing/bulk/preview'],
+    'inventory list' => ['GET', '/api/dashboard/inventory'],
+    'inventory show' => ['GET', '/api/dashboard/inventory/1'],
+    'inventory movements' => ['GET', '/api/dashboard/inventory/1/movements'],
+    'inventory adjust' => ['POST', '/api/dashboard/inventory/1/adjust'],
+    'inventory bulk adjust' => ['POST', '/api/dashboard/inventory/bulk-adjust'],
 ]);
 
 test('a guest is refused on every authenticated dashboard route', function (string $method, string $uri): void {

@@ -28,13 +28,15 @@ final class ProductFactory extends Factory
     }
 
     /**
-     * The single V1 SKU (BR-P02).
+     * The single V1 SKU (BR-P02), with stock in base units when `$onHand` is given (BR-INV02).
      *
      * @param  array<string, mixed>  $attributes
      */
-    public function withSku(array $attributes = []): static
+    public function withSku(array $attributes = [], ?int $onHand = null, int $reserved = 0): static
     {
-        return $this->has(SkuFactory::new()->state($attributes), 'skus');
+        $sku = SkuFactory::new()->state($attributes);
+
+        return $this->has($onHand === null ? $sku : $sku->withStock($onHand, $reserved), 'skus');
     }
 
     public function comingSoon(): static

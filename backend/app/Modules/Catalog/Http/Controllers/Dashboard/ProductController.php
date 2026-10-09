@@ -20,11 +20,11 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final readonly class ProductController
 {
-    /** GET /api/dashboard/products?q=&category=&status=&f[key]=&sort=&page=&per_page= */
+    /** GET /api/dashboard/products?q=&category=&status=&f[key]=&low_stock=&sort=&page=&per_page= */
     public function index(ListDashboardProductsRequest $request, DashboardProductListQuery $products): AnonymousResourceCollection
     {
         return DashboardProductResource::collection(
-            $products->paginate(ProductFilterData::fromRequest($request), $request->sort(), $request->perPage()),
+            $products->paginate(ProductFilterData::fromRequest($request), $request->sort(), $request->perPage(), $request->lowStock()),
         );
     }
 

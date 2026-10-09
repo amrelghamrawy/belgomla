@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * BR-P02, BR-P03, BR-U02, BR-PR01, BR-PR10, BR-MOQ01. Prices and MOQ are per selling unit (BR-U04).
@@ -35,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Unit $sellingUnit
  * @property-read Unit $baseUnit
  * @property-read Collection<int, SkuPriceTier> $tiers
+ * @property-read SkuInventory|null $inventory
  */
 final class Sku extends Model
 {
@@ -86,6 +89,17 @@ final class Sku extends Model
     public function tiers(): HasMany
     {
         return $this->hasMany(SkuPriceTier::class)->orderBy('min_quantity');
+    }
+
+    /**
+     * Stock in base units (BR-INV02). The table belongs to Inventory and is written only by its
+     * StockLedger; this relation lets Catalog eager-load the stock with the SKU. No row means no stock.
+     *
+     * @return HasOne<SkuInventory, $this>
+     */
+    public function inventory(): HasOne
+    {
+        return $this->hasOne(SkuInventory::class);
     }
 
     /**

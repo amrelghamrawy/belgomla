@@ -12,7 +12,7 @@ beforeEach(function (): void {
 
 test('the product page shows the list shape plus gallery and related products', function (): void {
     [$image, $revision] = $this->inTenant(function (): array {
-        $revision = Product::factory()->withSku()->create(['name' => 'المراجعة النهائية علوم']);
+        $revision = Product::factory()->withSku(onHand: 10)->create(['name' => 'المراجعة النهائية علوم']);
         ProductRelation::factory()->revisionOf()->create(['product_id' => $revision->id, 'related_product_id' => $this->book->id]);
 
         return [ProductImage::factory()->for($this->book)->main()->create(), $revision];
@@ -25,6 +25,7 @@ test('the product page shows the list shape plus gallery and related products', 
         ->assertJsonPath('data.related.0.type', 'revision_of')
         ->assertJsonPath('data.related.0.direction', 'incoming')
         ->assertJsonPath('data.related.0.product.id', $revision->id)
+        ->assertJsonPath('data.related.0.product.sku.available', 10)
         ->assertJsonPath('data.related.0.product.sku.in_stock', true)
         ->assertJsonMissingPath('data.related.0.product.related');
 });

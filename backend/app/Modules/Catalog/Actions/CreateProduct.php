@@ -11,13 +11,15 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Catalog\Services\ProductSnapshot;
+use App\Modules\Inventory\Actions\RecordOpeningStock;
 use App\Modules\Pricing\Actions\UpdateSkuPricing;
 use Illuminate\Support\Facades\DB;
 
 /**
  * BR-P02: creates the product and its single SKU in one transaction (owned here), audited. The SKU's
  * prices, MOQ and tiers are validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05).
- * Opening stock is Task 3 (Inventory).
+ * The opening stock is written by Inventory's RecordOpeningStock in the same transaction (an `opening`
+ * movement, BR-INV06) and recorded in the `product.created` audit as `opening_stock`.
  */
 final readonly class CreateProduct
 {
@@ -26,6 +28,7 @@ final readonly class CreateProduct
         private CustomFieldValidator $fields,
         private ProductSnapshot $snapshot,
         private UpdateSkuPricing $pricing,
+        private RecordOpeningStock $openingStock,
         private AuditLogger $audit,
     ) {}
 
@@ -44,10 +47,11 @@ final readonly class CreateProduct
                 'created_by' => $createdBy,
             ]);
 
-            $this->pricing->handle($product->skus()->make($data->sku->attributes()), $data->sku->pricing);
+            $sku = $this->pricing->handle($product->skus()->make($data->sku->attributes()), $data->sku->pricing);
+            $this->openingStock->handle($sku, $data->openingStock, $createdBy);
             $product->load('sku.tiers');
 
-            $this->audit->log('product.created', $product, null, $this->snapshot->of($product));
+            $this->audit->log('product.created', $product, null, [...$this->snapshot->of($product), 'opening_stock' => $data->openingStock]);
 
             return $product;
         });

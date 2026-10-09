@@ -17,12 +17,12 @@ beforeEach(function (): void {
 });
 
 test('the store product resource key set with visible prices', function (): void {
-    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers', 'mainImage']);
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers', 'sku.inventory', 'mainImage']);
 
     $data = rendered(new StoreProductResource($product, new Collection, false), storeRequest());
 
     expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category', 'custom_fields', 'sku'])
-        ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'in_stock'])
+        ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'])
         ->and($data['sku']['unit'])->toBe($product->sku->sellingUnit->name);
 });
 
@@ -46,13 +46,37 @@ test('BR-PR10 the store sku shows the discount off the cover price and its tiers
         ->and($sku['tiers'])->toBe([['min_quantity' => 10, 'unit_price' => '84.00']]);
 });
 
-test('BR-P04 a coming soon product is flagged and not in stock', function (): void {
-    $product = Product::factory()->withSku()->comingSoon()->create()->load('sku');
+test('BR-P04 a coming soon product is flagged, not in stock and shows no available stock', function (): void {
+    $product = Product::factory()->withSku(onHand: 50)->comingSoon()->create()->load('sku.inventory');
 
     $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
 
     expect($sku['in_stock'])->toBeFalse()
-        ->and($sku['coming_soon'])->toBeTrue();
+        ->and($sku['coming_soon'])->toBeTrue()
+        ->and($sku)->not->toHaveKey('available');
+});
+
+test('D37 an active sku is in stock while at least one selling unit is available', function (int $onHand, int $reserved, int $available, bool $inStock): void {
+    $product = Product::factory()->withSku(['conversion_factor' => 20], $onHand, $reserved)->create()->load('sku.inventory');
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
+
+    expect($sku['available'])->toBe($available)
+        ->and($sku['in_stock'])->toBe($inStock);
+})->with([
+    'BR-INV02 available is on hand minus reserved' => [100, 30, 70, true],
+    'exactly one carton' => [20, 0, 20, true],
+    'one piece short of a carton' => [39, 20, 19, false],
+    'nothing left' => [20, 20, 0, false],
+]);
+
+test('BR-INV02 a sku without a stock row has nothing available', function (): void {
+    $product = Product::factory()->withSku()->create()->load('sku.inventory');
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
+
+    expect($sku['available'])->toBe(0)
+        ->and($sku['in_stock'])->toBeFalse();
 });
 
 test('BR-P08 custom fields render per type with labels, unknown option ids are skipped', function (): void {

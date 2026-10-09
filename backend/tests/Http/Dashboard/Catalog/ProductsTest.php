@@ -17,10 +17,10 @@ const DASHBOARD_PRODUCT_KEYS = [
     'main_image_url', 'created_at', 'updated_at',
 ];
 
-/** The detail (show, create, update) also carries the tiers (08-api-contract.md §6). */
+/** The detail (show, create, update) also carries the tiers and the stock (08-api-contract.md §6). */
 const DASHBOARD_PRODUCT_DETAIL_KEYS = [
     ...DASHBOARD_PRODUCT_KEYS,
-    'sku' => [...DASHBOARD_PRODUCT_KEYS['sku'], 'tiers'],
+    'sku' => [...DASHBOARD_PRODUCT_KEYS['sku'], 'tiers', 'inventory' => ['on_hand', 'reserved', 'available']],
 ];
 
 beforeEach(function (): void {
@@ -138,6 +138,9 @@ test('product creation validation', function (array $overrides, string $field): 
     'BR-MOQ01 moq of 0' => [['sku' => ['moq' => 0]], 'sku.moq'],
     'BR-U05 fractional moq' => [['sku' => ['moq' => 2.5]], 'sku.moq'],
     'unknown status' => [['status' => 'draft'], 'status'],
+    'BR-INV02 negative opening stock' => [['opening_stock' => -1], 'opening_stock'],
+    'BR-U05 fractional opening stock' => [['opening_stock' => 2.5], 'opening_stock'],
+    'opening stock too large' => [['opening_stock' => 10_000_001], 'opening_stock'],
 ]);
 
 test('BR-PR10 a base price percentage is stored next to the price computed from the cover price', function (): void {
@@ -177,10 +180,36 @@ test('BR-PR05 duplicate tier thresholds on a product are refused with invalid_ti
         ->assertJsonCount(1, 'error.details.tiers');
 });
 
-test('opening stock is not accepted by this task and is ignored', function (): void {
-    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['opening_stock' => 100]))
+test('BR-INV06 the opening stock is written as an opening movement and in the creation audit', function (): void {
+    $id = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['opening_stock' => 100]))
         ->assertCreated()
-        ->assertJsonMissingPath('data.opening_stock');
+        ->assertJsonPath('data.sku.inventory', ['on_hand' => 100, 'reserved' => 0, 'available' => 100])
+        ->assertJsonMissingPath('data.opening_stock')
+        ->json('data.id');
+
+    $skuId = $this->inTenant(fn () => Sku::query()->where('product_id', $id)->sole()->id);
+
+    $this->assertDatabaseHas('inventory_movements', ['sku_id' => $skuId, 'type' => 'opening', 'quantity' => 100, 'on_hand_after' => 100, 'actor_type' => 'tenant_user', 'actor_id' => $this->me->id]);
+    expect($this->inTenant(fn () => AuditLog::query()->where('action', 'product.created')->sole()->new_values))->toMatchArray(['opening_stock' => 100]);
+});
+
+test('a product created without opening stock starts with an empty stock row and no movement', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload())
+        ->assertCreated()
+        ->assertJsonPath('data.sku.inventory', ['on_hand' => 0, 'reserved' => 0, 'available' => 0]);
+
+    $this->assertDatabaseCount('sku_inventory', 1);
+    $this->assertDatabaseCount('inventory_movements', 0);
+});
+
+test('the opening stock is create-only: an update ignores it', function (): void {
+    $id = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['opening_stock' => 10]))->json('data.id');
+
+    $this->tenantJson('PUT', "/api/dashboard/products/{$id}", $this->productPayload(['opening_stock' => 99]))
+        ->assertOk()
+        ->assertJsonPath('data.sku.inventory.on_hand', 10);
+
+    $this->assertDatabaseCount('inventory_movements', 1);
 });
 
 test('BR-P03 a sku code already used in the tenant conflicts', function (): void {
@@ -293,6 +322,22 @@ test('the dashboard list sorts by name and price', function (string $sort, array
     'price descending' => ['-price', ['a', 'b']],
 ]);
 
+test('D36 low_stock=1 keeps products whose stock is at most one minimum order, in base units', function (): void {
+    $ids = $this->inTenant(fn (): array => [
+        'low' => Product::factory()->withSku(['moq' => 5, 'conversion_factor' => 20], onHand: 120, reserved: 20)->create()->id,
+        'no stock row' => Product::factory()->withSku()->create()->id,
+        'plenty' => Product::factory()->withSku(['moq' => 5, 'conversion_factor' => 20], onHand: 101)->create()->id,
+    ]);
+    $this->inTenant(fn () => Product::factory()->withSku(onHand: 0)->create(), $this->otherTenant());
+
+    $listed = $this->tenantJson('GET', '/api/dashboard/products?low_stock=1')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 2)
+        ->json('data.*.id');
+
+    expect($listed)->toEqualCanonicalizing([$ids['low'], $ids['no stock row']]);
+});
+
 test('dashboard list validation', function (string $query, string $field): void {
     $this->tenantJson('GET', "/api/dashboard/products?{$query}")
         ->assertUnprocessable()
@@ -303,11 +348,12 @@ test('dashboard list validation', function (string $query, string $field): void 
     'unknown status' => ['status=draft', 'status'],
     'category not an id' => ['category=books', 'category'],
     'field filter not a map' => ['f=1', 'f'],
+    'low stock not a boolean' => ['low_stock=maybe', 'low_stock'],
 ]);
 
-test('the product detail includes the gallery and relations both ways', function (): void {
+test('the product detail includes the stock, the gallery and relations both ways', function (): void {
     [$product, $image, $revision] = $this->inTenant(function (): array {
-        $product = Product::factory()->withSku()->create();
+        $product = Product::factory()->withSku(onHand: 50, reserved: 8)->create();
         $revision = Product::factory()->create();
         App\Modules\Catalog\Models\ProductRelation::factory()->revisionOf()->create(['product_id' => $revision->id, 'related_product_id' => $product->id]);
 
@@ -321,6 +367,7 @@ test('the product detail includes the gallery and relations both ways', function
             'images' => ['*' => ['id', 'url', 'is_main', 'sort_order']],
             'relations' => ['*' => ['id', 'type', 'direction', 'product' => ['id', 'name', 'slug', 'status']]],
         ]])
+        ->assertJsonPath('data.sku.inventory', ['on_hand' => 50, 'reserved' => 8, 'available' => 42])
         ->assertJsonPath('data.images.0.id', $image->id)
         ->assertJsonPath('data.main_image_url', $image->url())
         ->assertJsonPath('data.relations.0.direction', 'incoming')

@@ -26,10 +26,11 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * Storefront product (08-api-contract.md §1). Custom fields are shown as `{key, label, value}` with the
  * option label, only for active fields marked `show_on_storefront`. When prices are hidden (D1) the
  * SKU prices are omitted and `prices_hidden: true` is added. `coming_soon` products are listed with
- * `in_stock: false, coming_soon: true` (BR-P04). The detail page adds `gallery` and `related` (BR-P10).
+ * `in_stock: false, coming_soon: true` and no `available` (BR-P04). The detail page adds `gallery` and `related` (BR-P10).
  *
  * `discount_percent` (off the cover price) and `tiers` come from Pricing's PriceResolver, read-only
- * (BR-PR03, BR-PR10). `in_stock` follows the status until Inventory (Task 3) adds `available`.
+ * (BR-PR03, BR-PR10). `available` is the SKU's stock in base units from Inventory (BR-INV02, BR-U03; no
+ * stock row = 0); `in_stock` means at least one selling unit can be ordered (D37).
  *
  * @property-read Product $resource
  */
@@ -122,6 +123,7 @@ final class StoreProductResource extends JsonResource
     {
         $unit = $sku->relationLoaded('sellingUnit') ? $sku->sellingUnit : null;
         $comingSoon = $this->resource->status === ProductStatus::ComingSoon;
+        $available = $sku->relationLoaded('inventory') ? $sku->inventory->available ?? 0 : 0;
 
         return [
             'id' => $sku->id,
@@ -133,7 +135,8 @@ final class StoreProductResource extends JsonResource
             'base_price' => $this->when(! $this->pricesHidden, $sku->base_price),
             'discount_percent' => $this->when(! $this->pricesHidden, fn (): ?string => app(PriceResolver::class)->baseDiscountPercent($sku)),
             'tiers' => $this->when(! $this->pricesHidden && $sku->relationLoaded('tiers'), fn (): array => $this->tiers($sku)),
-            'in_stock' => $this->resource->status === ProductStatus::Active,
+            'available' => $this->when(! $comingSoon, $available),
+            'in_stock' => $this->resource->status === ProductStatus::Active && $available >= $sku->conversion_factor,
             'coming_soon' => $this->when($comingSoon, true),
         ];
     }

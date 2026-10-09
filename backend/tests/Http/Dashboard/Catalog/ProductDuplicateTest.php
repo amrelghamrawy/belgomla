@@ -35,6 +35,17 @@ test('BR-P11 duplicating copies fields, units, prices and moq into a new inactiv
     $this->assertDatabaseHas('audit_logs', ['action' => 'product.duplicated', 'entity_id' => $copy['id'], 'actor_id' => $this->me->id]);
 });
 
+test('D30 the copy starts with an empty stock row and no movement, the source stock is untouched', function (): void {
+    $source = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['opening_stock' => 40]))->json('data');
+
+    $this->tenantJson('POST', "/api/dashboard/products/{$source['id']}/duplicate")
+        ->assertCreated()
+        ->assertJsonPath('data.sku.inventory', ['on_hand' => 0, 'reserved' => 0, 'available' => 0]);
+
+    $this->assertDatabaseHas('sku_inventory', ['sku_id' => $source['sku']['id'], 'on_hand' => 40]);
+    $this->assertDatabaseCount('inventory_movements', 1);
+});
+
 test('BR-P11 duplicating twice gives each copy its own code', function (): void {
     $id = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload())->json('data.id');
 

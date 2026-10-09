@@ -9,7 +9,7 @@ use App\Modules\Pricing\Concerns\ReadsSkuPricing;
 /**
  * Rules and typed accessors shared by the product create and update requests (08-api-contract.md §6).
  * The SKU price set (`sku.cover_price`, `sku.base_price[_percent]`, `sku.moq`, `sku.tiers`) is read by
- * Pricing's ReadsSkuPricing under the "sku." prefix. `opening_stock` (Task 3) is not read here.
+ * Pricing's ReadsSkuPricing under the "sku." prefix. `opening_stock` is create-only (StoreProductRequest).
  */
 trait ProductPayloadRules
 {

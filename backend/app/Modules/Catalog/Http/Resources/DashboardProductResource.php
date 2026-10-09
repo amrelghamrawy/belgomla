@@ -19,7 +19,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Dashboard view of a product with its SKU (08-api-contract.md §6). The detail endpoint also loads
  * `images` and `relations`; the list leaves them out. `custom_fields` is the raw stored map
  * (select values are option ids) because the dashboard form edits it. `sku.tiers` (with the % each was
- * entered as) is present when the tiers are loaded, i.e. on the detail; inventory arrives with Task 3.
+ * entered as) is present when the tiers are loaded, i.e. on the detail, and so is `sku.inventory`
+ * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros).
  *
  * @property-read Product $resource
  */
@@ -93,6 +94,11 @@ final class DashboardProductResource extends JsonResource
                 'unit_price' => $tier->unitPrice,
                 'discount_percent' => $tier->discountPercent,
             ], app(PriceResolver::class)->tiers($sku))),
+            'inventory' => $this->when($sku->relationLoaded('inventory'), fn (): array => [
+                'on_hand' => $sku->inventory->on_hand ?? 0,
+                'reserved' => $sku->inventory->reserved ?? 0,
+                'available' => $sku->inventory->available ?? 0,
+            ]),
         ];
     }
 

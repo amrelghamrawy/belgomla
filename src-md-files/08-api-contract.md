@@ -138,7 +138,7 @@ Item shape:
 
 If `require_login_for_prices` is on and no customer session: `sku.cover_price/base_price/tiers/discount_percent` are omitted and `prices_hidden: true` is added at the product level. `coming_soon` products return `in_stock:false, coming_soon:true` and `available` omitted.
 
-Delivered in stages (Task 1 = Catalog): the item also carries `description`; `custom_fields` lists only active fields with `show_on_storefront`, select values as the option label and booleans as `نعم`/`لا`. Until Inventory (Task 3) `in_stock` follows the status (`active` → true) and `available` is absent. Pricing (Task 2): `tiers` are `{ min_quantity, unit_price }` lowest first; `discount_percent` is the % the base price was entered as, else the % it implies off `cover_price`, else `null` (no cover price). Filter facets with `type: boolean` use the option ids `"true"` / `"false"`.
+Delivered in stages (Task 1 = Catalog): the item also carries `description`; `custom_fields` lists only active fields with `show_on_storefront`, select values as the option label and booleans as `نعم`/`لا`. Inventory (Task 3): `available` is the SKU's stock in base units and `in_stock` is true when the product is `active` and at least one selling unit is available (`available ≥ conversion_factor`, D37). Pricing (Task 2): `tiers` are `{ min_quantity, unit_price }` lowest first; `discount_percent` is the % the base price was entered as, else the % it implies off `cover_price`, else `null` (no cover price). Filter facets with `type: boolean` use the option ids `"true"` / `"false"`.
 
 ### `GET /api/store/products/{slug}`
 
@@ -422,6 +422,17 @@ Adjust below reserved (BR-INV08) → `422`:
 ```
 
 The adjust form must call `GET /api/dashboard/inventory/{skuId}` first and display `min_allowed` next to the input.
+
+Delivered (Task 3):
+
+- `GET /api/dashboard/inventory/{skuId}` exists (the adjust form needs it) and returns one row; `adjust` returns the same row after the change.
+- Row: `{ sku_id, product_id, code, name, status, on_hand, reserved, available, min_allowed, moq, conversion_factor, low_stock }`, all quantities in base units. `min_allowed` = `reserved`. `low_stock` is D36: `available ≤ moq × conversion_factor`.
+- List: every SKU of the tenant (any product status), Laravel pagination envelope; `q` searches like the product list (name, SKU code, option labels, D32); `low_stock=1`; `sort=code|-code|available|-available` (default `code`).
+- Movements: newest first, `{ id, type, type_label, quantity (signed), on_hand_after, reason, order_id, actor: { type, id }, created_at }`.
+- Adjust: `new_on_hand` integer 0..10,000,000, `reason` required (≤ 200). Setting the current value is a no-op (D35). Audit `stock.adjusted` (old/new `on_hand`, `reason`).
+- Bulk adjust: body is a bare JSON array (≤ 500 items, each `sku_id` once; validation errors are keyed `items.N.field`). Response `{ applied: <count>, skipped: [{ sku_id, reason: below_reserved|not_found|unchanged, reserved?, min_allowed? }], batch_id }`. An id of another tenant is `not_found` and untouched (BR-T04). Audit: `stock.adjusted` per applied SKU plus one `inventory.bulk_adjusted`, same `batch_id`.
+- `422 insufficient_stock` (`items: [{ sku_id, reason, available }]`) is what `StockLedger::reserve` throws; Task 6 turns it into `checkout_failed`.
+- Product create: `opening_stock` (integer ≥ 0, default 0) writes an `opening` movement and appears in the `product.created` audit; the dashboard product detail carries `sku.inventory: { on_hand, reserved, available }`; `GET /api/dashboard/products?low_stock=1` uses D36.
 
 ---
 

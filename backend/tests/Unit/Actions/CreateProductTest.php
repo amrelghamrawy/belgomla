@@ -11,6 +11,9 @@ use App\Modules\Catalog\Exceptions\InvalidCustomFields;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Inventory\Enums\MovementType;
+use App\Modules\Inventory\Models\InventoryMovement;
+use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Exceptions\InvalidTiers;
@@ -41,6 +44,16 @@ test('BR-P02 creates an active product with exactly one sku and a system audit r
         ->and($product->sku->moq)->toBe(1)
         ->and($product->created_by)->toBeNull()
         ->and(AuditLog::query()->sole()->new_values)->toMatchArray(['name' => 'قلم جاف', 'sku.code' => 'PEN-1', 'sku.base_price' => '30.00']);
+});
+
+test('BR-INV06 the opening stock is recorded by the creating user, inside the creation audit', function (): void {
+    $user = $this->makeOwner();
+
+    $product = app(CreateProduct::class)->handle(new ProductData(...[...get_object_vars(($this->data)()), 'openingStock' => 36]), $user->id);
+
+    expect(SkuInventory::query()->sole()->only(['sku_id', 'on_hand', 'reserved']))->toBe(['sku_id' => $product->sku->id, 'on_hand' => 36, 'reserved' => 0])
+        ->and(InventoryMovement::query()->sole()->only(['type', 'quantity', 'on_hand_after', 'actor_id']))->toBe(['type' => MovementType::Opening, 'quantity' => 36, 'on_hand_after' => 36, 'actor_id' => $user->id])
+        ->and(AuditLog::query()->sole()->new_values)->toMatchArray(['opening_stock' => 36]);
 });
 
 test('BR-PR10 the sku prices and tiers are written through pricing, inside the creation audit only', function (): void {
@@ -95,5 +108,14 @@ test('a failing sku insert rolls back the product and the audit record', functio
 
     expect(Product::query()->count())->toBe(0)
         ->and(Sku::query()->count())->toBe(0)
+        ->and(AuditLog::query()->count())->toBe(0);
+});
+
+test('an invalid opening stock rolls back the product, its sku and the audit record', function (): void {
+    expect(fn () => app(CreateProduct::class)->handle(new ProductData(...[...get_object_vars(($this->data)()), 'openingStock' => -1])))->toThrow(RuntimeException::class);
+
+    expect(Product::query()->count())->toBe(0)
+        ->and(Sku::query()->count())->toBe(0)
+        ->and(SkuInventory::query()->count())->toBe(0)
         ->and(AuditLog::query()->count())->toBe(0);
 });

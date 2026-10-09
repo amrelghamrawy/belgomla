@@ -51,10 +51,15 @@ arch('enums are backed string enums with labels')
     ->toHaveMethod('label')
     ->toHaveMethod('toArray');
 
-arch('module exceptions are final and extend ApiException')
+arch('module exceptions are final')
     ->expect(moduleNamespaces('Exceptions'))
-    ->toBeFinal()
-    ->toExtend(ApiException::class);
+    ->toBeFinal();
+
+// NotInTransaction is a programming error that must render as 500, so it stays a plain RuntimeException (rules/02 §7).
+arch('module exceptions extend ApiException')
+    ->expect(moduleNamespaces('Exceptions'))
+    ->toExtend(ApiException::class)
+    ->ignoring(App\Modules\Inventory\Exceptions\NotInTransaction::class);
 
 arch('models are final')
     ->expect(moduleNamespaces('Models'))
