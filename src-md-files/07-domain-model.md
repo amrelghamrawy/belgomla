@@ -412,20 +412,22 @@ Invariant (app, inside a transaction with the order row locked): `Σ non-voided 
 
 ### `outbound_messages` (Tech §13)
 
-| Column              | Type         | Notes                                                   |
-| ------------------- | ------------ | ------------------------------------------------------- |
-| id                  | bigint PK    |                                                         |
-| tenant_id           | FK           |                                                         |
-| to_phone            | varchar(20)  |                                                         |
-| purpose             | enum         | `otp`, `invitation`                                     |
-| channel             | enum         | `whatsapp`, `sms`                                       |
-| provider            | varchar(30)  | `hypersender` (V1), `meta_cloud` reserved               |
-| provider_request_id | varchar      | nullable; Hypersender `queued_request_uuid` polled for the final result |
-| provider_message_id | varchar      | nullable                                                |
-| status              | enum         | `queued`, `sent`, `delivered`, `failed`, `fell_back`    |
-| error_code          | varchar(50)  | nullable                                                |
-| fallback_of_id      | FK self      | nullable; the SMS row points at the failed WhatsApp row |
-| cost                | numeric(8,4) | nullable                                                |
+| Column              | Type         | Notes                                                                                       |
+| ------------------- | ------------ | ------------------------------------------------------------------------------------------- |
+| id                  | bigint PK    |                                                                                             |
+| tenant_id           | FK           |                                                                                             |
+| uuid                | uuid unique  | our reference; sent to Hypersender SMS as `request_id`                                      |
+| to_phone            | varchar(20)  | E.164 (`App\Support\PhoneNumber`)                                                           |
+| purpose             | enum         | `otp`, `invitation`, `system_alert`                                                         |
+| channel             | enum         | `whatsapp`, `sms`                                                                           |
+| provider            | varchar(30)  | `hypersender` (V1), `meta_cloud` reserved, `log` (development)                             |
+| provider_request_id | varchar      | nullable, indexed; Hypersender `queued_request_uuid` polled for the final result            |
+| provider_message_id | varchar      | nullable, indexed; WhatsApp `key.id` / SMS message id                                       |
+| status              | enum         | `queued`, `sent`, `delivered`, `failed`, `fell_back` (final: delivered, failed, fell_back) |
+| error_code          | varchar(50)  | nullable; e.g. `not_on_whatsapp`, `poll_timeout`, `sms_failed`, `provider_unreachable`       |
+| body                | text         | nullable, **encrypted**, never serialised; kept only until the SMS fallback can no longer be needed (cleared when final, or when an SMS is sent) |
+| fallback_of_id      | FK self      | nullable, **unique**; the SMS row points at the failed WhatsApp row; CHECK: only an SMS     |
+| cost                | numeric(8,4) | nullable (Hypersender reports no per-message cost)                                          |
 
 ---
 
@@ -551,7 +553,7 @@ app/Modules/
   Customers/    customers, addresses, otp, invitations, carts
   Orders/       orders, items, history, CheckoutService, OrderStateMachine
   Collections/  collections, CollectionService
-  Messaging/    MessagingService, WhatsAppDriver, SmsMisrDriver, webhooks
+  Messaging/    Messenger, MessageDriver (Hypersender WhatsApp/SMS, Log), RecordDeliveryStatus, webhooks
   Notifications/
   Audit/
 ```

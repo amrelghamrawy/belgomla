@@ -1,0 +1,19 @@
+{
+    "uuid": "a0816120-7e37-4e8b-8cf3-92deb2cdc133",
+    "request": {
+        "text": "رمز التحقق: 123456",
+        "chatId": "201012345678@c.us",
+        "session": "4-instance-2598",
+        "reply_to": null,
+        "linkPreview": false,
+        "linkPreviewHighQuality": false
+    },
+    "response_status": 201,
+    "response_body": {
+        "key": { "id": "3EB0155CFDC2464F72FD75", "fromMe": true, "remoteJid": "201012345678@s.whatsapp.net" },
+        "status": "PENDING",
+        "message": { "extendedTextMessage": { "text": "رمز التحقق: 123456" } },
+        "messageTimestamp": "1764859906"
+    },
+    "response_header": { "date": ["Thu, 04 Dec 2025 14:51:46 GMT"], "content-type": ["application/json"], "cache-control": ["no-cache, private"] }
+}

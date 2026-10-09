@@ -1,0 +1,7 @@
+{
+    "uuid": "a0816120-7e37-4e8b-8cf3-92deb2cdc133",
+    "request": { "chatId": "201012345678@c.us", "text": "رمز التحقق: 123456" },
+    "response_status": 200,
+    "response_body": { "message_id": "AAAAAA0000BBBBB00CCCCCC" },
+    "response_header": { "content-type": ["application/json"] }
+}

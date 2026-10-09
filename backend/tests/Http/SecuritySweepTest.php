@@ -93,3 +93,12 @@ test('server errors do not leak exception details when debug is off', function (
         ->assertStatus(500)
         ->assertExactJson(['error' => ['code' => 'server_error', 'message' => 'حدث خطأ غير متوقع']]);
 });
+
+test('webhook errors on the hooks host are json even without an Accept header', function (): void {
+    app(App\Modules\Tenancy\TenantContext::class)->clear();
+
+    $this->call('POST', 'http://hooks.gomal.test/api/webhooks/hypersender/sms')
+        ->assertUnauthorized()
+        ->assertHeader('content-type', 'application/json')
+        ->assertJsonPath('error.code', 'unauthenticated');
+});

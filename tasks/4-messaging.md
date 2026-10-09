@@ -1,6 +1,6 @@
 # Task 4 — Messaging module (WhatsApp + SMS via Hypersender, for OTP and invitations)
 
-Status: **not started**. Requires Task 0 only (independent of Catalog). Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done**, except the live Hypersender check, which needs the trial instance (D48/D49; see the delivery notes at the end). Requires Task 0 only (independent of Catalog). Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -58,6 +58,56 @@ Facts verified on 2026-10-09 (re-check when starting):
 
 ## Open questions
 
-- D30 (updated): the dedicated WhatsApp number for the platform instance; who pairs it and keeps the phone session alive?
-- D31 (updated): the Android phone + SIM for SMS (model, SIM bundle, where it lives, who charges it). Recipients will see this number as the sender.
+- D48 (was "D30 updated"; D30/D31 are catalog decisions): the dedicated WhatsApp number for the platform instance; who pairs it and keeps the phone session alive?
+- D49: the Android phone + SIM for SMS (model, SIM bundle, where it lives, who charges it). Recipients will see this number as the sender.
 - D47: Keep Hypersender beyond the trial (Starter plan) or evaluate Meta Cloud before release? Default: Starter for V1, revisit at Task 11.
+
+## Delivery notes (session 2026-10-09)
+
+Commit: see the task board.
+
+`composer test` is green with 1367 tests (+207 over Task 3's 1160). PHPStan max is clean and type coverage is 100%.
+
+Manual checks:
+- `MESSAGING_DRIVER=log`: `Messenger::send` for tenant `alnoor` wrote `[otp] whatsapp +201012345678 <uuid>: رمز التحقق …` to `storage/logs/messages.log`, and the row ended `sent`, provider `log`.
+- `php artisan serve` with curl on `hooks.gomal.test:8000`:
+  - a valid `Authorization` secret gave `200 {received: true}`; `queue:work redis --queue=messaging --once` then ran `ProcessProviderWebhook` and the row became `delivered` with its body cleared;
+  - a wrong secret gave `401 unauthenticated`;
+  - an unknown message gave `404 not_found`;
+  - a heartbeat gave `200`;
+  - the same path on `alnoor.gomal.test` gave `404`.
+- **Not done:** the live Hypersender check (one OTP on WhatsApp, one on SMS, measured delay). No trial instance exists yet: the number and phone are D48/D49. To do it, set `MESSAGING_DRIVER=hypersender` and `HYPERSENDER_*` in `.env`, set the instance webhook URLs to `https://hooks.<domain>/api/webhooks/hypersender/{whatsapp|sms}` with the `Authorization` secret, run `Messenger::send` twice (once with `Channel::Sms`), and record both outcomes and delays here.
+
+Rules covered by tests: BR-CU07 (channel order, fallback, 5 per phone per hour), BR-N01, BR-T03, BR-T04, Tech §13, D11, D46.
+
+Provider facts verified on 2026-10-09 from the Hypersender OpenAPI specs and SDK source (tests/Fixtures/hypersender are built from them):
+- Auth is `Authorization: Bearer <instance token>`. The WhatsApp and SMS instances can have different tokens (`HYPERSENDER_TOKEN`, `HYPERSENDER_SMS_TOKEN`).
+- WhatsApp v2 is asynchronous: `send-text-safe` returns `queued_request_uuid`, then `GET queued-requests/{uuid}` gives `response_status` (null means pending).
+- "Not on WhatsApp" shows up as `422` with `errors.exists: false` (or `404`) inside the queued result.
+- SMS is **v1** and synchronous (`/api/sms/v1/{instance}/send-message`, `to` in E.164, our `request_id`).
+- Webhooks have **no signature**, only a fixed `Authorization` header set per instance.
+- The SDK (`hypersender/hypersender-laravel` 2.1.2) is not used. It returns raw responses without polling and has bugs: `chat_id:` named arg in the docs vs `$chatId`, ignored `sms_base_url`, and a TypeError in its exception.
+
+Deviations from the brief above (the rules or the provider won):
+- `Messenger::send(MessagePayload)` takes no `tenantId`; the row takes it from the context. `MessagePayload` gained `channel` (default WhatsApp) for BR-CU07 step 3.
+- `outbound_messages` gained:
+  - `uuid`, our provider reference;
+  - an encrypted `body`, because a late WhatsApp failure from a poll or webhook still needs the text for the SMS copy. It is cleared once the row is final, or once an SMS is sent;
+  - a unique `fallback_of_id` with a CHECK that only an SMS is a fallback, so a racing poll and webhook can never send two SMS;
+  - CHECKs on purpose, channel and status.
+- `Messenger` creates the row itself: a named exception in rules/02 §2. All status changes go through `Actions\RecordDeliveryStatus`, which locks the row; a final row ignores later results.
+- Extra classes:
+  - `Actions\AcceptHypersenderWebhook` (keeps the controller free of branching)
+  - `Queries\OutboundMessageByProviderIdQuery` (cross-tenant lookup)
+  - `Services\MessageContext` (jobs run inside the message's tenant)
+  - `Services\MessageDrivers` (driver per channel from `messaging.driver`)
+  - `Exceptions\InvalidPhoneNumber`, `Exceptions\MessagingRateLimited`
+  - `Http\Requests\HypersenderWebhookRequest`
+- No `MessagingServiceProvider`: nothing needs binding.
+- `HypersenderErrors` lives in `Messaging\Services\Hypersender`, not `app/Support`, so the arch rule "no other module references Hypersender classes" covers it.
+- Fallback triggers: not on WhatsApp, any WhatsApp send failure, an error ack (−1), a WhatsApp poll timeout (5 polls), and `provider_unreachable` after the 10-minute retry window. An SMS failure is final.
+- The global limit (10 per minute) releases the job back to the queue; the log driver skips it. Webhooks for unknown events are `200` (Hypersender retries on errors).
+- Test infrastructure:
+  - `phpunit.xml` sets `memory_limit=512M`, because the arch boundary file outgrew the default 128M in one paratest worker;
+  - `tests/Pest.php` gained `fixture()`, `useHypersender()` and `runJob()` (runs `handle()` while `Queue::fake()` is on).
+- `08-api-contract.md` §13: the Meta/SMS Misr webhooks are replaced by `POST /api/webhooks/hypersender/{whatsapp|sms}` (§15 total 102).

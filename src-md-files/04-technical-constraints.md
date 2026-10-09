@@ -200,6 +200,11 @@ WhatsApp and SMS are required in V1 for OTP and customer invitations only. Rules
 - Every send is logged per tenant (channel, provider request/message ids, status, cost if available).
 - Rate limits from BR-CU07 are enforced server-side per phone and per IP.
 - Checkout and order status changes never depend on messaging.
+- Implementation (Task 4): plain `Http` calls, not the `hypersender/hypersender-laravel` SDK (v2.1.2 does not wrap the v2 queued requests and has bugs). WhatsApp uses `send-text-safe` (typing simulation, D46); SMS uses the synchronous v1 API. A queued request is polled up to 5 times (5, 10, 20, 40, 60 s); with no result the message fails with `poll_timeout`, and a WhatsApp message then falls back to SMS. A provider that stays unreachable for 10 minutes fails the message with `provider_unreachable` (same fallback).
+- Webhook authenticity: Hypersender sends no signature, so each instance is configured to send a fixed `Authorization` header equal to `MESSAGING_WEBHOOK_SECRET` (08-api-contract.md §13).
+- The message text is stored encrypted in `outbound_messages.body` only while an SMS fallback may still need it, so queued jobs carry ids, never OTP codes.
+- Limits: 5 messages per phone per hour per tenant (`429 rate_limited`, BR-CU07); 10 provider calls per minute globally, where jobs wait rather than fail (D46). Per-IP limits belong to the Customers endpoints.
+- `MESSAGING_DRIVER=log` (development and tests) writes `[purpose] channel +20… uuid: text` lines to `storage/logs/messages.log`.
 
 ## 14. No Online Payment
 

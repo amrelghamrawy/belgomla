@@ -129,3 +129,39 @@ function onSession(string $connection, callable $callback): mixed
         Illuminate\Support\Facades\DB::setDefaultConnection($previous);
     }
 }
+
+/**
+ * A provider payload from tests/Fixtures/<provider>/<name>.json.
+ *
+ * @return array<array-key, mixed>
+ */
+function fixture(string $path): array
+{
+    $decoded = json_decode((string) file_get_contents(__DIR__.'/Fixtures/'.$path.'.json'), true, flags: JSON_THROW_ON_ERROR);
+
+    if (! is_array($decoded)) {
+        throw new RuntimeException("Fixture {$path} is not a JSON object.");
+    }
+
+    return $decoded;
+}
+
+/** Points Messaging at a fake Hypersender account; pair with Http::fake() and Http::preventStrayRequests(). */
+function useHypersender(): void
+{
+    config([
+        'messaging.driver' => 'hypersender',
+        'messaging.hypersender.base_url' => 'https://app.hypersender.com/api',
+        'messaging.hypersender.token' => 'wa-token',
+        'messaging.hypersender.sms_token' => 'sms-token',
+        'messaging.hypersender.whatsapp_instance' => 'wa-instance',
+        'messaging.hypersender.sms_instance' => 'sms-instance',
+        'messaging.hypersender.safe_send' => true,
+    ]);
+}
+
+/** Runs a job's handle() through the container, like a worker would, even while Queue::fake() is on. */
+function runJob(App\Modules\Messaging\Jobs\SendMessage|App\Modules\Messaging\Jobs\PollMessageStatus|App\Modules\Messaging\Jobs\ProcessProviderWebhook $job): void
+{
+    app()->call($job->handle(...));
+}

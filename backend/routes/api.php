@@ -12,9 +12,13 @@ use Illuminate\Support\Facades\Route;
 | Tenant is resolved from the Host. Each module registers one file per surface:
 |   routes/api/store/<module>.php      -> /api/store/...      (public + customer guard)
 |   routes/api/dashboard/<module>.php  -> /api/dashboard/...  (tenant_user guard)
-|   routes/api/webhooks.php            -> /api/webhooks/...   (provider signatures)
+|   routes/api/webhooks.php            -> /api/webhooks/...   (platform host hooks.{base_domain}, provider secrets)
 |
 */
+
+Route::domain('hooks.'.config()->string('tenancy.base_domain'))->prefix('webhooks')->name('webhooks.')->group(function (): void {
+    require __DIR__.'/api/webhooks.php';
+});
 
 Route::prefix('store')->name('store.')->middleware(['tenant', 'tenant.active:store'])->group(function (): void {
     require __DIR__.'/api/store/tenancy.php';

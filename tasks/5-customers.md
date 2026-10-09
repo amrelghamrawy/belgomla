@@ -16,6 +16,13 @@ Tenant-scoped customers with phone + password login verified by OTP (WhatsApp �
 | Endpoints | `08-api-contract.md` §2 (10 auth), §3 addresses + cart (9), §8 dashboard customers (8)             |
 | Decisions | D1 (public prices + `require_login_for_prices`), D2 (`require_customer_approval`), D8, D15         |
 
+## Using Messaging (delivered by Task 4)
+
+- Send with `App\Modules\Messaging\Services\Messenger::send(new MessagePayload($phone, MessagePurpose::Otp|Invitation, $text, Channel::WhatsApp|Sms))`, inside the tenant context. There is no `tenantId` argument: the row takes the tenant from the context. `Channel::Sms` is the "send by SMS instead" button (BR-CU07 step 3). WhatsApp falls back to SMS on its own.
+- `Messenger` normalises the phone with `App\Support\PhoneNumber::toE164()` (use it for `customers.phone` too) and throws `InvalidPhoneNumber` (`422 invalid_phone`). It also throws `MessagingRateLimited` (`429 rate_limited`, `details.retry_after`) on the 6th message to a phone within an hour. The OTP limits of BR-CU07 still belong to `SendOtp`; Messenger's limit is a backstop.
+- Tests: `Queue::fake()` and `Queue::assertPushed(SendMessage::class)`, or run with `MESSAGING_DRIVER=log` (the phpunit default) and read the line `[otp] whatsapp +201… <uuid>: <text>` in `storage/logs/messages.log`.
+- Use only `Messenger`, `MessagePayload` and the Messaging enums. An arch test forbids the rest.
+
 ## Deliverables
 
 ### 1. Schema

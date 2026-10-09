@@ -12,7 +12,7 @@ REST API served by Laravel under the tenant host: `https://{tenant}.gomalecommer
 | -------------------- | ------------------------------ | ----------------- |
 | `/api/store/...`     | Storefront (public + customer) | none / `customer` |
 | `/api/dashboard/...` | Merchant dashboard             | `tenant_user`     |
-| `/api/webhooks/...`  | Providers (Meta, SMS Misr)     | signature         |
+| `/api/webhooks/...`  | Providers (Hypersender), host `hooks.{base_domain}` | shared secret |
 
 ### Auth
 
@@ -499,13 +499,16 @@ Delivered (Task 3):
 
 ## 13. Webhooks (Tech §13)
 
-| Method | Path                     | Notes                                                                                                                  |
-| ------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/webhooks/whatsapp` | Meta verification challenge                                                                                            |
-| POST   | `/api/webhooks/whatsapp` | delivery statuses; `X-Hub-Signature-256` verified; on `failed` with "not a WhatsApp user" error → enqueue SMS fallback |
-| POST   | `/api/webhooks/sms-misr` | delivery report; shared-secret verified                                                                                |
+| Method | Path                                  | Notes                                                                                                                       |
+| ------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/webhooks/hypersender/whatsapp`  | `message.ack` statuses (ack ≥ 2 delivered, −1 error); an error ack on a WhatsApp message → SMS fallback enqueued (BR-CU07)  |
+| POST   | `/api/webhooks/hypersender/sms`       | `message.phone.sent`, `message.phone.delivered`, `message.send.failed`, `message.send.expired`                              |
 
-Webhooks are platform-level (not tenant hosts): they are served on `https://hooks.gomalecommerce.app/...` and locate the tenant through `outbound_messages.provider_message_id`.
+Webhooks are platform-level (not tenant hosts): they are served only on `https://hooks.{base_domain}/...` (`hooks.gomal.test` locally) and locate the tenant through the message (`provider_message_id`, `provider_request_id`, or our `uuid` sent as the SMS `request_id`).
+
+- **Auth:** Hypersender has no webhook signature. Each instance is configured in the Hypersender dashboard to send `Authorization: <MESSAGING_WEBHOOK_SECRET>` (`Bearer <secret>` also accepted); anything else is `401 unauthenticated`, and an empty secret refuses every call.
+- **Body:** `{ event, data }` as Hypersender sends it; `422 validation_failed` without them.
+- **Responses:** `200 { "data": { "received": true } }`; events that are not delivery statuses (heartbeats, incoming messages) are acknowledged and dropped; a status for a message we never sent is `404 not_found`. Processing is queued (`ProcessProviderWebhook`) and idempotent: a final message ignores replays.
 
 ---
 
@@ -528,8 +531,8 @@ php artisan tenant:list
 | Store auth     |        10 |
 | Store customer |        13 |
 | Dashboard      |        71 |
-| Webhooks       |         3 |
-| **Total**      |   **103** |
+| Webhooks       |         2 |
+| **Total**      |   **102** |
 
 ---
 
@@ -539,7 +542,7 @@ php artisan tenant:list
 2. Catalog: units, categories, fields + vertical seeders, products + SKU, images, relations.
 3. Pricing: resolver, tiers, bulk pricing.
 4. Inventory: adjust (incl. BR-INV08), movements.
-5. Customers: OTP + Messaging service (WhatsApp/SMS Misr), register/login, invitations, addresses, cart.
+5. Messaging (Hypersender WhatsApp + SMS, Task 4), then Customers: OTP, register/login, invitations, addresses, cart.
 6. Orders: checkout transaction, transitions, cancel, history, notifications.
 7. Collections and reports.
 8. Storefront UI, then dashboard UI (both Next.js, RTL, mobile-first).

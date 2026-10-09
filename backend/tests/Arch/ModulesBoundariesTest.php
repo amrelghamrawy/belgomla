@@ -13,10 +13,10 @@ arch('audit logs are only written through the Audit module')
 
 arch('tenancy models are not used by other modules')
     ->expect('App\Modules\Tenancy\Models')
-    ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory']);
+    ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging']);
 
-arch('catalog, pricing and inventory reach tenancy only through its context, concern, hooks, enums and queries')
-    ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory'])
+arch('catalog, pricing, inventory and messaging reach tenancy only through its context, concern, hooks, enums and queries')
+    ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging'])
     ->not->toUse([
         'App\Modules\Tenancy\Actions',
         'App\Modules\Tenancy\Data',
@@ -29,9 +29,9 @@ arch('catalog, pricing and inventory reach audit only through the AuditLogger an
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory'])
     ->not->toUse(['App\Modules\Audit\Models', 'App\Modules\Audit\Http']);
 
-arch('tenancy and audit do not depend on catalog, pricing or inventory')
+arch('tenancy and audit do not depend on catalog, pricing, inventory or messaging')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit'])
-    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory']);
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging']);
 
 /*
 | Catalog ⇄ Pricing (tasks/2-pricing.md). Pricing never looks up Catalog rows by itself: it receives
@@ -119,3 +119,44 @@ arch('catalog reaches inventory only through its actions and queries')
 arch('pricing does not depend on inventory')
     ->expect('App\Modules\Pricing')
     ->not->toUse('App\Modules\Inventory');
+
+/*
+| Messaging (tasks/4-messaging.md, rules/02 §8). Outbound WhatsApp/SMS go only through Messenger; drivers
+| implement MessageDriver; Hypersender classes never leave the module, so moving to the Meta Cloud API
+| (D46) is a driver change. Only Messaging talks HTTP to a provider.
+*/
+
+arch('only messaging services and jobs use the http client')
+    ->expect(Illuminate\Support\Facades\Http::class)
+    ->toOnlyBeUsedIn(['App\Modules\Messaging\Services', 'App\Modules\Messaging\Jobs']);
+
+arch('message drivers implement the MessageDriver contract')
+    ->expect([
+        App\Modules\Messaging\Services\LogDriver::class,
+        App\Modules\Messaging\Services\Hypersender\HypersenderWhatsAppDriver::class,
+        App\Modules\Messaging\Services\Hypersender\HypersenderSmsDriver::class,
+    ])
+    ->toImplement(App\Modules\Messaging\Contracts\MessageDriver::class);
+
+arch('no other module references hypersender classes')
+    ->expect('App\Modules\Messaging\Services\Hypersender')
+    ->toOnlyBeUsedIn(['App\Modules\Messaging']);
+
+arch('messaging models are only used inside messaging')
+    ->expect('App\Modules\Messaging\Models')
+    ->toOnlyBeUsedIn(['App\Modules\Messaging', 'Database\Factories']);
+
+arch('other modules reach messaging only through Messenger, its payload and enums')
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory'])
+    ->not->toUse([
+        'App\Modules\Messaging\Actions',
+        'App\Modules\Messaging\Contracts',
+        'App\Modules\Messaging\Http',
+        'App\Modules\Messaging\Jobs',
+        'App\Modules\Messaging\Models',
+        'App\Modules\Messaging\Queries',
+    ]);
+
+arch('messaging does not depend on catalog, pricing or inventory')
+    ->expect('App\Modules\Messaging')
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Audit']);

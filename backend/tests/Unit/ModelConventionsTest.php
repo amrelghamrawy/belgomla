@@ -13,6 +13,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
+use App\Modules\Messaging\Models\OutboundMessage;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Tenant;
@@ -66,6 +67,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         Unit::class,
         InventoryMovement::class,
         SkuInventory::class,
+        OutboundMessage::class,
         SkuPriceTier::class,
         Tenant::class,
         TenantSetting::class,

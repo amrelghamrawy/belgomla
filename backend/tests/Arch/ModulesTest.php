@@ -42,7 +42,12 @@ arch('data classes are final readonly value objects')
     ->toBeFinal()
     ->toBeReadonly()
     ->toHaveSuffix('Data')
-    ->ignoring([App\Modules\Tenancy\Data\TenantUserChanges::class, App\Modules\Pricing\Data\ResolvedPrice::class])
+    ->ignoring([
+        App\Modules\Tenancy\Data\TenantUserChanges::class,
+        App\Modules\Pricing\Data\ResolvedPrice::class,
+        App\Modules\Messaging\Data\MessagePayload::class, // names fixed by tasks/4-messaging.md
+        App\Modules\Messaging\Data\DriverResult::class,
+    ])
     ->toExtendNothing();
 
 arch('enums are backed string enums with labels')

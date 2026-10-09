@@ -1,0 +1,15 @@
+{
+    "uuid": "a0816120-7e37-4e8b-8cf3-92deb2cdc133",
+    "request": { "text": "رمز التحقق: 123456", "chatId": "201012345678@c.us" },
+    "response_status": 422,
+    "response_body": {
+        "message": "The given data was invalid.",
+        "errors": {
+            "messages": ["The number you want to send the message to is not on whatsapp."],
+            "jid": "201012345678@s.whatsapp.net",
+            "exists": false
+        },
+        "statusCode": 422
+    },
+    "response_header": { "content-type": ["application/json"] }
+}

@@ -25,6 +25,7 @@
         </include>
     </source>
     <php>
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
@@ -33,6 +34,8 @@
         <env name="DB_DATABASE" value="belgomla_test"/>
         <env name="TENANT_BASE_DOMAIN" value="gomal.test"/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="MESSAGING_DRIVER" value="log"/>
+        <env name="MESSAGING_WEBHOOK_SECRET" value="test-webhook-secret"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
