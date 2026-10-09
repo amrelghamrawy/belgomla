@@ -7,7 +7,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | 0  | Tenancy + Audit (done in session 1)    | Tenancy, Audit                | done        | 82f6b33 |
 | 1  | [Catalog](1-catalog.md)                | Catalog                       | done        | dcbbd44 |
 | 2  | [Pricing](2-pricing.md)                | Pricing                       | done        | 5f90187 |
-| 3  | [Inventory](3-inventory.md)            | Inventory                     | done        | (this commit) |
+| 3  | [Inventory](3-inventory.md)            | Inventory                     | done        | ed057c0 |
 | 4  | [Messaging](4-messaging.md)            | Messaging                     | not started |        |
 | 5  | [Customers](5-customers.md)            | Customers (+ cart)            | not started |        |
 | 6  | [Orders & Checkout](6-orders.md)       | Orders, Notifications         | not started |        |

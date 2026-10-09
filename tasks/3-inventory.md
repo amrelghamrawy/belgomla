@@ -52,6 +52,8 @@ Per-SKU stock in base units with reservation support, movements ledger, merchant
 
 ## Delivery notes (session 2026-10-09)
 
+Commit: `ed057c0`.
+
 `composer test` green: 1129 tests (+148 over Task 2's 981), PHPStan max clean, type coverage 100%. Smoke-tested on `php artisan serve` with tenant `alnoor`:
 - created a product with `opening_stock: 100` (opening movement, `sku.inventory`);
 - listed `inventory?q=` and fetched `inventory/{sku}`;
