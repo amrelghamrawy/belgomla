@@ -37,6 +37,12 @@ final class Money
         return bccomp(self::numeric($a), self::numeric($b), 2);
     }
 
+    /** The sum of two amounts, e.g. a running items total (BR-MOV02). */
+    public static function add(string $a, string $b): string
+    {
+        return bcadd(self::numeric($a), self::numeric($b), 2);
+    }
+
     /** A unit price times a whole quantity, e.g. a line total (BR-PR07). */
     public static function times(string $amount, int $quantity): string
     {

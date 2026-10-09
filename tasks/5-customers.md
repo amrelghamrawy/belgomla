@@ -1,6 +1,6 @@
 # Task 5 — Customers module (auth, OTP, invitations, addresses, cart)
 
-Status: **not started**. Requires Tasks 1–4. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (see the delivery notes at the end). Requires Tasks 1–4. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -57,5 +57,28 @@ All §6 tables; `customers` unique `(tenant_id, phone)`; `customer_otps.code_has
 
 ## Open questions
 
-- D32: Password rules for customers (min 8, no complexity). Default as stated.
-- D33: Can a blocked customer still see the storefront? Default: yes, read-only.
+- D50 (was "D32" here; D32/D33 are catalog decisions): Password rules for customers (min 8, no complexity). Default as stated.
+- D51 (was "D33"): Can a blocked customer still see the storefront? Default: yes, read-only.
+- Added while building: D52 (re-registering a pending phone; no phone enumeration), D53 (guest add-to-cart: 403 `prices_hidden` vs 401), D54 (dashboard address sync).
+
+## Delivery notes (session 2026-10-09)
+
+Commit: `COMMIT_HASH`.
+
+`composer test` is green with 1982 tests (1946 passed + 36 arch tests flagged deprecated by PHP 8.5's `setAccessible`), +615 over Task 4's 1367. PHPStan max is clean and type coverage is 100%.
+
+What differs from the plan above, and why:
+- `customers` has `password` (not `password_hash`, matching `tenant_users`), `remember_token`, and `blocked_at`, `blocked_reason`, `status_before_block` so unblock can restore the status (07 §6 updated).
+- OTP hashes are HMAC-SHA256 with the app key: a plain hash of 6 digits is reversed by trying them all.
+- Extra classes: `CheckOtp` (shared by VerifyOtp and ResetPassword, runs outside transactions so a failed attempt is counted), `UpdateCustomerByMerchant` (needed by `PUT /dashboard/customers/{id}`), `EnsureDefaultAddress`, `RefreshCart` (the cart load deletes inactive lines, a write), `OrderableQuantity` service, `Catalog\Queries\CartSkuQuery`, `InvitationByTokenQuery`, `CustomerAddressesQuery`, `OutstandingAmountsQuery`, scope `InCartOf`, exceptions `OtpSendLimited`, `PhoneTaken`, `CustomerNotActive`, middleware `EnsureCustomerActive` (`customer.active`) and `RejectGuestsWhenPricesHidden` (`prices.visible`, before auth in the priority list), dashboard `CustomerUnblockController`.
+- Contracts for later modules, bound to null implementations in `CustomersServiceProvider`: `RecentOrders` (Orders rebinds in Task 6), `OutstandingBalances` (Collections rebinds in Task 7).
+- `bootstrap/app.php`: Laravel turns a policy's `denyAsNotFound()` and a CSRF mismatch into plain 404/419 HttpExceptions before the renderer runs, so 404 now always renders `not_found` and 419 `csrf_token_mismatch` (the 419 case was a Task 0 bug, found during the smoke test).
+- Invitation link format: `config/customers.php` `invitation.url` (`CUSTOMER_INVITATION_URL`, default `https://{host}/invite/{token}`); the storefront page arrives in Task 9.
+
+Manual checks (`php artisan serve`, curl with `--resolve` and the SPA origin, Redis queue):
+- register → `queue:work redis --queue=messaging --once` → OTP read from `storage/logs/messages.log` → `verify-otp` 200 active → `me` 200 → add 12 cartons of a SKU with a 10+ tier → cart `unit_price 85.00`, `line_total 1020.00`, `mov {enabled: true, amount: 1500.00, satisfied: false}`.
+- the alnoor session cookie replayed on `kotob.gomal.test` → 401; still 200 on alnoor.
+- dashboard login → create customer (`invited`) → invite 200 → link from `messages.log` → `GET invitation/{token}` 200 (masked phone) → `POST` 200 `active` → `me` 200.
+- guest `POST /cart/items`: 401 with public prices, `403 prices_hidden` with `require_login_for_prices` on (setting restored afterwards); this confirms the middleware priority on the live server.
+
+Rules covered by tests: BR-CU01..CU08, BR-P04, BR-MOQ01, BR-PR02, BR-PR04, BR-INV01, BR-U03, BR-U05, BR-MOV01, BR-MOV02, BR-T03, BR-T04, BR-L, Tech §6, D1, D2, D15, D21, D37, D50..D54.

@@ -53,6 +53,8 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 422  | `inventory_below_reserved` | BR-INV08 (`details.orders[]` filled)                      |
 | 422  | `invalid_tiers`            | BR-PR05 / D28 (`details.tiers[]`: one message per problem) |
 | 422  | `cover_price_required`     | BR-PR10: a % price on a SKU without a cover price         |
+| 403  | `prices_hidden`            | guest add-to-cart while `require_login_for_prices` (D53)  |
+| 422  | `cart_line_invalid`        | a cart line below MOQ, above stock, or of an inactive product (`items[]` filled) |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
 | 503  | `store_unavailable`        | tenant suspended (storefront)                             |
 
@@ -171,6 +173,16 @@ Row: `{ id, name, slug, code, unit, moq, cover_price, base_price, availability: 
 
 All auth endpoints are throttled per phone and per IP.
 
+Delivered in Task 5:
+
+- Phones are accepted in any spelling `PhoneNumber` understands and answered in E.164. Passwords: min 8 (D50).
+- `register`, `resend-otp` and `forgot-password` answer `{ data: { otp_sent_via } }`. A phone that cannot use the purpose gets the same answer and no message (D52); a `pending_verification` phone may register again (new code). Existing non-invited phone → `409 phone_taken`.
+- OTP errors: `422 otp_invalid` (`details.attempts_left` on a wrong code), `422 otp_expired`, `422 otp_attempts_exceeded`; `429 rate_limited` with `details.retry_after` for the 6th code within an hour or `channel=sms` within 60 s.
+- `verify-otp` with `purpose=register` answers the customer (session started, status `active` or `pending_approval`); with `purpose=password_reset` it only checks the code (attempt counted, code kept) and answers `204`. `reset-password` uses the code up and answers `204`.
+- `login` errors: `422 invalid_credentials`; after the password matched, `403 pending_approval | blocked | phone_not_verified`; `429 rate_limited` after 5 failures per phone+IP per minute; `400 stateful_request_required` without a SPA origin (also on `verify-otp` and `invitation/{token}` POST).
+- `invitation/{token}`: unknown, used, expired, superseded (re-sent) or no-longer-invited → `404 not_found`. `phone_masked` looks like `+20101****678`.
+- `me`, `logout`: any logged-in customer, whatever the status. Profile: `{ id, name, phone, status, status_label, phone_verified_at, created_at }`.
+
 ---
 
 ## 3. Storefront — Customer (guard `customer`, status `active`)
@@ -183,6 +195,8 @@ All auth endpoints are throttled per phone and per IP.
 | POST   | `/api/store/addresses`      | `label, governorate, city, address_line, landmark?, phone?, is_default?` |
 | PUT    | `/api/store/addresses/{id}` |                                                                          |
 | DELETE | `/api/store/addresses/{id}` | archives                                                                 |
+
+Address: `{ id, label, governorate, city, address_line, landmark, phone, is_default }`. The first address is the default; `phone` defaults to the customer phone; archiving the default hands it to the oldest remaining address. Another customer's (or an archived) address is `404` (CustomerAddressPolicy). Cart and addresses need status `active`: otherwise `403` with the status as the code (`blocked`, `pending_approval`, …).
 
 ### Cart (BR-CU06)
 
@@ -218,6 +232,8 @@ Cart response:
   }
 }
 ```
+
+Delivered in Task 5: every cart write answers this same body. `quantity`, `moq` are in selling units, `available` in base units (D37). A line that cannot be ordered is `422 cart_line_invalid` with `items: [{ sku_id, reason: below_moq|insufficient_stock|product_inactive, moq?|available? }]` (`available` here in selling units). Unknown or another tenant's SKU, or a SKU not in the cart for PATCH/DELETE → `404`. `mov.enabled` is false when the setting is on without an amount. Guest `POST /cart/items`: `403 prices_hidden` when `require_login_for_prices` is on, else `401` (D53).
 
 ### Checkout (BR-PR06, section 12 of the domain model)
 
@@ -448,6 +464,8 @@ Delivered (Task 3):
 | POST   | `/api/dashboard/customers/{id}/approve` | `pending_approval → active`                              |
 | POST   | `/api/dashboard/customers/{id}/block`   | `reason`                                                 |
 | POST   | `/api/dashboard/customers/{id}/unblock` |                                                          |
+
+Delivered in Task 5: the dashboard customer adds `outstanding_amount` ("0.00" until Collections, Task 7), `created_by`, `approved_by`, `blocked_at`, `blocked_reason`; the detail page adds `addresses` (active) and `recent_orders` ([] until Orders, Task 6). `PUT` takes `addresses[]` as the full list (D54). `invite` answers `200 { sent_via, expires_at, sent_count }`; only `invited` customers. `approve` only from `pending_approval`; `block` from any other status (keeps it), `unblock` restores it. Invalid transitions → `409 invalid_transition` with `details.from`. Duplicate phone → `409 phone_taken`. Audit actions: `customer.created`, `customer.updated`, `customer.invited`, `customer.approved`, `customer.blocked`, `customer.unblocked`.
 
 ---
 

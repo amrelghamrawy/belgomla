@@ -33,6 +33,11 @@ Each item below has a **default** already written into the other documents so wo
 | D36 | Low-stock threshold | A SKU is low on stock when Available ≤ MOQ × conversion factor, i.e. at most one minimum order left, compared in base units (BR-U03). A SKU without a stock row counts as 0. Used by the inventory list, `products?low_stock=1` and the low-stock report (D5). | BR-INV02, D5 |
 | D37 | Storefront `available` / `in_stock` | `available` is in base units. `in_stock` = product `active` and Available ≥ conversion factor (at least one selling unit can be ordered). `coming_soon` → `in_stock: false`, `available` omitted. | BR-INV02, BR-P04 |
 | D33 | Stationery / hardware templates                            | Filterable selects: stationery = brand, color (6 common colours), size; hardware = brand, material, size. Options other than colour start empty. | BR-P09 |
+| D50 | Customer password rules                                    | At least 8 characters, at most 200, no complexity rules (`config/customers.php` `password_min`).              | BR-CU04     |
+| D51 | Can a blocked customer still see the storefront?           | Yes, read-only: products, filters and the price list work (prices shown as for a logged-in customer); cart, addresses and checkout answer `403 blocked`. | BR-CU05 |
+| D52 | Re-registering, and OTP requests for unknown phones        | A phone still `pending_verification` registers again with the new name/password and gets a new code. `forgot-password` and `resend-otp` give the same answer for a phone that cannot use the purpose and send nothing, so phone numbers are not revealed. | BR-CU04, BR-CU07 |
+| D53 | Guest add-to-cart                                          | With `require_login_for_prices` on: `403 prices_hidden` (the storefront shows "log in to see prices"). Otherwise `401 unauthenticated` (BR-CU06: no guest carts). | BR-CU04, BR-CU06 |
+| D54 | Editing a merchant-created customer's addresses            | `PUT /dashboard/customers/{id}` with `addresses[]` is the full list: rows with an `id` are edited, rows without are added, active ones missing are archived. Without `addresses` they stay. The phone cannot change. | BR-CU03, BR-CU08 |
 
 These are treated as accepted defaults unless the product owner objects.
 

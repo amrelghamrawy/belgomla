@@ -62,7 +62,47 @@ dataset('dashboard authenticated routes', [
     'inventory movements' => ['GET', '/api/dashboard/inventory/1/movements'],
     'inventory adjust' => ['POST', '/api/dashboard/inventory/1/adjust'],
     'inventory bulk adjust' => ['POST', '/api/dashboard/inventory/bulk-adjust'],
+    'customers list' => ['GET', '/api/dashboard/customers'],
+    'customers create' => ['POST', '/api/dashboard/customers'],
+    'customers show' => ['GET', '/api/dashboard/customers/1'],
+    'customers update' => ['PUT', '/api/dashboard/customers/1'],
+    'customers invite' => ['POST', '/api/dashboard/customers/1/invite'],
+    'customers approve' => ['POST', '/api/dashboard/customers/1/approve'],
+    'customers block' => ['POST', '/api/dashboard/customers/1/block'],
+    'customers unblock' => ['POST', '/api/dashboard/customers/1/unblock'],
 ]);
+
+dataset('customer authenticated routes', [
+    'me' => ['GET', '/api/store/me'],
+    'logout' => ['POST', '/api/store/auth/logout'],
+    'addresses list' => ['GET', '/api/store/addresses'],
+    'addresses create' => ['POST', '/api/store/addresses'],
+    'addresses update' => ['PUT', '/api/store/addresses/1'],
+    'addresses delete' => ['DELETE', '/api/store/addresses/1'],
+    'cart show' => ['GET', '/api/store/cart'],
+    'cart clear' => ['DELETE', '/api/store/cart'],
+    'cart add' => ['POST', '/api/store/cart/items'],
+    'cart update' => ['PATCH', '/api/store/cart/items/1'],
+    'cart remove' => ['DELETE', '/api/store/cart/items/1'],
+]);
+
+test('a guest is refused on every customer route of the storefront', function (string $method, string $uri): void {
+    $this->tenantJson($method, $uri)
+        ->assertUnauthorized()
+        ->assertExactJson(['error' => ['code' => 'unauthenticated', 'message' => 'يجب تسجيل الدخول']]);
+})->with('customer authenticated routes');
+
+test('a dashboard user is not a storefront customer on any customer route', function (string $method, string $uri): void {
+    $this->actingAsOwner();
+
+    $this->tenantJson($method, $uri)->assertUnauthorized();
+})->with('customer authenticated routes');
+
+test('a storefront customer is not a dashboard user on any dashboard route', function (string $method, string $uri): void {
+    $this->actingAsCustomer();
+
+    $this->tenantJson($method, $uri)->assertUnauthorized();
+})->with('dashboard authenticated routes');
 
 test('a guest is refused on every authenticated dashboard route', function (string $method, string $uri): void {
     $this->tenantJson($method, $uri)
@@ -83,6 +123,22 @@ test('unknown api paths are 404 json, not html', function (): void {
     $this->tenantJson('GET', '/api/does-not-exist')
         ->assertNotFound()
         ->assertJsonPath('error.code', 'not_found');
+});
+
+test('a csrf mismatch is the csrf_token_mismatch envelope, not a generic http error', function (): void {
+    Illuminate\Support\Facades\Route::post('/api/store/_csrf', fn () => throw new Illuminate\Session\TokenMismatchException);
+
+    $this->tenantJson('POST', '/api/store/_csrf')
+        ->assertStatus(419)
+        ->assertExactJson(['error' => ['code' => 'csrf_token_mismatch', 'message' => 'انتهت صلاحية الجلسة، أعد تحميل الصفحة']]);
+});
+
+test('a policy that hides a resource renders as the not_found envelope', function (): void {
+    Illuminate\Support\Facades\Route::get('/api/store/_hidden', fn () => throw new Illuminate\Auth\Access\AuthorizationException()->withStatus(404));
+
+    $this->tenantJson('GET', '/api/store/_hidden')
+        ->assertNotFound()
+        ->assertExactJson(['error' => ['code' => 'not_found', 'message' => 'العنصر غير موجود']]);
 });
 
 test('server errors do not leak exception details when debug is off', function (): void {

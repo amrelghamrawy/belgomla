@@ -264,11 +264,15 @@ Reservation changes are **not** movements (BR-INV06).
 | tenant_id         | FK              |                                                                                      |
 | name              | varchar(150)    |                                                                                      |
 | phone             | varchar(20)     | E.164 (`+20…`); **unique (tenant_id, phone)** (BR-CU04)                              |
-| password_hash     | varchar         | nullable until activated                                                             |
+| password          | varchar         | bcrypt hash; nullable until activated (named like `tenant_users.password`)           |
+| remember_token    | varchar(100)    | nullable; rotated on password reset                                                  |
 | status            | enum            | `pending_verification`, `invited`, `pending_approval`, `active`, `blocked` (BR-CU05) |
 | phone_verified_at | timestamptz     | nullable                                                                             |
 | created_by        | FK tenant_users | nullable; set when merchant-created (BR-CU08)                                        |
 | approved_by       | FK tenant_users | nullable                                                                             |
+| blocked_at        | timestamptz     | nullable (BR-CU05)                                                                   |
+| blocked_reason    | varchar(300)    | nullable; the merchant's reason                                                     |
+| status_before_block | enum          | nullable; restored on unblock (07 §11)                                               |
 
 ### `customer_addresses` (BR-CU03)
 
@@ -283,8 +287,8 @@ Reservation changes are **not** movements (BR-INV06).
 | address_line | varchar(300) |                                          |
 | landmark     | varchar(200) | nullable                                 |
 | phone        | varchar(20)  | nullable, defaults to customer phone     |
-| is_default   | boolean      | partial unique: one default per customer |
-| status       | enum         | `active`, `archived`                     |
+| is_default   | boolean      | partial unique `WHERE is_default AND status = 'active'`: one active default per customer; the oldest active address takes over when the default is archived |
+| status       | enum         | `active` (default), `archived`           |
 
 ### `customer_otps` (BR-CU07)
 
@@ -294,13 +298,13 @@ Reservation changes are **not** movements (BR-INV06).
 | tenant_id   | FK          |                              |
 | phone       | varchar(20) |                              |
 | purpose     | enum        | `register`, `password_reset` |
-| code_hash   | varchar     | never store the plain code   |
+| code_hash   | varchar     | HMAC-SHA256 with the app key; never the plain code (a plain hash of 6 digits is reversible) |
 | channel     | enum        | `whatsapp`, `sms`            |
 | expires_at  | timestamptz | now + 10 min                 |
 | attempts    | smallint    | max 5                        |
 | consumed_at | timestamptz | nullable                     |
 
-Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table.
+Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. A new code marks the earlier live ones of the same phone and purpose as consumed.
 
 ### `customer_invitations` (BR-CU08)
 
@@ -308,8 +312,8 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table.
 | ------------ | ----------- | ------------ |
 | id           | bigint PK   |              |
 | tenant_id    | FK          |              |
-| customer_id  | FK          |              |
-| token_hash   | varchar     | **unique**   |
+| customer_id  | FK          | **unique**: one row per customer; a re-send rotates the token |
+| token_hash   | varchar     | sha256 of the 40-char token, **unique** |
 | expires_at   | timestamptz | now + 7 days |
 | used_at      | timestamptz | nullable     |
 | sent_count   | smallint    |              |

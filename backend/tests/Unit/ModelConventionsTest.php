@@ -11,6 +11,12 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Customers\Models\Cart;
+use App\Modules\Customers\Models\CartItem;
+use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerInvitation;
+use App\Modules\Customers\Models\CustomerOtp;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Models\OutboundMessage;
@@ -65,6 +71,12 @@ test('the module model list is explicit so new models are reviewed', function ()
         ProductRelation::class,
         Sku::class,
         Unit::class,
+        Cart::class,
+        CartItem::class,
+        Customer::class,
+        CustomerAddress::class,
+        CustomerInvitation::class,
+        CustomerOtp::class,
         InventoryMovement::class,
         SkuInventory::class,
         OutboundMessage::class,

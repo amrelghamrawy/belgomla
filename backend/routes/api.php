@@ -23,6 +23,7 @@ Route::domain('hooks.'.config()->string('tenancy.base_domain'))->prefix('webhook
 Route::prefix('store')->name('store.')->middleware(['tenant', 'tenant.active:store'])->group(function (): void {
     require __DIR__.'/api/store/tenancy.php';
     require __DIR__.'/api/store/catalog.php';
+    require __DIR__.'/api/store/customers.php';
 });
 
 Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.active:dashboard'])->group(function (): void {
@@ -30,4 +31,5 @@ Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.ac
     require __DIR__.'/api/dashboard/catalog.php';
     require __DIR__.'/api/dashboard/pricing.php';
     require __DIR__.'/api/dashboard/inventory.php';
+    require __DIR__.'/api/dashboard/customers.php';
 });

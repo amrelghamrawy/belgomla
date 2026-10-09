@@ -15,6 +15,10 @@ Cash collection records with void, derived collection status on orders, the "del
 | Endpoints | `08-api-contract.md` §10 (4), §11 reports (4), §12 audit (1)                          |
 | Decisions | D5 (reports), D7, D24 (no credit terms in V1)                                        |
 
+## Left by Task 5
+
+- Rebind `App\Modules\Customers\Contracts\OutstandingBalances` (bound to `NullOutstandingBalances` in `CustomersServiceProvider`) so the dashboard customer list and page show the real `outstanding_amount`.
+
 ## Deliverables
 
 ### 1. Schema

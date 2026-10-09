@@ -165,3 +165,47 @@ function runJob(App\Modules\Messaging\Jobs\SendMessage|App\Modules\Messaging\Job
 {
     app()->call($job->handle(...));
 }
+
+/**
+ * The text of the newest outbound message, any tenant. Messaging clears it once delivered, so use it with
+ * Queue::fake().
+ */
+function lastMessageText(): string
+{
+    $message = App\Modules\Messaging\Models\OutboundMessage::withoutTenantScope()->latest('id')->first();
+
+    if ($message?->body === null) {
+        throw new RuntimeException('No outbound message with a body; is Queue::fake() on?');
+    }
+
+    return $message->body;
+}
+
+/** The 6-digit code of the newest OTP message (BR-CU07). */
+function lastOtpCode(): string
+{
+    if (preg_match('/\b(\d{6})\b/', lastMessageText(), $match) !== 1) {
+        throw new RuntimeException('The newest message carries no 6-digit code.');
+    }
+
+    return $match[1];
+}
+
+/** The token at the end of the link in the newest invitation message (BR-CU08). */
+function lastInvitationToken(): string
+{
+    if (preg_match('#/invite/([A-Za-z0-9]{40})#', lastMessageText(), $match) !== 1) {
+        throw new RuntimeException('The newest message carries no invitation link.');
+    }
+
+    return $match[1];
+}
+
+/** A started in-memory session, for actions that log a customer in. */
+function arraySession(): Illuminate\Session\Store
+{
+    $session = new Illuminate\Session\Store('test', new Illuminate\Session\ArraySessionHandler(10));
+    $session->start();
+
+    return $session;
+}

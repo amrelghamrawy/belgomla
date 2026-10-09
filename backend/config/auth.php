@@ -46,7 +46,10 @@ return [
             'driver' => 'session',
             'provider' => 'tenant_users',
         ],
-        // The 'customer' guard is registered by the Customers module (BR-CU04).
+        'customer' => [
+            'driver' => 'session',
+            'provider' => 'customers',
+        ],
     ],
 
     /*
@@ -70,6 +73,11 @@ return [
         'tenant_users' => [
             'driver' => 'eloquent',
             'model' => App\Modules\Tenancy\Models\TenantUser::class,
+        ],
+        // BR-CU04: storefront customers. The model is tenant-scoped, so a lookup only sees the host's tenant.
+        'customers' => [
+            'driver' => 'eloquent',
+            'model' => App\Modules\Customers\Models\Customer::class,
         ],
     ],
 

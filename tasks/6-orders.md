@@ -16,6 +16,11 @@ The checkout transaction, order lifecycle with guards, customer/merchant cancell
 | Endpoints | `08-api-contract.md` §3 checkout + orders (4), §9 dashboard orders (5), §12 notifications (2)            |
 | Decisions | D7 (cancel with collections), D9 (address edit), D10 (stale 24h)                                        |
 
+## Left by Task 5
+
+- Rebind `App\Modules\Customers\Contracts\RecentOrders` (bound to `NullRecentOrders` in `CustomersServiceProvider`) so the dashboard customer page shows `recent_orders`.
+- Checkout reads the cart through `Customers\Queries\CartQuery` / `Actions\RefreshCart` and re-checks with `Services\OrderableQuantity` and `CartPricer` under lock (BR-PR06). `EnsureCustomerActive` (`customer.active`) already guards customer routes.
+
 ## Deliverables
 
 ### 1. Schema

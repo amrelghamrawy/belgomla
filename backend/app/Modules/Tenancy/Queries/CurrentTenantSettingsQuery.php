@@ -22,4 +22,23 @@ final readonly class CurrentTenantSettingsQuery
     {
         return TenantSetting::query()->whereKey($this->context->id())->value('require_login_for_prices') === true;
     }
+
+    /** BR-CU04 / D2: whether verified customers wait for the merchant's approval. Used by Customers. */
+    public function requiresCustomerApproval(): bool
+    {
+        return TenantSetting::query()->whereKey($this->context->id())->value('require_customer_approval') === true;
+    }
+
+    /**
+     * BR-MOV01: the minimum order value. Enabled without an amount counts as disabled.
+     *
+     * @return array{enabled: bool, amount: string|null}
+     */
+    public function minimumOrderValue(): array
+    {
+        $settings = $this->get();
+        $enabled = $settings->mov_enabled && $settings->mov_amount !== null;
+
+        return ['enabled' => $enabled, 'amount' => $enabled ? $settings->mov_amount : null];
+    }
 }

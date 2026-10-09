@@ -38,6 +38,15 @@ test('compare orders two amounts at two decimals', function (string $a, string $
     'higher' => ['90.01', '90.00', 1],
 ]);
 
+test('add sums two amounts exactly', function (): void {
+    expect(Money::add('0.10', '0.20'))->toBe('0.30')
+        ->and(Money::add('540.00', '1020.5'))->toBe('1560.50');
+});
+
+test('add refuses what is not a number', function (): void {
+    Money::add('1.00', 'x');
+})->throws(InvalidArgumentException::class);
+
 test('times multiplies a unit price by a whole quantity exactly', function (): void {
     expect(Money::times('89.99', 35))->toBe('3149.65')
         ->and(Money::times('0.10', 3))->toBe('0.30');

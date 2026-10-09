@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Customers\Http\Middleware\EnsureCustomerActive;
+use App\Modules\Customers\Http\Middleware\RejectGuestsWhenPricesHidden;
 use App\Modules\Tenancy\Console\TenantActivateCommand;
 use App\Modules\Tenancy\Console\TenantCreateCommand;
 use App\Modules\Tenancy\Console\TenantListCommand;
@@ -49,6 +51,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => ResolveTenant::class,
             'tenant.active' => EnsureTenantActive::class,
             'session.tenant' => EnsureSessionTenant::class,
+            'customer.active' => EnsureCustomerActive::class,
+            'prices.visible' => RejectGuestsWhenPricesHidden::class,
         ]);
 
         // Laravel re-sorts route middleware by priority and pulls `auth:*` ahead of unlisted middleware.
@@ -56,6 +60,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // (TenantScope) return nothing without a tenant in context.
         $middleware->prependToPriorityList(AuthenticatesRequests::class, ResolveTenant::class);
         $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureTenantActive::class);
+        // D53: a guest adding to the cart while prices are hidden gets 403 prices_hidden before auth's 401.
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, RejectGuestsWhenPricesHidden::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Every /api/* error uses the envelope from 08-api-contract.md §0.
@@ -76,11 +82,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 $e instanceof AuthorizationException => ApiResponse::error(403, 'forbidden', 'غير مسموح بهذا الإجراء'),
 
                 $e instanceof ModelNotFoundException,
-                $e instanceof NotFoundHttpException => ApiResponse::error(404, 'not_found', 'العنصر غير موجود'),
+                $e instanceof NotFoundHttpException,
+                // A policy's denyAsNotFound() arrives as a plain 404 HttpException (BR-T04: hidden, not forbidden).
+                $e instanceof HttpExceptionInterface && $e->getStatusCode() === 404 => ApiResponse::error(404, 'not_found', 'العنصر غير موجود'),
 
                 $e instanceof ThrottleRequestsException => ApiResponse::error(429, 'rate_limited', 'محاولات كثيرة، حاول لاحقًا'),
 
-                $e instanceof TokenMismatchException => ApiResponse::error(419, 'csrf_token_mismatch', 'انتهت صلاحية الجلسة، أعد تحميل الصفحة'),
+                // Laravel turns TokenMismatchException into a plain 419 HttpException before this renderer runs.
+                $e instanceof TokenMismatchException,
+                $e instanceof HttpExceptionInterface && $e->getStatusCode() === 419 => ApiResponse::error(419, 'csrf_token_mismatch', 'انتهت صلاحية الجلسة، أعد تحميل الصفحة'),
 
                 $e instanceof HttpExceptionInterface => ApiResponse::error(
                     $e->getStatusCode(),

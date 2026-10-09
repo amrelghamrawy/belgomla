@@ -6,6 +6,7 @@ namespace Tests;
 
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Customers\Models\Customer;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
@@ -158,6 +159,25 @@ abstract class TenantTestCase extends TestCase
         $this->actingAs($user, 'tenant_user');
 
         return $user;
+    }
+
+    /**
+     * A storefront customer; active with the password `password` unless the attributes say otherwise.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function makeCustomer(array $attributes = [], ?Tenant $tenant = null): Customer
+    {
+        return $this->asTenant($tenant ?? $this->tenant, fn (): Customer => Customer::factory()->create($attributes)->refresh());
+    }
+
+    /** Authenticate a storefront customer for subsequent requests on their tenant host. */
+    protected function actingAsCustomer(?Customer $customer = null): Customer
+    {
+        $customer ??= $this->makeCustomer();
+        $this->actingAs($customer, 'customer');
+
+        return $customer;
     }
 
     protected function otherTenant(string $subdomain = 'other'): Tenant
