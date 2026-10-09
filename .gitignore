@@ -1,0 +1,33 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Laravel backend
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/.env.backup
+backend/.env.production
+backend/.phpunit.cache/
+backend/.phpunit.result.cache
+backend/storage/*.key
+backend/storage/app/public/
+backend/storage/app/private/
+backend/storage/framework/cache/data/
+backend/storage/framework/sessions/
+backend/storage/framework/testing/
+backend/storage/framework/views/
+backend/storage/logs/
+backend/bootstrap/cache/*.php
+backend/public/build/
+backend/public/hot
+backend/public/storage
+backend/auth.json
+
+# Frontend (later)
+frontend/node_modules/
+frontend/.next/
+frontend/.env*.local
