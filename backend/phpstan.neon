@@ -9,6 +9,7 @@ parameters:
         - bootstrap/app.php
         - config/tenancy.php
         - database/factories
+        - database/verticals
         - database/seeders
         - routes
         - tests/Pest.php

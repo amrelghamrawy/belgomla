@@ -18,8 +18,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('store')->name('store.')->middleware(['tenant', 'tenant.active:store'])->group(function (): void {
     require __DIR__.'/api/store/tenancy.php';
+    require __DIR__.'/api/store/catalog.php';
 });
 
 Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.active:dashboard'])->group(function (): void {
     require __DIR__.'/api/dashboard/tenancy.php';
+    require __DIR__.'/api/dashboard/catalog.php';
 });

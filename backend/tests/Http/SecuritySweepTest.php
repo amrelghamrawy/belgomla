@@ -23,6 +23,23 @@ dataset('dashboard authenticated routes', [
     'users list' => ['GET', '/api/dashboard/users'],
     'users create' => ['POST', '/api/dashboard/users'],
     'users update' => ['PATCH', '/api/dashboard/users/1'],
+    'categories list' => ['GET', '/api/dashboard/categories'],
+    'categories create' => ['POST', '/api/dashboard/categories'],
+    'categories reorder' => ['POST', '/api/dashboard/categories/reorder'],
+    'categories update' => ['PUT', '/api/dashboard/categories/1'],
+    'categories archive' => ['POST', '/api/dashboard/categories/1/archive'],
+    'categories restore' => ['POST', '/api/dashboard/categories/1/restore'],
+    'units list' => ['GET', '/api/dashboard/units'],
+    'units create' => ['POST', '/api/dashboard/units'],
+    'units update' => ['PUT', '/api/dashboard/units/1'],
+    'units archive' => ['POST', '/api/dashboard/units/1/archive'],
+    'fields list' => ['GET', '/api/dashboard/fields'],
+    'fields create' => ['POST', '/api/dashboard/fields'],
+    'fields update' => ['PUT', '/api/dashboard/fields/1'],
+    'fields archive' => ['POST', '/api/dashboard/fields/1/archive'],
+    'field options create' => ['POST', '/api/dashboard/fields/1/options'],
+    'field options update' => ['PUT', '/api/dashboard/fields/1/options/1'],
+    'field options archive' => ['POST', '/api/dashboard/fields/1/options/1/archive'],
 ]);
 
 test('a guest is refused on every authenticated dashboard route', function (string $method, string $uri): void {

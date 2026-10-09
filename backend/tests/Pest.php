@@ -71,3 +71,37 @@ function moduleModels(): array
 
     return $classes;
 }
+
+/** A request on the default test tenant's storefront API. */
+function storeRequest(string $path = '/api/store/products'): Illuminate\Http\Request
+{
+    return Illuminate\Http\Request::create('http://alnoor.gomal.test'.$path);
+}
+
+/** A request on the default test tenant's dashboard API. */
+function dashboardRequest(string $path = '/api/dashboard/products'): Illuminate\Http\Request
+{
+    return Illuminate\Http\Request::create('http://alnoor.gomal.test'.$path);
+}
+
+/**
+ * A resource exactly as it is sent over HTTP: nested resources and when() fields resolved.
+ *
+ * @return array<string, mixed>
+ */
+function rendered(Illuminate\Http\Resources\Json\JsonResource $resource, Illuminate\Http\Request $request): array
+{
+    $decoded = json_decode((string) $resource->toResponse($request)->getContent(), true);
+
+    if (! is_array($decoded) || ! is_array($decoded['data'] ?? null)) {
+        throw new RuntimeException('The resource did not render a data object.');
+    }
+
+    $data = [];
+
+    foreach ($decoded['data'] as $key => $value) {
+        $data[(string) $key] = $value;
+    }
+
+    return $data;
+}
