@@ -71,6 +71,8 @@ Cash collection records with void, derived collection status on orders, the "del
 
 ## Delivery notes (session 2026-10-10)
 
+Commit: `0c2f33a`.
+
 `composer test` is green with 2658 tests (2615 passed + 43 arch tests flagged deprecated by PHP 8.5's `setAccessible`), +233 over Task 6's 2425. PHPStan max is clean and type coverage is 100%.
 
 What differs from the plan above, and why:
