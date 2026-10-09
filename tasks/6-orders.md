@@ -1,6 +1,6 @@
 # Task 6 — Orders & Checkout module (+ in-app Notifications)
 
-Status: **not started**. Requires Tasks 1–5. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (see the delivery notes at the end). Requires Tasks 1–5. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -57,5 +57,31 @@ The checkout transaction, order lifecycle with guards, customer/merchant cancell
 
 ## Open questions
 
-- D34: Idempotency key scope (per customer per tenant). Default as stated.
-- D35: Should the merchant be able to create an order on behalf of a customer in V1? Default: no (V2).
+- D55 (was "D34" here; D34/D35 are pricing/inventory decisions): Idempotency key scope. Default: per tenant host + signed-in user + route + key, 24 h.
+- D56 (was "D35"): Should the merchant be able to create an order on behalf of a customer in V1? Default: no (V2).
+- Added while building: D57 (empty cart `422 cart_empty`, foreign address `422` on `address_id`, another customer's order `404` — not the 403 this file asked for, confirmed with the product owner — and notifications shared by all owners).
+
+## Delivery notes (session 2026-10-09)
+
+Commit: see the task board.
+
+`composer test` is green with 2425 tests (2386 passed + 39 arch tests flagged deprecated by PHP 8.5's `setAccessible`), +443 over Task 5's 1982. PHPStan max is clean and type coverage is 100%.
+
+What differs from the plan above, and why:
+- Notifications: own `notifications` table, model `MerchantNotification` (Laravel's `Notification` name clash), written by the `NotifyMerchants` **action** rather than a `Notify` service, because it writes (rules/02 §2); rules/02 §8 updated. The resource exposes the payload as `details`, since a `data` key stops Laravel from wrapping the response.
+- Another customer's order is `404` (`denyAsNotFound`, D57), as for addresses, so order numbers cannot be probed.
+- Extra classes: `ApplyTransition` (stock move + status + history shared by `TransitionOrder` and `CancelOrder`), `RecordStatusChange`, `Data\TransitionPlan` (the state machine's output), `Data\CheckoutLine`/`CheckoutProblem`, `Data\OrderFiltersData`, `PlacedOrderResource` (the `{ order: … }` checkout envelope), requests `ListOrdersRequest`, `ListDashboardOrdersRequest`, `ListNotificationsRequest`, `MarkNotificationsReadRequest`, scopes `Open` and `Stale`, `Services\CustomerRecentOrders` (fills Customers' `RecentOrders`), `config/idempotency.php`.
+- `CheckoutValidator` re-checks product status, MOQ and stock itself against the rows `StockLedger::lock()` returned, instead of calling Customers' `OrderableQuantity` (which throws on the first problem and reads the unlocked stock); it collects every problem into one `checkout_failed`. Checkout reads the cart with `CartQuery`, not `RefreshCart`, so a failed checkout never deletes inactive lines.
+- The null bindings `NullReservationHolders` / `NullRecentOrders` and the now-empty `InventoryServiceProvider` were removed; `OrdersServiceProvider` binds the real implementations plus `NullCollectsPayments` for Task 7.
+- The idempotency key is scoped by host + user + route + key (D55); only 2xx answers are replayed. It uses the default cache store (Redis in dev; array in tests).
+- `inventory_movements.order_id` now has its FK; the two inventory tests that used a made-up order id create a real order.
+
+Manual checks (`php artisan serve`, curl with `--resolve` and the SPA origin, Redis queue):
+- register → OTP from `messages.log` → verify → address → 18 cartons in the cart → checkout `201` order #1 (`1530.00`, 18 × 85.00 tier price, MOV 1500 met); the same `Idempotency-Key` again → `201`, `Idempotent-Replayed: true`, identical body, one order; a third checkout → `422 cart_empty`.
+- dashboard login → notifications `unread_count 1`, `new_order #1` → transition `confirmed` 200 → `to: pending` 422 → `delivered` 200 → SKU stock 400 → 40, reserved 0 → `delivered` again `409 invalid_transition`.
+- customer `GET /orders/1`: history `null→pending (customer)`, `pending→confirmed (tenant_user)`, `confirmed→delivered (tenant_user)`; cancelling it → `409 invalid_transition`.
+- second order backdated 25 h → `?stale=1` lists only it with `is_stale: true`; an adjustment below its reservation names it in `details.orders` (BR-INV08); customer cancel → `cancelled`, stock released, `customer_cancelled` notification; mark all read → `marked 3`.
+- the alnoor customer and owner sessions on `kotob.gomal.test` → 401.
+- Found: `lang/` does not exist, so validation messages are raw keys (`validation.in`) in every module; noted in Task 7.
+
+Rules covered by tests: BR-PR04, BR-PR06, BR-PR07, BR-MOQ01, BR-MOV01, BR-MOV02, BR-INV01, BR-INV03, BR-INV04, BR-INV05, BR-INV06, BR-INV07, BR-INV08, BR-U03, BR-P04, BR-O01..O10 (O06 by construction: no item endpoint), BR-C03 (enum), BR-C04 (contract call), BR-N02, BR-CU02, BR-CU05, BR-CU06, BR-T03, BR-T04, BR-T07, BR-L, Tech §6, Tech §11, D7, D9, D10, D21, D51, D55, D57.

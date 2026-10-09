@@ -8,8 +8,7 @@ use App\Modules\Catalog\Models\Sku;
 
 /**
  * BR-INV08: the open orders holding a SKU's reservation, listed when an adjustment would go below it.
- * Orders binds its implementation (Task 6) so Inventory never depends on Orders; until then the
- * NullReservationHolders binding returns no orders.
+ * Implemented by Orders (OrdersHoldingSku, bound in OrdersServiceProvider) so Inventory never depends on Orders.
  */
 interface ReservationHolders
 {

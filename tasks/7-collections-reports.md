@@ -19,6 +19,14 @@ Cash collection records with void, derived collection status on orders, the "del
 
 - Rebind `App\Modules\Customers\Contracts\OutstandingBalances` (bound to `NullOutstandingBalances` in `CustomersServiceProvider`) so the dashboard customer list and page show the real `outstanding_amount`.
 
+## Left by Task 6
+
+- `Orders\Contracts\CollectsPayments::collectRemaining(Order $order, ?int $actorId): void` is called by `TransitionOrder` inside its transaction (order row already locked) when delivering with `collect_full_amount`. It is bound to `Orders\Services\NullCollectsPayments` in `OrdersServiceProvider`; rebind it to the Collections implementation (a binding in a provider registered after `OrdersServiceProvider`, or replace the entry there).
+- `orders.collected_amount` (default 0) and `collection_status` (`Orders\Enums\CollectionStatus`) exist; `CancelOrder` already refuses `collected_amount > 0` with `409 has_collections`.
+- The dashboard order detail renders `collections: []` (`DashboardOrderResource`); fill it.
+- The Orders arch rules (`tests/Arch/ModulesBoundariesTest.php`) forbid other modules from using `App\Modules\Orders`; Collections will need its own exception there (Orders models as typed arguments, `CollectionStatus`, the contract).
+- `lang/` does not exist yet, so validation messages render as keys (`validation.in`); worth adding `lang/ar/validation.php` before the UI tasks.
+
 ## Deliverables
 
 ### 1. Schema

@@ -4,9 +4,19 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Customers\Models\Cart;
+use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Orders\Actions\Checkout;
+use App\Modules\Orders\Data\CheckoutData;
+use App\Modules\Orders\Models\Order;
+use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
@@ -183,5 +193,76 @@ abstract class TenantTestCase extends TestCase
     protected function otherTenant(string $subdomain = 'other'): Tenant
     {
         return Tenant::factory()->create(['subdomain' => $subdomain, 'name' => 'متجر آخر']);
+    }
+
+    /**
+     * An orderable SKU: sold in cartons of 20 pieces, MOQ 5, base price 90.00, tier 10+ → 85.00, with
+     * `$onHand` pieces in stock (default 400 = 20 cartons).
+     *
+     * @param  array<string, mixed>  $attributes  SKU overrides
+     */
+    protected function orderableSku(array $attributes = [], int $onHand = 400, ProductStatus $status = ProductStatus::Active, ?Tenant $tenant = null, string $name = 'الأضواء علوم'): Sku
+    {
+        return $this->asTenant($tenant ?? $this->tenant, function () use ($attributes, $onHand, $status, $name): Sku {
+            $carton = Unit::query()->firstOrCreate(['name' => 'كرتونة']);
+            $sku = Product::factory()
+                ->state(['name' => $name, 'status' => $status])
+                ->withSku([
+                    'selling_unit_id' => $carton->id,
+                    'conversion_factor' => 20,
+                    'moq' => 5,
+                    'base_price' => '90.00',
+                    ...$attributes,
+                ], onHand: $onHand)
+                ->create()
+                ->sku()
+                ->sole();
+            SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
+
+            return $sku->refresh();
+        });
+    }
+
+    /**
+     * Puts lines in a customer's cart, as `[sku_id => quantity]`.
+     *
+     * @param  array<int, int>  $lines
+     */
+    protected function fillCart(Customer $customer, array $lines): void
+    {
+        $this->asTenant(Tenant::query()->findOrFail($customer->tenant_id), function () use ($customer, $lines): void {
+            $cart = Cart::query()->firstOrCreate(['customer_id' => $customer->id]);
+
+            foreach ($lines as $skuId => $quantity) {
+                CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_id' => $skuId], ['quantity' => $quantity]);
+            }
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function addressOf(Customer $customer, array $attributes = []): CustomerAddress
+    {
+        return $this->asTenant(
+            Tenant::query()->findOrFail($customer->tenant_id),
+            fn (): CustomerAddress => CustomerAddress::factory()->for($customer)->default()->create($attributes)->refresh(),
+        );
+    }
+
+    /**
+     * A real pending order placed through checkout (stock reserved, history, notification): the cart is filled
+     * with `[sku_id => quantity]` and checked out to the customer's first address, created when there is none.
+     *
+     * @param  array<int, int>  $lines
+     */
+    protected function placeOrder(Customer $customer, array $lines, ?string $note = null): Order
+    {
+        $this->fillCart($customer, $lines);
+        $tenant = Tenant::query()->findOrFail($customer->tenant_id);
+        $address = $this->asTenant($tenant, fn (): ?CustomerAddress => CustomerAddress::query()->where('customer_id', $customer->id)->first())
+            ?? $this->addressOf($customer);
+
+        return $this->asTenant($tenant, fn (): Order => app(Checkout::class)->handle($customer, new CheckoutData($address->id, $note))->refresh());
     }
 }

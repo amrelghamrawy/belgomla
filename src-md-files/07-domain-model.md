@@ -352,7 +352,9 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 
 ### `tenant_order_counters` (`tenant_id` PK, `next_number int`)
 
-Incremented under row lock inside the checkout transaction.
+Incremented under row lock inside the checkout transaction; the row is created on a tenant's first order.
+
+Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inventory_movements.order_id` are `NO ACTION` (rows are never deleted; a tenant delete cascades through them in one statement). CHECKs: status and collection status values, `quantity ≥ 1`, `quantity_base = quantity × conversion_factor`.
 
 ### `order_items` (BR-PR07)
 
@@ -413,6 +415,8 @@ Invariant (app, inside a transaction with the order row locked): `Σ non-voided 
 ### `notifications` (BR-N02)
 
 `id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled), data jsonb, read_at`.
+
+Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57).
 
 ### `outbound_messages` (Tech §13)
 

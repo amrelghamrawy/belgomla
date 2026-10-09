@@ -150,7 +150,7 @@ test('the customer page shows the profile, active addresses and recent orders', 
         ->assertJsonPath('data.recent_orders.0.number', 1024);
 });
 
-test('until orders exist a customer has no recent orders', function (): void {
+test('a customer without orders has no recent orders', function (): void {
     $customer = $this->makeCustomer();
 
     $this->tenantJson('GET', "/api/dashboard/customers/{$customer->id}")->assertJsonPath('data.recent_orders', []);
@@ -229,4 +229,15 @@ test('a customer created here is visible only here', function (): void {
     $this->tenantJson('POST', '/api/dashboard/customers', ['name' => 'س', 'phone' => '01012345678'])->assertCreated();
 
     expect(Customer::withoutTenantScope()->sole()->tenant_id)->toBe($this->tenant->id);
+});
+
+test('the customer page lists the latest orders of the customer (Orders fills RecentOrders)', function (): void {
+    $customer = $this->makeCustomer();
+    $order = $this->placeOrder($customer, [$this->orderableSku()->id => 5]);
+
+    $this->tenantJson('GET', "/api/dashboard/customers/{$customer->id}")
+        ->assertOk()
+        ->assertJsonPath('data.recent_orders', [[
+            'id' => $order->id, 'number' => $order->number, 'status' => 'pending', 'total' => '450.00', 'placed_at' => $order->placed_at->toIso8601String(),
+        ]]);
 });

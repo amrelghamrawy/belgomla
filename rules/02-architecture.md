@@ -173,7 +173,8 @@ final readonly class ReserveStock
 ## 8. Jobs, Notifications, Messaging
 
 - Jobs are `final class VerbNoun implements ShouldQueue` with `Queueable`, constructor carries ids or models, `handle()` takes dependencies by injection, logic delegated to an Action/Service. Provide `dispatchFor(...)` statics when the call site needs clarity.
-- In-app notifications are `final class NounHappened extends Notification` with `via() = ['database']` and a flat `toDatabase()` array.
+- In-app notifications are rows in our own `notifications` table (`Orders\Models\MerchantNotification`, 07 §9), written by an Action (`NotifyMerchants`) inside the transaction of the change they report — not Laravel `Notification` classes (decided in Task 6: the dashboard reads them per tenant, and a write belongs in the action's transaction).
+- `Idempotency-Key` is handled by the `idempotent` route middleware (`App\Support\Http\Middleware\IdempotencyKey`, D55), listed after `auth:*`; add it to every new retry-sensitive `POST`.
 - Outbound WhatsApp/SMS go only through `Messaging\Services\Messenger`; drivers implement `Messaging\Contracts\MessageDriver`. Nothing else may call a provider.
 
 ---

@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Http\Middleware\EnsureTenantActive;
 use App\Modules\Tenancy\Http\Middleware\ResolveTenant;
 use App\Support\ApiException;
 use App\Support\ApiResponse;
+use App\Support\Http\Middleware\IdempotencyKey;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -53,6 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'session.tenant' => EnsureSessionTenant::class,
             'customer.active' => EnsureCustomerActive::class,
             'prices.visible' => RejectGuestsWhenPricesHidden::class,
+            'idempotent' => IdempotencyKey::class,
         ]);
 
         // Laravel re-sorts route middleware by priority and pulls `auth:*` ahead of unlisted middleware.

@@ -89,3 +89,13 @@ test('BR-T04 adjusting a sku of another tenant is 404 and changes nothing there'
     $this->assertDatabaseHas('sku_inventory', ['sku_id' => $foreign->id, 'on_hand' => 7]);
     $this->assertDatabaseCount('inventory_movements', 0);
 });
+
+test('BR-INV08 the refusal names the open orders holding the stock (Orders fills ReservationHolders)', function (): void {
+    $sku = $this->orderableSku(onHand: 400);
+    $order = $this->placeOrder($this->makeCustomer(), [$sku->id => 6]);
+
+    $this->tenantJson('POST', "/api/dashboard/inventory/{$sku->id}/adjust", ['new_on_hand' => 100, 'reason' => 'جرد'])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'inventory_below_reserved')
+        ->assertJsonPath('error.details.orders', [['number' => $order->number, 'status' => 'pending', 'quantity_base' => 120]]);
+});

@@ -20,6 +20,11 @@ use App\Modules\Customers\Models\CustomerOtp;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Orders\Models\MerchantNotification;
+use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Orders\Models\TenantOrderCounter;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Tenant;
@@ -80,6 +85,11 @@ test('the module model list is explicit so new models are reviewed', function ()
         InventoryMovement::class,
         SkuInventory::class,
         OutboundMessage::class,
+        MerchantNotification::class,
+        Order::class,
+        OrderItem::class,
+        OrderStatusHistory::class,
+        TenantOrderCounter::class,
         SkuPriceTier::class,
         Tenant::class,
         TenantSetting::class,

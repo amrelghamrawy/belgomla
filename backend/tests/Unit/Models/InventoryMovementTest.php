@@ -6,6 +6,7 @@ use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Models\InventoryMovement;
+use App\Modules\Orders\Models\Order;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -20,13 +21,17 @@ test('to array', function (): void {
 });
 
 test('casts: enums for type and actor, integers, an immutable created_at and no updated_at', function (): void {
-    $movement = $this->inTenant(fn () => InventoryMovement::factory()->sale(6, 4, orderId: 1024)->create()->fresh());
+    [$order, $movement] = $this->inTenant(function (): array {
+        $order = Order::factory()->create();
+
+        return [$order, InventoryMovement::factory()->sale(6, 4, orderId: $order->id)->create()->fresh()];
+    });
 
     expect($movement->type)->toBe(MovementType::Sale)
         ->and($movement->actor_type)->toBe(ActorType::System)
         ->and($movement->quantity)->toBe(-6)
         ->and($movement->on_hand_after)->toBe(4)
-        ->and($movement->order_id)->toBe(1024)
+        ->and($movement->order_id)->toBe($order->id)
         ->and($movement->created_at)->toBeInstanceOf(CarbonImmutable::class)
         ->and(InventoryMovement::UPDATED_AT)->toBeNull();
 });

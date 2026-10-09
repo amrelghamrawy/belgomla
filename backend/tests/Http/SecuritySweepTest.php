@@ -70,6 +70,13 @@ dataset('dashboard authenticated routes', [
     'customers approve' => ['POST', '/api/dashboard/customers/1/approve'],
     'customers block' => ['POST', '/api/dashboard/customers/1/block'],
     'customers unblock' => ['POST', '/api/dashboard/customers/1/unblock'],
+    'orders list' => ['GET', '/api/dashboard/orders'],
+    'orders show' => ['GET', '/api/dashboard/orders/1'],
+    'orders transition' => ['POST', '/api/dashboard/orders/1/transition'],
+    'orders cancel' => ['POST', '/api/dashboard/orders/1/cancel'],
+    'orders delivery address' => ['PUT', '/api/dashboard/orders/1/delivery-address'],
+    'notifications list' => ['GET', '/api/dashboard/notifications'],
+    'notifications read' => ['POST', '/api/dashboard/notifications/read'],
 ]);
 
 dataset('customer authenticated routes', [
@@ -84,6 +91,10 @@ dataset('customer authenticated routes', [
     'cart add' => ['POST', '/api/store/cart/items'],
     'cart update' => ['PATCH', '/api/store/cart/items/1'],
     'cart remove' => ['DELETE', '/api/store/cart/items/1'],
+    'checkout' => ['POST', '/api/store/checkout'],
+    'orders list' => ['GET', '/api/store/orders'],
+    'orders show' => ['GET', '/api/store/orders/1'],
+    'orders cancel' => ['POST', '/api/store/orders/1/cancel'],
 ]);
 
 test('a guest is refused on every customer route of the storefront', function (string $method, string $uri): void {

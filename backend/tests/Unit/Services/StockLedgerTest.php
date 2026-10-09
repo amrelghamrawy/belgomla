@@ -12,6 +12,7 @@ use App\Modules\Inventory\Exceptions\NotInTransaction;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Inventory\Services\StockLedger;
+use App\Modules\Orders\Models\Order;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 
@@ -163,12 +164,13 @@ test('BR-INV04 a release gives the reservation back without a movement', functio
 
 test('BR-INV05 a deduction takes the units from on hand and reserved as a negative sale movement of the order', function (): void {
     $sku = Sku::factory()->withStock(10, 6)->create();
+    $order = Order::factory()->create();
 
-    $movement = ($this->ledger)()->deduct($sku, 6, orderId: 1024);
+    $movement = ($this->ledger)()->deduct($sku, 6, orderId: $order->id);
 
     expect(($this->stock)($sku)->only(['on_hand', 'reserved']))->toBe(['on_hand' => 4, 'reserved' => 0])
         ->and($movement->only(['type', 'quantity', 'on_hand_after', 'order_id', 'actor_type']))->toBe([
-            'type' => MovementType::Sale, 'quantity' => -6, 'on_hand_after' => 4, 'order_id' => 1024, 'actor_type' => ActorType::System,
+            'type' => MovementType::Sale, 'quantity' => -6, 'on_hand_after' => 4, 'order_id' => $order->id, 'actor_type' => ActorType::System,
         ]);
 });
 

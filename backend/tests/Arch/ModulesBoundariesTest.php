@@ -13,7 +13,7 @@ arch('audit logs are only written through the Audit module')
 
 arch('tenancy models are not used by other modules')
     ->expect('App\Modules\Tenancy\Models')
-    ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers']);
+    ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders']);
 
 arch('catalog, pricing, inventory and messaging reach tenancy only through its context, concern, hooks, enums and queries')
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging'])
@@ -25,13 +25,13 @@ arch('catalog, pricing, inventory and messaging reach tenancy only through its c
         'App\Modules\Tenancy\Exceptions',
     ]);
 
-arch('catalog, pricing, inventory and customers reach audit only through the AuditLogger and its enums')
-    ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers'])
+arch('catalog, pricing, inventory, customers and orders reach audit only through the AuditLogger and its enums')
+    ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders'])
     ->not->toUse(['App\Modules\Audit\Models', 'App\Modules\Audit\Http']);
 
-arch('tenancy and audit do not depend on catalog, pricing, inventory, messaging or customers')
+arch('tenancy and audit do not depend on catalog, pricing, inventory, messaging, customers or orders')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit'])
-    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers']);
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders']);
 
 /*
 | Catalog ⇄ Pricing (tasks/2-pricing.md). Pricing never looks up Catalog rows by itself: it receives
@@ -39,9 +39,9 @@ arch('tenancy and audit do not depend on catalog, pricing, inventory, messaging 
 | Catalog prices SKUs only through Pricing's actions, data, services and request concern.
 */
 
-arch('catalog models are used outside catalog only by pricing, inventory and customers')
+arch('catalog models are used outside catalog only by pricing, inventory, customers and orders')
     ->expect('App\Modules\Catalog\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'Database\Factories']);
 
 arch('pricing only touches the catalog product and sku it is handed, plus the shared filter')
     ->expect('App\Modules\Pricing')
@@ -103,6 +103,7 @@ arch('inventory models are written only by the StockLedger and read by inventory
         'App\Modules\Inventory\Queries',
         'App\Modules\Inventory\Http\Resources',
         App\Modules\Inventory\Actions\AdjustStock::class, // reads the movement the ledger returns, for the audit record
+        App\Modules\Orders\Services\CheckoutValidator::class, // reads the stock rows checkout locked through the ledger
         App\Modules\Catalog\Models\Sku::class,
         'Database\Factories',
     ]);
@@ -147,7 +148,7 @@ arch('messaging models are only used inside messaging')
     ->toOnlyBeUsedIn(['App\Modules\Messaging', 'Database\Factories']);
 
 arch('other modules reach messaging only through Messenger, its payload and enums')
-    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers'])
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders'])
     ->not->toUse([
         'App\Modules\Messaging\Actions',
         'App\Modules\Messaging\Contracts',
@@ -159,7 +160,7 @@ arch('other modules reach messaging only through Messenger, its payload and enum
 
 arch('messaging does not depend on catalog, pricing or inventory')
     ->expect('App\Modules\Messaging')
-    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Audit', 'App\Modules\Customers']);
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Audit', 'App\Modules\Customers', 'App\Modules\Orders']);
 
 /*
 | Customers (tasks/5-customers.md). Customers reads the catalog Sku/Product of a cart line (through Catalog's
@@ -205,10 +206,98 @@ arch('customers price only through the pricing services and read stock only thro
         'App\Modules\Inventory',
     ]);
 
-arch('customers models are only used inside customers')
+arch('customers models are used outside customers only by orders')
     ->expect('App\Modules\Customers\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Customers', App\Providers\CustomersServiceProvider::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Customers', 'App\Modules\Orders', App\Providers\CustomersServiceProvider::class, 'Database\Factories']);
 
 arch('no earlier module depends on customers')
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory'])
     ->not->toUse('App\Modules\Customers');
+
+/*
+| Orders (tasks/6-orders.md). Orders reads the cart through Customers' CartQuery and address query, empties it with
+| ClearCart, prices through Pricing's PriceResolver, moves stock only through Inventory's StockLedger, and fills the
+| contracts Inventory and Customers declared (ReservationHolders, RecentOrders). Catalog and Customers models appear
+| only as the typed rows those services hand over (Sku, Product, Customer, CustomerAddress, CartItem).
+*/
+
+arch('orders reach tenancy only through its context, concern and queries')
+    ->expect('App\Modules\Orders')
+    ->not->toUse([
+        'App\Modules\Tenancy\Actions',
+        'App\Modules\Tenancy\Data',
+        'App\Modules\Tenancy\Console',
+        'App\Modules\Tenancy\Exceptions',
+        'App\Modules\Tenancy\Http',
+    ]);
+
+arch('orders only touch the catalog sku and product of an order line')
+    ->expect('App\Modules\Orders')
+    ->not->toUse([
+        App\Modules\Catalog\Models\Category::class,
+        App\Modules\Catalog\Models\Unit::class,
+        App\Modules\Catalog\Models\ProductImage::class,
+        App\Modules\Catalog\Models\ProductRelation::class,
+        App\Modules\Catalog\Models\ProductFieldDefinition::class,
+        App\Modules\Catalog\Models\ProductFieldOption::class,
+        'App\Modules\Catalog\Models\Scopes',
+        'App\Modules\Catalog\Actions',
+        'App\Modules\Catalog\Queries',
+        'App\Modules\Catalog\Services',
+        'App\Modules\Catalog\Exceptions',
+        'App\Modules\Catalog\Http',
+    ]);
+
+arch('orders move stock only through the StockLedger')
+    ->expect('App\Modules\Orders')
+    ->not->toUse([
+        App\Modules\Inventory\Models\InventoryMovement::class,
+        'App\Modules\Inventory\Actions',
+        'App\Modules\Inventory\Queries',
+        'App\Modules\Inventory\Exceptions',
+        'App\Modules\Inventory\Http',
+    ]);
+
+arch('orders price only through the PriceResolver')
+    ->expect('App\Modules\Orders')
+    ->not->toUse([
+        'App\Modules\Pricing\Actions',
+        'App\Modules\Pricing\Models',
+        'App\Modules\Pricing\Queries',
+        'App\Modules\Pricing\Exceptions',
+        'App\Modules\Pricing\Concerns',
+        'App\Modules\Pricing\Http',
+    ]);
+
+arch('orders use customers only through its queries, cart actions, contracts and the customer, address and cart line')
+    ->expect('App\Modules\Orders')
+    ->not->toUse([
+        App\Modules\Customers\Models\Cart::class,
+        App\Modules\Customers\Models\CustomerOtp::class,
+        App\Modules\Customers\Models\CustomerInvitation::class,
+        'App\Modules\Customers\Models\Scopes',
+        'App\Modules\Customers\Data',
+        'App\Modules\Customers\Services',
+        'App\Modules\Customers\Exceptions',
+        'App\Modules\Customers\Http',
+    ]);
+
+arch('orders do not depend on messaging')
+    ->expect('App\Modules\Orders')
+    ->not->toUse('App\Modules\Messaging');
+
+arch('orders models are only used inside orders')
+    ->expect('App\Modules\Orders\Models')
+    ->toOnlyBeUsedIn(['App\Modules\Orders', App\Providers\OrdersServiceProvider::class, 'Database\Factories']);
+
+arch('no earlier module depends on orders')
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Support'])
+    ->not->toUse('App\Modules\Orders');
+
+arch('orders fill the reservation holders contract of inventory')
+    ->expect(App\Modules\Orders\Services\OrdersHoldingSku::class)
+    ->toImplement(App\Modules\Inventory\Contracts\ReservationHolders::class);
+
+arch('orders fill the recent orders contract of customers')
+    ->expect(App\Modules\Orders\Services\CustomerRecentOrders::class)
+    ->toImplement(App\Modules\Customers\Contracts\RecentOrders::class);

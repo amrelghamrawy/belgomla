@@ -55,6 +55,12 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 422  | `cover_price_required`     | BR-PR10: a % price on a SKU without a cover price         |
 | 403  | `prices_hidden`            | guest add-to-cart while `require_login_for_prices` (D53)  |
 | 422  | `cart_line_invalid`        | a cart line below MOQ, above stock, or of an inactive product (`items[]` filled) |
+| 422  | `cart_empty`               | checkout with an empty cart (D57)                         |
+| 409  | `invalid_transition`       | order status change not allowed (`details.from/to`, BR-O01/O02) |
+| 409  | `has_collections`          | cancelling an order with collected money (BR-O03, `details.collected_amount`) |
+| 409  | `address_locked`           | editing the delivery address from `out_for_delivery` on (D9) |
+| 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
+| 422  | `idempotency_key_reused`   | same `Idempotency-Key` with a different body (D55)        |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
 | 503  | `store_unavailable`        | tenant suspended (storefront)                             |
 
@@ -285,6 +291,8 @@ Order detail shape (shared with dashboard, dashboard adds customer + collections
   "history": [ { "from": null, "to": "pending", "at": "...", "by": "customer" } ] }
 ```
 
+Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `cancelled_by`, and each item `sku_id`, `sku_name`, `conversion_factor`, `cover_price`, `discount_percent`, `tier_min_quantity`. The list leaves out `items` and `history`. `{number}` is the per-tenant order number; another customer's or another tenant's order is `404` (D57). In `checkout_failed`, `requested`/`available` are selling units; an empty cart is `422 cart_empty`; an address that is not the customer's active address is `422 validation_failed` on `address_id`; a customer who is not active gets `403` with the status as code. Cancel needs `reason` (≤ 300); `has_collections` (409) when money was collected. Orders routes need status `active` (like the cart). Audit: `order.created`, `order.cancelled`.
+
 ---
 
 ## 4. Dashboard — Auth
@@ -481,6 +489,8 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` ("0.00" un
 
 `transition` rules (BR-O01): target must be forward of current; `delivered` triggers inventory deduction and, with `collect_full_amount: true`, creates one collection for the remaining balance in the same transaction (BR-C04). Invalid → `409 invalid_transition` with `{ "details": { "from": "preparing", "to": "confirmed" } }`.
 
+Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer { id, name, phone }`, `confirmed_at`, `delivered_at`, `cancelled_at`, `is_stale` (pending past `stale_pending_hours`), history entries with `actor_id` and `note`, and on the detail `collections` (`[]` until Task 7). `?from=&to=` are `Y-m-d` days of `placed_at`, both inclusive; `?q=` matches the order number (`#1024` too), customer name or phone, or recipient name; `?sort=placed_at|number|order_total` (default `-placed_at`). `delivery-address` takes `governorate, city, address_line, label?, landmark?, name?, phone?` (name/phone kept when omitted) → `409 address_locked` from `out_for_delivery` on. `collect_full_amount` is ignored for other targets and records nothing until Collections binds `CollectsPayments` (Task 7). Every write answers the dashboard order detail. Audit: `order.status_changed`, `order.cancelled`, `order.delivery_address_changed`.
+
 ---
 
 ## 10. Dashboard — Collections (BR-C02..C04)
@@ -512,6 +522,8 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` ("0.00" un
 | GET    | `/api/dashboard/notifications`      | `?unread=1`                                              |
 | POST   | `/api/dashboard/notifications/read` | `{ ids: [] }` or `{ all: true }`                         |
 | GET    | `/api/dashboard/audit`              | `?entity_type=&entity_id=&actor_id=&from=&to=&batch_id=` |
+
+Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled, type_label, details: { order_number, customer_name, order_total, reason? }, read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`.
 
 ---
 
