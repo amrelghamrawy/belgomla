@@ -30,4 +30,28 @@ final class Money
     {
         return $amount === null ? null : self::normalize($amount);
     }
+
+    /** bccomp of two amounts at 2 decimals: -1, 0 or 1. */
+    public static function compare(string $a, string $b): int
+    {
+        return bccomp(self::numeric($a), self::numeric($b), 2);
+    }
+
+    /** A unit price times a whole quantity, e.g. a line total (BR-PR07). */
+    public static function times(string $amount, int $quantity): string
+    {
+        return bcmul(self::numeric($amount), (string) $quantity, 2);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function numeric(string $amount): string
+    {
+        if (! is_numeric($amount)) {
+            throw new InvalidArgumentException("\"{$amount}\" is not a money amount.");
+        }
+
+        return $amount;
+    }
 }

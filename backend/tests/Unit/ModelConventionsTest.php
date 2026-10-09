@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantSetting;
@@ -61,6 +62,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         ProductRelation::class,
         Sku::class,
         Unit::class,
+        SkuPriceTier::class,
         Tenant::class,
         TenantSetting::class,
         TenantUser::class,

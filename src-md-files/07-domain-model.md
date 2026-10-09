@@ -209,7 +209,7 @@ V1 invariant (app-enforced): exactly one SKU per product. V2 lifts it.
 | sku_id           | FK            |                                                  |
 | min_quantity     | int           | **check ≥ 1**; **unique (sku_id, min_quantity)** |
 | unit_price       | numeric(12,2) | **check > 0**                                    |
-| discount_percent | numeric(5,2)  | nullable, display only                           |
+| discount_percent | numeric(5,2)  | nullable, **check > 0 and < 100**, display only  |
 
 **Price resolution** (pure function, used by cart display and checkout):
 

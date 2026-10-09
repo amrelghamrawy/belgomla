@@ -14,6 +14,8 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -26,8 +28,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * SKU prices are omitted and `prices_hidden: true` is added. `coming_soon` products are listed with
  * `in_stock: false, coming_soon: true` (BR-P04). The detail page adds `gallery` and `related` (BR-P10).
  *
- * Task 1 shape: `in_stock` follows the status until Inventory (Task 3) adds `available`; `tiers` and
- * `discount_percent` arrive with Pricing (Task 2).
+ * `discount_percent` (off the cover price) and `tiers` come from Pricing's PriceResolver, read-only
+ * (BR-PR03, BR-PR10). `in_stock` follows the status until Inventory (Task 3) adds `available`.
  *
  * @property-read Product $resource
  */
@@ -129,9 +131,22 @@ final class StoreProductResource extends JsonResource
             'moq' => $sku->moq,
             'cover_price' => $this->when(! $this->pricesHidden, $sku->cover_price),
             'base_price' => $this->when(! $this->pricesHidden, $sku->base_price),
+            'discount_percent' => $this->when(! $this->pricesHidden, fn (): ?string => app(PriceResolver::class)->baseDiscountPercent($sku)),
+            'tiers' => $this->when(! $this->pricesHidden && $sku->relationLoaded('tiers'), fn (): array => $this->tiers($sku)),
             'in_stock' => $this->resource->status === ProductStatus::Active,
             'coming_soon' => $this->when($comingSoon, true),
         ];
+    }
+
+    /**
+     * @return list<array{min_quantity: int, unit_price: string|null}>
+     */
+    private function tiers(Sku $sku): array
+    {
+        return array_map(
+            fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice],
+            app(PriceResolver::class)->tiers($sku),
+        );
     }
 
     /**

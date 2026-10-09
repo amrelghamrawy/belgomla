@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Concerns;
 
-use App\Support\Money;
+use App\Modules\Pricing\Concerns\ReadsSkuPricing;
 
 /**
  * Rules and typed accessors shared by the product create and update requests (08-api-contract.md §6).
- * `opening_stock` (Task 3) and `sku.tiers` (Task 2) are deliberately not read here.
+ * The SKU price set (`sku.cover_price`, `sku.base_price[_percent]`, `sku.moq`, `sku.tiers`) is read by
+ * Pricing's ReadsSkuPricing under the "sku." prefix. `opening_stock` (Task 3) is not read here.
  */
 trait ProductPayloadRules
 {
+    use ReadsSkuPricing;
+
     public function name(): string
     {
         return mb_trim($this->string('name')->value());
@@ -49,13 +52,9 @@ trait ProductPayloadRules
         return $this->filled("sku.{$key}") ? $this->integer("sku.{$key}") : $default;
     }
 
-    public function skuMoney(string $key): ?string
+    protected function pricingPrefix(): string
     {
-        $value = $this->input("sku.{$key}");
-
-        return is_int($value) || is_float($value) || (is_string($value) && $value !== '')
-            ? Money::normalize((string) $value)
-            : null;
+        return 'sku.';
     }
 
     /**
@@ -73,10 +72,7 @@ trait ProductPayloadRules
             'sku.selling_unit_id' => ['required', 'integer'],
             'sku.base_unit_id' => ['required', 'integer'],
             'sku.conversion_factor' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'sku.cover_price' => ['nullable', 'required_with:sku.base_price_percent', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
-            'sku.base_price' => ['required', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
-            'sku.base_price_percent' => ['nullable', 'decimal:0,2', 'gt:0', 'lt:100'],
-            'sku.moq' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+            ...$this->pricingRules(),
         ];
     }
 }

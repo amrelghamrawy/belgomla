@@ -1,6 +1,6 @@
 # Task 2 — Pricing module
 
-Status: **not started**. Requires Task 1 merged. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (see the delivery notes at the end). Requires Task 1 merged. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -50,3 +50,19 @@ Quantity-tier pricing per SKU, the single `PriceResolver` used by cart/checkout 
 
 - D27: Rounding rule for percent pricing (half-up to piaster). Default: half-up.
 - D28: Should tiers be allowed to be *higher* than base price (surcharge)? Default: no, reject with 422.
+
+## Delivery notes (session 2026-10-09)
+
+`composer test` green: 981 tests (+171 over Task 1's 810), PHPStan max clean, type coverage 100%. Smoke-tested on `php artisan serve` with tenant `alnoor`: product created with `sku.tiers` (base and tier as %), `PUT …/pricing`, duplicate thresholds → `422 invalid_tiers`, store product shows `tiers` + `discount_percent`, bulk preview then apply on `publisher = الأضواء` (2 affected, 1 skipped without cover price, one audit batch), recompute, guest `401`. The dev tenant `alnoor` predates the vertical templates, so the smoke script created its `publisher` field through the API.
+
+Rules covered by tests: BR-PR01, BR-PR02, BR-PR03, BR-PR04, BR-PR05, BR-PR07 (line total), BR-PR10, BR-PR11, BR-MOQ01, BR-U04/U05, BR-T03, BR-T04, BR-L, D27, D28, D34.
+
+Deviations from the brief above (rules/02 or the contract won):
+
+- `BulkPricingController@preview` is `BulkPricingPreviewController@store`: rules/02 §4 allows REST method names only.
+- `PercentPricing::priceFromPercent()` is an instance method on a `final readonly` service (rules/02 service shape), plus `percentOff()` for the implied discount.
+- Extra classes: `SkuPricePlanner` (turns entered prices into concrete, validated values; shared by update, bulk preview and recompute so preview fails exactly like apply), `InvalidPricingInput` (422 `validation_failed` for an empty bulk filter or a % price rounding to 0), `Pricing\Concerns\ReadsSkuPricing` (one set of price rules/parsing used by the pricing request **and** Catalog's product requests under `sku.`), `BulkPricingResultResource`, `App\Support\Money::compare()/times()`.
+- Boundary exceptions, enforced in `tests/Arch/ModulesBoundariesTest.php`: Catalog's `Sku::tiers()` relation is the only Catalog reference to a Pricing model; Pricing references only Catalog's `Product`/`Sku` (handed to it by route binding or Catalog queries), `FilteredProductsQuery`, `ProductFilterData` and `ReadsProductFilter`. Catalog resources read prices through `PriceResolver` (a Pricing service) rather than touching tier models.
+- Audit split (BR-L): a product update no longer lists prices/MOQ in `product.updated`; they are `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed`. `product.created` now includes `sku.tiers`. BR-PR11 said "one audit record per SKU"; it is one per kind of change per SKU, same batch — the rule text was updated.
+- Catalog: `SkuData` now carries a `SkuPricingData` (`pricing`); `DuplicateProduct` copies tiers exactly as stored; `ProductDetailQuery` and the store queries eager-load `sku.tiers`; the dashboard product detail also shows `sku.tiers` (contract §6).
+- The old product-create rule `cover_price required_with base_price_percent` was replaced by the uniform `422 cover_price_required` from the planner, so the pricing endpoint (where the cover price may come from the database) and the product endpoints behave the same.

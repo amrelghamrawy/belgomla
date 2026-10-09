@@ -42,7 +42,7 @@ arch('data classes are final readonly value objects')
     ->toBeFinal()
     ->toBeReadonly()
     ->toHaveSuffix('Data')
-    ->ignoring(App\Modules\Tenancy\Data\TenantUserChanges::class)
+    ->ignoring([App\Modules\Tenancy\Data\TenantUserChanges::class, App\Modules\Pricing\Data\ResolvedPrice::class])
     ->toExtendNothing();
 
 arch('enums are backed string enums with labels')

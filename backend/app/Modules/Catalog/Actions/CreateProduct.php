@@ -11,11 +11,13 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Catalog\Services\ProductSnapshot;
+use App\Modules\Pricing\Actions\UpdateSkuPricing;
 use Illuminate\Support\Facades\DB;
 
 /**
- * BR-P02: creates the product and its single SKU in one transaction (owned here), audited.
- * Opening stock is Task 3 (Inventory) and price tiers Task 2 (Pricing).
+ * BR-P02: creates the product and its single SKU in one transaction (owned here), audited. The SKU's
+ * prices, MOQ and tiers are validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05).
+ * Opening stock is Task 3 (Inventory).
  */
 final readonly class CreateProduct
 {
@@ -23,6 +25,7 @@ final readonly class CreateProduct
         private ProductReferences $references,
         private CustomFieldValidator $fields,
         private ProductSnapshot $snapshot,
+        private UpdateSkuPricing $pricing,
         private AuditLogger $audit,
     ) {}
 
@@ -41,8 +44,8 @@ final readonly class CreateProduct
                 'created_by' => $createdBy,
             ]);
 
-            $product->skus()->create($data->sku->attributes());
-            $product->load('sku');
+            $this->pricing->handle($product->skus()->make($data->sku->attributes()), $data->sku->pricing);
+            $product->load('sku.tiers');
 
             $this->audit->log('product.created', $product, null, $this->snapshot->of($product));
 

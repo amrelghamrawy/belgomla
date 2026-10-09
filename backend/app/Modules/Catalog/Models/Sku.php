@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\SkuFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * BR-P02, BR-P03, BR-U02, BR-PR01, BR-PR10, BR-MOQ01. Prices and MOQ are per selling unit (BR-U04).
@@ -31,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read Product $product
  * @property-read Unit $sellingUnit
  * @property-read Unit $baseUnit
+ * @property-read Collection<int, SkuPriceTier> $tiers
  */
 final class Sku extends Model
 {
@@ -71,6 +75,17 @@ final class Sku extends Model
     public function baseUnit(): BelongsTo
     {
         return $this->belongsTo(Unit::class, 'base_unit_id');
+    }
+
+    /**
+     * Quantity tiers, lowest threshold first. The table belongs to Pricing (BR-PR03); this relation is
+     * the only place Catalog names a Pricing model, so the tiers can be eager-loaded with the SKU.
+     *
+     * @return HasMany<SkuPriceTier, $this>
+     */
+    public function tiers(): HasMany
+    {
+        return $this->hasMany(SkuPriceTier::class)->orderBy('min_quantity');
     }
 
     /**

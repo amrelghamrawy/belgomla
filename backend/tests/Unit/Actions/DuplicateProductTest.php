@@ -49,3 +49,15 @@ test('relations are not copied and a product without a sku is copied without one
     expect($copy->relations()->count())->toBe(0)
         ->and($copy->sku)->toBeNull();
 });
+
+test('BR-P11 the tiers are copied exactly as stored, even when the cover price changed since', function (): void {
+    $source = Product::factory()->withSku(['cover_price' => '140.00', 'base_price' => '90.00', 'base_price_percent' => '25.00'])->create();
+    App\Modules\Pricing\Models\SkuPriceTier::factory()->for($source->sku)->percent('30.00')->create(['min_quantity' => 10, 'unit_price' => '84.00']);
+
+    $copy = app(DuplicateProduct::class)->handle($source->refresh());
+
+    expect($copy->sku->base_price)->toBe('90.00')
+        ->and($copy->sku->load('tiers')->tiers->map->only(['min_quantity', 'unit_price', 'discount_percent'])->all())
+        ->toBe([['min_quantity' => 10, 'unit_price' => '84.00', 'discount_percent' => '30.00']])
+        ->and(AuditLog::query()->pluck('action')->all())->toBe(['product.duplicated']);
+});

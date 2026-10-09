@@ -10,7 +10,7 @@ use App\Modules\Catalog\Models\ProductImage;
 
 const STORE_PRODUCT_KEYS = [
     'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name'],
-    'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'in_stock'],
+    'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'in_stock'],
 ];
 
 beforeEach(function (): void {

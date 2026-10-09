@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Catalog\Services\ProductReferences;
+use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Tenancy\TenantContext;
 
 beforeEach(function (): void {
@@ -19,7 +20,7 @@ beforeEach(function (): void {
 
 function referenceData(int $categoryId, int $sellingUnitId, int $baseUnitId, string $code = 'PEN-1'): ProductData
 {
-    return new ProductData('قلم', $categoryId, new SkuData($code, $sellingUnitId, $baseUnitId, 1, '10.00'));
+    return new ProductData('قلم', $categoryId, new SkuData($code, $sellingUnitId, $baseUnitId, 1, new SkuPricingData('10.00')));
 }
 
 test('valid references pass', function (): void {

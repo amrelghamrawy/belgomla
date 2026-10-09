@@ -23,6 +23,9 @@ Each item below has a **default** already written into the other documents so wo
 | D30 | Duplicate product naming                                   | Same name, new slug (`-2`, `-3`), SKU code `{code}-COPY`, `-COPY-2`, …; status `inactive`; images, relations and stock not copied. | BR-P11 |
 | D31 | Products inside an archived category                       | Stay visible on the store (product status alone decides); the archived category and its subtree leave the store category tree. | BR-P06 |
 | D32 | Arabic search normalisation                                | Remove tashkeel/tatweel; أ إ آ ٱ → ا, ى → ي, ة → ه; Egyptian colloquial ث → ت, ذ → د, ظ → ض; Latin lower-cased. Every query word must appear in name + SKU code + select option labels. | BR-P08 |
+| D27 | Rounding of % pricing                                    | Half-up to the piaster (2 decimals), exact bcmath math: 10.10 at 25% → 7.58.                                  | BR-PR10     |
+| D28 | Tier priced above the base price (surcharge)               | Not allowed: `422 invalid_tiers`. A tier equal to the base price is allowed.                                  | BR-PR05     |
+| D34 | Partial pricing input                                      | `PUT …/pricing` without `cover_price` keeps it (null clears it); a percentage sent next to a price wins; a product update without `sku.tiers` keeps the tiers; bulk pricing is %-only and its tiers replace each SKU's tiers. | BR-PR10/PR11 |
 | D33 | Stationery / hardware templates                            | Filterable selects: stationery = brand, color (6 common colours), size; hardware = brand, material, size. Options other than colour start empty. | BR-P09 |
 
 These are treated as accepted defaults unless the product owner objects.

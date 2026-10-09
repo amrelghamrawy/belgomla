@@ -9,6 +9,8 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,8 +18,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * Dashboard view of a product with its SKU (08-api-contract.md §6). The detail endpoint also loads
  * `images` and `relations`; the list leaves them out. `custom_fields` is the raw stored map
- * (select values are option ids) because the dashboard form edits it. Tiers (Task 2) and inventory
- * (Task 3) are added by those tasks.
+ * (select values are option ids) because the dashboard form edits it. `sku.tiers` (with the % each was
+ * entered as) is present when the tiers are loaded, i.e. on the detail; inventory arrives with Task 3.
  *
  * @property-read Product $resource
  */
@@ -86,6 +88,11 @@ final class DashboardProductResource extends JsonResource
             'base_price' => $sku->base_price,
             'base_price_percent' => $sku->base_price_percent,
             'moq' => $sku->moq,
+            'tiers' => $this->when($sku->relationLoaded('tiers'), fn (): array => array_map(fn (TierData $tier): array => [
+                'min_quantity' => $tier->minQuantity,
+                'unit_price' => $tier->unitPrice,
+                'discount_percent' => $tier->discountPercent,
+            ], app(PriceResolver::class)->tiers($sku))),
         ];
     }
 

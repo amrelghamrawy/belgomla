@@ -17,22 +17,33 @@ beforeEach(function (): void {
 });
 
 test('the store product resource key set with visible prices', function (): void {
-    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['category', 'sku.sellingUnit', 'mainImage']);
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers', 'mainImage']);
 
     $data = rendered(new StoreProductResource($product, new Collection, false), storeRequest());
 
     expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category', 'custom_fields', 'sku'])
-        ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'in_stock'])
+        ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'in_stock'])
         ->and($data['sku']['unit'])->toBe($product->sku->sellingUnit->name);
 });
 
 test('D1 hidden prices drop the price keys and flag the product', function (): void {
-    $product = Product::factory()->withSku()->create()->load('sku');
+    $product = Product::factory()->withSku()->create()->load('sku.tiers');
 
     $data = rendered(new StoreProductResource($product, new Collection, true), storeRequest());
 
     expect($data['prices_hidden'])->toBeTrue()
-        ->and($data['sku'])->not->toHaveKeys(['cover_price', 'base_price']);
+        ->and($data['sku'])->not->toHaveKeys(['cover_price', 'base_price', 'discount_percent', 'tiers']);
+});
+
+test('BR-PR10 the store sku shows the discount off the cover price and its tiers from the resolver', function (): void {
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load('sku');
+    App\Modules\Pricing\Models\SkuPriceTier::factory()->for($product->sku)->percent('30.00')->create(['min_quantity' => 10, 'unit_price' => '84.00']);
+    $product->load('sku.tiers');
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
+
+    expect($sku['discount_percent'])->toBe('25.00')
+        ->and($sku['tiers'])->toBe([['min_quantity' => 10, 'unit_price' => '84.00']]);
 });
 
 test('BR-P04 a coming soon product is flagged and not in stock', function (): void {

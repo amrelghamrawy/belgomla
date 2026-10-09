@@ -29,3 +29,20 @@ test('null passes through normalizeOrNull', function (): void {
     expect(Money::normalizeOrNull(null))->toBeNull()
         ->and(Money::normalizeOrNull('5'))->toBe('5.00');
 });
+
+test('compare orders two amounts at two decimals', function (string $a, string $b, int $result): void {
+    expect(Money::compare($a, $b))->toBe($result);
+})->with([
+    'lower' => ['89.99', '90', -1],
+    'equal with different formatting' => ['90', '90.00', 0],
+    'higher' => ['90.01', '90.00', 1],
+]);
+
+test('times multiplies a unit price by a whole quantity exactly', function (): void {
+    expect(Money::times('89.99', 35))->toBe('3149.65')
+        ->and(Money::times('0.10', 3))->toBe('0.30');
+});
+
+test('compare and times refuse what is not a number', function (): void {
+    Money::times('abc', 2);
+})->throws(InvalidArgumentException::class, 'is not a money amount');

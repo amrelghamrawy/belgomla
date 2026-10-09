@@ -51,6 +51,8 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 422  | `validation_failed`        | field validation                                          |
 | 422  | `checkout_failed`          | one or more checkout assertions failed (`items[]` filled) |
 | 422  | `inventory_below_reserved` | BR-INV08 (`details.orders[]` filled)                      |
+| 422  | `invalid_tiers`            | BR-PR05 / D28 (`details.tiers[]`: one message per problem) |
+| 422  | `cover_price_required`     | BR-PR10: a % price on a SKU without a cover price         |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
 | 503  | `store_unavailable`        | tenant suspended (storefront)                             |
 
@@ -136,7 +138,7 @@ Item shape:
 
 If `require_login_for_prices` is on and no customer session: `sku.cover_price/base_price/tiers/discount_percent` are omitted and `prices_hidden: true` is added at the product level. `coming_soon` products return `in_stock:false, coming_soon:true` and `available` omitted.
 
-Delivered in stages (Task 1 = Catalog): the item also carries `description`; `custom_fields` lists only active fields with `show_on_storefront`, select values as the option label and booleans as `نعم`/`لا`. Until Inventory (Task 3) `in_stock` follows the status (`active` → true) and `available` is absent; `tiers` and `discount_percent` arrive with Pricing (Task 2). Filter facets with `type: boolean` use the option ids `"true"` / `"false"`.
+Delivered in stages (Task 1 = Catalog): the item also carries `description`; `custom_fields` lists only active fields with `show_on_storefront`, select values as the option label and booleans as `نعم`/`لا`. Until Inventory (Task 3) `in_stock` follows the status (`active` → true) and `available` is absent. Pricing (Task 2): `tiers` are `{ min_quantity, unit_price }` lowest first; `discount_percent` is the % the base price was entered as, else the % it implies off `cover_price`, else `null` (no cover price). Filter facets with `type: boolean` use the option ids `"true"` / `"false"`.
 
 ### `GET /api/store/products/{slug}`
 
@@ -372,7 +374,7 @@ Create/update body:
 }
 ```
 
-`base_price` **or** `base_price_percent` is required (BR-PR10); when percent is given, server computes the price and stores both. Same for each tier (`unit_price` or `discount_percent`). `opening_stock` is accepted only on create and writes an `opening` movement.
+`base_price` **or** `base_price_percent` is required (BR-PR10); when percent is given, server computes the price and stores both (the percent wins if both are sent). Same for each tier (`unit_price` or `discount_percent`). On update, a body without `sku.tiers` keeps the tiers (D34). The detail response carries `sku.tiers: [{ min_quantity, unit_price, discount_percent }]`. Prices, MOQ and tiers are audited as `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed`, not inside `product.updated`. `opening_stock` is accepted only on create and writes an `opening` movement.
 
 ### Pricing (BR-PR11)
 
@@ -382,6 +384,12 @@ Create/update body:
 | POST   | `/api/dashboard/pricing/bulk`                    | `{ filter: {...}, base_price_percent, tiers: [ { min_quantity, discount_percent } ], moq? }` |
 | POST   | `/api/dashboard/pricing/bulk/preview`            | same body → `{ affected, skipped_no_cover_price: [...] }` without writing                    |
 | POST   | `/api/dashboard/products/{id}/pricing/recompute` | recompute prices from stored percentages after a cover-price change                          |
+
+Delivered (Task 2):
+
+- `PUT …/pricing` and `…/recompute` return the SKU price set: `{ product_id, sku_id, code, cover_price, base_price, base_price_percent, discount_percent, moq, tiers: [{ min_quantity, unit_price, discount_percent }] }`. A missing `cover_price` keeps the current one (D34); `tiers` is required and replaces every tier (`[]` removes them). Errors: `422 invalid_tiers`, `422 cover_price_required`, `404` for another tenant's product.
+- `POST /pricing/bulk` returns `{ affected, skipped_no_cover_price: [{ product_id, sku_id, code, name }], batch_id }`; `…/bulk/preview` returns the same without `batch_id` and writes nothing. Bulk tiers are `{ min_quantity, discount_percent }` only. An empty filter is `422` on `filter`.
+- Audit: `sku.price_changed`, `sku.tiers_changed`, `sku.moq_changed` (per SKU, only what changed) and `pricing.bulk_applied` (one per bulk, same `batch_id`).
 
 ---
 

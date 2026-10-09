@@ -347,6 +347,8 @@ Example: quantity 35 → 90 EGP. Quantity 7 with tiers starting at 10 → base p
 
 Two tiers of the same SKU cannot share the same `min_quantity`. Tier prices must be `> 0`.
 
+A tier may not cost more than the SKU's base price (D28: no surcharges); a tier equal to the base price is allowed. Violations are rejected together with `422 invalid_tiers`, one Arabic message per problem in `details.tiers`.
+
 ### BR-PR06 — Checkout Recalculation
 
 The cart is not the final pricing authority.
@@ -383,8 +385,10 @@ In the school-book trade every book has a printed **cover price** (سعر الغ
 
 - A SKU has an optional `cover_price` (سعر الغلاف). When set, the storefront shows cover price, wholesale price and the implied discount.
 - `base_price` and tier prices can be entered **either** as an absolute unit price **or** as a discount percentage off `cover_price`. The dashboard converts the percentage to an absolute `unit_price` at save time; the stored and snapshotted value is always the absolute price, plus the percentage used, for display.
-- Changing `cover_price` later does not silently recompute prices; the dashboard offers "recompute from percentages" as an explicit action (audited).
+- Changing `cover_price` later does not silently recompute prices; the dashboard offers "recompute from percentages" as an explicit action (audited). It re-derives the base price and every tier that has a stored percentage from the current cover price; absolute prices stay.
 - Pricing resolution (BR-PR04) is unchanged.
+- **Rounding (D27):** price = `cover_price × (100 − percent) / 100`, computed exactly (bcmath, never floats) and rounded **half-up to the piaster** (2 decimals): 120.00 at 25% → 90.00; 10.10 at 25% = 7.575 → 7.58. The implied discount shown next to an absolute price uses the same rounding.
+- When both a price and a percentage are sent for the same value, the percentage wins and the price is computed from it. A percentage on a SKU without a cover price is rejected with `422 cover_price_required`.
 
 ### BR-PR11 — Bulk Pricing by Filter
 
@@ -392,7 +396,10 @@ A merchant with hundreds of books sets prices per publisher or per grade, not pe
 
 - Select products by filter (e.g. `publisher = الأضواء`, `academic_year = 2026/2027`).
 - Apply: base price = X% off cover price, and optional tiers (e.g. 10+ → Y%, 50+ → Z%).
-- The action writes concrete prices/tiers to every matching SKU, in one transaction, with one audit record for the bulk action and one per SKU.
+- The action writes concrete prices/tiers to every matching SKU, in one transaction, under one audit batch id: one `pricing.bulk_applied` record for the bulk action, and per SKU one record per kind of change (`sku.price_changed`, `sku.tiers_changed`, `sku.moq_changed`), as for a single-SKU edit.
+- The given tiers replace each SKU's tiers (an empty list removes them); the MOQ changes only when one is given.
+- A preview runs the same selection and checks without writing and returns `{ affected, skipped_no_cover_price }`.
+- An empty filter is refused (as for bulk status, BR-P12).
 
 Products without `cover_price` are skipped and reported.
 

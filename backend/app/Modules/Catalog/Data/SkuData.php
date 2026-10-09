@@ -6,10 +6,11 @@ namespace App\Modules\Catalog\Data;
 
 use App\Modules\Catalog\Http\Requests\StoreProductRequest;
 use App\Modules\Catalog\Http\Requests\UpdateProductRequest;
+use App\Modules\Pricing\Data\SkuPricingData;
 
 /**
- * The single V1 SKU of a product (BR-P02, BR-U02, BR-PR01, BR-PR10, BR-MOQ01).
- * Money values are normalised 2-decimal strings. Tiers arrive with Task 2.
+ * The single V1 SKU of a product (BR-P02, BR-U02). Its prices, MOQ and tiers (BR-PR01, BR-PR10,
+ * BR-MOQ01) are Pricing's: they travel as SkuPricingData and are written by UpdateSkuPricing.
  */
 final readonly class SkuData
 {
@@ -18,10 +19,7 @@ final readonly class SkuData
         public int $sellingUnitId,
         public int $baseUnitId,
         public int $conversionFactor,
-        public string $basePrice,
-        public ?string $coverPrice = null,
-        public ?string $basePricePercent = null,
-        public int $moq = 1,
+        public SkuPricingData $pricing,
     ) {}
 
     public static function fromRequest(StoreProductRequest|UpdateProductRequest $request): self
@@ -31,17 +29,14 @@ final readonly class SkuData
             sellingUnitId: $request->skuInt('selling_unit_id'),
             baseUnitId: $request->skuInt('base_unit_id'),
             conversionFactor: $request->skuInt('conversion_factor'),
-            basePrice: $request->skuMoney('base_price') ?? '0.00',
-            coverPrice: $request->skuMoney('cover_price'),
-            basePricePercent: $request->skuMoney('base_price_percent'),
-            moq: $request->skuInt('moq', 1),
+            pricing: new SkuPricingData(...$request->pricingInput()),
         );
     }
 
     /**
-     * Column => value for the skus table.
+     * Column => value for the skus table, prices excluded.
      *
-     * @return array<string, int|string|null>
+     * @return array<string, int|string>
      */
     public function attributes(): array
     {
@@ -50,10 +45,6 @@ final readonly class SkuData
             'selling_unit_id' => $this->sellingUnitId,
             'base_unit_id' => $this->baseUnitId,
             'conversion_factor' => $this->conversionFactor,
-            'cover_price' => $this->coverPrice,
-            'base_price' => $this->basePrice,
-            'base_price_percent' => $this->basePricePercent,
-            'moq' => $this->moq,
         ];
     }
 }

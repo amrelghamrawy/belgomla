@@ -34,6 +34,16 @@ test('the dashboard product resource key set without detail relations', function
         ->and($data['created_at'])->toBe($product->created_at->toIso8601String());
 });
 
+test('the dashboard sku lists its tiers with the percent each was entered as once they are loaded', function (): void {
+    $product = Product::factory()->withSku()->create()->load('sku');
+    App\Modules\Pricing\Models\SkuPriceTier::factory()->for($product->sku)->create(['min_quantity' => 10, 'unit_price' => '90.00']);
+    $product->load('sku.tiers');
+
+    $sku = rendered(new DashboardProductResource($product), dashboardRequest())['sku'];
+
+    expect($sku['tiers'])->toBe([['min_quantity' => 10, 'unit_price' => '90.00', 'discount_percent' => null]]);
+});
+
 test('the dashboard product resource never lazy-loads: unloaded relations render as null', function (): void {
     $product = Product::factory()->withSku()->create()->refresh();
 

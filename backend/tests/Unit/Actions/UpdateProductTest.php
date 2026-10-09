@@ -8,6 +8,9 @@ use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Pricing\Data\SkuPricingData;
+use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 
@@ -23,20 +26,35 @@ beforeEach(function (): void {
         categoryId: $basics['category']->id,
         sku: new SkuData(...[
             'code' => 'PEN-1', 'sellingUnitId' => $basics['carton']->id, 'baseUnitId' => $basics['piece']->id,
-            'conversionFactor' => 1, 'basePrice' => '30.00', 'moq' => 2, ...$sku,
+            'conversionFactor' => 1, 'pricing' => new SkuPricingData(basePrice: '30.00', moq: 2), ...$sku,
         ]),
         customFields: $customFields,
     );
 });
 
-test('BR-L a price and moq change is audited as exactly those fields', function (): void {
-    app(UpdateProduct::class)->handle($this->product, ($this->data)(['basePrice' => '28.50', 'moq' => 5]));
+test('BR-L a price and moq change is audited by pricing as exactly those changes, not as a product update', function (): void {
+    app(UpdateProduct::class)->handle($this->product, ($this->data)(['pricing' => new SkuPricingData('28.50', moq: 5)]));
 
-    $log = AuditLog::query()->sole();
+    $logs = AuditLog::query()->get()->keyBy('action');
 
     expect($this->product->sku->base_price)->toBe('28.50')
-        ->and($log->old_values)->toEqual(['sku.base_price' => '30.00', 'sku.moq' => 2])
-        ->and($log->new_values)->toEqual(['sku.base_price' => '28.50', 'sku.moq' => 5]);
+        ->and($logs->keys()->sort()->values()->all())->toBe(['product.updated', 'sku.moq_changed', 'sku.price_changed'])
+        ->and($logs['sku.price_changed']->old_values)->toEqual(['base_price' => '30.00'])
+        ->and($logs['sku.price_changed']->new_values)->toEqual(['base_price' => '28.50'])
+        ->and($logs['sku.moq_changed']->new_values)->toEqual(['moq' => 5])
+        ->and($logs['product.updated']->new_values)->toBe([]);
+});
+
+test('BR-PR03 tiers not sent are kept, tiers sent replace the old ones', function (): void {
+    SkuPriceTier::factory()->for($this->product->sku)->create(['min_quantity' => 10, 'unit_price' => '25.00']);
+
+    app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)(name: 'قلم أزرق'));
+    $kept = $this->product->sku->tiers->pluck('unit_price', 'min_quantity')->all();
+
+    app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)(['pricing' => new SkuPricingData('30.00', moq: 2, tiers: [new TierData(20, '24.00')])]));
+
+    expect($kept)->toBe([10 => '25.00'])
+        ->and($this->product->sku->tiers->pluck('unit_price', 'min_quantity')->all())->toBe([20 => '24.00']);
 });
 
 test('BR-P08 archived field values survive an update that does not send them', function (): void {

@@ -17,6 +17,12 @@ const DASHBOARD_PRODUCT_KEYS = [
     'main_image_url', 'created_at', 'updated_at',
 ];
 
+/** The detail (show, create, update) also carries the tiers (08-api-contract.md §6). */
+const DASHBOARD_PRODUCT_DETAIL_KEYS = [
+    ...DASHBOARD_PRODUCT_KEYS,
+    'sku' => [...DASHBOARD_PRODUCT_KEYS['sku'], 'tiers'],
+];
+
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
 });
@@ -24,7 +30,7 @@ beforeEach(function (): void {
 test('BR-P02 creating a product creates exactly one sku in the same call, audited', function (): void {
     $response = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload())
         ->assertCreated()
-        ->assertExactJsonStructure(['data' => [...DASHBOARD_PRODUCT_KEYS, 'images', 'relations']])
+        ->assertExactJsonStructure(['data' => [...DASHBOARD_PRODUCT_DETAIL_KEYS, 'images', 'relations']])
         ->assertJsonPath('data.name', 'الأضواء علوم أولى إعدادي ترم أول')
         ->assertJsonPath('data.slug', 'الأضواء-علوم-أولى-إعدادي-ترم-أول')
         ->assertJsonPath('data.status', 'active')
@@ -122,17 +128,53 @@ test('product creation validation', function (array $overrides, string $field): 
     'BR-PR01 zero base price' => [['sku' => ['base_price' => 0]], 'sku.base_price'],
     'base price with 3 decimals' => [['sku' => ['base_price' => '1.005']], 'sku.base_price'],
     'negative cover price' => [['sku' => ['cover_price' => -1]], 'sku.cover_price'],
-    'BR-PR10 percent without cover price' => [['sku' => ['cover_price' => null, 'base_price_percent' => 25]], 'sku.cover_price'],
+    'BR-PR03 tier without a minimum quantity' => [['sku' => ['tiers' => [['unit_price' => 80]]]], 'sku.tiers.0.min_quantity'],
+    'BR-PR03 tier without a price or percent' => [['sku' => ['tiers' => [['min_quantity' => 10]]]], 'sku.tiers.0.unit_price'],
+    'BR-PR05 tier price of 0' => [['sku' => ['tiers' => [['min_quantity' => 10, 'unit_price' => 0]]]], 'sku.tiers.0.unit_price'],
+    'BR-U05 fractional tier quantity' => [['sku' => ['tiers' => [['min_quantity' => 2.5, 'unit_price' => 80]]]], 'sku.tiers.0.min_quantity'],
+    'BR-PR10 tier percent of 100' => [['sku' => ['tiers' => [['min_quantity' => 10, 'discount_percent' => 100]]]], 'sku.tiers.0.discount_percent'],
+    'tiers not a list' => [['sku' => ['tiers' => 'x']], 'sku.tiers'],
     'BR-PR10 percent of 100' => [['sku' => ['base_price_percent' => 100]], 'sku.base_price_percent'],
     'BR-MOQ01 moq of 0' => [['sku' => ['moq' => 0]], 'sku.moq'],
     'BR-U05 fractional moq' => [['sku' => ['moq' => 2.5]], 'sku.moq'],
     'unknown status' => [['status' => 'draft'], 'status'],
 ]);
 
-test('BR-PR10 a base price percentage is stored next to the cover price', function (): void {
-    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['base_price_percent' => 25]]))
+test('BR-PR10 a base price percentage is stored next to the price computed from the cover price', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['base_price' => null, 'base_price_percent' => 20]]))
         ->assertCreated()
-        ->assertJsonPath('data.sku.base_price_percent', '25.00');
+        ->assertJsonPath('data.sku.base_price', '96.00')
+        ->assertJsonPath('data.sku.base_price_percent', '20.00');
+});
+
+test('BR-PR10 a percentage without a cover price is refused with cover_price_required', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['cover_price' => null, 'base_price_percent' => 25]]))
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'cover_price_required');
+
+    expect($this->inTenant(fn () => Product::query()->count()))->toBe(0);
+});
+
+test('BR-PR03 a product is created with its tiers, absolute or as a percent off the cover price', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['tiers' => [
+        ['min_quantity' => 50, 'discount_percent' => 35],
+        ['min_quantity' => 10, 'unit_price' => '85'],
+    ]]]))
+        ->assertCreated()
+        ->assertJsonPath('data.sku.tiers', [
+            ['min_quantity' => 10, 'unit_price' => '85.00', 'discount_percent' => null],
+            ['min_quantity' => 50, 'unit_price' => '78.00', 'discount_percent' => '35.00'],
+        ]);
+});
+
+test('BR-PR05 duplicate tier thresholds on a product are refused with invalid_tiers', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['tiers' => [
+        ['min_quantity' => 10, 'unit_price' => '85'],
+        ['min_quantity' => 10, 'unit_price' => '80'],
+    ]]]))
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'invalid_tiers')
+        ->assertJsonCount(1, 'error.details.tiers');
 });
 
 test('opening stock is not accepted by this task and is ignored', function (): void {
@@ -275,7 +317,7 @@ test('the product detail includes the gallery and relations both ways', function
     $this->tenantJson('GET', "/api/dashboard/products/{$product->id}")
         ->assertOk()
         ->assertExactJsonStructure(['data' => [
-            ...DASHBOARD_PRODUCT_KEYS,
+            ...DASHBOARD_PRODUCT_DETAIL_KEYS,
             'images' => ['*' => ['id', 'url', 'is_main', 'sort_order']],
             'relations' => ['*' => ['id', 'type', 'direction', 'product' => ['id', 'name', 'slug', 'status']]],
         ]])
@@ -296,11 +338,13 @@ test('an owner updates product and sku fields; the audit keeps only what changed
         ->assertJsonPath('data.sku.moq', 10)
         ->assertJsonPath('data.slug', 'الأضواء-علوم-أولى-إعدادي-ترم-أول');
 
-    $log = $this->inTenant(fn () => AuditLog::query()->where('action', 'product.updated')->sole());
+    $logs = $this->inTenant(fn () => AuditLog::query()->whereIn('action', ['product.updated', 'sku.price_changed', 'sku.moq_changed'])->get()->keyBy('action'));
 
-    expect($log->old_values)->toEqual(['name' => 'الأضواء علوم أولى إعدادي ترم أول', 'sku.base_price' => '90.00', 'sku.moq' => 5])
-        ->and($log->new_values)->toEqual(['name' => 'اسم جديد', 'sku.base_price' => '85.00', 'sku.moq' => 10])
-        ->and($log->actor_id)->toBe($this->me->id);
+    expect($logs['product.updated']->old_values)->toEqual(['name' => 'الأضواء علوم أولى إعدادي ترم أول'])
+        ->and($logs['product.updated']->new_values)->toEqual(['name' => 'اسم جديد'])
+        ->and($logs['sku.price_changed']->new_values)->toEqual(['base_price' => '85.00'])
+        ->and($logs['sku.moq_changed']->new_values)->toEqual(['moq' => 10])
+        ->and($logs->pluck('actor_id')->unique()->all())->toBe([$this->me->id]);
 });
 
 test('an update may keep its own sku code but not take another product code', function (): void {
