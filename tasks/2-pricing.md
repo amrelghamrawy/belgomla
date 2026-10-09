@@ -53,7 +53,7 @@ Quantity-tier pricing per SKU, the single `PriceResolver` used by cart/checkout 
 
 ## Delivery notes (session 2026-10-09)
 
-`composer test` green: 981 tests (+171 over Task 1's 810), PHPStan max clean, type coverage 100%. Smoke-tested on `php artisan serve` with tenant `alnoor`: product created with `sku.tiers` (base and tier as %), `PUT …/pricing`, duplicate thresholds → `422 invalid_tiers`, store product shows `tiers` + `discount_percent`, bulk preview then apply on `publisher = الأضواء` (2 affected, 1 skipped without cover price, one audit batch), recompute, guest `401`. The dev tenant `alnoor` predates the vertical templates, so the smoke script created its `publisher` field through the API.
+Commit: `5f90187`. `composer test` green: 981 tests (+171 over Task 1's 810), PHPStan max clean, type coverage 100%. Smoke-tested on `php artisan serve` with tenant `alnoor`: product created with `sku.tiers` (base and tier as %), `PUT …/pricing`, duplicate thresholds → `422 invalid_tiers`, store product shows `tiers` + `discount_percent`, bulk preview then apply on `publisher = الأضواء` (2 affected, 1 skipped without cover price, one audit batch), recompute, guest `401`. The dev tenant `alnoor` predates the vertical templates, so the smoke script created its `publisher` field through the API.
 
 Rules covered by tests: BR-PR01, BR-PR02, BR-PR03, BR-PR04, BR-PR05, BR-PR07 (line total), BR-PR10, BR-PR11, BR-MOQ01, BR-U04/U05, BR-T03, BR-T04, BR-L, D27, D28, D34.
 
