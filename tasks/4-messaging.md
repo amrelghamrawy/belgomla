@@ -64,7 +64,7 @@ Facts verified on 2026-10-09 (re-check when starting):
 
 ## Delivery notes (session 2026-10-09)
 
-Commit: see the task board.
+Commit: `52b46bb`.
 
 `composer test` is green with 1367 tests (+207 over Task 3's 1160). PHPStan max is clean and type coverage is 100%.
 

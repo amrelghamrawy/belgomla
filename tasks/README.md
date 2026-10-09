@@ -8,7 +8,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | 1  | [Catalog](1-catalog.md)                | Catalog                       | done        | dcbbd44 |
 | 2  | [Pricing](2-pricing.md)                | Pricing                       | done        | 5f90187 |
 | 3  | [Inventory](3-inventory.md)            | Inventory                     | done        | ed057c0 |
-| 4  | [Messaging](4-messaging.md)            | Messaging                     | not started |        |
+| 4  | [Messaging](4-messaging.md)            | Messaging                     | done (live check pending) | 52b46bb |
 | 5  | [Customers](5-customers.md)            | Customers (+ cart)            | not started |        |
 | 6  | [Orders & Checkout](6-orders.md)       | Orders, Notifications         | not started |        |
 | 7  | [Collections & Reports](7-collections-reports.md) | Collections, Reports, Audit API | not started |        |
