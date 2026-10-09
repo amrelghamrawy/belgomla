@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy;
 
 use App\Modules\Tenancy\Models\Tenant;
@@ -9,7 +11,7 @@ use RuntimeException;
  * Holds the tenant resolved for the current request (or CLI run).
  * Registered as a singleton; every tenant-owned query reads from it.
  */
-class TenantContext
+final class TenantContext
 {
     private ?Tenant $tenant = null;
 
@@ -25,12 +27,12 @@ class TenantContext
 
     public function has(): bool
     {
-        return $this->tenant !== null;
+        return $this->tenant instanceof Tenant;
     }
 
     public function get(): Tenant
     {
-        if ($this->tenant === null) {
+        if (! $this->tenant instanceof Tenant) {
             throw new RuntimeException('No tenant is set in the current context.');
         }
 
@@ -49,6 +51,11 @@ class TenantContext
 
     /**
      * Run a callback with a specific tenant set, restoring the previous one afterwards.
+     *
+     * @template TReturn
+     *
+     * @param  callable(Tenant): TReturn  $callback
+     * @return TReturn
      */
     public function runAs(Tenant $tenant, callable $callback): mixed
     {

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -44,10 +46,7 @@ return [
             'driver' => 'session',
             'provider' => 'tenant_users',
         ],
-        'customer' => [
-            'driver' => 'session',
-            'provider' => 'customers',
-        ],
+        // The 'customer' guard is registered by the Customers module (BR-CU04).
     ],
 
     /*
@@ -71,11 +70,6 @@ return [
         'tenant_users' => [
             'driver' => 'eloquent',
             'model' => App\Modules\Tenancy\Models\TenantUser::class,
-        ],
-
-        'customers' => [
-            'driver' => 'eloquent',
-            'model' => App\Modules\Customers\Models\Customer::class,
         ],
     ],
 

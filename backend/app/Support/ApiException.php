@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Support;
 
 use RuntimeException;
@@ -7,8 +9,12 @@ use RuntimeException;
 /**
  * An error that maps directly onto the API error envelope (08-api-contract.md §0).
  */
-class ApiException extends RuntimeException
+final class ApiException extends RuntimeException
 {
+    /**
+     * @param  array<string, mixed>|null  $details
+     * @param  list<array<string, mixed>>|null  $items
+     */
     public function __construct(
         public readonly int $status,
         public readonly string $errorCode,
@@ -29,11 +35,18 @@ class ApiException extends RuntimeException
         return new self(403, $code, $message);
     }
 
+    /**
+     * @param  array<string, mixed>|null  $details
+     */
     public static function conflict(string $code, string $message, ?array $details = null): self
     {
         return new self(409, $code, $message, $details);
     }
 
+    /**
+     * @param  array<string, mixed>|null  $details
+     * @param  list<array<string, mixed>>|null  $items
+     */
     public static function unprocessable(string $code, string $message, ?array $details = null, ?array $items = null): self
     {
         return new self(422, $code, $message, $details, $items);

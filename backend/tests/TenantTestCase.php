@@ -1,15 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests;
 
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Base class for feature tests that talk to the API as a tenant.
- * Requests are sent with the tenant's Host header, exactly like production.
+ * Base class for tests that talk to the API as a tenant.
+ * Requests are sent to the tenant's host with an Origin header, exactly like the Next.js SPA.
  */
 abstract class TenantTestCase extends TestCase
 {
@@ -26,38 +30,57 @@ abstract class TenantTestCase extends TestCase
 
     protected function hostOf(Tenant $tenant): string
     {
-        return $tenant->subdomain.'.'.config('tenancy.base_domain');
+        return $tenant->subdomain.'.'.config()->string('tenancy.base_domain');
     }
 
     /**
-     * Send a JSON request to the given tenant's host, the way the Next.js SPA does:
-     * absolute URL on the tenant host plus an Origin header so Sanctum treats it as stateful.
+     * Send a JSON request to a tenant's host (defaults to the test tenant).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $headers
+     * @return TestResponse<Response>
      */
-    protected function tenantJson(string $method, string $uri, array $data = [], ?Tenant $tenant = null, array $headers = [])
+    protected function tenantJson(string $method, string $uri, array $data = [], ?Tenant $tenant = null, array $headers = []): TestResponse
     {
         return $this->hostJson($this->hostOf($tenant ?? $this->tenant), $method, $uri, $data, $headers);
     }
 
-    protected function hostJson(string $host, string $method, string $uri, array $data = [], array $headers = [])
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $headers
+     * @return TestResponse<Response>
+     */
+    protected function hostJson(string $host, string $method, string $uri, array $data = [], array $headers = []): TestResponse
     {
-        // Each real request starts with an empty tenant context; mirror that so middleware order bugs show up.
+        // Each real request starts with an empty tenant context; mirror that so middleware-order bugs show up.
         app(TenantContext::class)->clear();
 
         // Symfony's Request::create() derives HTTP_HOST from the URL, so the host must be in the URL itself.
         return $this->json($method, 'http://'.$host.$uri, $data, $headers + ['Origin' => 'http://'.$host]);
     }
 
-    /** Create a model inside a tenant's context (the trait fills tenant_id). */
+    /**
+     * Run a callback inside a tenant's context (BelongsToTenant fills tenant_id).
+     *
+     * @template TReturn
+     *
+     * @param  callable(Tenant): TReturn  $callback
+     * @return TReturn
+     */
     protected function asTenant(Tenant $tenant, callable $callback): mixed
     {
         return app(TenantContext::class)->runAs($tenant, $callback);
     }
 
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
     protected function makeOwner(?Tenant $tenant = null, array $attributes = []): TenantUser
     {
         $tenant ??= $this->tenant;
 
-        return $this->asTenant($tenant, fn () => TenantUser::factory()->create($attributes));
+        // refresh() loads DB defaults (remember_token, timestamps) so strict-mode attribute access never throws.
+        return $this->asTenant($tenant, fn (): TenantUser => TenantUser::factory()->create($attributes)->refresh());
     }
 
     /** Authenticate a dashboard user for subsequent requests on their tenant host. */
@@ -67,5 +90,10 @@ abstract class TenantTestCase extends TestCase
         $this->actingAs($user, 'tenant_user');
 
         return $user;
+    }
+
+    protected function otherTenant(string $subdomain = 'other'): Tenant
+    {
+        return Tenant::factory()->create(['subdomain' => $subdomain, 'name' => 'متجر آخر']);
     }
 }

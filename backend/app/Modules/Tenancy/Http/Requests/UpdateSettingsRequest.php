@@ -1,11 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateSettingsRequest extends FormRequest
 {
+    /**
+     * @return array<string, list<string>>
+     */
     public function rules(): array
     {
         return [
@@ -28,6 +33,9 @@ class UpdateSettingsRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return [
@@ -35,5 +43,11 @@ class UpdateSettingsRequest extends FormRequest
             'primary_color.regex' => 'اللون يجب أن يكون بصيغة #RRGGBB',
             'secondary_color.regex' => 'اللون يجب أن يكون بصيغة #RRGGBB',
         ];
+    }
+
+    /** The new store name, when one was sent. */
+    public function storeName(): ?string
+    {
+        return $this->has('name') ? $this->string('name')->value() : null;
     }
 }

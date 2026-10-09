@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Http\Middleware\EnsureSessionTenant;
@@ -26,16 +28,17 @@ class DashboardAuthController
             throw new ApiException(400, 'stateful_request_required', 'يجب إرسال الطلب من واجهة المتجر');
         }
 
-        $key = 'dashboard-login:'.$context->id().':'.strtolower($request->input('email')).'|'.$request->ip();
+        $email = $request->email();
+        $key = 'dashboard-login:'.$context->id().':'.$email.'|'.$request->ip();
 
         if (RateLimiter::tooManyAttempts($key, 5)) {
             throw new ApiException(429, 'rate_limited', 'محاولات كثيرة، حاول بعد دقيقة');
         }
 
         // TenantUser is tenant-scoped, so this can only find users of the current tenant.
-        $user = TenantUser::query()->where('email', strtolower($request->input('email')))->first();
+        $user = TenantUser::query()->where('email', $email)->first();
 
-        if ($user === null || ! Hash::check($request->input('password'), $user->password)) {
+        if ($user === null || ! Hash::check($request->password(), $user->password)) {
             RateLimiter::hit($key, 60);
 
             throw ApiException::unprocessable('invalid_credentials', 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
@@ -69,9 +72,12 @@ class DashboardAuthController
     /** GET /api/dashboard/me */
     public function me(Request $request, TenantContext $context): JsonResponse
     {
-        /** @var TenantUser $user */
         $user = $request->user(self::GUARD);
         $tenant = $context->get();
+
+        if (! $user instanceof TenantUser) {
+            throw new ApiException(401, 'unauthenticated', 'يجب تسجيل الدخول');
+        }
 
         return ApiResponse::data([
             'user' => $user->toApiArray(),

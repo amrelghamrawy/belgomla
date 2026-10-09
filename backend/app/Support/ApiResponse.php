@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Support;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Builds the response envelopes defined in 08-api-contract.md §0.
@@ -26,12 +29,14 @@ final class ApiResponse
     }
 
     /**
-     * @param  callable|null  $map  transforms each item
+     * @param  LengthAwarePaginator<int, mixed>  $paginator
+     * @param  (callable(mixed): mixed)|null  $map  transforms each item
      */
     public static function paginated(LengthAwarePaginator $paginator, ?callable $map = null): JsonResponse
     {
-        $items = $paginator->getCollection();
-        if ($map) {
+        $items = collect($paginator->items());
+
+        if ($map !== null) {
             $items = $items->map($map);
         }
 
@@ -46,12 +51,32 @@ final class ApiResponse
         ]);
     }
 
+    public static function validation(ValidationException $exception): JsonResponse
+    {
+        $details = [];
+
+        foreach ($exception->errors() as $field => $messages) {
+            $details[(string) $field] = array_values(array_map(
+                fn (mixed $message): string => is_string($message) ? $message : '',
+                is_array($messages) ? $messages : [$messages],
+            ));
+        }
+
+        return self::error(422, 'validation_failed', 'بعض البيانات غير صحيحة', $details);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $details
+     * @param  list<array<string, mixed>>|null  $items
+     */
     public static function error(int $status, string $code, string $message, ?array $details = null, ?array $items = null): JsonResponse
     {
         $error = ['code' => $code, 'message' => $message];
+
         if ($details !== null) {
             $error['details'] = $details;
         }
+
         if ($items !== null) {
             $error['items'] = $items;
         }

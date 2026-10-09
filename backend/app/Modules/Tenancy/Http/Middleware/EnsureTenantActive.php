@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy\Http\Middleware;
 
 use App\Modules\Tenancy\TenantContext;
@@ -16,6 +18,9 @@ class EnsureTenantActive
 {
     public function __construct(private readonly TenantContext $context) {}
 
+    /**
+     * @param  Closure(Request): Response  $next
+     */
     public function handle(Request $request, Closure $next, string $surface = 'store'): Response
     {
         $tenant = $this->context->get();

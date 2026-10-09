@@ -1,12 +1,29 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Audit\Models;
 
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Append-only. No updates or deletes are ever issued against this table (Tech §16).
+ *
+ * @property int $id
+ * @property int $tenant_id
+ * @property string $actor_type
+ * @property int|null $actor_id
+ * @property string $action
+ * @property string $entity_type
+ * @property int|null $entity_id
+ * @property array<string, mixed>|null $old_values
+ * @property array<string, mixed>|null $new_values
+ * @property string|null $batch_id
+ * @property string|null $ip
+ * @property string|null $user_agent
+ * @property Carbon $created_at
  */
 class AuditLog extends Model
 {
@@ -19,15 +36,9 @@ class AuditLog extends Model
         'old_values', 'new_values', 'batch_id', 'ip', 'user_agent',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'old_values' => 'array',
-            'new_values' => 'array',
-            'created_at' => 'datetime',
-        ];
-    }
-
+    /**
+     * @return array<string, mixed>
+     */
     public function toApiArray(): array
     {
         return [
@@ -39,7 +50,19 @@ class AuditLog extends Model
             'new_values' => $this->new_values,
             'batch_id' => $this->batch_id,
             'ip' => $this->ip,
-            'created_at' => $this->created_at?->toIso8601String(),
+            'created_at' => $this->created_at->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'old_values' => 'array',
+            'new_values' => 'array',
+            'created_at' => 'datetime',
         ];
     }
 }

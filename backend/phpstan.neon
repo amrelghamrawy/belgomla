@@ -1,0 +1,20 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: max
+
+    paths:
+        - app
+        - bootstrap/app.php
+        - config/tenancy.php
+        - database/factories
+        - database/seeders
+        - routes
+        - tests/Pest.php
+        - tests/TenantTestCase.php
+        - tests/TestCase.php
+
+    # Laravel's stock config files use env() with mixed return types; they are not ours to type.
+    excludePaths:
+        - config/app.php

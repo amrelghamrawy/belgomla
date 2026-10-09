@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('tenants', function (Blueprint $table) {
+        Schema::create('tenants', function (Blueprint $table): void {
             $table->id();
             $table->string('subdomain', 63)->unique();
             $table->string('name', 150);
@@ -17,7 +19,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('tenant_settings', function (Blueprint $table) {
+        Schema::create('tenant_settings', function (Blueprint $table): void {
             $table->foreignId('tenant_id')->primary()->constrained('tenants')->cascadeOnDelete();
             $table->string('logo_path')->nullable();
             $table->string('favicon_path')->nullable();
@@ -37,7 +39,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('tenant_users', function (Blueprint $table) {
+        Schema::create('tenant_users', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->string('name', 100);

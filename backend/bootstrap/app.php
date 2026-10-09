@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Modules\Tenancy\Console\TenantActivateCommand;
 use App\Modules\Tenancy\Console\TenantCreateCommand;
 use App\Modules\Tenancy\Console\TenantListCommand;
@@ -36,9 +38,12 @@ return Application::configure(basePath: dirname(__DIR__))
         TenantActivateCommand::class,
         TenantListCommand::class,
     ])
-    ->withMiddleware(function (Middleware $middleware) {
+    ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA: cookie sessions for requests coming from tenant hosts (Tech §6).
         $middleware->statefulApi();
+
+        // Pure API: guests get a 401 envelope, never a redirect to a login page.
+        $middleware->redirectGuestsTo(fn (): ?string => null);
 
         $middleware->alias([
             'tenant' => ResolveTenant::class,
@@ -52,11 +57,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(AuthenticatesRequests::class, ResolveTenant::class);
         $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureTenantActive::class);
     })
-    ->withExceptions(function (Exceptions $exceptions) {
+    ->withExceptions(function (Exceptions $exceptions): void {
         // Every /api/* error uses the envelope from 08-api-contract.md §0.
-        $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*') || $request->expectsJson());
+        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->expectsJson());
 
-        $exceptions->render(function (Throwable $e, Request $request) {
+        $exceptions->render(function (Throwable $e, Request $request): ?Illuminate\Http\JsonResponse {
             if (! $request->is('api/*')) {
                 return null;
             }
@@ -64,7 +69,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return match (true) {
                 $e instanceof ApiException => ApiResponse::error($e->status, $e->errorCode, $e->getMessage(), $e->details, $e->items),
 
-                $e instanceof ValidationException => ApiResponse::error(422, 'validation_failed', 'بعض البيانات غير صحيحة', $e->errors()),
+                $e instanceof ValidationException => ApiResponse::validation($e),
 
                 $e instanceof AuthenticationException => ApiResponse::error(401, 'unauthenticated', 'يجب تسجيل الدخول'),
 

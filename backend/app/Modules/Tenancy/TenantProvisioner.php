@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy;
 
 use App\Modules\Tenancy\Models\Tenant;
@@ -26,12 +28,12 @@ class TenantProvisioner
 
     public function create(string $subdomain, string $name, string $ownerEmail, string $ownerPassword, string $vertical = 'none'): Tenant
     {
-        $subdomain = strtolower(trim($subdomain));
+        $subdomain = mb_strtolower(mb_trim($subdomain));
 
         if (! preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $subdomain)) {
             throw new InvalidArgumentException('Subdomain must be 1-63 chars of a-z, 0-9 and hyphens.');
         }
-        if (in_array($subdomain, config('tenancy.reserved_subdomains', []), true)) {
+        if (in_array($subdomain, config()->array('tenancy.reserved_subdomains'), true)) {
             throw new InvalidArgumentException("Subdomain \"{$subdomain}\" is reserved.");
         }
         if (! in_array($vertical, Tenant::VERTICALS, true)) {
@@ -51,10 +53,10 @@ class TenantProvisioner
 
             $tenant->settings()->create([]);
 
-            $this->context->runAs($tenant, function () use ($ownerEmail, $ownerPassword, $name) {
+            $this->context->runAs($tenant, function () use ($ownerEmail, $ownerPassword, $name): void {
                 TenantUser::create([
                     'name' => $name,
-                    'email' => strtolower($ownerEmail),
+                    'email' => mb_strtolower($ownerEmail),
                     'password' => $ownerPassword,
                     'role' => TenantUser::ROLE_OWNER,
                 ]);
@@ -70,7 +72,7 @@ class TenantProvisioner
 
     public function setStatus(string $subdomain, string $status): Tenant
     {
-        $tenant = Tenant::query()->where('subdomain', strtolower($subdomain))->first();
+        $tenant = Tenant::query()->where('subdomain', mb_strtolower($subdomain))->first();
 
         if ($tenant === null) {
             throw new InvalidArgumentException("Tenant \"{$subdomain}\" not found.");

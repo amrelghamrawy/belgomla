@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\TenantContext;
@@ -12,8 +14,7 @@ class StoreTenantController
     public function show(TenantContext $context): JsonResponse
     {
         $tenant = $context->get();
-        $settings = $tenant->settings ?? $tenant->settings()->make();
 
-        return ApiResponse::data($settings->toPublicArray($tenant));
+        return ApiResponse::data($tenant->settingsRow()->toPublicArray($tenant));
     }
 }

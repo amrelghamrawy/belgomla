@@ -1,13 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Tenancy\Console;
 
 use App\Modules\Tenancy\TenantProvisioner;
+use App\Support\Console\TypedInput;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 
 class TenantCreateCommand extends Command
 {
+    use TypedInput;
+
     protected $signature = 'tenant:create
         {subdomain : Subdomain under the base domain, e.g. alnoor}
         {name : Store name (Arabic)}
@@ -19,16 +24,16 @@ class TenantCreateCommand extends Command
 
     public function handle(TenantProvisioner $provisioner): int
     {
-        $email = $this->option('owner-email') ?: $this->ask('Owner email');
-        $password = $this->option('owner-password') ?: $this->secret('Owner password');
-
         try {
+            $email = $this->stringOption('owner-email') ?? $this->askString('Owner email');
+            $password = $this->stringOption('owner-password') ?? $this->askString('Owner password', secret: true);
+
             $tenant = $provisioner->create(
-                $this->argument('subdomain'),
-                $this->argument('name'),
+                $this->stringArgument('subdomain'),
+                $this->stringArgument('name'),
                 $email,
                 $password,
-                $this->option('vertical'),
+                $this->stringOption('vertical', 'none') ?? 'none',
             );
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
@@ -40,5 +45,16 @@ class TenantCreateCommand extends Command
         $this->line("Dashboard login: {$email}");
 
         return self::SUCCESS;
+    }
+
+    private function askString(string $question, bool $secret = false): string
+    {
+        $answer = $secret ? $this->secret($question) : $this->ask($question);
+
+        if (! is_string($answer) || $answer === '') {
+            throw new InvalidArgumentException("{$question} is required.");
+        }
+
+        return $answer;
     }
 }

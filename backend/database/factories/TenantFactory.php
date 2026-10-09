@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Factories;
 
 use App\Modules\Tenancy\Models\Tenant;
@@ -22,7 +24,7 @@ class TenantFactory extends Factory
 
     public function configure(): static
     {
-        return $this->afterCreating(function (Tenant $tenant) {
+        return $this->afterCreating(function (Tenant $tenant): void {
             if ($tenant->settings()->doesntExist()) {
                 $tenant->settings()->create([]);
             }
