@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Audit;
+namespace App\Modules\Audit\Services;
 
+use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 /**
- * Single entry point for writing audit records (BR-L).
+ * Single entry point for writing audit records (BR-L). Called by Actions only.
  *
  * Usage:
  *   $audit->log('settings.updated', $settings, $old, $new);
@@ -42,7 +43,7 @@ final readonly class AuditLogger
             $entityType = $entity;
         }
 
-        return AuditLog::create([
+        return AuditLog::query()->create([
             'actor_type' => $actorType,
             'actor_id' => $actorId,
             'action' => $action,
@@ -82,14 +83,14 @@ final readonly class AuditLogger
     }
 
     /**
-     * The acting principal. Customers are added when the Customers module registers its guard.
-     *
-     * @return array{0: string, 1: int|null}
+     * @return array{0: ActorType, 1: int|null}
      */
     private function actor(): array
     {
-        foreach (['tenant_user' => 'tenant_user', 'customer' => 'customer'] as $guard => $type) {
-            if (! array_key_exists($guard, (array) config('auth.guards'))) {
+        foreach ([ActorType::TenantUser, ActorType::Customer] as $type) {
+            $guard = $type->guard();
+
+            if ($guard === null || ! array_key_exists($guard, config()->array('auth.guards'))) {
                 continue;
             }
 
@@ -102,6 +103,6 @@ final readonly class AuditLogger
             }
         }
 
-        return ['system', null];
+        return [ActorType::System, null];
     }
 }

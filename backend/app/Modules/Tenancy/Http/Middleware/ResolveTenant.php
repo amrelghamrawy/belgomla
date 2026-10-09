@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Middleware;
 
+use App\Modules\Tenancy\Exceptions\TenantNotFound;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\TenantContext;
-use App\Support\ApiException;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,9 +15,9 @@ use Symfony\Component\HttpFoundation\Response;
  * Resolves the tenant from the request Host only (Tech §2, §5).
  * `{subdomain}.{base_domain}` -> Tenant. Anything else is a 404.
  */
-class ResolveTenant
+final readonly class ResolveTenant
 {
-    public function __construct(private readonly TenantContext $context) {}
+    public function __construct(private TenantContext $context) {}
 
     /**
      * @param  Closure(Request): Response  $next
@@ -27,13 +27,13 @@ class ResolveTenant
         $subdomain = self::subdomainFromHost($request->getHost());
 
         if ($subdomain === null) {
-            throw ApiException::notFound('المتجر غير موجود');
+            throw TenantNotFound::forHost();
         }
 
         $tenant = Tenant::query()->where('subdomain', $subdomain)->first();
 
         if ($tenant === null) {
-            throw ApiException::notFound('المتجر غير موجود');
+            throw TenantNotFound::forHost();
         }
 
         $this->context->set($tenant);

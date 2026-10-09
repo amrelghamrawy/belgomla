@@ -15,11 +15,11 @@ use Symfony\Component\HttpFoundation\Response;
  * Tech §6: a session created on one tenant host must never authenticate on another.
  * Runs after auth:* middleware. Also verifies the authenticated model's own tenant_id.
  */
-class EnsureSessionTenant
+final readonly class EnsureSessionTenant
 {
     public const SESSION_KEY = 'tenant_id';
 
-    public function __construct(private readonly TenantContext $context) {}
+    public function __construct(private TenantContext $context) {}
 
     /**
      * @param  Closure(Request): Response  $next

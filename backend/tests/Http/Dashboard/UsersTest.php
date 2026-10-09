@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Modules\Tenancy\Models\TenantUser;
+use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Tenancy\Enums\TenantUserStatus;
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -38,7 +39,7 @@ test('user creation validation', function (array $body, string $field): void {
     'short password' => [['name' => 'x', 'email' => 'a@b.c', 'password' => 'short'], 'password'],
 ]);
 
-test('BR-P03 style uniqueness: the same email is allowed in another tenant but not twice in one', function (): void {
+test('the same email is allowed in another tenant but not twice in one', function (): void {
     $this->makeOwner($this->otherTenant(), ['email' => 'shared@x.test']);
 
     $this->tenantJson('POST', '/api/dashboard/users', ['name' => 'x', 'email' => 'shared@x.test', 'password' => 'secret123'])
@@ -49,6 +50,14 @@ test('BR-P03 style uniqueness: the same email is allowed in another tenant but n
         ->assertJsonPath('error.code', 'email_taken');
 });
 
+test('an unknown status is rejected on update', function (): void {
+    $other = $this->makeOwner();
+
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$other->id}", ['status' => 'nope'])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['error' => ['details' => ['status']]]);
+});
+
 test('an owner cannot disable their own account', function (): void {
     $this->tenantJson('PATCH', "/api/dashboard/users/{$this->me->id}", ['status' => 'disabled'])
         ->assertConflict()
@@ -57,12 +66,11 @@ test('an owner cannot disable their own account', function (): void {
 
 test('the last active user of a tenant cannot be disabled', function (): void {
     $second = $this->makeOwner();
-    $this->actingAs($second, 'tenant_user');
-    $this->me->update(['status' => TenantUser::STATUS_DISABLED]);
+    $this->me->update(['status' => TenantUserStatus::Disabled]);
 
     $this->tenantJson('PATCH', "/api/dashboard/users/{$second->id}", ['status' => 'disabled'])
         ->assertConflict()
-        ->assertJsonPath('error.code', 'cannot_disable_self');
+        ->assertJsonPath('error.code', 'last_active_user');
 });
 
 test('an owner disables, renames and resets the password of another user, audited', function (): void {
@@ -73,11 +81,11 @@ test('an owner disables, renames and resets the password of another user, audite
         ->assertJsonPath('data.status', 'disabled')
         ->assertJsonPath('data.name', 'جديد');
 
-    $log = $this->asTenant($this->tenant, fn () => App\Modules\Audit\Models\AuditLog::query()->latest('id')->first());
+    $log = $this->asTenant($this->tenant, fn () => AuditLog::query()->latest('id')->first());
 
     expect($log->action)->toBe('tenant_user.updated')
         ->and($log->new_values)->toMatchArray(['status' => 'disabled', 'name' => 'جديد', 'password' => '***'])
-        ->and($log->new_values)->not->toHaveKey('password_hash');
+        ->and($log->old_values)->toMatchArray(['status' => 'active']);
 });
 
 test('BR-T04 a user id of another tenant is 404 and untouched', function (): void {

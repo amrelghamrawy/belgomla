@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Enums\TenantStatus;
+use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 
 test('tenant:create provisions the tenant, its settings and the first owner', function (): void {
@@ -15,8 +17,8 @@ test('tenant:create provisions the tenant, its settings and the first owner', fu
 
     $tenant = Tenant::query()->where('subdomain', 'hadaya')->firstOrFail();
 
-    expect($tenant->vertical)->toBe('stationery')
-        ->and($tenant->status)->toBe(Tenant::STATUS_ACTIVE);
+    expect($tenant->vertical)->toBe(Vertical::Stationery)
+        ->and($tenant->status)->toBe(TenantStatus::Active);
 
     $this->assertDatabaseHas('tenant_settings', ['tenant_id' => $tenant->id, 'currency' => 'EGP']);
     $this->assertDatabaseHas('tenant_users', ['tenant_id' => $tenant->id, 'email' => 'owner@hadaya.test', 'role' => 'owner']);
@@ -38,11 +40,11 @@ test('tenant:suspend and tenant:activate flip the status', function (): void {
         ->expectsOutputToContain('now suspended')
         ->assertSuccessful();
 
-    expect($this->tenant->refresh()->status)->toBe(Tenant::STATUS_SUSPENDED);
+    expect($this->tenant->refresh()->status)->toBe(TenantStatus::Suspended);
 
     $this->artisan('tenant:activate', ['subdomain' => 'ALNOOR'])->assertSuccessful();
 
-    expect($this->tenant->refresh()->status)->toBe(Tenant::STATUS_ACTIVE);
+    expect($this->tenant->refresh()->status)->toBe(TenantStatus::Active);
 });
 
 test('status commands fail for an unknown tenant', function (): void {

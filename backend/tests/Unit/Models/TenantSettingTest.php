@@ -35,9 +35,6 @@ test('image urls are null until a file is stored', function (): void {
     expect($settings->logoUrl())->toBe(Storage::disk('public')->url('tenants/1/branding/logo.png'));
 });
 
-test('the public array never exposes storage paths or internal flags', function (): void {
-    $public = $this->tenant->settings->toPublicArray($this->tenant);
-
-    expect($public)->not->toHaveKeys(['logo_path', 'favicon_path', 'stale_pending_hours', 'tenant_id'])
-        ->and($public['mov'])->toBe(['enabled' => false, 'amount' => null]);
+test('belongs to its tenant', function (): void {
+    expect($this->tenant->settings->tenant->is($this->tenant))->toBeTrue();
 });

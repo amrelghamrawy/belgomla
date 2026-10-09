@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use RuntimeException;
 
-class UploadBrandingImageRequest extends FormRequest
+final class UploadBrandingImageRequest extends FormRequest
 {
     /**
      * @return array<string, list<string>>

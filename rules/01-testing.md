@@ -39,8 +39,13 @@ backend/tests/
   Arch/                     static rules per concept: HttpTest, ConsoleTest, ModelsTest, ServicesTest (add more per module)
   Unit/ModelConventionsTest.php   runtime model rules: factories, BelongsToTenant, datetime and money casts
   Http/<Area>/<Endpoint>Test.php    one file per endpoint group, e.g. Http/Dashboard/Settings/UpdateTest.php
-  Unit/Models/<Model>Test.php
+  Unit/Actions/<Action>Test.php       one per action: happy path, every guard/exception, audit row, rollback
+  Unit/Queries/<Query>Test.php
   Unit/Services/<Service>Test.php
+  Unit/Data/<Data>Test.php
+  Unit/Enums/<Module>EnumsTest.php
+  Unit/Resources/<Resource>Test.php
+  Unit/Models/<Model>Test.php
   Unit/Middleware/<Middleware>Test.php
   Unit/Rules/, Unit/Policies/, Unit/Jobs/, Unit/Support/ ...
   Console/<Command>Test.php
@@ -94,6 +99,13 @@ Model the "security sweep" tests from pinkary (`a guest is refused on every writ
 - Unit tests in `tests/Unit/Services/` with datasets covering boundaries (qty = tier min − 1, = tier min, MOQ − 1, available exactly equal, MOV exactly equal).
 - Transactions: a test that a failing step rolls back everything (no order row, no reservation change, no audit).
 - Concurrency-sensitive code (checkout, adjustments): a test that two simultaneous attempts on the last units produce exactly one success. Use two DB connections or `DB::transaction` with `lockForUpdate` and assert final inventory; document the approach in the test.
+
+### Resources, Data classes, Enums, Exceptions
+
+- Every `JsonResource` has a test asserting its exact key list (and any `when()` conditional) in `tests/Unit/Resources/`.
+- Every `Data` class has a `fromRequest` test covering sent vs. not-sent fields and type normalisation (money as string, enums).
+- Every enum is listed in the module's `tests/Unit/Enums/<Module>EnumsTest.php` dataset that checks `label()`/`toArray()` cover all cases, plus one test per domain method (`canTransitionTo`, `column`).
+- Exceptions are asserted through their `errorCode` / HTTP status in the endpoint tests, not by message substring (except one message test per exception).
 
 ### Models
 

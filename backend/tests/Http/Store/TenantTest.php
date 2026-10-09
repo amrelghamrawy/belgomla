@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Tenancy\Models\Tenant;
+use App\Modules\Tenancy\Enums\TenantStatus;
 
 test('the storefront resolves the tenant from the host and returns its public settings', function (): void {
     $this->tenantJson('GET', '/api/store/tenant')
@@ -36,7 +36,7 @@ test('hosts that are not a single tenant subdomain are 404', function (string $h
 ]);
 
 test('BR-T07 a suspended tenant storefront answers 503', function (): void {
-    $this->tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
+    $this->tenant->update(['status' => TenantStatus::Suspended]);
 
     $this->tenantJson('GET', '/api/store/tenant')
         ->assertStatus(503)

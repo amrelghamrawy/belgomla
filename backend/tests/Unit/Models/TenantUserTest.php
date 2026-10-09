@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Enums\TenantUserRole;
+use App\Modules\Tenancy\Enums\TenantUserStatus;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Hash;
 
 test('to array hides the password and remember token', function (): void {
@@ -14,17 +17,22 @@ test('to array hides the password and remember token', function (): void {
     ]);
 });
 
-test('passwords are hashed by the cast', function (): void {
-    $user = $this->makeOwner(attributes: ['password' => 'plain-text']);
+test('casts', function (): void {
+    $user = $this->makeOwner(attributes: ['password' => 'plain-text', 'last_login_at' => '2026-10-09 10:00:00']);
 
     expect($user->password)->not->toBe('plain-text')
-        ->and(Hash::check('plain-text', $user->password))->toBeTrue();
+        ->and(Hash::check('plain-text', $user->password))->toBeTrue()
+        ->and($user->role)->toBe(TenantUserRole::Owner)
+        ->and($user->status)->toBe(TenantUserStatus::Active)
+        ->and($user->last_login_at)->toBeInstanceOf(CarbonImmutable::class);
 });
 
-test('last_login_at is a datetime', function (): void {
-    $user = $this->makeOwner(attributes: ['last_login_at' => '2026-10-09 10:00:00']);
+test('defaults to an active owner', function (): void {
+    $user = $this->asTenant($this->tenant, fn (): TenantUser => TenantUser::query()->create(['name' => 'x', 'email' => 'x@y.z', 'password' => 'p']));
 
-    expect($user->last_login_at)->toBeInstanceOf(Illuminate\Support\Carbon::class);
+    expect($user->role)->toBe(TenantUserRole::Owner)
+        ->and($user->status)->toBe(TenantUserStatus::Active)
+        ->and($user->isActive())->toBeTrue();
 });
 
 test('BR-T03 creating a tenant user without a tenant in context throws', function (): void {
@@ -52,10 +60,4 @@ test('BR-T03 queries in context only see the current tenant', function (): void 
     $ids = $this->asTenant($this->tenant, fn () => TenantUser::query()->pluck('id')->all());
 
     expect($ids)->toBe([$mine->id]);
-});
-
-test('the api array exposes only safe fields', function (): void {
-    $user = $this->makeOwner();
-
-    expect(array_keys($user->toApiArray()))->toBe(['id', 'name', 'email', 'role', 'status', 'last_login_at']);
 });

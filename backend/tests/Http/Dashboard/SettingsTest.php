@@ -41,16 +41,22 @@ test('an owner updates settings and the change is audited with old and new value
         ->and($logs[0]->action)->toBe('tenant.renamed')
         ->and($logs[0]->old_values)->toBe(['name' => 'مكتبة النور'])
         ->and($logs[1]->action)->toBe('settings.updated')
-        ->and($logs[1]->actor_type)->toBe('tenant_user')
+        ->and($logs[1]->actor_type->value)->toBe('tenant_user')
         ->and($logs[1]->actor_id)->toBe($this->owner->id)
         ->and($logs[1]->old_values)->toMatchArray(['mov_enabled' => false, 'mov_amount' => null, 'phone' => null])
         ->and($logs[1]->new_values)->toMatchArray(['mov_enabled' => true, 'phone' => '+201000000000']);
 });
 
 test('an update that changes nothing writes no audit record', function (): void {
-    $this->tenantJson('PUT', '/api/dashboard/settings', ['mov_enabled' => false])->assertOk();
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['mov_enabled' => false, 'name' => 'مكتبة النور'])->assertOk();
 
     expect($this->asTenant($this->tenant, fn (): int => AuditLog::query()->count()))->toBe(0);
+});
+
+test('a nullable field sent as null is cleared', function (): void {
+    $this->tenant->settings->update(['phone' => '+201000000000']);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['phone' => null])->assertOk()->assertJsonPath('data.phone', null);
 });
 
 test('settings validation', function (array $body, string $field): void {

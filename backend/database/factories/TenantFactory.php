@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Tenancy\Enums\TenantStatus;
+use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Tenant> */
-class TenantFactory extends Factory
+final class TenantFactory extends Factory
 {
     protected $model = Tenant::class;
 
+    /**
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
             'subdomain' => 'store'.fake()->unique()->numberBetween(1000, 999999),
             'name' => 'مكتبة '.fake()->lastName(),
-            'status' => Tenant::STATUS_ACTIVE,
-            'vertical' => 'school-books',
+            'status' => TenantStatus::Active,
+            'vertical' => Vertical::SchoolBooks,
         ];
     }
 
@@ -33,6 +38,6 @@ class TenantFactory extends Factory
 
     public function suspended(): static
     {
-        return $this->state(['status' => Tenant::STATUS_SUSPENDED]);
+        return $this->state(['status' => TenantStatus::Suspended]);
     }
 }

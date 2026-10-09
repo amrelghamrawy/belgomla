@@ -2,12 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Enums\TenantStatus;
+use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
+use Carbon\CarbonImmutable;
 
 test('to array', function (): void {
     expect(array_keys($this->tenant->fresh()->toArray()))->toBe([
         'id', 'subdomain', 'name', 'status', 'vertical', 'created_at', 'updated_at',
     ]);
+});
+
+test('casts', function (): void {
+    $tenant = $this->tenant->fresh();
+
+    expect($tenant->status)->toBe(TenantStatus::Active)
+        ->and($tenant->vertical)->toBe(Vertical::SchoolBooks)
+        ->and($tenant->created_at)->toBeInstanceOf(CarbonImmutable::class);
 });
 
 test('status helpers', function (): void {

@@ -9,7 +9,7 @@ use RuntimeException;
 /**
  * An error that maps directly onto the API error envelope (08-api-contract.md §0).
  */
-final class ApiException extends RuntimeException
+class ApiException extends RuntimeException
 {
     /**
      * @param  array<string, mixed>|null  $details

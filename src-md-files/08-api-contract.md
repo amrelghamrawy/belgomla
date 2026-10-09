@@ -20,9 +20,13 @@ Sanctum SPA cookie sessions, CSRF via `GET /sanctum/csrf-cookie`. Cookie domain 
 
 ### Response envelope
 
+Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists use Laravel's paginated resource envelope.
+
 ```json
 { "data": { ... } }                                   // single
-{ "data": [ ... ], "meta": { "page": 1, "per_page": 24, "total": 180 } }  // list
+{ "data": [ ... ],
+  "links": { "first": "...", "last": "...", "prev": null, "next": "..." },
+  "meta": { "current_page": 1, "from": 1, "last_page": 8, "per_page": 24, "to": 24, "total": 180, "path": "...", "links": [...] } }  // list
 ```
 
 ### Error envelope

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
+use App\Modules\Tenancy\Enums\TenantUserRole;
+use App\Modules\Tenancy\Enums\TenantUserStatus;
+use Carbon\CarbonImmutable;
 use Database\Factories\TenantUserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -16,31 +18,23 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $email
  * @property string $password
- * @property string $role
- * @property string $status
- * @property Carbon|null $last_login_at
+ * @property TenantUserRole $role
+ * @property TenantUserStatus $status
+ * @property CarbonImmutable|null $last_login_at
  * @property string|null $remember_token
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
  */
-class TenantUser extends Authenticatable
+final class TenantUser extends Authenticatable
 {
     use BelongsToTenant;
 
     /** @use HasFactory<TenantUserFactory> */
     use HasFactory;
 
-    public const ROLE_OWNER = 'owner';
-
-    public const STATUS_ACTIVE = 'active';
-
-    public const STATUS_DISABLED = 'disabled';
-
-    protected $fillable = ['tenant_id', 'name', 'email', 'password', 'role', 'status', 'last_login_at'];
-
     protected $attributes = [
-        'role' => self::ROLE_OWNER,
-        'status' => self::STATUS_ACTIVE,
+        'role' => 'owner',
+        'status' => 'active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -52,22 +46,7 @@ class TenantUser extends Authenticatable
 
     public function isActive(): bool
     {
-        return $this->status === self::STATUS_ACTIVE;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function toApiArray(): array
-    {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'email' => $this->email,
-            'role' => $this->role,
-            'status' => $this->status,
-            'last_login_at' => $this->last_login_at?->toIso8601String(),
-        ];
+        return $this->status === TenantUserStatus::Active;
     }
 
     /**
@@ -77,6 +56,8 @@ class TenantUser extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'role' => TenantUserRole::class,
+            'status' => TenantUserStatus::class,
             'last_login_at' => 'datetime',
         ];
     }

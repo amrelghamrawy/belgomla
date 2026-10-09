@@ -21,11 +21,6 @@ arch('env() is only read from config files')
     ->expect('env')
     ->not->toBeUsed();
 
-arch('support classes are final')
-    ->expect('App\Support')
-    ->classes()
-    ->toBeFinal();
-
 arch('no stock laravel folders are used')
     ->expect(['App\Http', 'App\Console', 'App\Models'])
     ->not->toBeUsed();

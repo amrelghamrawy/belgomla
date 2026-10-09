@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Http\Middleware\EnsureTenantActive;
 use App\Modules\Tenancy\Http\Middleware\ResolveTenant;
-use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Support\Facades\Route;
 
 beforeEach(function (): void {
@@ -20,7 +20,7 @@ test('an active tenant passes on every surface', function (): void {
 });
 
 test('BR-T07 a suspended tenant is 503 on the store and 403 on the dashboard', function (): void {
-    $this->tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
+    $this->tenant->update(['status' => TenantStatus::Suspended]);
 
     $this->tenantJson('GET', '/api/_store')->assertStatus(503)->assertJsonPath('error.code', 'store_unavailable');
     $this->tenantJson('GET', '/api/_default')->assertStatus(503);

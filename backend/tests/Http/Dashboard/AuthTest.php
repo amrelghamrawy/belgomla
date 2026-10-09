@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Enums\TenantStatus;
+use App\Modules\Tenancy\Enums\TenantUserStatus;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use Illuminate\Support\Facades\RateLimiter;
@@ -74,7 +76,7 @@ test('a session created on one tenant host is rejected and destroyed on another 
 });
 
 test('a disabled user cannot log in', function (): void {
-    TenantUser::withoutTenantScope()->update(['status' => TenantUser::STATUS_DISABLED]);
+    TenantUser::withoutTenantScope()->update(['status' => TenantUserStatus::Disabled]);
 
     login()
         ->assertForbidden()
@@ -82,7 +84,7 @@ test('a disabled user cannot log in', function (): void {
 });
 
 test('BR-T07 a suspended tenant refuses dashboard login with 403', function (): void {
-    $this->tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
+    $this->tenant->update(['status' => TenantStatus::Suspended]);
 
     login()
         ->assertForbidden()

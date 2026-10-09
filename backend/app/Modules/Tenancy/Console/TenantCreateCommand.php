@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Console;
 
-use App\Modules\Tenancy\TenantProvisioner;
+use App\Modules\Tenancy\Actions\CreateTenant;
+use App\Modules\Tenancy\Data\NewTenantData;
+use App\Modules\Tenancy\Enums\Vertical;
+use App\Modules\Tenancy\Exceptions\InvalidTenantInput;
+use App\Support\ApiException;
 use App\Support\Console\TypedInput;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 
-class TenantCreateCommand extends Command
+final class TenantCreateCommand extends Command
 {
     use TypedInput;
 
@@ -22,20 +26,20 @@ class TenantCreateCommand extends Command
 
     protected $description = 'Create a new tenant with its settings and first owner user';
 
-    public function handle(TenantProvisioner $provisioner): int
+    public function handle(CreateTenant $createTenant): int
     {
         try {
             $email = $this->stringOption('owner-email') ?? $this->askString('Owner email');
             $password = $this->stringOption('owner-password') ?? $this->askString('Owner password', secret: true);
 
-            $tenant = $provisioner->create(
-                $this->stringArgument('subdomain'),
-                $this->stringArgument('name'),
-                $email,
-                $password,
-                $this->stringOption('vertical', 'none') ?? 'none',
-            );
-        } catch (InvalidArgumentException $e) {
+            $tenant = $createTenant->handle(new NewTenantData(
+                subdomain: $this->stringArgument('subdomain'),
+                name: $this->stringArgument('name'),
+                ownerEmail: $email,
+                ownerPassword: $password,
+                vertical: Vertical::tryFrom($this->stringOption('vertical', 'none') ?? 'none') ?? throw InvalidTenantInput::vertical(),
+            ));
+        } catch (ApiException|InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;

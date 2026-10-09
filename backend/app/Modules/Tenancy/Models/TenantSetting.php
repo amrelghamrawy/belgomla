@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -26,28 +26,15 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $require_login_for_prices
  * @property bool $require_customer_approval
  * @property int $stale_pending_hours
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
+ * @property-read Tenant $tenant
  */
-class TenantSetting extends Model
+final class TenantSetting extends Model
 {
-    /** Fields the merchant may edit through the dashboard. */
-    public const EDITABLE = [
-        'primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description',
-        'working_hours', 'mov_enabled', 'mov_amount',
-        'require_login_for_prices', 'require_customer_approval', 'stale_pending_hours',
-    ];
-
     public $incrementing = false;
 
     protected $primaryKey = 'tenant_id';
-
-    protected $fillable = [
-        'logo_path', 'favicon_path', 'primary_color', 'secondary_color',
-        'phone', 'whatsapp', 'address', 'description', 'working_hours',
-        'currency', 'mov_enabled', 'mov_amount',
-        'require_login_for_prices', 'require_customer_approval', 'stale_pending_hours',
-    ];
 
     /**
      * @return BelongsTo<Tenant, $this>
@@ -65,31 +52,6 @@ class TenantSetting extends Model
     public function faviconUrl(): ?string
     {
         return $this->favicon_path === null ? null : Storage::disk('public')->url($this->favicon_path);
-    }
-
-    /**
-     * Shape returned to both storefront and dashboard.
-     *
-     * @return array<string, mixed>
-     */
-    public function toPublicArray(Tenant $tenant): array
-    {
-        return [
-            'name' => $tenant->name,
-            'subdomain' => $tenant->subdomain,
-            'logo_url' => $this->logoUrl(),
-            'favicon_url' => $this->faviconUrl(),
-            'colors' => ['primary' => $this->primary_color, 'secondary' => $this->secondary_color],
-            'phone' => $this->phone,
-            'whatsapp' => $this->whatsapp,
-            'address' => $this->address,
-            'description' => $this->description,
-            'working_hours' => $this->working_hours ?? [],
-            'currency' => $this->currency,
-            'require_login_for_prices' => $this->require_login_for_prices,
-            'require_customer_approval' => $this->require_customer_approval,
-            'mov' => ['enabled' => $this->mov_enabled, 'amount' => $this->mov_amount],
-        ];
     }
 
     /**

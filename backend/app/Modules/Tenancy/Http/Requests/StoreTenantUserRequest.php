@@ -6,7 +6,7 @@ namespace App\Modules\Tenancy\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreTenantUserRequest extends FormRequest
+final class StoreTenantUserRequest extends FormRequest
 {
     /**
      * @return array<string, list<string>>

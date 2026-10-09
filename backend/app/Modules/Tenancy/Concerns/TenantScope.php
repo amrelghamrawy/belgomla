@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Scope;
  * Global scope: every query on a tenant-owned model is restricted to the current tenant.
  * Without a tenant in context the query matches nothing, never everything (BR-T03).
  */
-class TenantScope implements Scope
+final class TenantScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Modules\Audit\AuditLogger;
+use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Audit\Services\AuditLogger;
 use Illuminate\Http\Request;
 
 test('only the keys whose values changed are recorded on both sides', function (): void {
@@ -38,7 +39,7 @@ test('without an authenticated user the actor is the system', function (): void 
 
     $log = $this->asTenant($this->tenant, fn (): AuditLog => $logger->log('x', 'y'));
 
-    expect($log->actor_type)->toBe('system')
+    expect($log->actor_type)->toBe(ActorType::System)
         ->and($log->actor_id)->toBeNull();
 });
 
@@ -50,7 +51,7 @@ test('an authenticated tenant user is recorded as the actor', function (): void 
 
     $log = $this->asTenant($this->tenant, fn (): AuditLog => $logger->log('x', 'y'));
 
-    expect($log->actor_type)->toBe('tenant_user')
+    expect($log->actor_type)->toBe(ActorType::TenantUser)
         ->and($log->actor_id)->toBe($owner->id);
 });
 

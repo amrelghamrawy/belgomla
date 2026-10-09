@@ -4,36 +4,30 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Enums\TenantStatus;
+use App\Modules\Tenancy\Enums\Vertical;
+use Carbon\CarbonImmutable;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $subdomain
  * @property string $name
- * @property string $status
- * @property string $vertical
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property TenantStatus $status
+ * @property Vertical $vertical
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
  * @property-read TenantSetting|null $settings
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, TenantUser> $users
  */
-class Tenant extends Model
+final class Tenant extends Model
 {
     /** @use HasFactory<TenantFactory> */
     use HasFactory;
-
-    public const STATUS_ACTIVE = 'active';
-
-    public const STATUS_SUSPENDED = 'suspended';
-
-    /** @var list<string> */
-    public const VERTICALS = ['school-books', 'stationery', 'hardware', 'none'];
-
-    protected $fillable = ['subdomain', 'name', 'status', 'vertical'];
 
     protected static function newFactory(): TenantFactory
     {
@@ -56,24 +50,29 @@ class Tenant extends Model
         return $this->hasMany(TenantUser::class);
     }
 
-    /** The settings row always exists after provisioning; create it defensively otherwise. */
-    public function settingsRow(): TenantSetting
-    {
-        return $this->settings ?? $this->settings()->create([]);
-    }
-
     public function isActive(): bool
     {
-        return $this->status === self::STATUS_ACTIVE;
+        return $this->status === TenantStatus::Active;
     }
 
     public function isSuspended(): bool
     {
-        return $this->status === self::STATUS_SUSPENDED;
+        return $this->status === TenantStatus::Suspended;
     }
 
     public function host(): string
     {
         return $this->subdomain.'.'.config()->string('tenancy.base_domain');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => TenantStatus::class,
+            'vertical' => Vertical::class,
+        ];
     }
 }
