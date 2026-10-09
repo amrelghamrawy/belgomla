@@ -16,4 +16,10 @@ final readonly class CurrentTenantSettingsQuery
     {
         return TenantSetting::query()->whereKey($this->context->id())->firstOrFail();
     }
+
+    /** BR-CU04 / D1: whether guests must log in to see prices. Used by Catalog's storefront. */
+    public function requiresLoginForPrices(): bool
+    {
+        return TenantSetting::query()->whereKey($this->context->id())->value('require_login_for_prices') === true;
+    }
 }

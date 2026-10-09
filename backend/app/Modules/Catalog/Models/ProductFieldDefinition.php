@@ -6,9 +6,11 @@ namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\FieldType;
+use App\Modules\Catalog\Observers\FacetCacheObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductFieldDefinitionFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $updated_at
  * @property-read Collection<int, ProductFieldOption> $options
  */
+#[ObservedBy(FacetCacheObserver::class)]
 final class ProductFieldDefinition extends Model
 {
     use BelongsToTenant;

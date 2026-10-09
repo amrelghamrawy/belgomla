@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Http\Requests;
 
 use App\Modules\Catalog\Concerns\ReadsProductFilter;
+use App\Modules\Catalog\Concerns\ResolvesCustomer;
 use App\Support\Http\PaginatedRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,6 +16,7 @@ use Illuminate\Validation\Rule;
 final class StoreProductListRequest extends PaginatedRequest
 {
     use ReadsProductFilter;
+    use ResolvesCustomer;
 
     public const array SORTS = ['name', '-created_at', 'price', '-price'];
 

@@ -1,6 +1,6 @@
 # Task 1 — Catalog module
 
-Status: **not started**. Execute in its own session. Read `CLAUDE.md` and `rules/*.md` first; they are binding.
+Status: **done** (see the delivery notes at the end). Executed in its own session. Read `CLAUDE.md` and `rules/*.md` first; they are binding.
 
 ## Goal
 
@@ -67,3 +67,16 @@ See `tasks/README.md`: 2 Pricing, 3 Inventory, 4 Messaging, 5 Customers, 6 Order
 
 - D25: Should a product be allowed with zero categories (uncategorised) or is `category_id` required? Default: required.
 - D26: Maximum gallery images per product. Default: 8, 2 MB each.
+
+## Delivery notes (session 2026-10-10)
+
+Commits: `3240a9b` schema + models, `ef787e4` units/categories/fields/templates, `e6b4c3e` products, then the storefront commit that closes this task (see `git log`). `composer test` green: 838 tests (+647 over Tenancy's 191). Smoke-tested on `php artisan serve` with tenant `kotob` (school-books template): login, category, units, product with custom fields, store list with category + facet + colloquial `q`, filters, product page, price list, duplicate, bulk inactivate by `academic_year`, empty store afterwards.
+
+Deviations from the brief above (rules/02 or the contract won):
+
+- `UnitData`, `FieldOptionData`, `ProductRelationData` were not created: ≤2 scalar inputs are method parameters (rules/02 §2).
+- `ProductNotEditable` is named `InvalidProductTransition` (409 `invalid_transition`, like `InvalidOrderTransition`); `CategoryCycle` is 422 `category_cycle` per the contract. Extra exceptions: `CatalogConflict` (409 `duplicate_*`), `InvalidCatalogInput` (422 for cross-tenant / archived references), `GalleryFull` (422).
+- Extra classes: `FilteredProductsQuery` (shared filter for store, dashboard, facets, price list, bulk), `ProductReferences`, `ProductSnapshot`, `PriceVisibilityQuery`, `StorefrontFieldsQuery`, `FacetCacheObserver`, `Models\Casts\JsonObject` (custom_fields always a JSON object), `App\Support\Money`, `App\Support\ArabicText`.
+- Store detail uses the same `StoreProductResource` (gallery/related appear when loaded); there is no separate detail resource.
+- Dashboard `low_stock=1` moved to Task 3; `in_stock` is status-based until Task 3.
+- Decisions D25, D26, D29–D33 recorded in `06-open-decisions.md`; rules/02 amended (observers may use cache/slug services, actions may read through a Query).

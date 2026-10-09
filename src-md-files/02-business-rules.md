@@ -163,7 +163,7 @@ Storefront behavior:
 - Filterable fields are shown as facets in the order defined by the merchant (`filter_order`). For school books this is Grade → Subject → Publisher.
 - Facets combine with AND; each facet shows only options that still have active products given the other selected facets.
 - Facet selections are reflected in the URL so a merchant can share a link such as "كل كتب أولى إعدادي الأضواء".
-- Basic search matches product name, SKU code, and the option labels of `select` custom fields (so "علوم تانية اعدادي الأضواء" finds the book).
+- Basic search matches product name, SKU code, and the option labels of `select` custom fields (so "علوم تانية اعدادي الأضواء" finds the book). Every word must match; both sides are folded the same way (D32: tashkeel removed, alef forms unified, ى→ي, ة→ه, colloquial ث→ت, ذ→د, ظ→ض).
 
 ### BR-P09 — Vertical Templates
 

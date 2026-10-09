@@ -33,7 +33,7 @@ Per-SKU stock in base units with reservation support, movements ledger, merchant
 - **Queries**: `InventoryListQuery` (`?low_stock=1&q=` with `available` computed), `MovementsQuery`, `LowStockQuery` (`available ≤ moq`, used by Reports later).
 - **Exceptions**: `BelowReserved`, `InsufficientStock` (422 `insufficient_stock`, used by Orders), `NotInTransaction` (plain RuntimeException).
 - **Http**: `AdjustStockRequest`, `BulkAdjustStockRequest`; `InventoryRowResource` (on_hand, reserved, available, min_allowed = reserved), `MovementResource`; controllers `Dashboard/InventoryController@index/@show`, `Dashboard/StockAdjustmentController@store`, `Dashboard/BulkStockAdjustmentController@store`, `Dashboard/MovementsController@index`; `routes/api/dashboard/inventory.php`.
-- **Catalog integration**: `CreateProduct` accepts `opening_stock` and calls `RecordOpeningStock`; `StoreProductResource` adds `available` and `in_stock` (coming_soon → `in_stock=false`, `available` omitted).
+- **Catalog integration**: `CreateProduct` accepts `opening_stock` and calls `RecordOpeningStock`; `StoreProductResource` adds `available` and switches `in_stock` from status-based (Task 1) to `available > 0` (coming_soon → `in_stock=false`, `available` omitted). Add the dashboard product list filter `low_stock=1` to `ListDashboardProductsRequest` / `DashboardProductListQuery` (deferred from Task 1).
 
 ### 3. Tests
 

@@ -6,6 +6,7 @@ namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Observers\CategoryObserver;
+use App\Modules\Catalog\Observers\FacetCacheObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\CategoryFactory;
@@ -35,7 +36,7 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, Category> $children
  * @property-read Collection<int, Product> $products
  */
-#[ObservedBy(CategoryObserver::class)]
+#[ObservedBy([CategoryObserver::class, FacetCacheObserver::class])]
 final class Category extends Model
 {
     use BelongsToTenant;

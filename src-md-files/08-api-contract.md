@@ -134,15 +134,21 @@ Item shape:
 }
 ```
 
-If `require_login_for_prices` is on and no customer session: `sku.cover_price/base_price/tiers/discount_percent` are omitted and `prices_hidden: true` is added. `coming_soon` products return `in_stock:false, coming_soon:true` and `available` omitted.
+If `require_login_for_prices` is on and no customer session: `sku.cover_price/base_price/tiers/discount_percent` are omitted and `prices_hidden: true` is added at the product level. `coming_soon` products return `in_stock:false, coming_soon:true` and `available` omitted.
+
+Delivered in stages (Task 1 = Catalog): the item also carries `description`; `custom_fields` lists only active fields with `show_on_storefront`, select values as the option label and booleans as `نعم`/`لا`. Until Inventory (Task 3) `in_stock` follows the status (`active` → true) and `available` is absent; `tiers` and `discount_percent` arrive with Pricing (Task 2). Filter facets with `type: boolean` use the option ids `"true"` / `"false"`.
 
 ### `GET /api/store/products/{slug}`
 
 Product detail + `gallery: []` + `related: [{ type: "revision_of"|"companion", product: {…list shape…} }]` (BR-P10).
 
+Detail notes (Task 1): `gallery` items are `{ id, url, is_main, sort_order }`; `related` items are `{ type, direction: "outgoing"|"incoming", product }` where `outgoing` means this product declared the relation (e.g. this is the revision of `product`). Relations to inactive products are not returned. An inactive or unknown slug is `404`.
+
 ### `GET /api/store/price-list`
 
 Same filters as the product list; returns all matching products (no pagination, max 2000) in a compact shape for the printable page (BR-P13).
+
+Row: `{ id, name, slug, code, unit, moq, cover_price, base_price, availability: "available"|"coming_soon" }`; `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list.
 
 ---
 
@@ -296,7 +302,7 @@ Suspended tenant → `403 tenant_suspended`.
 | ------ | ---------------------------------------- | ---------------------------------------------------- |
 | GET    | `/api/dashboard/categories`              | tree incl. archived (`?status=`)                     |
 | POST   | `/api/dashboard/categories`              | `name, parent_id?, image?, sort_order?`              |
-| PUT    | `/api/dashboard/categories/{id}`         | move = change `parent_id`; cycle → `422`             |
+| PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `sort_order?`; move = change `parent_id`; cycle → `422 category_cycle` |
 | POST   | `/api/dashboard/categories/{id}/archive` | allowed with products (BR-P06); products stay linked |
 | POST   | `/api/dashboard/categories/{id}/restore` |                                                      |
 | POST   | `/api/dashboard/categories/reorder`      | `[ {id, sort_order} ]`                               |
@@ -329,11 +335,11 @@ Suspended tenant → `403 tenant_suspended`.
 | POST   | `/api/dashboard/products/{id}/duplicate`         | BR-P11; returns new product (status `inactive`, stock 0)                       |
 | POST   | `/api/dashboard/products/{id}/images`            | multipart, `is_main?`                                                          |
 | DELETE | `/api/dashboard/products/{id}/images/{imgId}`    |                                                                                |
-| POST   | `/api/dashboard/products/{id}/images/reorder`    |                                                                                |
+| POST   | `/api/dashboard/products/{id}/images/reorder`    | `{ ids: [...] }` — every image of the product, in the new order               |
 | GET    | `/api/dashboard/products/{id}/relations`         |                                                                                |
 | POST   | `/api/dashboard/products/{id}/relations`         | `related_product_id, type`                                                     |
 | DELETE | `/api/dashboard/products/{id}/relations/{relId}` |                                                                                |
-| POST   | `/api/dashboard/products/bulk/status`            | `{ filter: {...same as list...}, status }` → `{ affected, batch_id }` (BR-P12) |
+| POST   | `/api/dashboard/products/bulk/status`            | `{ filter: {...same as list...}, status }` → `{ affected, skipped, batch_id }` (BR-P12, D29) |
 
 Create/update body:
 

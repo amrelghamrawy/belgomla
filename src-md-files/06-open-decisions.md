@@ -17,6 +17,13 @@ Each item below has a **default** already written into the other documents so wo
 | D22 | Cover price + % pricing                                    | Added to V1 (BR-PR10, BR-PR11). Pricing engine still stores absolute prices.                                  | BR-PR10     |
 | D23 | Printable price list                                       | Added to V1 as a print-friendly page. Excel/PDF export is V2.                                                 | BR-P13      |
 | D24 | Credit terms (آجل) per customer                            | V2. In V1 the merchant tracks outstanding balance through collection records and the per-customer report.     | Roadmap V2  |
+| D25 | Product without a category                                 | Not allowed: `category_id` is required (any level of the tree).                                               | BR-P06      |
+| D26 | Gallery size                                               | At most 8 images per product, png/jpg/webp, 2 MB each. The first image becomes the main image.               | BR-P07      |
+| D29 | Bulk status hits a product whose transition is not allowed | The product is skipped and counted; the response is `{ affected, skipped, batch_id }`. An empty filter is refused (422). | BR-P12 |
+| D30 | Duplicate product naming                                   | Same name, new slug (`-2`, `-3`), SKU code `{code}-COPY`, `-COPY-2`, …; status `inactive`; images, relations and stock not copied. | BR-P11 |
+| D31 | Products inside an archived category                       | Stay visible on the store (product status alone decides); the archived category and its subtree leave the store category tree. | BR-P06 |
+| D32 | Arabic search normalisation                                | Remove tashkeel/tatweel; أ إ آ ٱ → ا, ى → ي, ة → ه; Egyptian colloquial ث → ت, ذ → د, ظ → ض; Latin lower-cased. Every query word must appear in name + SKU code + select option labels. | BR-P08 |
+| D33 | Stationery / hardware templates                            | Filterable selects: stationery = brand, color (6 common colours), size; hardware = brand, material, size. Options other than colour start empty. | BR-P09 |
 
 These are treated as accepted defaults unless the product owner objects.
 
