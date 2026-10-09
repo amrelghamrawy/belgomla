@@ -73,6 +73,19 @@ abstract class TenantTestCase extends TestCase
     }
 
     /**
+     * asTenant() for the default test tenant, or another one when given.
+     *
+     * @template TReturn
+     *
+     * @param  callable(Tenant): TReturn  $callback
+     * @return TReturn
+     */
+    protected function inTenant(callable $callback, ?Tenant $tenant = null): mixed
+    {
+        return $this->asTenant($tenant ?? $this->tenant, $callback);
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     protected function makeOwner(?Tenant $tenant = null, array $attributes = []): TenantUser

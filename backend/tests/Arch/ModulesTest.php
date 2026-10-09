@@ -56,11 +56,32 @@ arch('module exceptions are final and extend ApiException')
     ->toBeFinal()
     ->toExtend(ApiException::class);
 
-arch('models are final, extend Eloquent and declare casts()')
+arch('models are final')
     ->expect(moduleNamespaces('Models'))
-    ->toBeFinal()
+    ->toBeFinal();
+
+arch('models extend Eloquent')
+    ->expect(moduleNamespaces('Models'))
     ->toExtend(Model::class)
-    ->toHaveMethod('casts');
+    ->ignoring(moduleNamespaces('Models\Scopes'));
+
+arch('models declare casts()')
+    ->expect(moduleNamespaces('Models'))
+    ->toHaveMethod('casts')
+    ->ignoring(moduleNamespaces('Models\Scopes'));
+
+arch('model scopes are final invokable classes')
+    ->expect(moduleNamespaces('Models\Scopes'))
+    ->toBeFinal()
+    ->toBeInvokable()
+    ->toExtendNothing();
+
+arch('observers are final readonly and only keep invariants')
+    ->expect(moduleNamespaces('Observers'))
+    ->toBeFinal()
+    ->toBeReadonly()
+    ->toHaveSuffix('Observer')
+    ->not->toUse(moduleNamespaces('Http'));
 
 arch('models never depend on the write side')
     ->expect(moduleNamespaces('Models'))

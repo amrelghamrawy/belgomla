@@ -3,6 +3,14 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Models\ProductFieldOption;
+use App\Modules\Catalog\Models\ProductImage;
+use App\Modules\Catalog\Models\ProductRelation;
+use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\Unit;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantSetting;
@@ -45,6 +53,14 @@ function columnsEndingWith(string $model, array $suffixes): array
 test('the module model list is explicit so new models are reviewed', function (): void {
     expect(moduleModels())->toBe([
         AuditLog::class,
+        Category::class,
+        Product::class,
+        ProductFieldDefinition::class,
+        ProductFieldOption::class,
+        ProductImage::class,
+        ProductRelation::class,
+        Sku::class,
+        Unit::class,
         Tenant::class,
         TenantSetting::class,
         TenantUser::class,

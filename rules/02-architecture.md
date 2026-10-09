@@ -81,7 +81,7 @@ Every class under `app/` is `final` unless it is an explicitly listed abstract b
 | Service     | `final readonly`          | named methods             | Config, Http, Cache, Models (read)       |
 | Controller  | `final readonly`          | REST methods              | Requests, Actions, Queries, Resources, Gate |
 | Policy      | `final readonly`          | ability methods           | Models only                              |
-| Observer    | `final readonly`          | lifecycle methods         | Actions, Jobs                            |
+| Observer    | `final readonly`          | lifecycle methods         | Actions, Jobs, invariant Services (slug, cache version) |
 | Request     | `final`                   | `rules()` + typed accessors | Rules, Enums                           |
 | Resource    | `final`                   | `toArray(Request)`        | Models, Support                          |
 | Model       | `final`                   | relations, casts, accessors, scopes | nothing from Actions/Services  |
