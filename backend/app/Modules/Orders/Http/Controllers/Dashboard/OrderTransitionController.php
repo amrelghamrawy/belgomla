@@ -19,6 +19,6 @@ final readonly class OrderTransitionController
     {
         $order = $transition->handle($order, TransitionData::fromRequest($request), $request->actorId());
 
-        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore());
+        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore(), $detail->collections($order));
     }
 }

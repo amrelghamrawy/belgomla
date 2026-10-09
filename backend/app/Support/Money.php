@@ -43,6 +43,12 @@ final class Money
         return bcadd(self::numeric($a), self::numeric($b), 2);
     }
 
+    /** The difference of two amounts, e.g. the balance left on an order (BR-C03). */
+    public static function subtract(string $a, string $b): string
+    {
+        return bcsub(self::numeric($a), self::numeric($b), 2);
+    }
+
     /** A unit price times a whole quantity, e.g. a line total (BR-PR07). */
     public static function times(string $amount, int $quantity): string
     {

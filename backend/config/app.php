@@ -70,6 +70,12 @@ return [
     'timezone' => 'UTC',
 
     /*
+    | D60: the merchants' calendar. Report buckets, "today" and the `from`/`to` day filters of collections,
+    | reports and the audit log are days in this zone; timestamps stay stored and rendered in UTC.
+    */
+    'business_timezone' => 'Africa/Cairo',
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

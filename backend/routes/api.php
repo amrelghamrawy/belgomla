@@ -34,4 +34,7 @@ Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.ac
     require __DIR__.'/api/dashboard/inventory.php';
     require __DIR__.'/api/dashboard/customers.php';
     require __DIR__.'/api/dashboard/orders.php';
+    require __DIR__.'/api/dashboard/collections.php';
+    require __DIR__.'/api/dashboard/reports.php';
+    require __DIR__.'/api/dashboard/audit.php';
 });

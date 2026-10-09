@@ -16,13 +16,16 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * An order on the dashboard (08-api-contract.md §9): the customer's shape plus the order id, the customer, the
  * status timestamps, `is_stale` (pending past `stale_pending_hours`, BR-INV07), history with the actor id and
- * note, and `collections` on the detail page — always empty until Collections (Task 7).
+ * note, and `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()).
  *
  * @property-read Order $resource
  */
 final class DashboardOrderResource extends JsonResource
 {
-    public function __construct(Order $resource, private readonly CarbonImmutable $staleBefore)
+    /**
+     * @param  list<JsonResource>  $collections
+     */
+    public function __construct(Order $resource, private readonly CarbonImmutable $staleBefore, private readonly array $collections = [])
     {
         parent::__construct($resource);
     }
@@ -63,7 +66,7 @@ final class DashboardOrderResource extends JsonResource
                 'actor_id' => $entry->actor_id,
                 'note' => $entry->note,
             ])->values()->all()),
-            'collections' => $this->when($detail, []),
+            'collections' => $this->when($detail, $this->collections),
         ];
     }
 }

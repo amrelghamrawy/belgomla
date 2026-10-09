@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Actions\TransitionOrder;
 use App\Modules\Orders\Contracts\CollectsPayments;
 use App\Modules\Orders\Data\TransitionData;
+use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Exceptions\InvalidOrderTransition;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
 
 beforeEach(function (): void {
     $this->owner = $this->makeOwner();
@@ -110,6 +113,26 @@ test('BR-C04 delivered with collect_full_amount asks Collections to record the r
     ($this->move)(OrderStatus::Delivered, collect: true);
 
     expect($payments->calls)->toBe([[$this->order->id, $this->owner->id]]);
+});
+
+test('BR-C04 delivered with collect_full_amount records the order total as collected in the same step', function (): void {
+    $order = ($this->move)(OrderStatus::Delivered, collect: true);
+
+    expect($order->only(['status', 'collected_amount', 'collection_status']))->toBe([
+        'status' => OrderStatus::Delivered, 'collected_amount' => $order->order_total, 'collection_status' => CollectionStatus::Collected,
+    ])->and(CashCollection::query()->sole()->only(['order_id', 'amount', 'recorded_by']))->toBe([
+        'order_id' => $this->order->id, 'amount' => $order->order_total, 'recorded_by' => $this->owner->id,
+    ])->and(AuditLog::query()->orderBy('id')->pluck('action')->all())->toBe(['collection.recorded', 'order.status_changed']);
+});
+
+test('BR-C04 a failing collection rolls the delivery back', function (): void {
+    expect(fn () => app(TransitionOrder::class)->handle($this->order, new TransitionData(OrderStatus::Delivered, null, true), 999_999))
+        ->toThrow(QueryException::class);
+
+    expect($this->order->refresh()->only(['status', 'collected_amount']))->toBe(['status' => OrderStatus::Pending, 'collected_amount' => '0.00'])
+        ->and(($this->stock)())->toBe(['on_hand' => 400, 'reserved' => 120])
+        ->and(CashCollection::query()->count())->toBe(0)
+        ->and(AuditLog::query()->count())->toBe(0);
 });
 
 test('BR-C04 without collect_full_amount nothing is collected', function (): void {

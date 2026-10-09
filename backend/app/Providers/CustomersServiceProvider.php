@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Customers wiring: the address policy (BR-CU03), and the read contract Collections fills later
- * (OutstandingBalances, Task 7); until then customers owe nothing. RecentOrders is bound by Orders
+ * Customers wiring: the address policy (BR-CU03), and the read contract Collections fills (OutstandingBalances,
+ * rebound in CollectionsServiceProvider); without it customers owe nothing. RecentOrders is bound by Orders
  * (OrdersServiceProvider).
  */
 final class CustomersServiceProvider extends ServiceProvider

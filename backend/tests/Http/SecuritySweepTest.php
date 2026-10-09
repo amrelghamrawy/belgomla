@@ -77,6 +77,15 @@ dataset('dashboard authenticated routes', [
     'orders delivery address' => ['PUT', '/api/dashboard/orders/1/delivery-address'],
     'notifications list' => ['GET', '/api/dashboard/notifications'],
     'notifications read' => ['POST', '/api/dashboard/notifications/read'],
+    'collections list' => ['GET', '/api/dashboard/collections'],
+    'collections record' => ['POST', '/api/dashboard/orders/1/collections'],
+    'collections void' => ['POST', '/api/dashboard/collections/1/void'],
+    'customer statement' => ['GET', '/api/dashboard/customers/1/statement'],
+    'reports overview' => ['GET', '/api/dashboard/reports/overview'],
+    'reports sales' => ['GET', '/api/dashboard/reports/sales'],
+    'reports outstanding' => ['GET', '/api/dashboard/reports/outstanding'],
+    'reports low stock' => ['GET', '/api/dashboard/reports/low-stock'],
+    'audit log' => ['GET', '/api/dashboard/audit'],
 ]);
 
 dataset('customer authenticated routes', [

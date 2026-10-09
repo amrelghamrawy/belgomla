@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
@@ -76,6 +77,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         ProductRelation::class,
         Sku::class,
         Unit::class,
+        CashCollection::class,
         Cart::class,
         CartItem::class,
         Customer::class,

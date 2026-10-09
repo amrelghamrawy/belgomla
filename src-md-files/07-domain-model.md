@@ -400,13 +400,13 @@ Not created in V1. Name and the `return` movement type are reserved so V2 adds i
 | amount       | numeric(12,2)   | **check > 0**     |
 | method       | enum            | `cash` only in V1 |
 | collected_at | timestamptz     |                   |
-| recorded_by  | FK tenant_users |                   |
+| recorded_by  | FK tenant_users | nullable (system, e.g. a transition without a user) |
 | note         | varchar(300)    | nullable          |
 | voided_at    | timestamptz     | nullable          |
 | void_reason  | varchar(300)    | nullable          |
 | voided_by    | FK tenant_users | nullable          |
 
-Invariant (app, inside a transaction with the order row locked): `Σ non-voided amount ≤ order_total`. After every insert/void, `orders.collected_amount` and `collection_status` are recomputed.
+Invariant (app, inside a transaction with the order row locked): `Σ non-voided amount ≤ order_total`. After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method = 'cash'`, `voided_at` and `void_reason` set together.
 
 ---
 

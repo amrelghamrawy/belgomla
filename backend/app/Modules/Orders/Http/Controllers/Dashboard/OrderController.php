@@ -22,6 +22,6 @@ final readonly class OrderController
 
     public function show(Order $order, OrderDetailQuery $detail, DashboardOrdersQuery $orders): DashboardOrderResource
     {
-        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore());
+        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore(), $detail->collections($order));
     }
 }

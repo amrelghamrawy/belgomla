@@ -40,6 +40,25 @@ test('BR-INV05 delivering deducts the stock with a sale movement', function (): 
     $this->assertDatabaseHas('inventory_movements', ['order_id' => $this->order->id, 'type' => 'sale', 'quantity' => -120, 'actor_id' => $this->owner->id]);
 });
 
+test('BR-C04 delivered and collected the full amount in one step', function (): void {
+    ($this->transition)(['to' => 'delivered', 'collect_full_amount' => true])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'delivered')
+        ->assertJsonPath('data.collected_amount', '540.00')
+        ->assertJsonPath('data.collection_status', 'collected')
+        ->assertJsonCount(1, 'data.collections')
+        ->assertJsonPath('data.collections.0.amount', '540.00')
+        ->assertJsonPath('data.collections.0.recorded_by', $this->owner->id);
+
+    $this->assertDatabaseHas('collections', ['order_id' => $this->order->id, 'amount' => '540.00', 'voided_at' => null]);
+});
+
+test('BR-C04 collect_full_amount on a forward move short of delivered records nothing', function (): void {
+    ($this->transition)(['to' => 'confirmed', 'collect_full_amount' => true])->assertOk()->assertJsonPath('data.collection_status', 'unpaid');
+
+    $this->assertDatabaseCount('collections', 0);
+});
+
 test('BR-O01 an invalid move answers 409 invalid_transition with from and to', function (OrderStatus $from, string $to): void {
     ($this->at)($from);
 

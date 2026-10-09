@@ -13,7 +13,7 @@ arch('audit logs are only written through the Audit module')
 
 arch('tenancy models are not used by other modules')
     ->expect('App\Modules\Tenancy\Models')
-    ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders']);
+    ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports']);
 
 arch('catalog, pricing, inventory and messaging reach tenancy only through its context, concern, hooks, enums and queries')
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging'])
@@ -25,13 +25,13 @@ arch('catalog, pricing, inventory and messaging reach tenancy only through its c
         'App\Modules\Tenancy\Exceptions',
     ]);
 
-arch('catalog, pricing, inventory, customers and orders reach audit only through the AuditLogger and its enums')
-    ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders'])
+arch('other modules reach audit only through the AuditLogger and its enums')
+    ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
     ->not->toUse(['App\Modules\Audit\Models', 'App\Modules\Audit\Http']);
 
-arch('tenancy and audit do not depend on catalog, pricing, inventory, messaging, customers or orders')
+arch('tenancy and audit do not depend on the business modules')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit'])
-    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders']);
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports']);
 
 /*
 | Catalog ⇄ Pricing (tasks/2-pricing.md). Pricing never looks up Catalog rows by itself: it receives
@@ -39,9 +39,9 @@ arch('tenancy and audit do not depend on catalog, pricing, inventory, messaging,
 | Catalog prices SKUs only through Pricing's actions, data, services and request concern.
 */
 
-arch('catalog models are used outside catalog only by pricing, inventory, customers and orders')
+arch('catalog models are used outside catalog only by pricing, inventory, customers, orders and the low-stock report')
     ->expect('App\Modules\Catalog\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Reports', 'Database\Factories']);
 
 arch('pricing only touches the catalog product and sku it is handed, plus the shared filter')
     ->expect('App\Modules\Pricing')
@@ -148,7 +148,7 @@ arch('messaging models are only used inside messaging')
     ->toOnlyBeUsedIn(['App\Modules\Messaging', 'Database\Factories']);
 
 arch('other modules reach messaging only through Messenger, its payload and enums')
-    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders'])
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
     ->not->toUse([
         'App\Modules\Messaging\Actions',
         'App\Modules\Messaging\Contracts',
@@ -206,9 +206,9 @@ arch('customers price only through the pricing services and read stock only thro
         'App\Modules\Inventory',
     ]);
 
-arch('customers models are used outside customers only by orders')
+arch('customers models are used outside customers only by orders and collections')
     ->expect('App\Modules\Customers\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Customers', 'App\Modules\Orders', App\Providers\CustomersServiceProvider::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', App\Providers\CustomersServiceProvider::class, 'Database\Factories']);
 
 arch('no earlier module depends on customers')
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory'])
@@ -286,9 +286,15 @@ arch('orders do not depend on messaging')
     ->expect('App\Modules\Orders')
     ->not->toUse('App\Modules\Messaging');
 
-arch('orders models are only used inside orders')
+arch('orders models are used outside orders only by collections and reports')
     ->expect('App\Modules\Orders\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Orders', App\Providers\OrdersServiceProvider::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn([
+        'App\Modules\Orders',
+        'App\Modules\Collections', // locks the order it records on, sums and lists orders for balances and statements
+        'App\Modules\Reports', // reads orders for the overview and sales report
+        App\Providers\OrdersServiceProvider::class,
+        'Database\Factories',
+    ]);
 
 arch('no earlier module depends on orders')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Support'])
@@ -301,3 +307,110 @@ arch('orders fill the reservation holders contract of inventory')
 arch('orders fill the recent orders contract of customers')
     ->expect(App\Modules\Orders\Services\CustomerRecentOrders::class)
     ->toImplement(App\Modules\Customers\Contracts\RecentOrders::class);
+
+/*
+| Collections (tasks/7-collections-reports.md). Collections locks and reads the Order it records on, stores the
+| balance through Orders' ApplyCollectedAmount, and fills the contracts Orders and Customers declared
+| (CollectsPayments, OrderCollections, OutstandingBalances). Nothing earlier depends on it.
+*/
+
+arch('collection models are only used inside collections')
+    ->expect('App\Modules\Collections\Models')
+    ->toOnlyBeUsedIn(['App\Modules\Collections', 'Database\Factories']);
+
+arch('collections use orders only through the order, its enums, contracts and ApplyCollectedAmount')
+    ->expect('App\Modules\Collections')
+    ->not->toUse([
+        App\Modules\Orders\Models\OrderItem::class,
+        App\Modules\Orders\Models\OrderStatusHistory::class,
+        App\Modules\Orders\Models\MerchantNotification::class,
+        App\Modules\Orders\Models\TenantOrderCounter::class,
+        App\Modules\Orders\Actions\TransitionOrder::class,
+        App\Modules\Orders\Actions\CancelOrder::class,
+        App\Modules\Orders\Actions\ApplyTransition::class,
+        'App\Modules\Orders\Data',
+        'App\Modules\Orders\Exceptions',
+        'App\Modules\Orders\Http',
+        'App\Modules\Orders\Policies',
+        'App\Modules\Orders\Queries',
+        'App\Modules\Orders\Services',
+    ]);
+
+arch('collections use customers only through the customer row and the outstanding contract')
+    ->expect('App\Modules\Collections')
+    ->not->toUse([
+        App\Modules\Customers\Models\Cart::class,
+        App\Modules\Customers\Models\CartItem::class,
+        App\Modules\Customers\Models\CustomerAddress::class,
+        App\Modules\Customers\Models\CustomerOtp::class,
+        App\Modules\Customers\Models\CustomerInvitation::class,
+        'App\Modules\Customers\Actions',
+        'App\Modules\Customers\Data',
+        'App\Modules\Customers\Services',
+        'App\Modules\Customers\Exceptions',
+        'App\Modules\Customers\Http',
+    ]);
+
+arch('collections do not depend on catalog, pricing, inventory, messaging or reports')
+    ->expect('App\Modules\Collections')
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Reports']);
+
+arch('no earlier module depends on collections')
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Support'])
+    ->not->toUse('App\Modules\Collections');
+
+arch('collections fill the collects payments contract of orders')
+    ->expect(App\Modules\Collections\Services\RemainingBalanceCollector::class)
+    ->toImplement(App\Modules\Orders\Contracts\CollectsPayments::class);
+
+arch('collections fill the order collections contract of orders')
+    ->expect(App\Modules\Collections\Services\OrderCollectionRecords::class)
+    ->toImplement(App\Modules\Orders\Contracts\OrderCollections::class);
+
+arch('collections fill the outstanding balances contract of customers')
+    ->expect(App\Modules\Collections\Queries\OutstandingByCustomerQuery::class)
+    ->toImplement(App\Modules\Customers\Contracts\OutstandingBalances::class);
+
+/*
+| Reports (tasks/7-collections-reports.md, D5) are read-only: queries, their input and resources. They read orders,
+| reuse Collections' outstanding query and Inventory's low-stock query, and never write: no actions, no writing
+| services, no DB facade (so no transactions or raw writes). Nothing depends on Reports.
+*/
+
+arch('reports write nothing')
+    ->expect('App\Modules\Reports')
+    ->not->toUse([
+        Illuminate\Support\Facades\DB::class,
+        'App\Modules\Tenancy\Actions',
+        'App\Modules\Catalog\Actions',
+        'App\Modules\Pricing\Actions',
+        'App\Modules\Inventory\Actions',
+        'App\Modules\Inventory\Services',
+        'App\Modules\Messaging',
+        'App\Modules\Customers\Actions',
+        'App\Modules\Orders\Actions',
+        'App\Modules\Collections\Actions',
+        'App\Modules\Collections\Services',
+        'App\Modules\Audit\Services',
+    ]);
+
+arch('reports read other modules only through orders, their queries and enums')
+    ->expect('App\Modules\Reports')
+    ->not->toUse([
+        'App\Modules\Inventory\Models',
+        'App\Modules\Customers\Models',
+        'App\Modules\Collections\Models',
+        'App\Modules\Orders\Http',
+        'App\Modules\Collections\Http',
+        'App\Modules\Inventory\Http',
+    ]);
+
+arch('no module depends on reports')
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Support'])
+    ->not->toUse('App\Modules\Reports');
+
+test('reports contain only queries, their input, enums and http', function (): void {
+    $folders = array_map(basename(...), glob(dirname(__DIR__, 2).'/app/Modules/Reports/*', GLOB_ONLYDIR) ?: []);
+
+    expect($folders)->toBe(['Data', 'Enums', 'Http', 'Queries']);
+});

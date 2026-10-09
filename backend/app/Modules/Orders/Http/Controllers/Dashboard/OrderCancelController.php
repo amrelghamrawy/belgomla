@@ -20,6 +20,6 @@ final readonly class OrderCancelController
     {
         $order = $cancel->handle($order, CancelData::fromRequest($request), CancelledBy::TenantUser, $request->actorId());
 
-        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore());
+        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore(), $detail->collections($order));
     }
 }

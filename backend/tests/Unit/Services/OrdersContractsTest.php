@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Modules\Collections\Services\OrderCollectionRecords;
+use App\Modules\Collections\Services\RemainingBalanceCollector;
 use App\Modules\Customers\Contracts\RecentOrders;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Orders\Contracts\CollectsPayments;
+use App\Modules\Orders\Contracts\OrderCollections;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\CustomerRecentOrders;
 use App\Modules\Orders\Services\NullCollectsPayments;
+use App\Modules\Orders\Services\NullOrderCollections;
 use App\Modules\Orders\Services\OrdersHoldingSku;
 use App\Modules\Tenancy\TenantContext;
 
@@ -17,10 +21,11 @@ beforeEach(function (): void {
     $this->sku = $this->orderableSku();
 });
 
-test('Orders fills the contracts of Inventory and Customers, and Collections has none yet', function (): void {
+test('Orders fills the contracts of Inventory and Customers, and Collections fills those of Orders', function (): void {
     expect(app(ReservationHolders::class))->toBeInstanceOf(OrdersHoldingSku::class)
         ->and(app(RecentOrders::class))->toBeInstanceOf(CustomerRecentOrders::class)
-        ->and(app(CollectsPayments::class))->toBeInstanceOf(NullCollectsPayments::class);
+        ->and(app(CollectsPayments::class))->toBeInstanceOf(RemainingBalanceCollector::class)
+        ->and(app(OrderCollections::class))->toBeInstanceOf(OrderCollectionRecords::class);
 });
 
 test('BR-INV08 the orders holding a sku are its open orders, oldest first, with the base units each holds', function (): void {
@@ -68,11 +73,17 @@ test('the recent orders honour the limit', function (): void {
     expect(app(CustomerRecentOrders::class)->forCustomer($this->customer->id, 2))->toHaveCount(2);
 });
 
-test('until collections exist the full-amount shortcut records nothing', function (): void {
+test('without collections the full-amount shortcut records nothing', function (): void {
     app(TenantContext::class)->set($this->tenant);
     $order = Order::factory()->create();
 
     new NullCollectsPayments()->collectRemaining($order, null);
 
     expect($order->refresh()->collected_amount)->toBe('0.00');
+});
+
+test('without collections an order lists no collections', function (): void {
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(new NullOrderCollections()->forOrder(Order::factory()->create()))->toBe([]);
 });

@@ -59,6 +59,9 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 409  | `invalid_transition`       | order status change not allowed (`details.from/to`, BR-O01/O02) |
 | 409  | `has_collections`          | cancelling an order with collected money (BR-O03, `details.collected_amount`) |
 | 409  | `address_locked`           | editing the delivery address from `out_for_delivery` on (D9) |
+| 422  | `exceeds_balance`          | a collection above the order's remaining balance (BR-C03, `details.remaining`) |
+| 409  | `order_cancelled`          | recording a collection on a cancelled order (BR-C04)      |
+| 409  | `already_voided`           | voiding a collection twice (BR-C02, `details.voided_at`)  |
 | 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
 | 422  | `idempotency_key_reused`   | same `Idempotency-Key` with a different body (D55)        |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
@@ -464,7 +467,7 @@ Delivered (Task 3):
 
 | Method | Path                                    | Notes                                                    |
 | ------ | --------------------------------------- | -------------------------------------------------------- |
-| GET    | `/api/dashboard/customers`              | `?q=&status=`; includes `outstanding_amount`             |
+| GET    | `/api/dashboard/customers`              | `?q=&status=`; includes `outstanding_amount` (D59)       |
 | POST   | `/api/dashboard/customers`              | `name, phone, addresses[]?` → status `invited` (BR-CU08) |
 | GET    | `/api/dashboard/customers/{id}`         | profile, addresses, recent orders, outstanding           |
 | PUT    | `/api/dashboard/customers/{id}`         | name, addresses                                          |
@@ -473,7 +476,7 @@ Delivered (Task 3):
 | POST   | `/api/dashboard/customers/{id}/block`   | `reason`                                                 |
 | POST   | `/api/dashboard/customers/{id}/unblock` |                                                          |
 
-Delivered in Task 5: the dashboard customer adds `outstanding_amount` ("0.00" until Collections, Task 7), `created_by`, `approved_by`, `blocked_at`, `blocked_reason`; the detail page adds `addresses` (active) and `recent_orders` ([] until Orders, Task 6). `PUT` takes `addresses[]` as the full list (D54). `invite` answers `200 { sent_via, expires_at, sent_count }`; only `invited` customers. `approve` only from `pending_approval`; `block` from any other status (keeps it), `unblock` restores it. Invalid transitions → `409 invalid_transition` with `details.from`. Duplicate phone → `409 phone_taken`. Audit actions: `customer.created`, `customer.updated`, `customer.invited`, `customer.approved`, `customer.blocked`, `customer.unblocked`.
+Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by Collections since Task 7: delivered orders only, D59), `created_by`, `approved_by`, `blocked_at`, `blocked_reason`; the detail page adds `addresses` (active) and `recent_orders` ([] until Orders, Task 6). `PUT` takes `addresses[]` as the full list (D54). `invite` answers `200 { sent_via, expires_at, sent_count }`; only `invited` customers. `approve` only from `pending_approval`; `block` from any other status (keeps it), `unblock` restores it. Invalid transitions → `409 invalid_transition` with `details.from`. Duplicate phone → `409 phone_taken`. Audit actions: `customer.created`, `customer.updated`, `customer.invited`, `customer.approved`, `customer.blocked`, `customer.unblocked`.
 
 ---
 
@@ -489,7 +492,7 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` ("0.00" un
 
 `transition` rules (BR-O01): target must be forward of current; `delivered` triggers inventory deduction and, with `collect_full_amount: true`, creates one collection for the remaining balance in the same transaction (BR-C04). Invalid → `409 invalid_transition` with `{ "details": { "from": "preparing", "to": "confirmed" } }`.
 
-Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer { id, name, phone }`, `confirmed_at`, `delivered_at`, `cancelled_at`, `is_stale` (pending past `stale_pending_hours`), history entries with `actor_id` and `note`, and on the detail `collections` (`[]` until Task 7). `?from=&to=` are `Y-m-d` days of `placed_at`, both inclusive; `?q=` matches the order number (`#1024` too), customer name or phone, or recipient name; `?sort=placed_at|number|order_total` (default `-placed_at`). `delivery-address` takes `governorate, city, address_line, label?, landmark?, name?, phone?` (name/phone kept when omitted) → `409 address_locked` from `out_for_delivery` on. `collect_full_amount` is ignored for other targets and records nothing until Collections binds `CollectsPayments` (Task 7). Every write answers the dashboard order detail. Audit: `order.status_changed`, `order.cancelled`, `order.delivery_address_changed`.
+Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer { id, name, phone }`, `confirmed_at`, `delivered_at`, `cancelled_at`, `is_stale` (pending past `stale_pending_hours`), history entries with `actor_id` and `note`, and on the detail `collections` (the collection shape of §10, newest first, voided ones included). `?from=&to=` are `Y-m-d` days of `placed_at`, both inclusive; `?q=` matches the order number (`#1024` too), customer name or phone, or recipient name; `?sort=placed_at|number|order_total` (default `-placed_at`). `delivery-address` takes `governorate, city, address_line, label?, landmark?, name?, phone?` (name/phone kept when omitted) → `409 address_locked` from `out_for_delivery` on. `collect_full_amount` is ignored for other targets (see §10 for what it records). Every write answers the dashboard order detail. Audit: `order.status_changed`, `order.cancelled`, `order.delivery_address_changed`.
 
 ---
 
@@ -502,6 +505,20 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 | POST   | `/api/dashboard/collections/{id}/void`       | `{ reason }`                                                                |
 | GET    | `/api/dashboard/customers/{id}/statement`    | orders with totals, collected, outstanding (basis for V2 statements)        |
 
+Delivered in Task 7:
+
+- **Collection** shape (list, record, void, and `collections` on the dashboard order detail): `{ id, order { id, number, order_total, collected_amount, collection_status }, customer { id, name }, amount, method: "cash", method_label, collected_at, recorded_by, note, is_voided, voided_at, void_reason, voided_by, created_at }`. `order` carries the balance after the change. `customer` is only on the list, not on the order detail. `recorded_by`/`voided_by` are tenant user ids (`null` = system).
+- **List**: every collection, voided ones included, newest `collected_at` first. `from`/`to` are business days (D60) of `collected_at`, both inclusive. `order` is the order number.
+- **Record**: answers `201` with the collection. `amount` is `decimal:0,2`, `> 0`, ≤ 9 999 999 999.99. `collected_at` defaults to now and cannot be in the future. `note` is at most 300 characters. Allowed at any order status but cancelled (`409 order_cancelled`); a deposit before delivery is fine (BR-C04). More than the remaining balance is `422 exceeds_balance`. The order row is locked, so two concurrent collections cannot both fit one balance. Honors `Idempotency-Key`.
+- **Void**: `reason` is at most 300 characters. Answers the collection; a second void is `409 already_voided`. Voiding everything makes the order cancellable again (BR-O03). Honors `Idempotency-Key`.
+- `orders.collected_amount` / `collection_status` are recomputed after every record or void (BR-C03).
+- **Shortcut**: `transition` to `delivered` with `collect_full_amount: true` records one collection for whatever is left, in the same transaction. Nothing is recorded when a deposit already covered the order; if the collection fails, the delivery rolls back.
+- **Statement**: `{ data: [ { number, status, status_label, placed_at, delivered_at, order_total, collected_amount, balance, collection_status } ], links, meta, customer { id, name, phone }, summary { orders_count, total, collected, outstanding } }`.
+  - Lists the customer's non-cancelled orders, newest first.
+  - `balance` = `order_total − collected_amount`.
+  - `summary.outstanding` counts delivered orders only (D59), the same figure as the customer list's `outstanding_amount`.
+- Audit actions: `collection.recorded`, `collection.voided`.
+
 ---
 
 ## 11. Dashboard — Reports (D5)
@@ -512,6 +529,25 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 | GET    | `/api/dashboard/reports/sales`       | `?from=&to=&group=day                                                                      | week | month` → totals per bucket |
 | GET    | `/api/dashboard/reports/outstanding` | per customer: orders, total, collected, outstanding                                        |
 | GET    | `/api/dashboard/reports/low-stock`   | SKUs with `available ≤ moq` (threshold param optional)                                     |
+
+Delivered in Task 7. All days are business days in Africa/Cairo (D60).
+
+- **overview**:
+  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total }, stale_pending, outstanding_total, low_stock_count }`.
+  - `today` counts orders placed since local midnight; its total leaves cancelled orders out.
+  - `outstanding_total` follows D59.
+- **sales**:
+  - Shape: `{ from, to, group, buckets: [ { period_start, orders, total } ], totals { orders, total } }`.
+  - It covers delivered orders by `delivered_at`.
+  - Every bucket of the range is listed, with empty ones as zero. Weeks start on Saturday (D58) and the first bucket starts on the Saturday on or before `from`.
+  - Without `from`/`to`, it covers the last 30 days up to today; `group` defaults to `day`.
+- **outstanding**:
+  - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding }` rows, largest debt first.
+  - It covers delivered orders that are not fully collected (D59).
+- **low-stock**:
+  - Paginated `{ sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold }`, ordered by code.
+  - It covers SKUs of products that are not inactive.
+  - The threshold is fixed by D36 (`moq × conversion_factor`, base units), so there is no `threshold` param.
 
 ---
 
@@ -524,6 +560,13 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 | GET    | `/api/dashboard/audit`              | `?entity_type=&entity_id=&actor_id=&from=&to=&batch_id=` |
 
 Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled, type_label, details: { order_number, customer_name, order_total, reason? }, read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`.
+
+Delivered in Task 7 (audit):
+- The list is paginated newest first, as `{ id, actor { type, id }, action, entity { type, id }, old_values, new_values, batch_id, ip, created_at }`.
+- `entity_type` is the table name (`orders`, `collections`, `products`, `sku_inventory`, …).
+- `from`/`to` are business days (D60).
+- `batch_id` must be a uuid and returns exactly the rows of one bulk action.
+- Reading the log is not audited.
 
 ---
 

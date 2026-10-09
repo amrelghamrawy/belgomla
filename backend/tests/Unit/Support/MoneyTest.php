@@ -55,3 +55,11 @@ test('times multiplies a unit price by a whole quantity exactly', function (): v
 test('compare and times refuse what is not a number', function (): void {
     Money::times('abc', 2);
 })->throws(InvalidArgumentException::class, 'is not a money amount');
+
+test('subtract gives the difference at two decimals', function (string $a, string $b, string $difference): void {
+    expect(Money::subtract($a, $b))->toBe($difference);
+})->with([
+    'a remaining balance' => ['500.00', '120.50', '379.50'],
+    'nothing left' => ['90', '90.00', '0.00'],
+    'below zero' => ['10.00', '10.01', '-0.01'],
+]);

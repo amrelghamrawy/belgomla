@@ -4,12 +4,24 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Enums;
 
-/** BR-C03: derived from the collected amount against the order total. Computed by Collections (Task 7). */
+use App\Support\Money;
+
+/** BR-C03: derived from the collected amount against the order total (Orders\Actions\ApplyCollectedAmount). */
 enum CollectionStatus: string
 {
     case Unpaid = 'unpaid';
     case PartiallyCollected = 'partially_collected';
     case Collected = 'collected';
+
+    /** BR-C03: 0 → unpaid, below the total → partially collected, the total or more → collected. */
+    public static function for(string $collected, string $total): self
+    {
+        return match (true) {
+            Money::compare($collected, '0.00') <= 0 => self::Unpaid,
+            Money::compare($collected, $total) < 0 => self::PartiallyCollected,
+            default => self::Collected,
+        };
+    }
 
     public function label(): string
     {

@@ -6,7 +6,7 @@ namespace App\Modules\Customers\Contracts;
 
 /**
  * What each customer still owes (BR-C03, D5 b): delivered order totals minus their non-voided collections.
- * Collections implements it in Task 7; until then nobody owes anything (NullOutstandingBalances).
+ * Collections implements it (OutstandingByCustomerQuery, D59); without it nobody owes anything (NullOutstandingBalances).
  */
 interface OutstandingBalances
 {

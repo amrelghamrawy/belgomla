@@ -121,6 +121,21 @@ test('the merchant opens an order with lines, history, customer and collections'
         ->assertJsonPath('data.collections', []);
 });
 
+test('BR-C02 the order detail lists its collections, voided ones included, newest first', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 12]);
+    $first = $this->tenantJson('POST', "/api/dashboard/orders/{$order->number}/collections", ['amount' => '100'])->assertCreated()->json('data.id');
+    $this->travel(1)->minutes();
+    $second = $this->tenantJson('POST', "/api/dashboard/orders/{$order->number}/collections", ['amount' => '50'])->assertCreated()->json('data.id');
+    $this->tenantJson('POST', "/api/dashboard/collections/{$first}/void", ['reason' => 'خطأ'])->assertOk();
+
+    $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
+        ->assertOk()
+        ->assertJsonPath('data.collected_amount', '50.00')
+        ->assertJsonPath('data.collections.*.id', [$second, $first])
+        ->assertJsonPath('data.collections.1.is_voided', true)
+        ->assertJsonMissingPath('data.collections.0.customer');
+});
+
 test('BR-T04 an order number of another tenant is 404 here', function (): void {
     $other = $this->otherTenant();
     $theirs = $this->placeOrder($this->makeCustomer(tenant: $other), [$this->orderableSku(tenant: $other)->id => 5]);

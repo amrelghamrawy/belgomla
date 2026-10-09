@@ -1,6 +1,6 @@
 # Task 7 — Collections & Reports (+ Audit API)
 
-Status: **not started**. Requires Tasks 1–6. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (see the delivery notes at the end). Requires Tasks 1–6. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -65,5 +65,38 @@ Cash collection records with void, derived collection status on orders, the "del
 
 ## Open questions
 
-- D36: Week grouping start day for sales report (ISO Monday vs Egyptian Saturday). Default: Saturday.
-- D37: Can a collection be recorded before the order is confirmed (deposit)? Default: yes, any status except cancelled (BR-C04).
+- D58 (was "D36" here; D36/D37 are inventory/storefront decisions): week start of the sales report. Default: Saturday.
+- Deposits (was "D37"): no decision needed, BR-C04 already allows any status except cancelled.
+- Added while building: D59 (outstanding = delivered orders only) and D60 (business days in Africa/Cairo), both confirmed with the product owner before coding.
+
+## Delivery notes (session 2026-10-10)
+
+`composer test` is green with 2658 tests (2615 passed + 43 arch tests flagged deprecated by PHP 8.5's `setAccessible`), +233 over Task 6's 2425. PHPStan max is clean and type coverage is 100%.
+
+What differs from the plan above, and why:
+- `CollectionBalance` is not a Collections service. Recomputing the balance writes `orders`, so per rules/02 §2 it is an Orders **action**, `ApplyCollectedAmount`. Collections sums the non-voided amounts (`CollectedAmountQuery`) and hands the result to it. The status derivation lives on the enum: `CollectionStatus::for($collected, $total)`.
+- `RecordCollection` keeps a single `handle()` (rules/02 §3). `CollectsPayments` is implemented by `Services\RemainingBalanceCollector`, which records whatever is left. It records nothing when a deposit already covered the order, and it refreshes the order the transition answers with.
+- The order detail's `collections` come through a new Orders contract, `OrderCollections`, which returns `list<JsonResource>`. It is null-bound in `OrdersServiceProvider` and filled by `Services\OrderCollectionRecords`. The four dashboard order controllers pass it to `DashboardOrderResource`.
+- `OrderCollectionController@store` answers the **collection** (`201`), not the order detail: Collections cannot use Orders' Http resources. The collection's `order { … }` carries the new balance and status, so the UI does not need a second call.
+- `StatementResource` is the statement head (`customer`, `summary`) sent next to the paginated `StatementOrderResource` rows.
+- Reports also has a `Data` folder (`SalesReportData`). Arch rules: Reports contains only `Data`, `Enums`, `Http` and `Queries`, and uses no writing actions, services or the `DB` facade. The low-stock report reuses Inventory's `LowStockQuery::builder()` unchanged. The `threshold` param from 08 §11 was dropped, because D36 fixes the threshold.
+- New Support: `Money::subtract`, `BusinessCalendar` (Cairo days → UTC bounds, D60), and `config('app.business_timezone')`.
+- `collections.recorded_by` is nullable (a system actor); 07 §8 updated. `CashCollection` exposes the user ids only, because Tenancy models stay inside Tenancy.
+- Cross-host tests on routes with a bound id: route binding (tenant-scoped) runs before `session.tenant`, so an id that only exists in the session's own store is a 404 on another host. The tests therefore use an id that exists on the other host, which must be `401`.
+- Not done: `lang/ar/validation.php` (left over from Task 6) is still missing. It is better done with the frontend foundation (Task 8), where the messages are shown.
+- Follow-up: the orders list (Task 6) still filters `from`/`to` by UTC days; align it with D60 when the dashboard UI uses it.
+
+Manual checks (`php artisan serve`, curl with `--resolve` and the SPA origin, owner session):
+- **Deliver and collect**: order #3 (confirmed, 300.00) moved to `delivered` with `collect_full_amount`. The answer was `collected_amount 300.00`, `collected`, and one collection in `collections`.
+- **Partial collection**: order #1 (delivered, 1530.00) took 500.00 with an Arabic note and answered `201` with `partially_collected`. Then:
+  - 1030.01 more → `422 exceeds_balance` with `remaining 1030.00`;
+  - a collection on the cancelled order #2 → `409 order_cancelled`.
+- **Statement**: customer 4 showed both orders with balances 0.00 and 1030.00, and the summary had `outstanding 1030.00`. The customer list showed the same 1030.00.
+- **Void**: voiding the 500.00 collection set order #1 back to `unpaid`. A second void → `409 already_voided`. The collections list showed it as voided.
+- **Reports**:
+  - The overview was correct, with `today` counted on the Cairo date.
+  - In `sales?group=week`, order #3 was delivered at 22:03 UTC, which is the next day in Cairo, so it landed in the week starting Saturday 2026-10-10.
+  - The outstanding and low-stock reports answered `200`.
+- **Audit**: `audit?entity_type=collections` listed `collection.recorded` ×2 and `collection.voided` with the owner as actor. A guest on the reports → `401`.
+
+Rules covered by tests: BR-C01, BR-C02, BR-C03, BR-C04, BR-O03, BR-L, BR-INV07, BR-T03, BR-T04, BR-CU02, Tech §6, D5, D7, D24, D36, D55, D58, D59, D60.

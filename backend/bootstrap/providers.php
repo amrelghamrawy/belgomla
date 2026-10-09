@@ -7,4 +7,5 @@ return [
     App\Providers\CatalogServiceProvider::class,
     App\Providers\CustomersServiceProvider::class,
     App\Providers\OrdersServiceProvider::class,
+    App\Providers\CollectionsServiceProvider::class,
 ];
