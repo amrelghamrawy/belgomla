@@ -192,12 +192,12 @@ Email is not required for V1.
 
 WhatsApp and SMS are required in V1 for OTP and customer invitations only. Rules:
 
-- One `MessagingService` with two drivers behind an interface: `WhatsAppDriver` and `SmsDriver`. Business code never calls a provider directly.
-- WhatsApp: Meta WhatsApp Business Cloud API using a pre-approved **authentication template** for OTP and a **utility template** for invitations. One platform-level WhatsApp Business number is used for all tenants in V1 (the message body names the store).
-- SMS: **SMS Misr** (decided 2026-10-09) behind the `SmsDriver` interface. One platform-level sender name registered with NTRA. Messaging cost is absorbed by the platform in V1 and logged per tenant.
-- Fallback logic lives in `MessagingService`: try WhatsApp; on provider error indicating the number is not on WhatsApp, or on any send failure, send via SMS. The Cloud API has no reliable "is this number on WhatsApp" check, so fallback is driven by the send result and delivery webhook.
-- Sends run on the queue (Redis), with webhook endpoints to record delivery status.
-- Every send is logged per tenant (channel, template, provider id, status, cost if available).
+- One `Messenger` service; providers sit behind the `MessageDriver` contract. Business code never calls a provider directly.
+- Provider in V1 (decided 2026-10-09, D11/D46): **Hypersender** (hypersender.com) for both channels. WhatsApp through one Hypersender instance paired to a dedicated platform number (unofficial WhatsApp, transactional messages only, ≤ 10 messages/min). SMS through the Hypersender Android app on the platform's phone + SIM; recipients see that number. Free plan is a 14-day trial; production runs on the Starter plan. The official Meta Cloud API stays the fallback plan if the number is blocked, as a driver swap.
+- OTP codes are generated and verified by BelGomla (`Customers\Services\OtpCodes`), not by the provider's OTP endpoints, so the provider stays replaceable.
+- Fallback logic lives in `Messenger`: try WhatsApp; on a provider result meaning the number is not on WhatsApp, or on any send failure, send via SMS. Hypersender v2 is asynchronous (every send returns a queued request id), so the result comes from polling or the status webhook.
+- Sends run on the queue (Redis), with webhook endpoints on the platform `hooks` host to record delivery status.
+- Every send is logged per tenant (channel, provider request/message ids, status, cost if available).
 - Rate limits from BR-CU07 are enforced server-side per phone and per IP.
 - Checkout and order status changes never depend on messaging.
 

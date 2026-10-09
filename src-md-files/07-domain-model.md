@@ -419,7 +419,8 @@ Invariant (app, inside a transaction with the order row locked): `Σ non-voided 
 | to_phone            | varchar(20)  |                                                         |
 | purpose             | enum         | `otp`, `invitation`                                     |
 | channel             | enum         | `whatsapp`, `sms`                                       |
-| provider            | varchar(30)  | `meta_cloud`, `sms_misr`                                |
+| provider            | varchar(30)  | `hypersender` (V1), `meta_cloud` reserved               |
+| provider_request_id | varchar      | nullable; Hypersender `queued_request_uuid` polled for the final result |
 | provider_message_id | varchar      | nullable                                                |
 | status              | enum         | `queued`, `sent`, `delivered`, `failed`, `fell_back`    |
 | error_code          | varchar(50)  | nullable                                                |

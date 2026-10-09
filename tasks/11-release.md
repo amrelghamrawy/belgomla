@@ -22,9 +22,9 @@ A reproducible production deployment on one Linux VM without Docker, the first r
    - `deploy.sh`: git pull → `composer install --no-dev --optimize-autoloader` → `php artisan migrate --force` → `config:cache route:cache view:cache` → `npm ci && npm run build` → restart services; zero-downtime is **not** required in V1.
    - `backup.sh`: nightly `pg_dump` + `storage/app/public` to an S3-compatible bucket; retention 30 days; restore procedure documented and tested once.
 2. Backend production settings: `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`, `SANCTUM_STATEFUL_DOMAINS=*.gomalecommerce.app`, `TENANT_BASE_DOMAIN=gomalecommerce.app`, `FILESYSTEM_DISK=s3` for product images (`04` §1) with `public` URL base, logging to daily files + optional Sentry DSN; `DB::prohibitDestructiveCommands` already on.
-3. Health and monitoring: `/up` wired to Nginx; a `monitor.sh` cron that checks `/up` per tenant host, queue backlog, disk; alerts via email-free channel (WhatsApp to the operator through the Messaging module's `Messenger` with a `system_alert` template — add the template to D30's list) or a simple log + external uptime service.
+3. Health and monitoring: `/up` wired to Nginx; a `monitor.sh` cron that checks `/up` per tenant host, queue backlog, disk; alerts via WhatsApp to the operator through the Messaging module's `Messenger` (purpose `system_alert`) or a simple log + external uptime service. The monitor must also alert when the Hypersender SMS phone has not sent a heartbeat for 2 hours.
 4. First tenant: `php artisan tenant:create alnoor "مكتبة النور" --owner-email=... --owner-password=... --vertical=school-books`; import the initial catalog manually (bulk import is V2) — plan the data entry session with the merchant.
-5. Go-live checklist (in this file, ticked during execution): DNS wildcard A record; TLS issued; webhooks registered at Meta and SMS Misr with the `hooks` host URLs; WhatsApp templates approved; SMS sender name approved; `composer test` green on the release commit; smoke test of every flow on production with a test tenant that is suspended afterwards; backup restore drill done; `rules/00-session-start.md` updated with production access notes (no secrets in the repo).
+5. Go-live checklist (in this file, ticked during execution): DNS wildcard A record; TLS issued; Hypersender paid plan active (trial is 14 days) with the WhatsApp instance paired to the dedicated platform number; the platform Android phone with its SIM running the Hypersender SMS app, charged, on Wi-Fi, heartbeat visible in the Hypersender dashboard; webhook URLs on the `hooks` host registered in Hypersender; `composer test` green on the release commit; smoke test of every flow on production with a test tenant that is suspended afterwards (including one real OTP over WhatsApp and one over SMS); backup restore drill done; `rules/00-session-start.md` updated with production access notes (no secrets in the repo).
 
 ## Tests
 
@@ -37,4 +37,4 @@ Production serves `https://alnoor.gomalecommerce.app` end-to-end; checklist full
 ## Open questions
 
 - D44: Hosting provider and VM size (default: 2 vCPU / 4 GB, Hetzner or DigitalOcean) and object storage (default: provider's S3-compatible).
-- D45: Who holds the Meta Business and SMS Misr accounts (ties to D30/D31).
+- D45: Who holds the Hypersender account, the dedicated WhatsApp number, and the Android phone + SIM (ties to D30/D31). The phone is a production asset: where does it physically live?

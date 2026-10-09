@@ -27,9 +27,10 @@ These are treated as accepted defaults unless the product owner objects.
 | D1    | Public prices             | Public by default; tenant setting `require_login_for_prices` can hide them.                                          | BR-CU04, BR-M        |
 | D2    | Customer approval         | Off by default; tenant setting `require_customer_approval` adds `Pending Approval` status.                           | BR-CU04/CU05, BR-M   |
 | D3    | VAT / taxes               | Merchant prices are final; no VAT, no tax engine in V1.                                                              | BR-PR09              |
-| D11   | SMS provider              | SMS Misr for now, behind the `SmsDriver` interface so it can be swapped.                                             | Tech §13             |
-| D12   | WhatsApp number           | One platform-level number for all tenants in V1.                                                                     | Tech §13             |
-| D13   | Messaging cost            | Platform absorbs it in V1; usage logged per tenant.                                                                  | Tech §13             |
+| D11   | Messaging provider        | **Superseded 2026-10-09:** Hypersender (hypersender.com) for WhatsApp and SMS behind the `MessageDriver` contract, replacing Meta Cloud API + SMS Misr. Meta Cloud remains the migration path if the unofficial channel is blocked. | Tech §13 |
+| D12   | WhatsApp number           | One dedicated platform number = one Hypersender instance for all tenants in V1. Never a merchant's personal number.   | Tech §13             |
+| D13   | Messaging cost            | Platform pays: Hypersender Starter after the 14-day trial (≈ $9.99/instance/month) plus carrier SMS cost on the platform SIM; usage logged per tenant. | Tech §13 |
+| D46   | Unofficial WhatsApp risk  | Accepted for V1: Hypersender is not an official WhatsApp API and its docs say a block is possible. Mitigation: transactional only, ≤ 10 msgs/min, dedicated number, SMS fallback, driver swap to Meta Cloud if blocked. | Tech §13 |
 | D14   | Custom field types        | text, number, select, boolean.                                                                                       | BR-P08               |
 | D15   | Self-registered ordering  | Can order immediately unless `require_customer_approval` is on.                                                      | BR-CU04              |
 | D20   | Returns (المرتجع)         | **Not in V1.** Planned for V2 as the first V2 increment. Schema reserves `return` movement type and `order_returns`. | BR-INV06, Roadmap V2 |
