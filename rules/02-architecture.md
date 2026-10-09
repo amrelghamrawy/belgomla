@@ -76,7 +76,7 @@ Every class under `app/` is `final` unless it is an explicitly listed abstract b
 
 | Kind        | Modifiers                 | Single public entry point | May depend on                            |
 | ----------- | ------------------------- | ------------------------- | ---------------------------------------- |
-| Action      | `final readonly`          | `handle()`                | Models, Services, other Actions, Audit   |
+| Action      | `final readonly`          | `handle()`                | Models, Services, Queries (read a selection, e.g. bulk by filter), other Actions, Audit |
 | Query       | `final readonly`          | `builder()` / `paginate()` / `get()` | Models, Scopes                |
 | Service     | `final readonly`          | named methods             | Config, Http, Cache, Models (read)       |
 | Controller  | `final readonly`          | REST methods              | Requests, Actions, Queries, Resources, Gate |

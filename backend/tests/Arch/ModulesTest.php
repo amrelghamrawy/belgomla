@@ -63,12 +63,12 @@ arch('models are final')
 arch('models extend Eloquent')
     ->expect(moduleNamespaces('Models'))
     ->toExtend(Model::class)
-    ->ignoring(moduleNamespaces('Models\Scopes'));
+    ->ignoring([...moduleNamespaces('Models\Scopes'), ...moduleNamespaces('Models\Casts')]);
 
 arch('models declare casts()')
     ->expect(moduleNamespaces('Models'))
     ->toHaveMethod('casts')
-    ->ignoring(moduleNamespaces('Models\Scopes'));
+    ->ignoring([...moduleNamespaces('Models\Scopes'), ...moduleNamespaces('Models\Casts')]);
 
 arch('model scopes are final invokable classes')
     ->expect(moduleNamespaces('Models\Scopes'))

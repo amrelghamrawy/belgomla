@@ -10,6 +10,13 @@ use App\Modules\Catalog\Http\Controllers\Dashboard\FieldArchiveController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\FieldController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\FieldOptionArchiveController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\FieldOptionController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductBulkStatusController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductDuplicateController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductImageController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductImageReorderController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductRelationController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductStatusController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\UnitArchiveController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\UnitController;
 use Illuminate\Support\Facades\Route;
@@ -36,7 +43,26 @@ Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(fun
     Route::put('fields/{field}', [FieldController::class, 'update'])->whereNumber('field')->name('fields.update');
     Route::post('fields/{field}/archive', [FieldArchiveController::class, 'store'])->whereNumber('field')->name('fields.archive');
 
+    Route::get('products', [ProductController::class, 'index'])->name('products.index');
+    Route::post('products', [ProductController::class, 'store'])->name('products.store');
+    Route::post('products/bulk/status', [ProductBulkStatusController::class, 'store'])->name('products.bulk-status');
+    Route::get('products/{product}', [ProductController::class, 'show'])->whereNumber('product')->name('products.show');
+    Route::put('products/{product}', [ProductController::class, 'update'])->whereNumber('product')->name('products.update');
+    Route::patch('products/{product}/status', [ProductStatusController::class, 'update'])->whereNumber('product')->name('products.status');
+    Route::post('products/{product}/duplicate', [ProductDuplicateController::class, 'store'])->whereNumber('product')->name('products.duplicate');
+    Route::post('products/{product}/images', [ProductImageController::class, 'store'])->whereNumber('product')->name('products.images.store');
+    Route::post('products/{product}/images/reorder', [ProductImageReorderController::class, 'store'])->whereNumber('product')->name('products.images.reorder');
+    Route::get('products/{product}/relations', [ProductRelationController::class, 'index'])->whereNumber('product')->name('products.relations.index');
+    Route::post('products/{product}/relations', [ProductRelationController::class, 'store'])->whereNumber('product')->name('products.relations.store');
+
     Route::scopeBindings()->group(function (): void {
+        Route::delete('products/{product}/images/{image}', [ProductImageController::class, 'destroy'])
+            ->whereNumber(['product', 'image'])
+            ->name('products.images.destroy');
+        Route::delete('products/{product}/relations/{relation}', [ProductRelationController::class, 'destroy'])
+            ->whereNumber(['product', 'relation'])
+            ->name('products.relations.destroy');
+
         Route::post('fields/{field}/options', [FieldOptionController::class, 'store'])
             ->whereNumber('field')
             ->name('fields.options.store');

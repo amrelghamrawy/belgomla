@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Models\Casts\JsonObject;
 use App\Modules\Catalog\Observers\ProductObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
@@ -126,7 +127,7 @@ final class Product extends Model
     {
         return [
             'status' => ProductStatus::class,
-            'custom_fields' => 'array',
+            'custom_fields' => JsonObject::class,
         ];
     }
 }

@@ -40,6 +40,19 @@ dataset('dashboard authenticated routes', [
     'field options create' => ['POST', '/api/dashboard/fields/1/options'],
     'field options update' => ['PUT', '/api/dashboard/fields/1/options/1'],
     'field options archive' => ['POST', '/api/dashboard/fields/1/options/1/archive'],
+    'products list' => ['GET', '/api/dashboard/products'],
+    'products create' => ['POST', '/api/dashboard/products'],
+    'products bulk status' => ['POST', '/api/dashboard/products/bulk/status'],
+    'products show' => ['GET', '/api/dashboard/products/1'],
+    'products update' => ['PUT', '/api/dashboard/products/1'],
+    'products status' => ['PATCH', '/api/dashboard/products/1/status'],
+    'products duplicate' => ['POST', '/api/dashboard/products/1/duplicate'],
+    'product images upload' => ['POST', '/api/dashboard/products/1/images'],
+    'product images reorder' => ['POST', '/api/dashboard/products/1/images/reorder'],
+    'product images delete' => ['DELETE', '/api/dashboard/products/1/images/1'],
+    'product relations list' => ['GET', '/api/dashboard/products/1/relations'],
+    'product relations add' => ['POST', '/api/dashboard/products/1/relations'],
+    'product relations delete' => ['DELETE', '/api/dashboard/products/1/relations/1'],
 ]);
 
 test('a guest is refused on every authenticated dashboard route', function (string $method, string $uri): void {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Unit;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
@@ -21,11 +23,64 @@ abstract class TenantTestCase extends TestCase
 
     protected Tenant $tenant;
 
+    /** @var array{category: Category, carton: Unit, piece: Unit}|null */
+    private ?array $catalogBasics = null;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->tenant = Tenant::factory()->create(['subdomain' => 'alnoor', 'name' => 'مكتبة النور']);
+    }
+
+    /**
+     * One category and two units on the default tenant, created once per test.
+     *
+     * @return array{category: Category, carton: Unit, piece: Unit}
+     */
+    protected function catalogBasics(): array
+    {
+        return $this->catalogBasics ??= $this->inTenant(fn (): array => [
+            'category' => Category::factory()->create(['name' => 'إعدادي']),
+            'carton' => Unit::factory()->create(['name' => 'كرتونة']),
+            'piece' => Unit::factory()->create(['name' => 'قطعة']),
+        ]);
+    }
+
+    /**
+     * A valid product create/update body (08-api-contract.md §6); overrides merge recursively.
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    protected function productPayload(array $overrides = []): array
+    {
+        $basics = $this->catalogBasics();
+
+        $merged = array_replace_recursive([
+            'name' => 'الأضواء علوم أولى إعدادي ترم أول',
+            'category_id' => $basics['category']->id,
+            'description' => 'كتاب العلوم',
+            'custom_fields' => [],
+            'sku' => [
+                'code' => 'ADW-SCI-P1-T1',
+                'selling_unit_id' => $basics['carton']->id,
+                'base_unit_id' => $basics['piece']->id,
+                'conversion_factor' => 20,
+                'cover_price' => '120.00',
+                'base_price' => '90.00',
+                'base_price_percent' => null,
+                'moq' => 5,
+            ],
+        ], $overrides);
+
+        $payload = [];
+
+        foreach ($merged as $key => $value) {
+            $payload[(string) $key] = $value;
+        }
+
+        return $payload;
     }
 
     protected function hostOf(Tenant $tenant): string
