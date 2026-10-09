@@ -63,7 +63,7 @@ All §6 tables; `customers` unique `(tenant_id, phone)`; `customer_otps.code_has
 
 ## Delivery notes (session 2026-10-09)
 
-Commit: `COMMIT_HASH`.
+Commit: `04c5b76`.
 
 `composer test` is green with 1982 tests (1946 passed + 36 arch tests flagged deprecated by PHP 8.5's `setAccessible`), +615 over Task 4's 1367. PHPStan max is clean and type coverage is 100%.
 
