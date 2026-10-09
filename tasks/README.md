@@ -5,7 +5,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | #  | Task                                   | Module(s)                     | Status      | Commit |
 | -- | -------------------------------------- | ----------------------------- | ----------- | ------ |
 | 0  | Tenancy + Audit (done in session 1)    | Tenancy, Audit                | done        | 82f6b33 |
-| 1  | [Catalog](1-catalog.md)                | Catalog                       | done        | see task file |
+| 1  | [Catalog](1-catalog.md)                | Catalog                       | done        | dcbbd44 |
 | 2  | [Pricing](2-pricing.md)                | Pricing                       | not started |        |
 | 3  | [Inventory](3-inventory.md)            | Inventory                     | not started |        |
 | 4  | [Messaging](4-messaging.md)            | Messaging                     | not started |        |

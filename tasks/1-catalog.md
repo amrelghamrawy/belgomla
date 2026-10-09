@@ -70,7 +70,7 @@ See `tasks/README.md`: 2 Pricing, 3 Inventory, 4 Messaging, 5 Customers, 6 Order
 
 ## Delivery notes (session 2026-10-10)
 
-Commits: `3240a9b` schema + models, `ef787e4` units/categories/fields/templates, `e6b4c3e` products, then the storefront commit that closes this task (see `git log`). `composer test` green: 838 tests (+647 over Tenancy's 191). Smoke-tested on `php artisan serve` with tenant `kotob` (school-books template): login, category, units, product with custom fields, store list with category + facet + colloquial `q`, filters, product page, price list, duplicate, bulk inactivate by `academic_year`, empty store afterwards.
+Commits: `3240a9b` schema + models, `ef787e4` units/categories/fields/templates, `e6b4c3e` products, `dcbbd44` storefront + docs (closes the task). `composer test` green: 838 tests (+647 over Tenancy's 191). Smoke-tested on `php artisan serve` with tenant `kotob` (school-books template): login, category, units, product with custom fields, store list with category + facet + colloquial `q`, filters, product page, price list, duplicate, bulk inactivate by `academic_year`, empty store afterwards.
 
 Deviations from the brief above (rules/02 or the contract won):
 
