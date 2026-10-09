@@ -10,7 +10,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | 3  | [Inventory](3-inventory.md)            | Inventory                     | done        | ed057c0 |
 | 4  | [Messaging](4-messaging.md)            | Messaging                     | done (live check pending) | 52b46bb |
 | 5  | [Customers](5-customers.md)            | Customers (+ cart)            | done        | 04c5b76 |
-| 6  | [Orders & Checkout](6-orders.md)       | Orders, Notifications         | done        |         |
+| 6  | [Orders & Checkout](6-orders.md)       | Orders, Notifications         | done        | ed252a5 |
 | 7  | [Collections & Reports](7-collections-reports.md) | Collections, Reports, Audit API | not started |        |
 | 8  | [Frontend foundation](8-frontend-foundation.md) | frontend/ (Next.js)   | not started |        |
 | 9  | [Storefront UI](9-storefront-ui.md)    | frontend/ storefront          | not started |        |

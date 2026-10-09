@@ -63,7 +63,7 @@ The checkout transaction, order lifecycle with guards, customer/merchant cancell
 
 ## Delivery notes (session 2026-10-09)
 
-Commit: see the task board.
+Commit: `ed252a5`.
 
 `composer test` is green with 2425 tests (2386 passed + 39 arch tests flagged deprecated by PHP 8.5's `setAccessible`), +443 over Task 5's 1982. PHPStan max is clean and type coverage is 100%.
 
