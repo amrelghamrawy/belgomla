@@ -42,8 +42,8 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
           <span
             className={
               comingSoon
-                ? "bg-highlight text-highlight-foreground absolute start-5 top-5 rounded-md px-2 py-0.5 text-xs font-bold"
-                : "bg-card text-foreground shadow-card absolute start-5 top-5 rounded-md px-2 py-0.5 text-xs font-bold"
+                ? "bg-highlight text-highlight-foreground absolute end-5 top-5 rounded-md px-2 py-0.5 text-xs font-bold"
+                : "bg-card text-foreground shadow-card absolute end-5 top-5 rounded-md px-2 py-0.5 text-xs font-bold"
             }
           >
             {comingSoon ? ar.catalog.comingSoon : ar.catalog.outOfStock}
