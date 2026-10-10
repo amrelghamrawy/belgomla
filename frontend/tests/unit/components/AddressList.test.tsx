@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { addressSchema } from "@/components/store/AddressFormDialog";
+import { addressSchema } from "@/lib/forms/address";
 import { AddressList } from "@/components/store/AddressList";
 
 import { address, customer } from "../fixtures";

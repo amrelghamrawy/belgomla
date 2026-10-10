@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { TextField } from "@/components/shared/TextField";
 import { Button } from "@/components/ui/button";
@@ -12,25 +11,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import type { Address } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
+import { addressSchema, type AddressFormValues } from "@/lib/forms/address";
 import { applyServerErrors } from "@/lib/forms/server-errors";
-import { phoneField } from "@/lib/forms/phone";
 import { useSaveAddress } from "@/lib/store/addresses";
 
-const optional = (max: number) => z.string().trim().max(max, ar.validation.max(max));
-const required = (max: number) => optional(max).min(1, ar.validation.required);
-
-// Mirrors SaveAddressRequest (BR-CU03).
-export const addressSchema = z.object({
-  label: required(50),
-  governorate: required(50),
-  city: required(80),
-  address_line: required(300),
-  landmark: optional(200),
-  phone: z.union([z.literal(""), phoneField()]),
-  is_default: z.boolean(),
-});
-
-type AddressValues = z.infer<typeof addressSchema>;
+type AddressValues = AddressFormValues;
 
 const FIELDS = ["label", "governorate", "city", "address_line", "landmark", "phone", "is_default"] as const;
 
