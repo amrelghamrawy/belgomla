@@ -88,9 +88,67 @@ describe("ProductListing", () => {
     await user.click(await screen.findByRole("button", { name: "تصفية" }));
 
     const drawer = await screen.findByRole("dialog", { name: "تصفية المنتجات" });
-    const groups = within(drawer).getAllByRole("group");
-    expect(groups.map((group) => group.querySelector("legend")?.textContent)).toEqual(["السنة الدراسية", "المادة"]);
+    const groups = within(drawer).getAllByRole("radiogroup");
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["السنة الدراسية", "المادة"]);
     expect(within(groups[0] as HTMLElement).getByRole("radio", { name: /أولى إعدادي\s*16/ })).toBeInTheDocument();
+  });
+
+  it("opens the first two groups and any group with a selection; the rest collapse to their current choice", async () => {
+    searchParams.value = new URLSearchParams("f[term]=21");
+    stubApi({
+      "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/filters": json(200, {
+        data: [
+          facet(),
+          facet({ key: "subject", label: "المادة", options: [{ id: 15, label: "علوم", count: 9 }] }),
+          facet({ key: "publisher", label: "الشركة", options: [{ id: 30, label: "الأضواء", count: 4 }] }),
+          facet({ key: "term", label: "الترم", options: [{ id: 21, label: "الترم الأول", count: 3 }] }),
+        ],
+      }),
+      "GET /api/store/products": json(200, page([storeProduct()], { total: 3 })),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية (1)" }));
+    const drawer = await screen.findByRole("dialog", { name: "تصفية المنتجات" });
+
+    const toggle = (name: RegExp) => within(drawer).getByRole("button", { name });
+    expect(toggle(/^السنة الدراسية/)).toHaveAttribute("aria-expanded", "true");
+    expect(toggle(/^المادة/)).toHaveAttribute("aria-expanded", "true");
+    expect(toggle(/^الشركة\s*الكل/)).toHaveAttribute("aria-expanded", "false");
+    expect(toggle(/^الترم\s*الترم الأول/)).toHaveAttribute("aria-expanded", "true");
+    expect(within(drawer).queryByRole("radio", { name: /الأضواء/ })).not.toBeInTheDocument();
+
+    await user.click(toggle(/^الشركة/));
+
+    expect(within(drawer).getByRole("radio", { name: /الأضواء\s*4/ })).toBeInTheDocument();
+  });
+
+  it("shows the first eight options of a long group until «show all», and searches a group past twelve", async () => {
+    const options = Array.from({ length: 14 }, (_, index) => ({ id: 100 + index, label: `مادة ${index + 1}`, count: 1 }));
+    stubApi({
+      "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/filters": json(200, { data: [facet({ key: "subject", label: "المادة", options })] }),
+      "GET /api/store/products": json(200, page([storeProduct()], { total: 14 })),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية" }));
+    const drawer = await screen.findByRole("dialog", { name: "تصفية المنتجات" });
+
+    // «الكل» + the first eight.
+    expect(within(drawer).getAllByRole("radio")).toHaveLength(9);
+    await user.click(within(drawer).getByRole("button", { name: "عرض الكل (14)" }));
+    expect(within(drawer).getAllByRole("radio")).toHaveLength(15);
+    await user.click(within(drawer).getByRole("button", { name: "عرض أقل" }));
+
+    await user.type(within(drawer).getByRole("searchbox", { name: "ابحث في المادة" }), "مادة 13");
+    expect(within(drawer).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["مادة 131"]);
+
+    await user.clear(within(drawer).getByRole("searchbox"));
+    await user.type(within(drawer).getByRole("searchbox"), "رياضيات");
+    expect(within(drawer).queryByRole("radio")).not.toBeInTheDocument();
+    expect(within(drawer).getByText("لا توجد نتائج مطابقة")).toBeInTheDocument();
   });
 
   it("BR-P08 choosing an option writes f[key] into the URL", async () => {

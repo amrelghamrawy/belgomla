@@ -170,6 +170,10 @@ export const ar = {
     clearFilters: "مسح الكل",
     showResults: (count: number) => `عرض ${count} منتج`,
     activeFilters: (count: number) => `تصفية (${count})`,
+    showAllOptions: (count: number) => `عرض الكل (${count})`,
+    showLess: "عرض أقل",
+    searchOptions: (label: string) => `ابحث في ${label}`,
+    noOptionMatches: "لا توجد نتائج مطابقة",
     sort: "الترتيب",
     sorts: {
       "-created_at": "الأحدث",
