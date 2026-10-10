@@ -179,15 +179,24 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   return (isRecord(body) && "data" in body ? body.data : body) as T;
 }
 
-/** Like apiFetch for a list with `meta` (a Laravel page, or the price list): keeps `meta` next to the rows. */
-export async function apiFetchPage<T, M = PaginationMeta>(path: string, options: ApiOptions = {}): Promise<Page<T, M>> {
+/**
+ * Like apiFetch for a list with `meta` (a Laravel page, or the price list): keeps `meta` next to the rows, and any
+ * other top-level key the endpoint adds (`unread_count`, a statement `summary`) typed as `E`. `links` are dropped.
+ */
+export async function apiFetchPage<T, M = PaginationMeta, E extends object = object>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<Page<T, M> & E> {
   const body = await call(path, options);
 
   if (!isRecord(body) || !Array.isArray(body.data) || !isRecord(body.meta)) {
     throw new ApiError(0, "server_error", ar.errors.server_error);
   }
 
-  return { data: body.data as T[], meta: body.meta as M };
+  const rest: Record<string, unknown> = { ...body };
+  delete rest.links;
+
+  return { ...rest, data: body.data as T[], meta: body.meta as M } as Page<T, M> & E;
 }
 
 /** Sends the request with CSRF bootstrap, the single 419 retry and the 401 hook; returns the parsed body. */

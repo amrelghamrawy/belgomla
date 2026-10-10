@@ -234,6 +234,18 @@ describe("apiFetchPage", () => {
     });
   });
 
+  it("keeps the extra top-level keys an endpoint adds, but not links", async () => {
+    stubFetch(json(200, { data: [], links: { next: null }, meta: { current_page: 1 }, unread_count: 4 }));
+
+    await expect(
+      apiFetchPage<never, { current_page: number }, { unread_count: number }>("/api/dashboard/notifications"),
+    ).resolves.toEqual({
+      data: [],
+      meta: { current_page: 1 },
+      unread_count: 4,
+    });
+  });
+
   it("treats a body without data and meta as server_error", async () => {
     stubFetch(json(200, { data: { id: 1 } }));
 

@@ -502,6 +502,1070 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardSettings"];
+        /** Updates any subset of the settings (audited) */
+        put: operations["dashboardUpdateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/settings/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "logo" | "favicon";
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardUploadBrandingImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardUsers"];
+        put?: never;
+        /** Adds an owner (role is always owner in V1) */
+        post: operations["dashboardCreateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/users/{user}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["dashboardUpdateUser"];
+        trace?: never;
+    };
+    "/api/dashboard/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The whole category tree, archived nodes included unless filtered */
+        get: operations["dashboardCategories"];
+        put?: never;
+        post: operations["dashboardCreateCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/categories/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardReorderCategories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/categories/{category}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: components["parameters"]["CategoryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Renames and/or moves a category with its subtree; parent_id null makes it a root */
+        put: operations["dashboardUpdateCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/categories/{category}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: components["parameters"]["CategoryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardArchiveCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/categories/{category}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: components["parameters"]["CategoryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardRestoreCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardUnits"];
+        put?: never;
+        post: operations["dashboardCreateUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/units/{unit}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit: components["parameters"]["UnitId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["dashboardUpdateUnit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/units/{unit}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit: components["parameters"]["UnitId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardArchiveUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardFields"];
+        put?: never;
+        post: operations["dashboardCreateField"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/fields/{field}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** The key is fixed; the type cannot change once products have values (field_type_locked) */
+        put: operations["dashboardUpdateField"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/fields/{field}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardArchiveField"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/fields/{field}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardCreateFieldOption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/fields/{field}/options/{option}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+                option: components["parameters"]["OptionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["dashboardUpdateFieldOption"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/fields/{field}/options/{option}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+                option: components["parameters"]["OptionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardArchiveFieldOption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardProducts"];
+        put?: never;
+        /** Creates the product and its single SKU; opening_stock is accepted here only */
+        post: operations["dashboardCreateProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/bulk/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets the status of every product matching a non-empty filter (BR-P12, D29) */
+        post: operations["dashboardBulkProductStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get: operations["dashboardProduct"];
+        /** Replaces the product and SKU fields; without sku.tiers the tiers are kept */
+        put: operations["dashboardUpdateProduct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["dashboardSetProductStatus"];
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copies the product into an inactive one with SKU {code}-COPY and no stock, images or relations (BR-P11, D30) */
+        post: operations["dashboardDuplicateProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardUploadProductImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/images/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardReorderProductImages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/images/{image}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+                image: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["dashboardDeleteProductImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get: operations["dashboardProductRelations"];
+        put?: never;
+        post: operations["dashboardCreateProductRelation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/relations/{relation}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+                relation: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["dashboardDeleteProductRelation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/pricing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Replaces the SKU's price set; tiers is required and replaces all tiers */
+        put: operations["dashboardUpdatePricing"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/pricing/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recomputes percentage-based prices from the current cover price (BR-PR10, audited) */
+        post: operations["dashboardRecomputePricing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/pricing/bulk/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Runs the bulk pricing selection and checks without writing (BR-PR11) */
+        post: operations["dashboardBulkPricingPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/pricing/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies a percentage off cover price (and tiers) to every matching product, in one audit batch (BR-PR11) */
+        post: operations["dashboardBulkPricing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory/bulk-adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies the valid rows and reports the skipped ones (BR-INV08) */
+        post: operations["dashboardBulkAdjustStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        /** The stock of one SKU; the adjust form reads min_allowed from here */
+        get: operations["dashboardInventoryRow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory/{sku}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardAdjustStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory/{sku}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get: operations["dashboardStockMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardCustomers"];
+        put?: never;
+        /** Creates an invited customer (BR-CU08); send the invitation with /invite */
+        post: operations["dashboardCreateCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get: operations["dashboardCustomer"];
+        /** Name and the full address list (rows with id are edited, new rows added, missing rows archived; D54) */
+        put: operations["dashboardUpdateCustomer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends (or re-sends) the 7-day invitation link; invited customers only */
+        post: operations["dashboardInviteCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardApproveCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardBlockCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/unblock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardUnblockCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get: operations["dashboardCustomerStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get: operations["dashboardOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/transition": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04) */
+        post: operations["dashboardTransitionOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/cancel": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels from any status except delivered (BR-O02); refused while collections exist (BR-O03) */
+        post: operations["dashboardCancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/delivery-address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Edits the address snapshot before out for delivery (D9) */
+        put: operations["dashboardUpdateDeliveryAddress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardMarkNotificationsRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardCollections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/collections": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Records a cash collection on any non-cancelled order */
+        post: operations["dashboardRecordCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/collections/{collection}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                collection: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardVoidCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardReportOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sales buckets in Africa/Cairo days (D60); defaults to the last 30 days by day; weeks start on Saturday (D58) */
+        get: operations["dashboardReportSales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/outstanding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outstanding amount per customer over delivered orders, largest first (D59) */
+        get: operations["dashboardReportOutstanding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/low-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SKUs whose available stock is at or below MOQ × conversion factor (D36) */
+        get: operations["dashboardReportLowStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -876,6 +1940,487 @@ export interface components {
             user: components["schemas"]["TenantUser"];
             tenant: components["schemas"]["Tenant"];
         };
+        DashboardSettings: components["schemas"]["TenantSettings"] & {
+            /** @description Hours before a pending order is stale (D10) */
+            stale_pending_hours: number;
+        };
+        /** @description Every key is optional; only the sent keys change */
+        SettingsRequest: {
+            name?: string;
+            primary_color?: string;
+            secondary_color?: string;
+            phone?: string | null;
+            whatsapp?: string | null;
+            address?: string | null;
+            description?: string | null;
+            working_hours?: components["schemas"]["WorkingHours"][] | null;
+            mov_enabled?: boolean;
+            /** @description Required when mov_enabled is true */
+            mov_amount?: string | number | null;
+            require_login_for_prices?: boolean;
+            require_customer_approval?: boolean;
+            stale_pending_hours?: number;
+        };
+        IdName: {
+            id: number;
+            name: string;
+        };
+        /** @enum {string} */
+        ArchiveStatus: "active" | "archived";
+        /** @enum {string} */
+        ProductStatus: "active" | "coming_soon" | "inactive";
+        DashboardCategory: {
+            id: number;
+            name: string;
+            slug: string;
+            image_url: string | null;
+            parent_id: number | null;
+            sort_order: number;
+            status: components["schemas"]["ArchiveStatus"];
+            children: components["schemas"]["DashboardCategory"][];
+        };
+        Unit: {
+            id: number;
+            name: string;
+            status: components["schemas"]["ArchiveStatus"];
+        };
+        /** @enum {string} */
+        FieldType: "text" | "number" | "select" | "boolean";
+        FieldOption: {
+            id: number;
+            label: string;
+            sort_order: number;
+            status: components["schemas"]["ArchiveStatus"];
+        };
+        FieldDefinition: {
+            id: number;
+            key: string;
+            label: string;
+            type: components["schemas"]["FieldType"];
+            is_required: boolean;
+            show_on_storefront: boolean;
+            is_filterable: boolean;
+            filter_order: number;
+            sort_order: number;
+            status: components["schemas"]["ArchiveStatus"];
+            options: components["schemas"]["FieldOption"][];
+        };
+        FieldRequest: {
+            label: string;
+            type: components["schemas"]["FieldType"];
+            is_required?: boolean;
+            show_on_storefront?: boolean;
+            is_filterable?: boolean;
+            filter_order?: number;
+            sort_order?: number;
+        };
+        DashboardTier: {
+            min_quantity: number;
+            unit_price: components["schemas"]["Money"];
+            discount_percent: components["schemas"]["Money"] | null;
+        };
+        StockLevels: {
+            on_hand: number;
+            reserved: number;
+            available: number;
+        };
+        DashboardSku: {
+            id: number;
+            code: string;
+            selling_unit: components["schemas"]["IdName"] | null;
+            base_unit: components["schemas"]["IdName"] | null;
+            conversion_factor: number;
+            cover_price: components["schemas"]["Money"] | null;
+            base_price: components["schemas"]["Money"];
+            base_price_percent: components["schemas"]["Money"] | null;
+            moq: number;
+            tiers?: components["schemas"]["DashboardTier"][];
+            inventory?: components["schemas"]["StockLevels"];
+        };
+        DashboardProduct: {
+            id: number;
+            name: string;
+            slug: string;
+            description: string | null;
+            status: components["schemas"]["ProductStatus"];
+            category: components["schemas"]["IdName"] | null;
+            /** @description Field key → option id (select), number, boolean or text */
+            custom_fields: {
+                [key: string]: string | number | boolean;
+            };
+            sku: components["schemas"]["DashboardSku"] | null;
+            main_image_url: string | null;
+            /** @description Detail responses only */
+            images?: components["schemas"]["ProductImage"][];
+            /** @description Detail responses only */
+            relations?: components["schemas"]["ProductRelation"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ProductRelation: {
+            id: number;
+            /** @enum {string} */
+            type: "revision_of" | "companion";
+            /** @enum {string} */
+            direction: "outgoing" | "incoming";
+            product: {
+                id: number;
+                name: string;
+                slug: string;
+                status: components["schemas"]["ProductStatus"];
+            };
+        };
+        /** @description Send unit_price or discount_percent; the percentage wins when both are sent (BR-PR10) */
+        TierRequest: {
+            min_quantity: number;
+            unit_price?: string | null;
+            discount_percent?: string | null;
+        };
+        /** @description Send base_price or base_price_percent (off cover_price); the percentage wins (BR-PR10, D27) */
+        PriceSetRequest: {
+            cover_price?: string | null;
+            base_price?: string | null;
+            base_price_percent?: string | null;
+            moq?: number;
+            tiers?: components["schemas"]["TierRequest"][];
+        };
+        ProductRequest: {
+            name: string;
+            category_id: number;
+            description?: string | null;
+            custom_fields?: {
+                [key: string]: string | number | boolean | null;
+            };
+            sku: components["schemas"]["PriceSetRequest"] & {
+                code: string;
+                selling_unit_id: number;
+                base_unit_id: number;
+                conversion_factor: number;
+            };
+        };
+        PricingRequest: components["schemas"]["PriceSetRequest"] & Record<string, never>;
+        /** @description Must not be empty (BR-P12) */
+        ProductFilter: {
+            category?: number;
+            q?: string | null;
+            status?: components["schemas"]["ProductStatus"];
+            f?: {
+                [key: string]: string;
+            };
+        };
+        BulkStatusResult: {
+            affected: number;
+            /** @description Products whose status transition is not allowed (D29) */
+            skipped: number;
+            /** Format: uuid */
+            batch_id: string;
+        };
+        SkuPricing: {
+            product_id: number;
+            sku_id: number;
+            code: string;
+            cover_price: components["schemas"]["Money"] | null;
+            base_price: components["schemas"]["Money"];
+            base_price_percent: components["schemas"]["Money"] | null;
+            discount_percent: components["schemas"]["Money"] | null;
+            moq: number;
+            tiers: components["schemas"]["DashboardTier"][];
+        };
+        BulkPricingRequest: {
+            filter: components["schemas"]["ProductFilter"];
+            base_price_percent: string;
+            /** @description Replaces every SKU's tiers; an empty list removes them */
+            tiers: {
+                min_quantity: number;
+                discount_percent: string;
+            }[];
+            moq?: number;
+        };
+        SkippedNoCoverPrice: {
+            product_id: number;
+            sku_id: number;
+            code: string;
+            name: string;
+        };
+        BulkPricingResult: {
+            affected: number;
+            skipped_no_cover_price: components["schemas"]["SkippedNoCoverPrice"][];
+            /**
+             * Format: uuid
+             * @description Apply only; the preview has none
+             */
+            batch_id?: string;
+        };
+        InventoryRow: {
+            sku_id: number;
+            product_id: number;
+            code: string;
+            name: string | null;
+            status: components["schemas"]["ProductStatus"] | null;
+            on_hand: number;
+            reserved: number;
+            available: number;
+            /** @description The lowest on hand an adjustment may set: the reserved quantity (BR-INV08) */
+            min_allowed: number;
+            moq: number;
+            conversion_factor: number;
+            low_stock: boolean;
+        };
+        /** @description The details of 422 inventory_below_reserved (BR-INV08) */
+        BelowReservedDetails: {
+            reserved: number;
+            min_allowed: number;
+            orders: {
+                number: number;
+                status: components["schemas"]["OrderStatus"];
+                quantity_base: number;
+            }[];
+        };
+        /** @enum {string} */
+        ActorType: "tenant_user" | "customer" | "system";
+        Actor: {
+            type: components["schemas"]["ActorType"];
+            id: number | null;
+        };
+        StockMovement: {
+            id: number;
+            /** @enum {string} */
+            type: "opening" | "adjustment" | "sale" | "return";
+            type_label: string;
+            /** @description Signed change in base units */
+            quantity: number;
+            on_hand_after: number;
+            reason: string | null;
+            order_id: number | null;
+            actor: components["schemas"]["Actor"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        BulkAdjustItem: {
+            sku_id: number;
+            new_on_hand: number;
+            reason: string;
+        };
+        BulkAdjustSkipped: {
+            sku_id: number;
+            /** @enum {string} */
+            reason: "below_reserved" | "not_found" | "unchanged";
+            reserved?: number;
+            min_allowed?: number;
+        };
+        BulkAdjustResult: {
+            applied: number;
+            skipped: components["schemas"]["BulkAdjustSkipped"][];
+            /** Format: uuid */
+            batch_id: string;
+        };
+        /** @enum {string} */
+        CustomerStatus: "pending_verification" | "invited" | "pending_approval" | "active" | "blocked";
+        CustomerRef: {
+            id: number;
+            name: string;
+            phone: string;
+        };
+        RecentOrder: {
+            id: number;
+            number: number;
+            status: components["schemas"]["OrderStatus"];
+            total: components["schemas"]["Money"];
+            /** Format: date-time */
+            placed_at: string;
+        };
+        DashboardCustomer: components["schemas"]["Customer"] & {
+            outstanding_amount: components["schemas"]["Money"];
+            created_by: number | null;
+            approved_by: number | null;
+            /** Format: date-time */
+            blocked_at: string | null;
+            blocked_reason: string | null;
+            /** @description Detail and write responses only */
+            addresses?: components["schemas"]["Address"][];
+            /** @description GET customers/{customer} only, the 5 newest */
+            recent_orders?: components["schemas"]["RecentOrder"][];
+        };
+        InviteResult: {
+            /** @enum {string} */
+            sent_via: "whatsapp" | "sms";
+            /** Format: date-time */
+            expires_at: string;
+            sent_count: number;
+        };
+        /** @enum {string} */
+        CollectionStatus: "unpaid" | "partially_collected" | "collected";
+        DashboardOrderFields: {
+            id: number;
+            customer?: {
+                id: number;
+                name: string;
+                phone: string;
+            };
+            /** Format: date-time */
+            confirmed_at: string | null;
+            /** Format: date-time */
+            delivered_at: string | null;
+            /** Format: date-time */
+            cancelled_at: string | null;
+            /** @description Pending for longer than stale_pending_hours (D10) */
+            is_stale: boolean;
+        };
+        DashboardOrder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"];
+        DashboardOrderHistoryEntry: {
+            from: components["schemas"]["OrderStatus"] | null;
+            to: components["schemas"]["OrderStatus"];
+            /** Format: date-time */
+            at: string;
+            by: components["schemas"]["ActorType"];
+            actor_id: number | null;
+            note: string | null;
+        };
+        DashboardOrderDetail: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"] & {
+            items: components["schemas"]["OrderItem"][];
+            history: components["schemas"]["DashboardOrderHistoryEntry"][];
+            collections: components["schemas"]["Collection"][];
+        };
+        MerchantNotification: {
+            id: number;
+            /** @enum {string} */
+            type: "new_order" | "customer_cancelled";
+            type_label: string;
+            details: {
+                order_number: number;
+                customer_name: string;
+                order_total: components["schemas"]["Money"];
+                /** @description customer_cancelled only */
+                reason?: string | null;
+            };
+            /** Format: date-time */
+            read_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        Collection: {
+            id: number;
+            order: {
+                id: number;
+                number: number;
+                order_total: components["schemas"]["Money"];
+                collected_amount: components["schemas"]["Money"];
+                collection_status: components["schemas"]["CollectionStatus"];
+            };
+            customer?: components["schemas"]["IdName"];
+            amount: components["schemas"]["Money"];
+            /** @enum {string} */
+            method: "cash";
+            method_label: string;
+            /** Format: date-time */
+            collected_at: string;
+            recorded_by: number | null;
+            note: string | null;
+            is_voided: boolean;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
+            voided_by: number | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        StatementOrder: {
+            number: number;
+            status: components["schemas"]["OrderStatus"];
+            status_label: string;
+            /** Format: date-time */
+            placed_at: string;
+            /** Format: date-time */
+            delivered_at: string | null;
+            order_total: components["schemas"]["Money"];
+            collected_amount: components["schemas"]["Money"];
+            balance: components["schemas"]["Money"];
+            collection_status: components["schemas"]["CollectionStatus"];
+        };
+        StatementSummary: {
+            orders_count: number;
+            total: components["schemas"]["Money"];
+            collected: components["schemas"]["Money"];
+            outstanding: components["schemas"]["Money"];
+        };
+        OverviewReport: {
+            orders_by_status: {
+                pending: number;
+                confirmed: number;
+                preparing: number;
+                out_for_delivery: number;
+                delivered: number;
+                cancelled: number;
+            };
+            today: {
+                orders: number;
+                total: components["schemas"]["Money"];
+            };
+            stale_pending: number;
+            outstanding_total: components["schemas"]["Money"];
+            low_stock_count: number;
+        };
+        /** @enum {string} */
+        SalesGrouping: "day" | "week" | "month";
+        SalesReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            group: components["schemas"]["SalesGrouping"];
+            buckets: {
+                /** Format: date */
+                period_start: string;
+                orders: number;
+                total: components["schemas"]["Money"];
+            }[];
+            totals: {
+                orders: number;
+                total: components["schemas"]["Money"];
+            };
+        };
+        OutstandingCustomer: {
+            customer: components["schemas"]["CustomerRef"];
+            orders: number;
+            total: components["schemas"]["Money"];
+            collected: components["schemas"]["Money"];
+            outstanding: components["schemas"]["Money"];
+        };
+        LowStockSku: {
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            code: string;
+            name: string | null;
+            available: number;
+            moq: number;
+            conversion_factor: number;
+            threshold: number;
+        };
+        AuditLog: {
+            id: number;
+            actor: components["schemas"]["Actor"];
+            /** @example product.updated */
+            action: string;
+            entity: {
+                /** @description A table name */
+                type: string;
+                id: number | null;
+            };
+            old_values: {
+                [key: string]: unknown;
+            } | null;
+            new_values: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: uuid */
+            batch_id: string | null;
+            ip: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
     };
     responses: {
         /** @description Error envelope (08 §0) */
@@ -909,6 +2454,160 @@ export interface components {
                 };
             };
         };
+        /** @description The tenant settings */
+        DashboardSettings: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DashboardSettings"];
+                };
+            };
+        };
+        /** @description The user */
+        TenantUser: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["TenantUser"];
+                };
+            };
+        };
+        /** @description The category */
+        DashboardCategory: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DashboardCategory"];
+                };
+            };
+        };
+        /** @description The root categories, each with its children */
+        DashboardCategoryTree: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DashboardCategory"][];
+                };
+            };
+        };
+        /** @description The unit */
+        Unit: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["Unit"];
+                };
+            };
+        };
+        /** @description The field definition with its options */
+        FieldDefinition: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["FieldDefinition"];
+                };
+            };
+        };
+        /** @description The option */
+        FieldOption: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["FieldOption"];
+                };
+            };
+        };
+        /** @description The product with SKU, tiers, stock, images and relations */
+        DashboardProduct: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DashboardProduct"];
+                };
+            };
+        };
+        /** @description The SKU's price set */
+        SkuPricing: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["SkuPricing"];
+                };
+            };
+        };
+        /** @description Affected count and the SKUs skipped for missing cover price */
+        BulkPricingResult: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["BulkPricingResult"];
+                };
+            };
+        };
+        /** @description The SKU's stock */
+        InventoryRow: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["InventoryRow"];
+                };
+            };
+        };
+        /** @description The customer */
+        DashboardCustomer: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DashboardCustomer"];
+                };
+            };
+        };
+        /** @description The order with items, history and collections */
+        DashboardOrderDetail: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DashboardOrderDetail"];
+                };
+            };
+        };
+        /** @description The collection */
+        Collection: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["Collection"];
+                };
+            };
+        };
     };
     parameters: {
         /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
@@ -923,8 +2622,44 @@ export interface components {
         PerPage: number;
         /** @description The per-tenant order number (BR-O09) */
         OrderNumber: number;
+        /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+        IdempotencyKey: string;
+        /** @description Category id; its descendants are included */
+        CategoryIdFilter: number;
+        /** @description Only SKUs whose available stock is at or below MOQ × conversion factor (D36) */
+        LowStock: 0 | 1;
+        From: string;
+        To: string;
+        CategoryId: number;
+        UnitId: number;
+        FieldId: number;
+        OptionId: number;
+        ProductId: number;
+        SkuId: number;
+        CustomerId: number;
+        UserId: number;
     };
-    requestBodies: never;
+    requestBodies: {
+        Unit: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        Reason: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        BulkPricing: {
+            content: {
+                "application/json": components["schemas"]["BulkPricingRequest"];
+            };
+        };
+    };
     headers: never;
     pathItems: never;
 }
@@ -1808,6 +3543,1883 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    dashboardSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardSettings"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardSettings"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUploadBrandingImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "logo" | "favicon";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description png, jpg, webp, ico or svg, at most 2 MB
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardSettings"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every user of the tenant */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["TenantUser"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** Format: email */
+                    email: string;
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["TenantUser"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description email_taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    /** @enum {string} */
+                    status?: "active" | "disabled";
+                    password?: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["TenantUser"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description cannot_disable_self */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCategories: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ArchiveStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardCategoryTree"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    parent_id?: number | null;
+                    sort_order?: number;
+                };
+                "multipart/form-data": {
+                    name: string;
+                    parent_id?: number;
+                    sort_order?: number;
+                    /** Format: binary */
+                    image?: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardCategory"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReorderCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: number;
+                    sort_order: number;
+                }[];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardCategoryTree"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: components["parameters"]["CategoryId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    parent_id: number | null;
+                    sort_order?: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardCategory"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            /** @description category_cycle or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardArchiveCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: components["parameters"]["CategoryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardCategory"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    dashboardRestoreCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: components["parameters"]["CategoryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardCategory"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    dashboardUnits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every unit, archived included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Unit"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Unit"];
+        responses: {
+            201: components["responses"]["Unit"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit: components["parameters"]["UnitId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Unit"];
+        responses: {
+            200: components["responses"]["Unit"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardArchiveUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit: components["parameters"]["UnitId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Unit"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description in_use (a SKU uses the unit) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardFields: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every custom field definition with its options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["FieldDefinition"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateField: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldRequest"] & {
+                    key: string;
+                    options?: string[];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["FieldDefinition"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateField: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["FieldDefinition"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description field_type_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardArchiveField: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["FieldDefinition"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateFieldOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label: string;
+                    sort_order?: number;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["FieldOption"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateFieldOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+                option: components["parameters"]["OptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label?: string;
+                    sort_order?: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["FieldOption"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardArchiveFieldOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                field: components["parameters"]["FieldId"];
+                option: components["parameters"]["OptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["FieldOption"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardProducts: {
+        parameters: {
+            query?: {
+                /** @description Category id; its descendants are included */
+                category?: components["parameters"]["CategoryIdFilter"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                status?: components["schemas"]["ProductStatus"];
+                /** @description Only SKUs whose available stock is at or below MOQ × conversion factor (D36) */
+                low_stock?: components["parameters"]["LowStock"];
+                sort?: "name" | "-name" | "created_at" | "-created_at" | "price" | "-price";
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of products with SKU and stock (without images and relations) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardProduct"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductRequest"] & {
+                    status?: components["schemas"]["ProductStatus"];
+                    opening_stock?: number;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardBulkProductStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    filter: components["schemas"]["ProductFilter"];
+                    status: components["schemas"]["ProductStatus"];
+                };
+            };
+        };
+        responses: {
+            /** @description How many products changed and how many were skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["BulkStatusResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardSetProductStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    status: components["schemas"]["ProductStatus"];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardDuplicateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    dashboardUploadProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description png, jpg or webp, at most 2 MB
+                     */
+                    file: string;
+                    is_main?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The stored image */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProductImage"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description gallery_full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReorderProductImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Every image of the product, in the new order */
+                    ids: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description The images in their new order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProductImage"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardDeleteProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+                image: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardProductRelations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Relations in both directions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProductRelation"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateProductRelation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    related_product_id: number;
+                    /** @enum {string} */
+                    type: "revision_of" | "companion";
+                };
+            };
+        };
+        responses: {
+            /** @description The new relation */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProductRelation"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardDeleteProductRelation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+                relation: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdatePricing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricingRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["SkuPricing"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description invalid_tiers */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    dashboardRecomputePricing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["SkuPricing"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardBulkPricingPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["BulkPricing"];
+        responses: {
+            200: components["responses"]["BulkPricingResult"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardBulkPricing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["BulkPricing"];
+        responses: {
+            200: components["responses"]["BulkPricingResult"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardInventory: {
+        parameters: {
+            query?: {
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                /** @description Only SKUs whose available stock is at or below MOQ × conversion factor (D36) */
+                low_stock?: components["parameters"]["LowStock"];
+                sort?: "code" | "-code" | "available" | "-available";
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of stock rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardBulkAdjustStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAdjustItem"][];
+            };
+        };
+        responses: {
+            /** @description What was applied and skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["BulkAdjustResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description validation_failed keyed items.N.field */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardInventoryRow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["InventoryRow"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardAdjustStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    new_on_hand: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["InventoryRow"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description inventory_below_reserved with `details` as BelowReservedDetails and the Arabic message listing the holding orders (BR-INV08); or validation_failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardStockMovements: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The SKU's stock movements, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["StockMovement"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomers: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: components["schemas"]["CustomerStatus"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of customers with their outstanding amount */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardCustomer"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    phone: string;
+                    addresses?: components["schemas"]["AddressRequest"][];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardCustomer"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description phone_taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardCustomer"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    addresses?: (components["schemas"]["AddressRequest"] & {
+                        id?: number;
+                    })[];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardCustomer"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardInviteCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where and until when the invitation was sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InviteResult"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    dashboardApproveCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardCustomer"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description invalid_transition with details.from */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardBlockCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            200: components["responses"]["DashboardCustomer"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUnblockCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardCustomer"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomerStatement: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the customer's non-cancelled orders with balances, plus the summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["StatementOrder"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        customer: components["schemas"]["CustomerRef"];
+                        summary: components["schemas"]["StatementSummary"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardOrders: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["OrderStatus"];
+                collection_status?: components["schemas"]["CollectionStatus"];
+                customer_id?: number;
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                q?: string;
+                stale?: 0 | 1;
+                sort?: "placed_at" | "-placed_at" | "number" | "-number" | "order_total" | "-order_total";
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of orders */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardOrder"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DashboardOrderDetail"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardTransitionOrder: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    to: "confirmed" | "preparing" | "out_for_delivery" | "delivered";
+                    note?: string | null;
+                    collect_full_amount?: boolean;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardOrderDetail"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description invalid_transition with details.from and details.to */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCancelOrder: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            200: components["responses"]["DashboardOrderDetail"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description invalid_transition or has_collections */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateDeliveryAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    label?: string | null;
+                    governorate: string;
+                    city: string;
+                    address_line: string;
+                    landmark?: string | null;
+                    name?: string | null;
+                    phone?: string | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardOrderDetail"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description address_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardNotifications: {
+        parameters: {
+            query?: {
+                unread?: 0 | 1;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of notifications, newest first, with the unread count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["MerchantNotification"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        unread_count: number;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardMarkNotificationsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ids: number[];
+                } | {
+                    /** @constant */
+                    all: true;
+                };
+            };
+        };
+        responses: {
+            /** @description How many were marked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            marked: number;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCollections: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                customer_id?: number;
+                /** @description Order number */
+                order?: number;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of collections, voided included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Collection"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRecordCollection: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    amount: components["schemas"]["Money"];
+                    /** Format: date-time */
+                    collected_at?: string;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["Collection"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description order_cancelled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description exceeds_balance or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardVoidCollection: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                collection: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            200: components["responses"]["Collection"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description already_voided */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The overview cards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OverviewReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardReportSales: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                group?: components["schemas"]["SalesGrouping"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sales buckets and totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportOutstanding: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of customers who owe money */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OutstandingCustomer"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportLowStock: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of low-stock SKUs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LowStockSku"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardAudit: {
+        parameters: {
+            query?: {
+                /** @description A table name, e.g. products, orders, sku_inventory */
+                entity_type?: string;
+                entity_id?: number;
+                actor_id?: number;
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                batch_id?: string;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of audit entries, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AuditLog"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
         };
     };
 }

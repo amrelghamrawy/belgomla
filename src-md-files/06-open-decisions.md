@@ -51,6 +51,8 @@ Each item below has a **default** already written into the other documents so wo
 | D61 | Public image URLs                                          | The `public` disk returns relative URLs (`/storage/...`, `PUBLIC_DISK_URL`), so logos and product images load from the tenant host the shopper is on. Nginx serves `/storage` (tasks/11); in dev, Next proxies it like `/api`. | Tech §8, rules/03 §4 |
 | D62 | Reading an OTP in end-to-end tests                         | `GET /api/_test/last-otp?phone=` returns the newest OTP sent to that phone on the tenant. The route is registered only in the `local` and `testing` environments, never in production. | tasks/9, 08 §2 |
 | D63 | Customer profile editing                                   | Not in V1: the API has no profile-update endpoint, so `/account` shows name, phone and status read-only. The merchant edits customer details from the dashboard. | BR-CU04, 08 §2 |
+| D42 | Dashboard default landing page                             | The overview (`/dashboard`): today's orders and sales, stale pending, outstanding total, low-stock count, orders per status (D5). | tasks/10 |
+| D43 | Dashboard table page size                                  | 24 rows, the backend `PaginatedRequest` default; lists page with previous/next and the URL keeps `page`. | tasks/10, 08 §0 |
 
 These are treated as accepted defaults unless the product owner objects.
 

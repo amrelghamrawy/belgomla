@@ -18,4 +18,8 @@ export const queryKeys = {
   ordersLists: ["store", "orders", "list"] as const,
   ordersList: (params: ListParams) => ["store", "orders", "list", params] as const,
   order: (number: number) => ["store", "orders", "detail", number] as const,
+
+  // Dashboard (tasks/10)
+  dashboardNotifications: ["dashboard", "notifications"] as const,
+  dashboardOverview: ["dashboard", "reports", "overview"] as const,
 };

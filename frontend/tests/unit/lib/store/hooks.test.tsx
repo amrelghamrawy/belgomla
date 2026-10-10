@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { queryKeys } from "@/lib/api/keys";
 import { findCategory, useProductsInfinite } from "@/lib/store/catalog";
-import { newIdempotencyKey, useCheckout } from "@/lib/store/checkout";
+import { newIdempotencyKey } from "@/lib/api/idempotency";
+import { useCheckout } from "@/lib/store/checkout";
 import { useAddToCart } from "@/lib/store/cart";
 import { useVerifyOtp } from "@/lib/store/auth";
 import { forgetReset, pendingReset, rememberReset } from "@/lib/store/reset-flow";
@@ -140,7 +141,7 @@ describe("useCheckout", () => {
   });
 
   it("makes keys without crypto.randomUUID, which http pages do not have", () => {
-    expect(newIdempotencyKey()).not.toBe(newIdempotencyKey());
+    expect(newIdempotencyKey("checkout")).not.toBe(newIdempotencyKey("checkout"));
   });
 });
 

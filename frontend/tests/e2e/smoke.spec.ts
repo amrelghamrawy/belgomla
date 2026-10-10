@@ -21,7 +21,9 @@ test("a merchant logs in to the dashboard and sees who they are", async ({ page 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByTestId("tenant-name")).toHaveText("مكتبة النور");
 
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await page.getByRole("button", { name: "حساب المستخدم" }).click();
+  await expect(page.getByTestId("user-name")).toHaveText("مكتبة النور");
+  await page.getByRole("menuitem", { name: "تسجيل الخروج" }).click();
   await expect(page).toHaveURL(/\/dashboard\/login$/);
 });
 

@@ -56,6 +56,24 @@ export function useRequiredCustomer() {
   return session;
 }
 
+/**
+ * For every dashboard page: sends a guest to the dashboard login with `?next=` back here. `data` is the
+ * user and tenant once known; render nothing while it is undefined or null.
+ */
+export function useRequiredDashboardUser() {
+  const router = useRouter();
+  const session = useDashboardSession();
+
+  useEffect(() => {
+    if (session.data === null) {
+      const next = window.location.pathname + window.location.search;
+      router.replace(`${loginPaths.dashboard}?next=${encodeURIComponent(next)}`);
+    }
+  }, [router, session.data]);
+
+  return session;
+}
+
 export function useDashboardLogin() {
   const queryClient = useQueryClient();
 

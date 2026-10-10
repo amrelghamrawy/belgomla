@@ -25,6 +25,30 @@ test('every path and method in the spec is a registered route', function (): voi
     expect(array_values(array_diff($documented, $registered)))->toBe([]);
 });
 
+test('every dashboard route is in the spec, so the dashboard UI has a type for each call', function (): void {
+    /** @var array<string, array<string, mixed>> $paths */
+    $paths = openApiSpec()['paths'];
+
+    $documented = collect($paths)
+        ->flatMap(fn (array $operations, string $path): array => array_map(
+            fn (string $method): string => mb_strtoupper($method).' '.mb_ltrim($path, '/'),
+            array_keys($operations),
+        ))
+        ->all();
+
+    $dashboard = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn (RouteDefinition $route): bool => str_starts_with($route->uri(), 'api/dashboard/'))
+        ->flatMap(fn (RouteDefinition $route): array => array_map(
+            fn (string $method): string => $method.' '.$route->uri(),
+            array_diff($route->methods(), ['HEAD']),
+        ))
+        ->sort()
+        ->values()
+        ->all();
+
+    expect(array_values(array_diff($dashboard, $documented)))->toBe([]);
+});
+
 test('the spec lists exactly the error codes the backend throws', function (): void {
     $documented = openApiSchema('ErrorCode')['enum'];
 

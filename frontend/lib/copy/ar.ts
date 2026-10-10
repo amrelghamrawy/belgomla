@@ -1,4 +1,5 @@
 import type { ApiErrorCode } from "@/lib/api/errors";
+import { dashboard } from "@/lib/copy/ar-dashboard";
 
 // Every Arabic string the UI shows (rules/03 §5). No i18n framework in V1: Arabic only.
 
@@ -345,12 +346,7 @@ export const ar = {
     cancelledReason: (reason: string) => `سبب الإلغاء: ${reason}`,
     quantityOf: (quantity: number, unit: string) => `${quantity} ${unit}`,
   },
-  dashboard: {
-    title: "لوحة التحكم",
-    signedInAs: "مسجل الدخول باسم",
-    role: "الصلاحية",
-    store: "المتجر",
-  },
+  dashboard,
   validation: {
     required: "هذا الحقل مطلوب",
     email: "اكتب بريدًا إلكترونيًا صحيحًا",

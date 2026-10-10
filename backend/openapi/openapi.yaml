@@ -1,7 +1,7 @@
 # BelGomla API — machine-readable twin of src-md-files/08-api-contract.md.
 # Hand-written (Task 8 decision); compile with `php artisan api:openapi` into backend/openapi.json,
 # which the frontend turns into types (`npm run api:types`). Every path here must be a registered
-# route (tests/Unit/OpenApiSpecTest.php). Tasks 9 and 10 add the endpoints their screens use.
+# route and every dashboard route is documented (tests/Unit/OpenApiSpecTest.php).
 openapi: 3.1.0
 info:
   title: BelGomla API
@@ -21,6 +21,17 @@ tags:
   - name: store-cart
   - name: store-orders
   - name: dashboard-auth
+  - name: dashboard-settings
+  - name: dashboard-users
+  - name: dashboard-catalog
+  - name: dashboard-pricing
+  - name: dashboard-inventory
+  - name: dashboard-customers
+  - name: dashboard-orders
+  - name: dashboard-notifications
+  - name: dashboard-collections
+  - name: dashboard-reports
+  - name: dashboard-audit
   - name: testing
 
 paths:
@@ -714,6 +725,1545 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  # ---- Dashboard: settings and users (08 §5) ----
+
+  /api/dashboard/settings:
+    get:
+      operationId: dashboardSettings
+      tags: [dashboard-settings]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: dashboardUpdateSettings
+      tags: [dashboard-settings]
+      summary: Updates any subset of the settings (audited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettingsRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/settings/{kind}:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [logo, favicon]
+    post:
+      operationId: dashboardUploadBrandingImage
+      tags: [dashboard-settings]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: 'png, jpg, webp, ico or svg, at most 2 MB' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/users:
+    get:
+      operationId: dashboardUsers
+      tags: [dashboard-users]
+      responses:
+        '200':
+          description: Every user of the tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/TenantUser' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateUser
+      tags: [dashboard-users]
+      summary: Adds an owner (role is always owner in V1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 190 }
+                password: { type: string, minLength: 8, maxLength: 200 }
+      responses:
+        '201': { $ref: '#/components/responses/TenantUser' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { description: email_taken, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/users/{user}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      operationId: dashboardUpdateUser
+      tags: [dashboard-users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                status:
+                  type: string
+                  enum: [active, disabled]
+                password: { type: string, minLength: 8, maxLength: 200 }
+      responses:
+        '200': { $ref: '#/components/responses/TenantUser' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: cannot_disable_self, last_active_user, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: catalog (08 §6) ----
+
+  /api/dashboard/categories:
+    get:
+      operationId: dashboardCategories
+      tags: [dashboard-catalog]
+      summary: The whole category tree, archived nodes included unless filtered
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ArchiveStatus' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCategoryTree' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateCategory
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                parent_id: { type: [integer, 'null'] }
+                sort_order: { type: integer, minimum: 0, maximum: 100000 }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                parent_id: { type: integer }
+                sort_order: { type: integer }
+                image: { type: string, format: binary }
+      responses:
+        '201': { $ref: '#/components/responses/DashboardCategory' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/categories/reorder:
+    post:
+      operationId: dashboardReorderCategories
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required: [id, sort_order]
+                properties:
+                  id: { type: integer }
+                  sort_order: { type: integer, minimum: 0, maximum: 100000 }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCategoryTree' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/categories/{category}:
+    parameters:
+      - $ref: '#/components/parameters/CategoryId'
+    put:
+      operationId: dashboardUpdateCategory
+      tags: [dashboard-catalog]
+      summary: Renames and/or moves a category with its subtree; parent_id null makes it a root
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, parent_id]
+              properties:
+                name: { type: string, maxLength: 100 }
+                parent_id: { type: [integer, 'null'] }
+                sort_order: { type: integer, minimum: 0, maximum: 100000 }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCategory' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { description: category_cycle or validation_failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/categories/{category}/archive:
+    parameters:
+      - $ref: '#/components/parameters/CategoryId'
+    post:
+      operationId: dashboardArchiveCategory
+      tags: [dashboard-catalog]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCategory' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/categories/{category}/restore:
+    parameters:
+      - $ref: '#/components/parameters/CategoryId'
+    post:
+      operationId: dashboardRestoreCategory
+      tags: [dashboard-catalog]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCategory' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/units:
+    get:
+      operationId: dashboardUnits
+      tags: [dashboard-catalog]
+      responses:
+        '200':
+          description: Every unit, archived included
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Unit' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateUnit
+      tags: [dashboard-catalog]
+      requestBody: { $ref: '#/components/requestBodies/Unit' }
+      responses:
+        '201': { $ref: '#/components/responses/Unit' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/units/{unit}:
+    parameters:
+      - $ref: '#/components/parameters/UnitId'
+    put:
+      operationId: dashboardUpdateUnit
+      tags: [dashboard-catalog]
+      requestBody: { $ref: '#/components/requestBodies/Unit' }
+      responses:
+        '200': { $ref: '#/components/responses/Unit' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/units/{unit}/archive:
+    parameters:
+      - $ref: '#/components/parameters/UnitId'
+    post:
+      operationId: dashboardArchiveUnit
+      tags: [dashboard-catalog]
+      responses:
+        '200': { $ref: '#/components/responses/Unit' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: in_use (a SKU uses the unit), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/fields:
+    get:
+      operationId: dashboardFields
+      tags: [dashboard-catalog]
+      responses:
+        '200':
+          description: Every custom field definition with its options
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/FieldDefinition' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateField
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/FieldRequest'
+                - type: object
+                  required: [key]
+                  properties:
+                    key: { type: string, maxLength: 50, pattern: '^[a-z][a-z0-9_]*$' }
+                    options:
+                      type: array
+                      maxItems: 500
+                      items: { type: string, maxLength: 100 }
+      responses:
+        '201': { $ref: '#/components/responses/FieldDefinition' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/fields/{field}:
+    parameters:
+      - $ref: '#/components/parameters/FieldId'
+    put:
+      operationId: dashboardUpdateField
+      tags: [dashboard-catalog]
+      summary: The key is fixed; the type cannot change once products have values (field_type_locked)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FieldRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/FieldDefinition' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: field_type_locked, duplicate_label, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/fields/{field}/archive:
+    parameters:
+      - $ref: '#/components/parameters/FieldId'
+    post:
+      operationId: dashboardArchiveField
+      tags: [dashboard-catalog]
+      responses:
+        '200': { $ref: '#/components/responses/FieldDefinition' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/fields/{field}/options:
+    parameters:
+      - $ref: '#/components/parameters/FieldId'
+    post:
+      operationId: dashboardCreateFieldOption
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string, maxLength: 100 }
+                sort_order: { type: integer, minimum: 0, maximum: 100000 }
+      responses:
+        '201': { $ref: '#/components/responses/FieldOption' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/fields/{field}/options/{option}:
+    parameters:
+      - $ref: '#/components/parameters/FieldId'
+      - $ref: '#/components/parameters/OptionId'
+    put:
+      operationId: dashboardUpdateFieldOption
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string, maxLength: 100 }
+                sort_order: { type: integer, minimum: 0, maximum: 100000 }
+      responses:
+        '200': { $ref: '#/components/responses/FieldOption' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/fields/{field}/options/{option}/archive:
+    parameters:
+      - $ref: '#/components/parameters/FieldId'
+      - $ref: '#/components/parameters/OptionId'
+    post:
+      operationId: dashboardArchiveFieldOption
+      tags: [dashboard-catalog]
+      responses:
+        '200': { $ref: '#/components/responses/FieldOption' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products:
+    get:
+      operationId: dashboardProducts
+      tags: [dashboard-catalog]
+      parameters:
+        - $ref: '#/components/parameters/CategoryIdFilter'
+        - $ref: '#/components/parameters/Facets'
+        - $ref: '#/components/parameters/Search'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ProductStatus' }
+        - $ref: '#/components/parameters/LowStock'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, -name, created_at, -created_at, price, -price]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of products with SKU and stock (without images and relations)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DashboardProduct' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateProduct
+      tags: [dashboard-catalog]
+      summary: Creates the product and its single SKU; opening_stock is accepted here only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ProductRequest'
+                - type: object
+                  properties:
+                    status: { $ref: '#/components/schemas/ProductStatus' }
+                    opening_stock: { type: integer, minimum: 0, maximum: 10000000 }
+      responses:
+        '201': { $ref: '#/components/responses/DashboardProduct' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/bulk/status:
+    post:
+      operationId: dashboardBulkProductStatus
+      tags: [dashboard-catalog]
+      summary: Sets the status of every product matching a non-empty filter (BR-P12, D29)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filter, status]
+              properties:
+                filter: { $ref: '#/components/schemas/ProductFilter' }
+                status: { $ref: '#/components/schemas/ProductStatus' }
+      responses:
+        '200':
+          description: How many products changed and how many were skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/BulkStatusResult' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      operationId: dashboardProduct
+      tags: [dashboard-catalog]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardProduct' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: dashboardUpdateProduct
+      tags: [dashboard-catalog]
+      summary: Replaces the product and SKU fields; without sku.tiers the tiers are kept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardProduct' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/status:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    patch:
+      operationId: dashboardSetProductStatus
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/ProductStatus' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardProduct' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/duplicate:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      operationId: dashboardDuplicateProduct
+      tags: [dashboard-catalog]
+      summary: Copies the product into an inactive one with SKU {code}-COPY and no stock, images or relations (BR-P11, D30)
+      responses:
+        '201': { $ref: '#/components/responses/DashboardProduct' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/images:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      operationId: dashboardUploadProductImage
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: 'png, jpg or webp, at most 2 MB' }
+                is_main: { type: boolean }
+      responses:
+        '201':
+          description: The stored image
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/ProductImage' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: gallery_full, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/images/reorder:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      operationId: dashboardReorderProductImages
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  description: Every image of the product, in the new order
+                  items: { type: integer }
+      responses:
+        '200':
+          description: The images in their new order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductImage' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/images/{image}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+      - name: image
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: dashboardDeleteProductImage
+      tags: [dashboard-catalog]
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/relations:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      operationId: dashboardProductRelations
+      tags: [dashboard-catalog]
+      responses:
+        '200':
+          description: Relations in both directions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductRelation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateProductRelation
+      tags: [dashboard-catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [related_product_id, type]
+              properties:
+                related_product_id: { type: integer }
+                type:
+                  type: string
+                  enum: [revision_of, companion]
+      responses:
+        '201':
+          description: The new relation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/ProductRelation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/relations/{relation}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+      - name: relation
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: dashboardDeleteProductRelation
+      tags: [dashboard-catalog]
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: pricing (08 §6, BR-PR10/PR11) ----
+
+  /api/dashboard/products/{product}/pricing:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    put:
+      operationId: dashboardUpdatePricing
+      tags: [dashboard-pricing]
+      summary: Replaces the SKU's price set; tiers is required and replaces all tiers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PricingRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/SkuPricing' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { description: invalid_tiers, cover_price_required or validation_failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/products/{product}/pricing/recompute:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      operationId: dashboardRecomputePricing
+      tags: [dashboard-pricing]
+      summary: Recomputes percentage-based prices from the current cover price (BR-PR10, audited)
+      responses:
+        '200': { $ref: '#/components/responses/SkuPricing' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/pricing/bulk/preview:
+    post:
+      operationId: dashboardBulkPricingPreview
+      tags: [dashboard-pricing]
+      summary: Runs the bulk pricing selection and checks without writing (BR-PR11)
+      requestBody: { $ref: '#/components/requestBodies/BulkPricing' }
+      responses:
+        '200': { $ref: '#/components/responses/BulkPricingResult' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/pricing/bulk:
+    post:
+      operationId: dashboardBulkPricing
+      tags: [dashboard-pricing]
+      summary: Applies a percentage off cover price (and tiers) to every matching product, in one audit batch (BR-PR11)
+      requestBody: { $ref: '#/components/requestBodies/BulkPricing' }
+      responses:
+        '200': { $ref: '#/components/responses/BulkPricingResult' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: inventory (08 §7, BR-INV08) ----
+
+  /api/dashboard/inventory:
+    get:
+      operationId: dashboardInventory
+      tags: [dashboard-inventory]
+      parameters:
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/LowStock'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [code, -code, available, -available]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of stock rows
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/InventoryRow' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/inventory/bulk-adjust:
+    post:
+      operationId: dashboardBulkAdjustStock
+      tags: [dashboard-inventory]
+      summary: Applies the valid rows and reports the skipped ones (BR-INV08)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              maxItems: 500
+              items: { $ref: '#/components/schemas/BulkAdjustItem' }
+      responses:
+        '200':
+          description: What was applied and skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/BulkAdjustResult' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { description: validation_failed keyed items.N.field, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/inventory/{sku}:
+    parameters:
+      - $ref: '#/components/parameters/SkuId'
+    get:
+      operationId: dashboardInventoryRow
+      tags: [dashboard-inventory]
+      summary: The stock of one SKU; the adjust form reads min_allowed from here
+      responses:
+        '200': { $ref: '#/components/responses/InventoryRow' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/inventory/{sku}/adjust:
+    parameters:
+      - $ref: '#/components/parameters/SkuId'
+    post:
+      operationId: dashboardAdjustStock
+      tags: [dashboard-inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_on_hand, reason]
+              properties:
+                new_on_hand: { type: integer, minimum: 0, maximum: 10000000 }
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200': { $ref: '#/components/responses/InventoryRow' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422':
+          description: >
+            inventory_below_reserved with `details` as BelowReservedDetails and the Arabic message listing the
+            holding orders (BR-INV08); or validation_failed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /api/dashboard/inventory/{sku}/movements:
+    parameters:
+      - $ref: '#/components/parameters/SkuId'
+    get:
+      operationId: dashboardStockMovements
+      tags: [dashboard-inventory]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: The SKU's stock movements, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/StockMovement' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: customers (08 §8) ----
+
+  /api/dashboard/customers:
+    get:
+      operationId: dashboardCustomers
+      tags: [dashboard-customers]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/CustomerStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of customers with their outstanding amount
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DashboardCustomer' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreateCustomer
+      tags: [dashboard-customers]
+      summary: Creates an invited customer (BR-CU08); send the invitation with /invite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone]
+              properties:
+                name: { type: string, maxLength: 150 }
+                phone: { type: string, maxLength: 30 }
+                addresses:
+                  type: array
+                  items: { $ref: '#/components/schemas/AddressRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/DashboardCustomer' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { description: phone_taken, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/customers/{customer}:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    get:
+      operationId: dashboardCustomer
+      tags: [dashboard-customers]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCustomer' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: dashboardUpdateCustomer
+      tags: [dashboard-customers]
+      summary: Name and the full address list (rows with id are edited, new rows added, missing rows archived; D54)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 150 }
+                addresses:
+                  type: array
+                  items:
+                    allOf:
+                      - $ref: '#/components/schemas/AddressRequest'
+                      - type: object
+                        properties:
+                          id: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCustomer' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/customers/{customer}/invite:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    post:
+      operationId: dashboardInviteCustomer
+      tags: [dashboard-customers]
+      summary: Sends (or re-sends) the 7-day invitation link; invited customers only
+      responses:
+        '200':
+          description: Where and until when the invitation was sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/InviteResult' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/customers/{customer}/approve:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    post:
+      operationId: dashboardApproveCustomer
+      tags: [dashboard-customers]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCustomer' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: invalid_transition with details.from, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/customers/{customer}/block:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    post:
+      operationId: dashboardBlockCustomer
+      tags: [dashboard-customers]
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCustomer' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/customers/{customer}/unblock:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    post:
+      operationId: dashboardUnblockCustomer
+      tags: [dashboard-customers]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardCustomer' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/customers/{customer}/statement:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    get:
+      operationId: dashboardCustomerStatement
+      tags: [dashboard-collections]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of the customer's non-cancelled orders with balances, plus the summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta, customer, summary]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/StatementOrder' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  customer: { $ref: '#/components/schemas/CustomerRef' }
+                  summary: { $ref: '#/components/schemas/StatementSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: orders and notifications (08 §9, §12) ----
+
+  /api/dashboard/orders:
+    get:
+      operationId: dashboardOrders
+      tags: [dashboard-orders]
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/OrderStatus' }
+        - name: collection_status
+          in: query
+          schema: { $ref: '#/components/schemas/CollectionStatus' }
+        - name: customer_id
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: stale
+          in: query
+          schema: { type: integer, enum: [0, 1] }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [placed_at, -placed_at, number, -number, order_total, -order_total]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DashboardOrder' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/orders/{order}:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+    get:
+      operationId: dashboardOrder
+      tags: [dashboard-orders]
+      responses:
+        '200': { $ref: '#/components/responses/DashboardOrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/orders/{order}/transition:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      operationId: dashboardTransitionOrder
+      tags: [dashboard-orders]
+      summary: Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:
+                  type: string
+                  enum: [confirmed, preparing, out_for_delivery, delivered]
+                note: { type: [string, 'null'], maxLength: 300 }
+                collect_full_amount: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardOrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: invalid_transition with details.from and details.to, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/orders/{order}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      operationId: dashboardCancelOrder
+      tags: [dashboard-orders]
+      summary: Cancels from any status except delivered (BR-O02); refused while collections exist (BR-O03)
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardOrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: invalid_transition or has_collections, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/orders/{order}/delivery-address:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+    put:
+      operationId: dashboardUpdateDeliveryAddress
+      tags: [dashboard-orders]
+      summary: Edits the address snapshot before out for delivery (D9)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [governorate, city, address_line]
+              properties:
+                label: { type: [string, 'null'], maxLength: 50 }
+                governorate: { type: string, maxLength: 50 }
+                city: { type: string, maxLength: 80 }
+                address_line: { type: string, maxLength: 300 }
+                landmark: { type: [string, 'null'], maxLength: 200 }
+                name: { type: [string, 'null'], maxLength: 150 }
+                phone: { type: [string, 'null'], maxLength: 30 }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardOrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: address_locked, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/notifications:
+    get:
+      operationId: dashboardNotifications
+      tags: [dashboard-notifications]
+      parameters:
+        - name: unread
+          in: query
+          schema: { type: integer, enum: [0, 1] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of notifications, newest first, with the unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta, unread_count]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MerchantNotification' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  unread_count: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/notifications/read:
+    post:
+      operationId: dashboardMarkNotificationsRead
+      tags: [dashboard-notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [ids]
+                  properties:
+                    ids:
+                      type: array
+                      minItems: 1
+                      maxItems: 100
+                      items: { type: integer }
+                - type: object
+                  required: [all]
+                  properties:
+                    all: { type: boolean, const: true }
+      responses:
+        '200':
+          description: How many were marked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [marked]
+                    properties:
+                      marked: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: collections (08 §10, BR-C04) ----
+
+  /api/dashboard/collections:
+    get:
+      operationId: dashboardCollections
+      tags: [dashboard-collections]
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: customer_id
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: order
+          in: query
+          description: Order number
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of collections, voided included
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Collection' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/orders/{order}/collections:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      operationId: dashboardRecordCollection
+      tags: [dashboard-collections]
+      summary: Records a cash collection on any non-cancelled order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { $ref: '#/components/schemas/Money' }
+                collected_at: { type: string, format: date-time }
+                note: { type: [string, 'null'], maxLength: 300 }
+      responses:
+        '201': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: order_cancelled, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { description: exceeds_balance or validation_failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/collections/{collection}/void:
+    parameters:
+      - name: collection
+        in: path
+        required: true
+        schema: { type: integer }
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      operationId: dashboardVoidCollection
+      tags: [dashboard-collections]
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        '200': { $ref: '#/components/responses/Collection' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: already_voided, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: reports (08 §11, D5) ----
+
+  /api/dashboard/reports/overview:
+    get:
+      operationId: dashboardReportOverview
+      tags: [dashboard-reports]
+      responses:
+        '200':
+          description: The overview cards
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/OverviewReport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/sales:
+    get:
+      operationId: dashboardReportSales
+      tags: [dashboard-reports]
+      summary: Sales buckets in Africa/Cairo days (D60); defaults to the last 30 days by day; weeks start on Saturday (D58)
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: group
+          in: query
+          schema: { $ref: '#/components/schemas/SalesGrouping' }
+      responses:
+        '200':
+          description: The sales buckets and totals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/SalesReport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/outstanding:
+    get:
+      operationId: dashboardReportOutstanding
+      tags: [dashboard-reports]
+      summary: Outstanding amount per customer over delivered orders, largest first (D59)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of customers who owe money
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/OutstandingCustomer' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/low-stock:
+    get:
+      operationId: dashboardReportLowStock
+      tags: [dashboard-reports]
+      summary: SKUs whose available stock is at or below MOQ × conversion factor (D36)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of low-stock SKUs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LowStockSku' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  # ---- Dashboard: audit (08 §12) ----
+
+  /api/dashboard/audit:
+    get:
+      operationId: dashboardAudit
+      tags: [dashboard-audit]
+      parameters:
+        - name: entity_type
+          in: query
+          description: A table name, e.g. products, orders, sku_inventory
+          schema: { type: string, maxLength: 40 }
+        - name: entity_id
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: actor_id
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: batch_id
+          in: query
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of audit entries, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditLog' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
 components:
   parameters:
     Category:
@@ -749,6 +2299,94 @@ components:
       required: true
       description: The per-tenant order number (BR-O09)
       schema: { type: integer }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Retry-safe writes (D55); the same key with another body is idempotency_key_reused
+      schema: { type: string, pattern: '^[A-Za-z0-9_\-:.]{1,255}$' }
+    CategoryIdFilter:
+      name: category
+      in: query
+      description: Category id; its descendants are included
+      schema: { type: integer }
+    LowStock:
+      name: low_stock
+      in: query
+      description: Only SKUs whose available stock is at or below MOQ × conversion factor (D36)
+      schema: { type: integer, enum: [0, 1] }
+    From:
+      name: from
+      in: query
+      schema: { type: string, format: date, description: 'Y-m-d' }
+    To:
+      name: to
+      in: query
+      schema: { type: string, format: date, description: 'Y-m-d, on or after from' }
+    CategoryId:
+      name: category
+      in: path
+      required: true
+      schema: { type: integer }
+    UnitId:
+      name: unit
+      in: path
+      required: true
+      schema: { type: integer }
+    FieldId:
+      name: field
+      in: path
+      required: true
+      schema: { type: integer }
+    OptionId:
+      name: option
+      in: path
+      required: true
+      schema: { type: integer }
+    ProductId:
+      name: product
+      in: path
+      required: true
+      schema: { type: integer }
+    SkuId:
+      name: sku
+      in: path
+      required: true
+      schema: { type: integer }
+    CustomerId:
+      name: customer
+      in: path
+      required: true
+      schema: { type: integer }
+    UserId:
+      name: user
+      in: path
+      required: true
+      schema: { type: integer }
+
+  requestBodies:
+    Unit:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string, maxLength: 50 }
+    Reason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            properties:
+              reason: { type: string, maxLength: 300 }
+    BulkPricing:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/BulkPricingRequest' }
 
   responses:
     Error:
@@ -774,6 +2412,134 @@ components:
             required: [data]
             properties:
               data: { $ref: '#/components/schemas/Cart' }
+    DashboardSettings:
+      description: The tenant settings
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/DashboardSettings' }
+    TenantUser:
+      description: The user
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/TenantUser' }
+    DashboardCategory:
+      description: The category
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/DashboardCategory' }
+    DashboardCategoryTree:
+      description: The root categories, each with its children
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/DashboardCategory' }
+    Unit:
+      description: The unit
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Unit' }
+    FieldDefinition:
+      description: The field definition with its options
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/FieldDefinition' }
+    FieldOption:
+      description: The option
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/FieldOption' }
+    DashboardProduct:
+      description: The product with SKU, tiers, stock, images and relations
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/DashboardProduct' }
+    SkuPricing:
+      description: The SKU's price set
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/SkuPricing' }
+    BulkPricingResult:
+      description: Affected count and the SKUs skipped for missing cover price
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/BulkPricingResult' }
+    InventoryRow:
+      description: The SKU's stock
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/InventoryRow' }
+    DashboardCustomer:
+      description: The customer
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/DashboardCustomer' }
+    DashboardOrderDetail:
+      description: The order with items, history and collections
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/DashboardOrderDetail' }
+    Collection:
+      description: The collection
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Collection' }
 
   schemas:
     Money:
@@ -1404,3 +3170,719 @@ components:
       properties:
         user: { $ref: '#/components/schemas/TenantUser' }
         tenant: { $ref: '#/components/schemas/Tenant' }
+
+    # ---- Dashboard schemas (Task 10) ----
+
+    DashboardSettings:
+      allOf:
+        - $ref: '#/components/schemas/TenantSettings'
+        - type: object
+          required: [stale_pending_hours]
+          properties:
+            stale_pending_hours: { type: integer, description: 'Hours before a pending order is stale (D10)' }
+
+    SettingsRequest:
+      type: object
+      description: Every key is optional; only the sent keys change
+      properties:
+        name: { type: string, maxLength: 150 }
+        primary_color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
+        secondary_color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
+        phone: { type: [string, 'null'], maxLength: 20 }
+        whatsapp: { type: [string, 'null'], maxLength: 20 }
+        address: { type: [string, 'null'], maxLength: 1000 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        working_hours:
+          type: [array, 'null']
+          maxItems: 7
+          items: { $ref: '#/components/schemas/WorkingHours' }
+        mov_enabled: { type: boolean }
+        mov_amount: { type: [string, number, 'null'], description: 'Required when mov_enabled is true' }
+        require_login_for_prices: { type: boolean }
+        require_customer_approval: { type: boolean }
+        stale_pending_hours: { type: integer, minimum: 1, maximum: 720 }
+
+    IdName:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+
+    ArchiveStatus:
+      type: string
+      enum: [active, archived]
+
+    ProductStatus:
+      type: string
+      enum: [active, coming_soon, inactive]
+
+    DashboardCategory:
+      type: object
+      required: [id, name, slug, image_url, parent_id, sort_order, status, children]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        image_url: { type: [string, 'null'] }
+        parent_id: { type: [integer, 'null'] }
+        sort_order: { type: integer }
+        status: { $ref: '#/components/schemas/ArchiveStatus' }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/DashboardCategory' }
+
+    Unit:
+      type: object
+      required: [id, name, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/ArchiveStatus' }
+
+    FieldType:
+      type: string
+      enum: [text, number, select, boolean]
+
+    FieldOption:
+      type: object
+      required: [id, label, sort_order, status]
+      properties:
+        id: { type: integer }
+        label: { type: string }
+        sort_order: { type: integer }
+        status: { $ref: '#/components/schemas/ArchiveStatus' }
+
+    FieldDefinition:
+      type: object
+      required: [id, key, label, type, is_required, show_on_storefront, is_filterable, filter_order, sort_order, status, options]
+      properties:
+        id: { type: integer }
+        key: { type: string }
+        label: { type: string }
+        type: { $ref: '#/components/schemas/FieldType' }
+        is_required: { type: boolean }
+        show_on_storefront: { type: boolean }
+        is_filterable: { type: boolean }
+        filter_order: { type: integer }
+        sort_order: { type: integer }
+        status: { $ref: '#/components/schemas/ArchiveStatus' }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/FieldOption' }
+
+    FieldRequest:
+      type: object
+      required: [label, type]
+      properties:
+        label: { type: string, maxLength: 100 }
+        type: { $ref: '#/components/schemas/FieldType' }
+        is_required: { type: boolean }
+        show_on_storefront: { type: boolean }
+        is_filterable: { type: boolean }
+        filter_order: { type: integer, minimum: 0, maximum: 100000 }
+        sort_order: { type: integer, minimum: 0, maximum: 100000 }
+
+    DashboardTier:
+      type: object
+      required: [min_quantity, unit_price, discount_percent]
+      properties:
+        min_quantity: { type: integer }
+        unit_price: { $ref: '#/components/schemas/Money' }
+        discount_percent:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+
+    StockLevels:
+      type: object
+      required: [on_hand, reserved, available]
+      properties:
+        on_hand: { type: integer }
+        reserved: { type: integer }
+        available: { type: integer }
+
+    DashboardSku:
+      type: object
+      required: [id, code, selling_unit, base_unit, conversion_factor, cover_price, base_price, base_price_percent, moq]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        selling_unit:
+          oneOf:
+            - $ref: '#/components/schemas/IdName'
+            - type: 'null'
+        base_unit:
+          oneOf:
+            - $ref: '#/components/schemas/IdName'
+            - type: 'null'
+        conversion_factor: { type: integer }
+        cover_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        base_price: { $ref: '#/components/schemas/Money' }
+        base_price_percent:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        moq: { type: integer }
+        tiers:
+          type: array
+          items: { $ref: '#/components/schemas/DashboardTier' }
+        inventory: { $ref: '#/components/schemas/StockLevels' }
+
+    DashboardProduct:
+      type: object
+      required: [id, name, slug, description, status, category, custom_fields, sku, main_image_url, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        category:
+          oneOf:
+            - $ref: '#/components/schemas/IdName'
+            - type: 'null'
+        custom_fields:
+          type: object
+          description: 'Field key → option id (select), number, boolean or text'
+          additionalProperties: { type: [string, integer, number, boolean] }
+        sku:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardSku'
+            - type: 'null'
+        main_image_url: { type: [string, 'null'] }
+        images:
+          type: array
+          description: Detail responses only
+          items: { $ref: '#/components/schemas/ProductImage' }
+        relations:
+          type: array
+          description: Detail responses only
+          items: { $ref: '#/components/schemas/ProductRelation' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProductRelation:
+      type: object
+      required: [id, type, direction, product]
+      properties:
+        id: { type: integer }
+        type:
+          type: string
+          enum: [revision_of, companion]
+        direction:
+          type: string
+          enum: [outgoing, incoming]
+        product:
+          type: object
+          required: [id, name, slug, status]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            slug: { type: string }
+            status: { $ref: '#/components/schemas/ProductStatus' }
+
+    TierRequest:
+      type: object
+      required: [min_quantity]
+      description: Send unit_price or discount_percent; the percentage wins when both are sent (BR-PR10)
+      properties:
+        min_quantity: { type: integer, minimum: 1, maximum: 1000000 }
+        unit_price: { type: [string, 'null'] }
+        discount_percent: { type: [string, 'null'] }
+
+    PriceSetRequest:
+      type: object
+      description: Send base_price or base_price_percent (off cover_price); the percentage wins (BR-PR10, D27)
+      properties:
+        cover_price: { type: [string, 'null'] }
+        base_price: { type: [string, 'null'] }
+        base_price_percent: { type: [string, 'null'] }
+        moq: { type: integer, minimum: 1, maximum: 1000000 }
+        tiers:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/TierRequest' }
+
+    ProductRequest:
+      type: object
+      required: [name, category_id, sku]
+      properties:
+        name: { type: string, maxLength: 200 }
+        category_id: { type: integer }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        custom_fields:
+          type: object
+          additionalProperties: { type: [string, integer, number, boolean, 'null'] }
+        sku:
+          allOf:
+            - $ref: '#/components/schemas/PriceSetRequest'
+            - type: object
+              required: [code, selling_unit_id, base_unit_id, conversion_factor]
+              properties:
+                code: { type: string, maxLength: 60, pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]*$' }
+                selling_unit_id: { type: integer }
+                base_unit_id: { type: integer }
+                conversion_factor: { type: integer, minimum: 1, maximum: 1000000 }
+
+    PricingRequest:
+      allOf:
+        - $ref: '#/components/schemas/PriceSetRequest'
+        - type: object
+          required: [moq, tiers]
+
+    ProductFilter:
+      type: object
+      description: Must not be empty (BR-P12)
+      properties:
+        category: { type: integer }
+        q: { type: [string, 'null'], maxLength: 100 }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        f:
+          type: object
+          additionalProperties: { type: string, maxLength: 50 }
+
+    BulkStatusResult:
+      type: object
+      required: [affected, skipped, batch_id]
+      properties:
+        affected: { type: integer }
+        skipped: { type: integer, description: Products whose status transition is not allowed (D29) }
+        batch_id: { type: string, format: uuid }
+
+    SkuPricing:
+      type: object
+      required: [product_id, sku_id, code, cover_price, base_price, base_price_percent, discount_percent, moq, tiers]
+      properties:
+        product_id: { type: integer }
+        sku_id: { type: integer }
+        code: { type: string }
+        cover_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        base_price: { $ref: '#/components/schemas/Money' }
+        base_price_percent:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        discount_percent:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        moq: { type: integer }
+        tiers:
+          type: array
+          items: { $ref: '#/components/schemas/DashboardTier' }
+
+    BulkPricingRequest:
+      type: object
+      required: [filter, base_price_percent, tiers]
+      properties:
+        filter: { $ref: '#/components/schemas/ProductFilter' }
+        base_price_percent: { type: string }
+        tiers:
+          type: array
+          maxItems: 20
+          description: Replaces every SKU's tiers; an empty list removes them
+          items:
+            type: object
+            required: [min_quantity, discount_percent]
+            properties:
+              min_quantity: { type: integer, minimum: 1, maximum: 1000000 }
+              discount_percent: { type: string }
+        moq: { type: integer, minimum: 1, maximum: 1000000 }
+
+    SkippedNoCoverPrice:
+      type: object
+      required: [product_id, sku_id, code, name]
+      properties:
+        product_id: { type: integer }
+        sku_id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+
+    BulkPricingResult:
+      type: object
+      required: [affected, skipped_no_cover_price]
+      properties:
+        affected: { type: integer }
+        skipped_no_cover_price:
+          type: array
+          items: { $ref: '#/components/schemas/SkippedNoCoverPrice' }
+        batch_id: { type: string, format: uuid, description: Apply only; the preview has none }
+
+    InventoryRow:
+      type: object
+      required: [sku_id, product_id, code, name, status, on_hand, reserved, available, min_allowed, moq, conversion_factor, low_stock]
+      properties:
+        sku_id: { type: integer }
+        product_id: { type: integer }
+        code: { type: string }
+        name: { type: [string, 'null'] }
+        status:
+          oneOf:
+            - $ref: '#/components/schemas/ProductStatus'
+            - type: 'null'
+        on_hand: { type: integer }
+        reserved: { type: integer }
+        available: { type: integer }
+        min_allowed: { type: integer, description: 'The lowest on hand an adjustment may set: the reserved quantity (BR-INV08)' }
+        moq: { type: integer }
+        conversion_factor: { type: integer }
+        low_stock: { type: boolean }
+
+    BelowReservedDetails:
+      type: object
+      description: The details of 422 inventory_below_reserved (BR-INV08)
+      required: [reserved, min_allowed, orders]
+      properties:
+        reserved: { type: integer }
+        min_allowed: { type: integer }
+        orders:
+          type: array
+          items:
+            type: object
+            required: [number, status, quantity_base]
+            properties:
+              number: { type: integer }
+              status: { $ref: '#/components/schemas/OrderStatus' }
+              quantity_base: { type: integer }
+
+    ActorType:
+      type: string
+      enum: [tenant_user, customer, system]
+
+    Actor:
+      type: object
+      required: [type, id]
+      properties:
+        type: { $ref: '#/components/schemas/ActorType' }
+        id: { type: [integer, 'null'] }
+
+    StockMovement:
+      type: object
+      required: [id, type, type_label, quantity, on_hand_after, reason, order_id, actor, created_at]
+      properties:
+        id: { type: integer }
+        type:
+          type: string
+          enum: [opening, adjustment, sale, return]
+        type_label: { type: string }
+        quantity: { type: integer, description: Signed change in base units }
+        on_hand_after: { type: integer }
+        reason: { type: [string, 'null'] }
+        order_id: { type: [integer, 'null'] }
+        actor: { $ref: '#/components/schemas/Actor' }
+        created_at: { type: string, format: date-time }
+
+    BulkAdjustItem:
+      type: object
+      required: [sku_id, new_on_hand, reason]
+      properties:
+        sku_id: { type: integer, minimum: 1 }
+        new_on_hand: { type: integer, minimum: 0, maximum: 10000000 }
+        reason: { type: string, maxLength: 200 }
+
+    BulkAdjustSkipped:
+      type: object
+      required: [sku_id, reason]
+      properties:
+        sku_id: { type: integer }
+        reason:
+          type: string
+          enum: [below_reserved, not_found, unchanged]
+        reserved: { type: integer }
+        min_allowed: { type: integer }
+
+    BulkAdjustResult:
+      type: object
+      required: [applied, skipped, batch_id]
+      properties:
+        applied: { type: integer }
+        skipped:
+          type: array
+          items: { $ref: '#/components/schemas/BulkAdjustSkipped' }
+        batch_id: { type: string, format: uuid }
+
+    CustomerStatus:
+      type: string
+      enum: [pending_verification, invited, pending_approval, active, blocked]
+
+    CustomerRef:
+      type: object
+      required: [id, name, phone]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string }
+
+    RecentOrder:
+      type: object
+      required: [id, number, status, total, placed_at]
+      properties:
+        id: { type: integer }
+        number: { type: integer }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        total: { $ref: '#/components/schemas/Money' }
+        placed_at: { type: string, format: date-time }
+
+    DashboardCustomer:
+      allOf:
+        - $ref: '#/components/schemas/Customer'
+        - type: object
+          required: [outstanding_amount, created_by, approved_by, blocked_at, blocked_reason]
+          properties:
+            outstanding_amount: { $ref: '#/components/schemas/Money' }
+            created_by: { type: [integer, 'null'] }
+            approved_by: { type: [integer, 'null'] }
+            blocked_at: { type: [string, 'null'], format: date-time }
+            blocked_reason: { type: [string, 'null'] }
+            addresses:
+              type: array
+              description: Detail and write responses only
+              items: { $ref: '#/components/schemas/Address' }
+            recent_orders:
+              type: array
+              description: GET customers/{customer} only, the 5 newest
+              items: { $ref: '#/components/schemas/RecentOrder' }
+
+    InviteResult:
+      type: object
+      required: [sent_via, expires_at, sent_count]
+      properties:
+        sent_via:
+          type: string
+          enum: [whatsapp, sms]
+        expires_at: { type: string, format: date-time }
+        sent_count: { type: integer }
+
+    CollectionStatus:
+      type: string
+      enum: [unpaid, partially_collected, collected]
+
+    DashboardOrderFields:
+      type: object
+      required: [id, confirmed_at, delivered_at, cancelled_at, is_stale]
+      properties:
+        id: { type: integer }
+        customer:
+          type: object
+          required: [id, name, phone]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            phone: { type: string }
+        confirmed_at: { type: [string, 'null'], format: date-time }
+        delivered_at: { type: [string, 'null'], format: date-time }
+        cancelled_at: { type: [string, 'null'], format: date-time }
+        is_stale: { type: boolean, description: 'Pending for longer than stale_pending_hours (D10)' }
+
+    DashboardOrder:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - $ref: '#/components/schemas/DashboardOrderFields'
+
+    DashboardOrderHistoryEntry:
+      type: object
+      required: [from, to, at, by, actor_id, note]
+      properties:
+        from:
+          oneOf:
+            - $ref: '#/components/schemas/OrderStatus'
+            - type: 'null'
+        to: { $ref: '#/components/schemas/OrderStatus' }
+        at: { type: string, format: date-time }
+        by: { $ref: '#/components/schemas/ActorType' }
+        actor_id: { type: [integer, 'null'] }
+        note: { type: [string, 'null'] }
+
+    DashboardOrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - $ref: '#/components/schemas/DashboardOrderFields'
+        - type: object
+          required: [items, history, collections]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/OrderItem' }
+            history:
+              type: array
+              items: { $ref: '#/components/schemas/DashboardOrderHistoryEntry' }
+            collections:
+              type: array
+              items: { $ref: '#/components/schemas/Collection' }
+
+    MerchantNotification:
+      type: object
+      required: [id, type, type_label, details, read_at, created_at]
+      properties:
+        id: { type: integer }
+        type:
+          type: string
+          enum: [new_order, customer_cancelled]
+        type_label: { type: string }
+        details:
+          type: object
+          required: [order_number, customer_name, order_total]
+          properties:
+            order_number: { type: integer }
+            customer_name: { type: string }
+            order_total: { $ref: '#/components/schemas/Money' }
+            reason: { type: [string, 'null'], description: customer_cancelled only }
+        read_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+
+    Collection:
+      type: object
+      required: [id, order, amount, method, method_label, collected_at, recorded_by, note, is_voided, voided_at, void_reason, voided_by, created_at]
+      properties:
+        id: { type: integer }
+        order:
+          type: object
+          required: [id, number, order_total, collected_amount, collection_status]
+          properties:
+            id: { type: integer }
+            number: { type: integer }
+            order_total: { $ref: '#/components/schemas/Money' }
+            collected_amount: { $ref: '#/components/schemas/Money' }
+            collection_status: { $ref: '#/components/schemas/CollectionStatus' }
+        customer: { $ref: '#/components/schemas/IdName' }
+        amount: { $ref: '#/components/schemas/Money' }
+        method:
+          type: string
+          enum: [cash]
+        method_label: { type: string }
+        collected_at: { type: string, format: date-time }
+        recorded_by: { type: [integer, 'null'] }
+        note: { type: [string, 'null'] }
+        is_voided: { type: boolean }
+        voided_at: { type: [string, 'null'], format: date-time }
+        void_reason: { type: [string, 'null'] }
+        voided_by: { type: [integer, 'null'] }
+        created_at: { type: string, format: date-time }
+
+    StatementOrder:
+      type: object
+      required: [number, status, status_label, placed_at, delivered_at, order_total, collected_amount, balance, collection_status]
+      properties:
+        number: { type: integer }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        status_label: { type: string }
+        placed_at: { type: string, format: date-time }
+        delivered_at: { type: [string, 'null'], format: date-time }
+        order_total: { $ref: '#/components/schemas/Money' }
+        collected_amount: { $ref: '#/components/schemas/Money' }
+        balance: { $ref: '#/components/schemas/Money' }
+        collection_status: { $ref: '#/components/schemas/CollectionStatus' }
+
+    StatementSummary:
+      type: object
+      required: [orders_count, total, collected, outstanding]
+      properties:
+        orders_count: { type: integer }
+        total: { $ref: '#/components/schemas/Money' }
+        collected: { $ref: '#/components/schemas/Money' }
+        outstanding: { $ref: '#/components/schemas/Money' }
+
+    OverviewReport:
+      type: object
+      required: [orders_by_status, today, stale_pending, outstanding_total, low_stock_count]
+      properties:
+        orders_by_status:
+          type: object
+          required: [pending, confirmed, preparing, out_for_delivery, delivered, cancelled]
+          properties:
+            pending: { type: integer }
+            confirmed: { type: integer }
+            preparing: { type: integer }
+            out_for_delivery: { type: integer }
+            delivered: { type: integer }
+            cancelled: { type: integer }
+        today:
+          type: object
+          required: [orders, total]
+          properties:
+            orders: { type: integer }
+            total: { $ref: '#/components/schemas/Money' }
+        stale_pending: { type: integer }
+        outstanding_total: { $ref: '#/components/schemas/Money' }
+        low_stock_count: { type: integer }
+
+    SalesGrouping:
+      type: string
+      enum: [day, week, month]
+
+    SalesReport:
+      type: object
+      required: [from, to, group, buckets, totals]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        group: { $ref: '#/components/schemas/SalesGrouping' }
+        buckets:
+          type: array
+          items:
+            type: object
+            required: [period_start, orders, total]
+            properties:
+              period_start: { type: string, format: date }
+              orders: { type: integer }
+              total: { $ref: '#/components/schemas/Money' }
+        totals:
+          type: object
+          required: [orders, total]
+          properties:
+            orders: { type: integer }
+            total: { $ref: '#/components/schemas/Money' }
+
+    OutstandingCustomer:
+      type: object
+      required: [customer, orders, total, collected, outstanding]
+      properties:
+        customer: { $ref: '#/components/schemas/CustomerRef' }
+        orders: { type: integer }
+        total: { $ref: '#/components/schemas/Money' }
+        collected: { $ref: '#/components/schemas/Money' }
+        outstanding: { $ref: '#/components/schemas/Money' }
+
+    LowStockSku:
+      type: object
+      required: [sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold]
+      properties:
+        sku_id: { type: integer }
+        product_id: { type: integer }
+        product_name: { type: string }
+        code: { type: string }
+        name: { type: [string, 'null'] }
+        available: { type: integer }
+        moq: { type: integer }
+        conversion_factor: { type: integer }
+        threshold: { type: integer }
+
+    AuditLog:
+      type: object
+      required: [id, actor, action, entity, old_values, new_values, batch_id, ip, created_at]
+      properties:
+        id: { type: integer }
+        actor: { $ref: '#/components/schemas/Actor' }
+        action: { type: string, examples: [product.updated] }
+        entity:
+          type: object
+          required: [type, id]
+          properties:
+            type: { type: string, description: A table name }
+            id: { type: [integer, 'null'] }
+        old_values:
+          type: [object, 'null']
+          additionalProperties: true
+        new_values:
+          type: [object, 'null']
+          additionalProperties: true
+        batch_id: { type: [string, 'null'], format: uuid }
+        ip: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
