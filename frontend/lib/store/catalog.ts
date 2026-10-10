@@ -39,6 +39,16 @@ export function findCategory(tree: readonly Category[], slug: string): Category 
   return null;
 }
 
+export type CategoryOption = { slug: string; name: string; depth: number };
+
+/** The tree flattened in display order (each parent before its children), for a category picker. */
+export function categoryOptions(tree: readonly Category[], depth = 0): CategoryOption[] {
+  return tree.flatMap((category) => [
+    { slug: category.slug, name: category.name, depth },
+    ...categoryOptions(category.children, depth + 1),
+  ]);
+}
+
 /** Facets with counts for the selection (BR-P08), in the merchant's filter order (D18). */
 export function useFilters(listing: Listing, enabled = true) {
   const params = apiParams({ ...listing, sort: undefined });

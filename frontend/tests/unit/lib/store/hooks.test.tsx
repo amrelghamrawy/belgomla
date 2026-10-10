@@ -2,7 +2,7 @@ import { act, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { queryKeys } from "@/lib/api/keys";
-import { findCategory, useProductsInfinite } from "@/lib/store/catalog";
+import { categoryOptions, findCategory, useProductsInfinite } from "@/lib/store/catalog";
 import { newIdempotencyKey } from "@/lib/api/idempotency";
 import { useCheckout } from "@/lib/store/checkout";
 import { useAddToCart } from "@/lib/store/cart";
@@ -30,6 +30,27 @@ describe("findCategory", () => {
 
   it("is null for an unknown slug", () => {
     expect(findCategory(tree, "nope")).toBeNull();
+  });
+});
+
+describe("categoryOptions", () => {
+  it("flattens the tree with each parent before its children and their depth", () => {
+    const tree = [
+      {
+        id: 1,
+        name: "إعدادي",
+        slug: "prep",
+        image_url: null,
+        children: [{ id: 2, name: "أولى", slug: "first", image_url: null, children: [] }],
+      },
+      { id: 3, name: "ثانوي", slug: "sec", image_url: null, children: [] },
+    ];
+
+    expect(categoryOptions(tree)).toEqual([
+      { slug: "prep", name: "إعدادي", depth: 0 },
+      { slug: "first", name: "أولى", depth: 1 },
+      { slug: "sec", name: "ثانوي", depth: 0 },
+    ]);
   });
 });
 

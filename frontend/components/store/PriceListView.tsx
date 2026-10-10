@@ -2,8 +2,8 @@
 
 import { PrinterIcon, Share2Icon } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,7 +14,9 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { findCategory, useCategories, usePriceList } from "@/lib/store/catalog";
-import { parseListing } from "@/lib/store/listing";
+import { parseListing, priceListHref, type Listing } from "@/lib/store/listing";
+
+import { PriceListFilters } from "./PriceListFilters";
 
 /**
  * Copies the page URL, which carries the whole selection, so the list can be sent as a link (BR-P13). The Clipboard
@@ -58,6 +60,7 @@ function copyWithSelection(text: string): boolean {
  * code, unit, cover and wholesale price, MOQ, availability. The browser's print-to-PDF is the V1 export.
  */
 export function PriceListView() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const listing = useMemo(() => parseListing(searchParams, searchParams.get("category") ?? undefined), [searchParams]);
   const { data: tenant } = useTenant();
@@ -66,6 +69,7 @@ export function PriceListView() {
   const category = listing.category && categories.data ? findCategory(categories.data, listing.category) : null;
   const filtered = Object.keys(listing.f).length > 0 || listing.q !== undefined;
   const pricesHidden = list.data?.meta.prices_hidden === true;
+  const navigate = useCallback((next: Listing) => router.replace(priceListHref(next), { scroll: false }), [router]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-4 print:max-w-none print:p-0">
@@ -94,6 +98,13 @@ export function PriceListView() {
           </Button>
         </div>
       </div>
+
+      <PriceListFilters
+        listing={listing}
+        categories={categories.data ?? []}
+        total={list.data?.meta.count}
+        onChange={navigate}
+      />
 
       {pricesHidden && (
         <Alert className="print:hidden">

@@ -211,7 +211,7 @@ School-book merchants replace most of the catalog every academic year. V1 suppor
 
 ### BR-P13 — Printable Price List
 
-Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. The merchant can share its URL; the browser's print-to-PDF is used in V1. Excel/PDF export is V2.
+Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL; the browser's print-to-PDF is used in V1. Excel/PDF export is V2.
 
 ### BR-P07 — Product Images
 

@@ -189,6 +189,11 @@ export const ar = {
     printedOn: (date: string) => `بتاريخ ${date}`,
     empty: "لا توجد منتجات في هذه القائمة",
     filtered: "حسب التصفية المختارة",
+    search: "بحث في القائمة",
+    searchPlaceholder: "ابحث بالاسم أو الكود",
+    category: "القسم",
+    allCategories: "كل الأقسام",
+    clearFilters: "مسح التصفية",
   },
   auth: {
     email: "البريد الإلكتروني",

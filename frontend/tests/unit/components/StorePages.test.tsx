@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { PriceListView } from "@/components/store/PriceListView";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHome } from "@/components/store/StoreHome";
 
-import { cart, cartItem, customer, omit, page, storeProduct, tenantSettings } from "../fixtures";
+import { cart, cartItem, customer, facet, omit, page, storeProduct, tenantSettings } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { renderWithQuery, router, searchParams } from "../render";
 
@@ -16,6 +16,7 @@ const tree = [{ id: 1, name: "المرحلة الإعدادية", slug: "prep", 
 
 beforeEach(() => {
   router.push.mockReset();
+  router.replace.mockReset();
   searchParams.value = new URLSearchParams();
 });
 
@@ -130,6 +131,7 @@ describe("PriceListView", () => {
     return stubApi({
       "GET /api/store/tenant": json(200, { data: tenantSettings() }),
       "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/filters": json(200, { data: [facet()] }),
       "GET /api/store/price-list": json(200, {
         data,
         meta: { count: data.length, truncated: false, prices_hidden: false, ...meta },
@@ -195,6 +197,75 @@ describe("PriceListView", () => {
     await waitFor(() => expect(success).toHaveBeenCalledWith("تم نسخ الرابط"));
     expect(execCommand).toHaveBeenCalledWith("copy");
     Reflect.deleteProperty(document, "execCommand");
+  });
+
+  it("BR-P13 a search narrows the list and keeps the category", async () => {
+    searchParams.value = new URLSearchParams("category=prep");
+    stubList();
+    const user = userEvent.setup();
+    renderWithQuery(<PriceListView />);
+
+    await user.type(screen.getByRole("searchbox", { name: "بحث في القائمة" }), " علوم {Enter}");
+
+    expect(router.replace).toHaveBeenCalledWith("/price-list?q=%D8%B9%D9%84%D9%88%D9%85&category=prep", {
+      scroll: false,
+    });
+  });
+
+  it("BR-P13 an empty search removes q from the URL", async () => {
+    searchParams.value = new URLSearchParams("q=علوم");
+    stubList();
+    const user = userEvent.setup();
+    renderWithQuery(<PriceListView />);
+
+    await user.clear(screen.getByRole("searchbox", { name: "بحث في القائمة" }));
+    await user.keyboard("{Enter}");
+
+    expect(router.replace).toHaveBeenCalledWith("/price-list", { scroll: false });
+  });
+
+  it("BR-P13 choosing a category writes it into the URL and drops the facets of the previous one", async () => {
+    searchParams.value = new URLSearchParams("f[grade]=7&q=علوم");
+    stubList();
+    const user = userEvent.setup();
+    renderWithQuery(<PriceListView />);
+    const select = screen.getByRole("combobox", { name: "القسم" });
+    await screen.findByRole("option", { name: "المرحلة الإعدادية" });
+
+    await user.selectOptions(select, "prep");
+
+    expect(router.replace).toHaveBeenCalledWith("/price-list?q=%D8%B9%D9%84%D9%88%D9%85&category=prep", {
+      scroll: false,
+    });
+  });
+
+  it("BR-P08 a facet from the drawer is added to the list's URL", async () => {
+    searchParams.value = new URLSearchParams("category=prep");
+    const fetchMock = stubList();
+    const user = userEvent.setup();
+    renderWithQuery(<PriceListView />);
+    await user.click(screen.getByRole("button", { name: "تصفية" }));
+    const drawer = await screen.findByRole("dialog", { name: "تصفية المنتجات" });
+
+    await user.click(within(drawer).getByRole("radio", { name: /أولى إعدادي\s*16/ }));
+
+    expect(router.replace).toHaveBeenCalledWith("/price-list?f%5Bgrade%5D=7&category=prep", { scroll: false });
+    expect(callsTo(fetchMock, "GET /api/store/filters")[0]?.url.search).toBe("?category=prep");
+  });
+
+  it("clearing the filters returns to the whole list, and the button shows only when something is selected", async () => {
+    searchParams.value = new URLSearchParams("category=prep&f[grade]=7&q=علوم");
+    stubList();
+    const user = userEvent.setup();
+    const { unmount } = renderWithQuery(<PriceListView />);
+
+    await user.click(screen.getByRole("button", { name: "مسح التصفية" }));
+
+    expect(router.replace).toHaveBeenCalledWith("/price-list", { scroll: false });
+    unmount();
+    searchParams.value = new URLSearchParams();
+    renderWithQuery(<PriceListView />);
+    expect(screen.queryByRole("button", { name: "مسح التصفية" })).not.toBeInTheDocument();
   });
 
   it("the print button opens the browser's print dialog", async () => {
