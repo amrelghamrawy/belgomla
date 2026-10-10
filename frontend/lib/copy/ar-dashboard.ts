@@ -68,6 +68,12 @@ export const dashboard = {
     staleOrders: "طلبات قيد الانتظار متأخرة",
     lowStockList: "مخزون منخفض",
     viewAll: "عرض الكل",
+    salesTrend: "المبيعات آخر 30 يومًا",
+    salesTrendOrders: (n: number) => `${n} طلب مُسلَّم`,
+    noSales: "لا توجد مبيعات مسلّمة في آخر 30 يومًا",
+    viewReport: "التقرير",
+    topDebtors: "أكبر المديونيات",
+    noDebtors: "لا توجد مستحقات",
   },
 
   categories: {

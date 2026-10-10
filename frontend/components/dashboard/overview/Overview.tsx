@@ -7,12 +7,14 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import type { OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { useOrders } from "@/lib/dashboard/orders";
-import { useLowStockReport, useOverviewReport } from "@/lib/dashboard/reports";
+import { useLowStockReport, useOutstandingReport, useOverviewReport, useSalesReport } from "@/lib/dashboard/reports";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
 
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { SalesChart } from "../reports/SalesChart";
+import { BarList } from "./BarList";
 
 const copy = ar.dashboard.overview;
 const STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
@@ -30,7 +32,10 @@ function Stat({ label, value, href, tone }: { label: string; value: ReactNode; h
   );
 }
 
-/** The landing page (D42): today's numbers and what needs attention, from `reports/overview` (D5). */
+/**
+ * The landing page (D42): today's numbers and what needs attention, from `reports/overview` (D5), with the
+ * last 30 days of sales, orders per status and the largest debts as charts.
+ */
 export function Overview() {
   const report = useOverviewReport();
 
@@ -62,34 +67,105 @@ export function Overview() {
               tone={report.data.low_stock_count > 0 ? "warning" : undefined}
             />
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>{copy.byStatus}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {STATUSES.map((status) => (
-                  <li key={status}>
-                    <Link
-                      href={`/dashboard/orders?status=${status}`}
-                      className="hover:bg-muted flex flex-col rounded-md border p-3"
-                      data-testid={`status-${status}`}
-                    >
-                      <span className="text-muted-foreground text-xs">{ar.orders.statuses[status]}</span>
-                      <span className="text-lg font-bold">{report.data.orders_by_status[status]}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <SalesTrend />
+            <Card>
+              <CardHeader>
+                <CardTitle>{copy.byStatus}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BarList
+                  label={copy.byStatus}
+                  testId="status"
+                  items={STATUSES.map((status) => ({
+                    key: status,
+                    label: ar.orders.statuses[status],
+                    value: report.data.orders_by_status[status],
+                    display: String(report.data.orders_by_status[status]),
+                    href: `/dashboard/orders?status=${status}`,
+                    muted: status === "cancelled",
+                  }))}
+                />
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <TopDebtors />
             <StaleOrders />
             <LowStockList />
           </div>
         </>
       )}
     </>
+  );
+}
+
+/** Delivered sales of the last 30 days (the report's default range): the total as the headline, then the columns. */
+function SalesTrend() {
+  const sales = useSalesReport({});
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle>{copy.salesTrend}</CardTitle>
+        <CardAction>
+          <Link href="/dashboard/reports" className="text-primary text-sm hover:underline">
+            {copy.viewReport}
+          </Link>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {sales.isError && <ErrorBlock error={sales.error} onRetry={() => void sales.refetch()} />}
+        {sales.data && (
+          <>
+            <p className="flex flex-wrap items-baseline gap-x-3" data-testid="sales-trend-total">
+              <span className="text-2xl font-bold">{formatMoney(sales.data.totals.total)}</span>
+              <span className="text-muted-foreground text-sm">{copy.salesTrendOrders(sales.data.totals.orders)}</span>
+            </p>
+            {sales.data.totals.orders === 0 ? (
+              <p className="text-muted-foreground text-sm">{copy.noSales}</p>
+            ) : (
+              <SalesChart report={sales.data} className="h-56" />
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** The five customers who owe the most on delivered orders (D59), as bars on one scale. */
+function TopDebtors() {
+  const outstanding = useOutstandingReport(1);
+  const rows = outstanding.data?.data.slice(0, 5) ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{copy.topDebtors}</CardTitle>
+        <CardAction>
+          <Link href="/dashboard/reports?tab=outstanding" className="text-primary text-sm hover:underline">
+            {copy.viewAll}
+          </Link>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {outstanding.data !== undefined && rows.length === 0 && (
+          <p className="text-muted-foreground text-sm">{copy.noDebtors}</p>
+        )}
+        <BarList
+          label={copy.topDebtors}
+          testId="debtors"
+          items={rows.map((row) => ({
+            key: String(row.customer.id),
+            label: row.customer.name,
+            value: Number(row.outstanding),
+            display: formatMoney(row.outstanding),
+            href: `/dashboard/customers/${row.customer.id}?tab=statement`,
+          }))}
+        />
+      </CardContent>
+    </Card>
   );
 }
 

@@ -16,6 +16,7 @@ import type { SalesReport } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
+import { cn } from "@/lib/utils";
 
 const copy = ar.dashboard.reports;
 
@@ -59,7 +60,7 @@ function SalesTooltip({ active, payload }: TooltipContentProps<TooltipValueType,
  * columns with a rounded cap on a recessive grid; a hover tooltip per column; time runs right to left in
  * RTL (the axis is reversed and the value axis sits on the right). The table view carries the same numbers.
  */
-export function SalesChart({ report }: { report: SalesReport }) {
+export function SalesChart({ report, className = "h-72" }: { report: SalesReport; className?: string }) {
   const points: Point[] = report.buckets.map((bucket) => ({
     label: formatDate(bucket.period_start),
     total: Number(bucket.total),
@@ -68,7 +69,10 @@ export function SalesChart({ report }: { report: SalesReport }) {
   }));
 
   return (
-    <figure aria-label={copy.chartLabel(formatDate(report.from), formatDate(report.to))} className="h-72 w-full">
+    <figure
+      aria-label={copy.chartLabel(formatDate(report.from), formatDate(report.to))}
+      className={cn("w-full", className)}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={points} margin={{ top: 8, right: 8, bottom: 8, left: 8 }} barCategoryGap={2}>
           <CartesianGrid vertical={false} stroke="var(--border)" strokeWidth={1} />
