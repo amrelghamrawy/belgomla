@@ -48,6 +48,10 @@ php artisan tenant:activate alnoor
 php artisan tenant:list
 ```
 
+## Production
+
+Deployment, monitoring, backups and the runbook live in [`../deploy/README.md`](../deploy/README.md) (tasks/11). Health: `GET /up` checks PostgreSQL and Redis; `php artisan platform:monitor` runs the operator checks.
+
 ## Tests
 
 ```

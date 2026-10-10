@@ -5,7 +5,7 @@
 ### Backend
 
 - Laravel 12.
-- PHP 8.3+.
+- PHP 8.5 (composer allows ^8.3; development, tests and production all run 8.5, D66).
 - REST API.
 - Sanctum for authentication.
 
@@ -28,8 +28,8 @@ A single shared database is recommended initially.
 
 - Redis for cache/queues where useful (database driver for queue/cache is acceptable in local development).
 - S3-compatible object storage for product images (local disk in development).
-- **No Docker.** Local development runs natively on Windows (PHP 8.3, Composer, PostgreSQL, Node). Production runs on a plain Linux VM with Nginx + PHP-FPM + PostgreSQL + Redis, provisioned by a documented script. Decided 2026-10-09.
-- Centralized application/error logging.
+- **No Docker.** Local development runs natively on Windows (PHP 8.5, Composer, PostgreSQL, Node). Production runs on a plain Linux VM with Nginx + PHP-FPM + PostgreSQL + Redis, provisioned by `deploy/provision.sh` (runbook: `deploy/README.md`, tasks/11). Decided 2026-10-09.
+- Centralized application/error logging: daily log files plus `platform:monitor` alerts to the operator (D65, D66); no Sentry in V1.
 
 ## 2. Multi-Tenant Architecture
 
@@ -96,7 +96,7 @@ Everything for a tenant lives under its own subdomain. There is no separate API 
 | Dashboard        | `https://{tenant}.gomalecommerce.app/dashboard/...` |
 | API              | `https://{tenant}.gomalecommerce.app/api/...`       |
 
-Next.js serves the UI and proxies `/api/*` to Laravel (Next.js rewrite or reverse proxy), forwarding the original `Host` header. Laravel resolves the tenant **only** from that `Host` header.
+In production Nginx sends `/api/*`, `/sanctum/*` and `/up` to PHP-FPM and serves `/storage/*` from disk, before everything else goes to Next.js (`deploy/nginx/belgomla.conf`); in development the Next.js route handlers proxy the same paths. Both keep the original `Host` header, because Laravel resolves the tenant **only** from it.
 
 Reason: if the API lived on `api.gomalecommerce.app`, the client would have to tell the API which tenant it wants, which violates §2.
 

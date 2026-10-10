@@ -20,6 +20,14 @@
 - Redis Windows service on 6379.
 - Tenant hosts are `{subdomain}.gomal.test`. Smoke-test with `curl --resolve alnoor.gomal.test:8000:127.0.0.1` and an `Origin` header.
 
+## Production (tasks/11, `deploy/README.md`)
+
+- One Ubuntu 24.04 VM (D44, provider not chosen yet). App in `/srv/belgomla` as user `belgomla`; secrets only in `/etc/belgomla/*.env`, `~belgomla/.pgpass` and the rclone config, never in git.
+- Deploy: `sudo -u belgomla /srv/belgomla/deploy/deploy.sh` (ends with post-deploy assertions). Tenants: `php artisan tenant:*` in `/srv/belgomla/backend`.
+- Logs: `backend/storage/logs/laravel-*.log`, `monitor-*.log`; `journalctl -u 'belgomla-*'`. Alerts reach the operator on WhatsApp (D65).
+- SSH access, the VM address and the Hypersender account owner are recorded with the platform owner (D45), not here.
+- Anything changed on the VM by hand must be reflected in `deploy/` in the same session.
+
 ## Definition of Done for any feature
 
 1. Code follows `rules/01-testing.md` and the arch tests pass.

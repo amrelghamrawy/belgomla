@@ -15,7 +15,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | 8  | [Frontend foundation](8-frontend-foundation.md) | frontend/ (Next.js)   | done        | c195b49 |
 | 9  | [Storefront UI](9-storefront-ui.md)    | frontend/ storefront          | done (Lighthouse open) | 009b240 |
 | 10 | [Dashboard UI](10-dashboard-ui.md)     | frontend/ dashboard           | done        | 33d231b |
-| 11 | [Release](11-release.md)               | infra, seed, go-live checks   | not started |        |
+| 11 | [Release](11-release.md)               | infra, seed, go-live checks   | repo side done (go-live pending) | a7c3884 |
 
 Rules for the board:
 
