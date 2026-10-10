@@ -43,15 +43,19 @@ frontend/
     shared/                  used by both surfaces (StoreUnavailable, BrandLogo, ...)
   lib/
     api/                     client.ts (the only fetch), errors.ts, schema.d.ts (generated), types.ts, keys.ts
-    server/                  server-only code: backend-proxy.ts (the dev proxy behind app/api and app/sanctum)
-    forms/                   server-errors.ts (backend `details` → form fields)
-    auth/                    session hooks, login/logout mutations, useTenant + branding
-    format/                  money.ts, date.ts, phone.ts
+    server/                  server-only code: backend-proxy.ts (the dev proxy behind app/api, app/sanctum and
+                             app/storage), store-data.ts (server-side prefetch of a listing's first screen)
+    forms/                   server-errors.ts (backend `details` → form fields), phone.ts (the zod phone field)
+    auth/                    session hooks (incl. useRequiredCustomer), login/logout mutations, useTenant + branding
+    store/                   storefront hooks per concern (catalog, auth, cart, checkout, orders, addresses) and
+                             pure helpers (listing = URL ↔ facets, quantity = MOQ/stock/MOV, checkout-errors)
+    format/                  money.ts, date.ts, phone.ts (no zod here: the footer imports it on every page)
     copy/ar.ts               every Arabic string + the error-code → message map
   tests/
     unit/                    Vitest, mirrors lib/, components/, app/ (e.g. tests/unit/lib/api/client.test.ts)
-                             helpers: http.ts (stubFetch, envelopeError, csrfCookie), render.tsx (renderWithQuery,
-                             router/searchParams mocks), fixtures.ts
+                             helpers: http.ts (stubFetch = ordered queue, stubApi = routed by "METHOD /path",
+                             callsTo, envelopeError, csrfCookie), render.tsx (renderWithQuery, router/searchParams/
+                             pathname/params mocks), fixtures.ts (storefront builders, omit)
     e2e/                     Playwright specs
 ```
 
@@ -66,6 +70,9 @@ Which file to write:
 | A piece of UI used by both surfaces            | `components/shared/`                                      |
 | Any Arabic text                                | a key in `lib/copy/ar.ts`                                  |
 | Money, dates, phones on screen                 | `lib/format/*`, never inline formatting                    |
+| A list page that must paint fast (LCP)         | prefetch its first screen in the server page with `prefetchListing()` (`lib/server/store-data.ts`) into a `HydrationBoundary`, under the same query keys as the client hooks; give the query a `staleTime` so hydration does not refetch |
+| State in the URL (filters, sort, search)       | parse/serialise in a pure `lib/store/*` module, `router.replace(..., { scroll: false })`; never local state |
+| A page that needs a logged-in customer         | `useRequiredCustomer()`: renders nothing until known, sends a guest to `/account/login?next=` |
 
 ---
 
@@ -99,7 +106,10 @@ Which file to write:
   - `503 store_unavailable` → `StoreUnavailableError`, rendered as the full-page «المتجر غير متاح».
 - Session hooks: `useDashboardSession()` / `useCustomerSession()` return the user or `null` (a 401 from `me` is "logged out", not an error).
 - Show `messageFor(error)` from `lib/copy/ar.ts`. It shows the envelope message, which is already Arabic, specific and safe. It falls back to the code's message in `ar.errors` when there is no envelope, and for the generic `server_error` / `http_error`. `ar.errors` is a `Record` over every `ErrorCode` in the spec, so a new backend code is a type error until it gets Arabic text.
-- Query keys only from `lib/api/keys.ts`. Mutations invalidate exactly the keys they change.
+- Query keys only from `lib/api/keys.ts`. Mutations invalidate exactly the keys they change. A mutation that returns the new state (the cart, a cancelled order) writes it with `setQueryData` and invalidates only the lists.
+- Server components may read storefront data only through `lib/server/store-data.ts`, which goes through `proxyToBackend` with the shopper's Host, cookies and a Referer (so Sanctum sees the session and prices follow D1). Production: `BACKEND_HOST/PORT` must reach Laravel (Nginx/PHP-FPM) from the Next server. Any failure falls back to loading in the browser.
+- Images are same-origin `/storage/...` (D61), optimised by `next/image` (`images.localPatterns`); `app/storage` proxies them in dev.
+- Dev and LAN stores run on **http**, which is not a secure context: no `crypto.randomUUID()` (use `crypto.getRandomValues`), no `navigator.clipboard` (fall back), as the checkout key and the price-list share button do.
 
 ---
 
@@ -128,6 +138,10 @@ Which file to write:
 - Stub `fetch` per test; never hit the network in Vitest.
 - `npm run typecheck && npm run lint && npm test` must be green, plus `npm run build` for anything touching routing/config.
 - E2E (`npm run test:e2e`) runs against `php artisan serve` + `next dev`, started by Playwright if they are not running. Chromium maps `*.gomal.test` to 127.0.0.1 itself (`--host-resolver-rules`), so no hosts entry is needed. It is a manual gate until CI exists.
+  - The backend must be seeded (`php artisan migrate:fresh --seed`: the alnoor tenant + StorefrontDemoSeeder catalog).
+  - `workers: 1`: `php artisan serve` answers one request at a time, parallel workers starve it into timeouts.
+  - Calls a test makes itself go through the page (`page.evaluate(fetch)`), not `page.request`: Node does not get Chromium's host mapping. OTPs come from `GET /api/_test/last-otp` (D62); each run registers a new phone (5 OTPs per phone per hour).
+- jsdom gaps are filled in `tests/unit/setup.ts` (ResizeObserver for Radix, elementFromPoint for input-otp), assigned rather than `vi.stubGlobal` because `unstubGlobals` resets stubs after each test. `userEvent.setup()` installs its own `navigator.clipboard`: use `fireEvent` when a test stubs the clipboard.
 - Tests that run Node-only code (the proxy) start with `// @vitest-environment node`.
 - Inside `<main>`, query alerts as `getByRole('main').getByRole('alert')`: Next adds its own `role="alert"` route announcer to every page.
 

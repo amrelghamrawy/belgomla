@@ -11,3 +11,7 @@ export const router = {
 };
 
 export const searchParams = { value: new URLSearchParams() };
+
+/** usePathname() and useParams() answers; tests set them per case. */
+export const pathname = { value: "/" };
+export const params = { value: {} as Record<string, string> };

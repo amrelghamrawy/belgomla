@@ -19,3 +19,8 @@ export function formatMoney(amount: Money): string {
 
   return `${sign}${grouped}.${fraction} ${ar.currency}`;
 }
+
+/** A percent string from the API ("20.00", "12.50") without trailing zeros: "20", "12.5". */
+export function formatPercent(percent: string): string {
+  return percent.includes(".") ? percent.replace(/\.?0+$/, "") : percent;
+}

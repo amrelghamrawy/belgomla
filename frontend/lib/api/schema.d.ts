@@ -87,6 +87,372 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The active category tree (08 §1, D31) */
+        get: operations["storeCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Facets with counts for the current selection (BR-P08, D18 order) */
+        get: operations["storeFilters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active and coming-soon products, faceted and searchable (BR-P08) */
+        get: operations["storeProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/products/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One product with its gallery and related editions (BR-P10) */
+        get: operations["storeProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/price-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Printable price list for a facet selection (BR-P13) */
+        get: operations["storePriceList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Self-registration; sends an OTP (BR-CU04, BR-CU07) */
+        post: operations["storeRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/auth/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Checks an OTP; for `register` it activates the customer and starts the session */
+        post: operations["storeVerifyOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/auth/resend-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends a new OTP; `channel=sms` is the "send by SMS" link (BR-CU07) */
+        post: operations["storeResendOtp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends a password-reset OTP; same answer for unknown phones (D52) */
+        post: operations["storeForgotPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets a new password with the reset OTP; the customer then logs in */
+        post: operations["storeResetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/auth/invitation/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        /** The invitation behind a link (BR-CU08) */
+        get: operations["storeInvitation"];
+        put?: never;
+        /** Sets the password, verifies the phone and starts the session (BR-CU08) */
+        post: operations["storeAcceptInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeAddresses"];
+        put?: never;
+        post: operations["storeCreateAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/addresses/{address}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                address: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["storeUpdateAddress"];
+        post?: never;
+        delete: operations["storeDeleteAddress"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cart priced now; inactive lines are removed and reported once (BR-P04, BR-PR04) */
+        get: operations["storeCart"];
+        put?: never;
+        post?: never;
+        delete: operations["storeClearCart"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/cart/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adds a SKU (or adds to its quantity); guests get 403 prices_hidden or 401 (D53) */
+        post: operations["storeAddCartItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/cart/items/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["storeRemoveCartItem"];
+        options?: never;
+        head?: never;
+        patch: operations["storeUpdateCartItem"];
+        trace?: never;
+    };
+    "/api/store/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Places the order from the cart (BR-PR06); retry-safe with Idempotency-Key (D55) */
+        post: operations["storeCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The customer's orders, newest first (D6) */
+        get: operations["storeOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/orders/{order}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get: operations["storeOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/orders/{order}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels a pending order with a reason (BR-O02) */
+        post: operations["storeCancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/_test/last-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The newest OTP sent to a phone on this tenant (D62; local and testing environments only) */
+        get: operations["testLastOtp"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/auth/login": {
         parameters: {
             query?: never;
@@ -216,6 +582,272 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        PaginationLinks: {
+            first: string | null;
+            last: string | null;
+            prev: string | null;
+            next: string | null;
+        };
+        PaginationMeta: {
+            current_page: number;
+            from: number | null;
+            last_page: number;
+            links: {
+                [key: string]: unknown;
+            }[];
+            path: string;
+            per_page: number;
+            to: number | null;
+            total: number;
+        };
+        Category: {
+            id: number;
+            name: string;
+            slug: string;
+            image_url: string | null;
+            children: components["schemas"]["Category"][];
+        };
+        FacetOption: {
+            /** @description Select option id, or "true"/"false" for a boolean field; sent back as `f[<key>]=<id>`. */
+            id: number | string;
+            label: string;
+            count: number;
+        };
+        Facet: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            type: "select" | "boolean";
+            options: components["schemas"]["FacetOption"][];
+        };
+        CustomFieldValue: {
+            key: string;
+            label: string;
+            value: string;
+        };
+        PriceTier: {
+            min_quantity: number;
+            unit_price: components["schemas"]["Money"] | null;
+        };
+        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). */
+        StoreSku: {
+            id: number;
+            code: string;
+            unit: string | null;
+            conversion_factor: number;
+            moq: number;
+            cover_price?: components["schemas"]["Money"] | null;
+            base_price?: components["schemas"]["Money"];
+            discount_percent?: components["schemas"]["Money"] | null;
+            tiers?: components["schemas"]["PriceTier"][];
+            available?: number;
+            in_stock: boolean;
+            /** @constant */
+            coming_soon?: true;
+        };
+        StoreProduct: {
+            id: number;
+            name: string;
+            slug: string;
+            description: string | null;
+            /** @enum {string} */
+            status: "active" | "coming_soon";
+            main_image_url: string | null;
+            category: {
+                id: number;
+                name: string;
+            } | null;
+            custom_fields: components["schemas"]["CustomFieldValue"][];
+            sku: components["schemas"]["StoreSku"] | null;
+            /**
+             * @description Present (true) only when the tenant hides prices from guests (BR-CU04).
+             * @constant
+             */
+            prices_hidden?: true;
+        };
+        ProductImage: {
+            id: number;
+            url: string;
+            is_main: boolean;
+            sort_order: number;
+        };
+        RelatedProduct: {
+            /** @enum {string} */
+            type: "revision_of" | "companion";
+            /** @enum {string} */
+            direction: "outgoing" | "incoming";
+            product: components["schemas"]["StoreProduct"];
+        };
+        StoreProductDetail: components["schemas"]["StoreProduct"] & {
+            gallery: components["schemas"]["ProductImage"][];
+            related: components["schemas"]["RelatedProduct"][];
+        };
+        PriceListRow: {
+            id: number;
+            name: string;
+            slug: string;
+            code: string | null;
+            unit: string | null;
+            moq: number | null;
+            cover_price?: components["schemas"]["Money"] | null;
+            base_price?: components["schemas"]["Money"] | null;
+            /** @enum {string} */
+            availability: "available" | "coming_soon";
+        };
+        PriceListMeta: {
+            count: number;
+            truncated: boolean;
+            prices_hidden: boolean;
+        };
+        /** @enum {string} */
+        OtpPurpose: "register" | "password_reset";
+        OtpSent: {
+            /** @enum {string} */
+            otp_sent_via: "whatsapp" | "sms";
+        };
+        RegisterRequest: {
+            name: string;
+            phone: string;
+            password: string;
+        };
+        VerifyOtpRequest: {
+            phone: string;
+            code: string;
+            purpose: components["schemas"]["OtpPurpose"];
+        };
+        ResendOtpRequest: {
+            phone: string;
+            purpose: components["schemas"]["OtpPurpose"];
+            /** @enum {string} */
+            channel?: "whatsapp" | "sms";
+        };
+        ResetPasswordRequest: {
+            phone: string;
+            code: string;
+            password: string;
+        };
+        Invitation: {
+            name: string;
+            /** @example +20101****678 */
+            phone_masked: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        Address: {
+            id: number;
+            label: string;
+            governorate: string;
+            city: string;
+            address_line: string;
+            landmark: string | null;
+            /** @description E.164; the customer's phone when none was given */
+            phone: string;
+            is_default: boolean;
+        };
+        AddressRequest: {
+            label: string;
+            governorate: string;
+            city: string;
+            address_line: string;
+            landmark?: string | null;
+            phone?: string | null;
+            is_default?: boolean;
+        };
+        CartItem: {
+            sku_id: number;
+            product_name: string;
+            product_slug: string;
+            unit: string;
+            conversion_factor: number;
+            /** @description Selling units */
+            quantity: number;
+            unit_price: components["schemas"]["Money"];
+            tier_min_quantity: number | null;
+            line_total: components["schemas"]["Money"];
+            moq: number;
+            /** @description Base units (D37) */
+            available: number;
+        };
+        RemovedCartItem: {
+            product_name: string;
+            /** @constant */
+            reason: "inactive";
+        };
+        Cart: {
+            items: components["schemas"]["CartItem"][];
+            /** @description Lines removed because their product is no longer active, reported once (BR-P04). */
+            removed_items: components["schemas"]["RemovedCartItem"][];
+            items_total: components["schemas"]["Money"];
+            mov: {
+                enabled: boolean;
+                amount: components["schemas"]["Money"] | null;
+                satisfied: boolean;
+            };
+        };
+        /** @description One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units. */
+        LineProblem: {
+            sku_id: number;
+            /** @enum {string} */
+            reason: "insufficient_stock" | "below_moq" | "product_inactive";
+            requested?: number;
+            available?: number;
+            moq?: number;
+        };
+        /** @enum {string} */
+        OrderStatus: "pending" | "confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
+        OrderItem: {
+            sku_id: number;
+            product_name: string;
+            sku_code: string;
+            sku_name: string;
+            unit: string;
+            conversion_factor: number;
+            quantity: number;
+            cover_price: components["schemas"]["Money"] | null;
+            unit_price: components["schemas"]["Money"];
+            discount_percent: components["schemas"]["Money"] | null;
+            tier_min_quantity: number | null;
+            line_total: components["schemas"]["Money"];
+        };
+        OrderHistoryEntry: {
+            from: components["schemas"]["OrderStatus"] | null;
+            to: components["schemas"]["OrderStatus"];
+            /** Format: date-time */
+            at: string;
+            /** @enum {string} */
+            by: "customer" | "tenant_user" | "system";
+        };
+        Order: {
+            number: number;
+            status: components["schemas"]["OrderStatus"];
+            status_label: string;
+            /** Format: date-time */
+            placed_at: string;
+            items_total: components["schemas"]["Money"];
+            order_total: components["schemas"]["Money"];
+            /** @enum {string} */
+            collection_status: "unpaid" | "partially_collected" | "collected";
+            collected_amount: components["schemas"]["Money"];
+            delivery: {
+                name: string;
+                phone: string;
+                address: {
+                    label: string;
+                    governorate: string;
+                    city: string;
+                    address_line: string;
+                    landmark: string | null;
+                };
+            };
+            customer_note: string | null;
+            cancel_reason: string | null;
+            /** @enum {string|null} */
+            cancelled_by: "customer" | "tenant_user" | null;
+        };
+        OrderDetail: components["schemas"]["Order"] & {
+            items: components["schemas"]["OrderItem"][];
+            history: components["schemas"]["OrderHistoryEntry"][];
+        };
         DashboardLoginRequest: {
             /** Format: email */
             email: string;
@@ -255,8 +887,43 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description An OTP was sent */
+        OtpSent: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["OtpSent"];
+                };
+            };
+        };
+        /** @description The whole cart, priced now */
+        Cart: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["Cart"];
+                };
+            };
+        };
     };
-    parameters: never;
+    parameters: {
+        /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
+        Category: string;
+        /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+        Facets: {
+            [key: string]: string;
+        };
+        /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+        Search: string;
+        Page: number;
+        PerPage: number;
+        /** @description The per-tenant order number (BR-O09) */
+        OrderNumber: number;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -375,6 +1042,699 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+        };
+    };
+    storeCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Root categories with their children */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Category"][];
+                    };
+                };
+            };
+        };
+    };
+    storeFilters: {
+        parameters: {
+            query?: {
+                /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
+                category?: components["parameters"]["Category"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Facets in the merchant's filter order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Facet"][];
+                    };
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    storeProducts: {
+        parameters: {
+            query?: {
+                /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
+                category?: components["parameters"]["Category"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                sort?: "name" | "-created_at" | "price" | "-price";
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of products */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["StoreProduct"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    storeProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The product */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["StoreProductDetail"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    storePriceList: {
+        parameters: {
+            query?: {
+                /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
+                category?: components["parameters"]["Category"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows sorted by name, capped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PriceListRow"][];
+                        meta: components["schemas"]["PriceListMeta"];
+                    };
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    storeRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["OtpSent"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    storeVerifyOtp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Registered and logged in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Customer"];
+                    };
+                };
+            };
+            /** @description Password-reset code is valid (not consumed) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    storeResendOtp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendOtpRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["OtpSent"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    storeForgotPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    phone: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["OtpSent"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    storeResetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    storeInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Invitation"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    storeAcceptInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Activated and logged in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Customer"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeAddresses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The customer's addresses */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Address"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    storeCreateAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Address"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeUpdateAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                address: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Address"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeDeleteAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                address: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    storeCart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Cart"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    storeClearCart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Emptied */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    storeAddCartItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sku_id: number;
+                    quantity: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cart"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeRemoveCartItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Cart"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    storeUpdateCartItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    quantity: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cart"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeCheckout: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    address_id: number;
+                    customer_note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Placed; the cart is emptied */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            order: components["schemas"]["OrderDetail"];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            /** @description checkout_failed with `items` (CheckoutProblem) and, for the minimum order value, `details.mov`; cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            503: components["responses"]["Error"];
+        };
+    };
+    storeOrders: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["OrderStatus"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of orders (without items and history) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Order"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The order with items and status history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    storeCancelOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The cancelled order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    testLastOtp: {
+        parameters: {
+            query: {
+                phone: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            code: string;
+                        };
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
         };
     };
     dashboardLogin: {

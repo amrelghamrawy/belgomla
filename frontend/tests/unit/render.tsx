@@ -21,4 +21,4 @@ export function renderHookWithQuery<T>(hook: () => T, client = testQueryClient()
   return { client, ...renderHook(hook, { wrapper: wrapperFor(client) }) };
 }
 
-export { router, searchParams } from "./navigation";
+export { params, pathname, router, searchParams } from "./navigation";

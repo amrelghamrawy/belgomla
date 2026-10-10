@@ -1,0 +1,182 @@
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { ProductListing } from "@/components/store/ProductListing";
+
+import { facet, page, storeProduct } from "../fixtures";
+import { callsTo, json, stubApi } from "../http";
+import { pathname, renderWithQuery, router, searchParams } from "../render";
+
+const tree = [
+  {
+    id: 1,
+    name: "المرحلة الإعدادية",
+    slug: "prep",
+    image_url: null,
+    children: [{ id: 2, name: "أولى إعدادي", slug: "first-prep", image_url: null, children: [] }],
+  },
+];
+
+function stubCatalog(products = [storeProduct()]) {
+  return stubApi({
+    "GET /api/store/categories": json(200, { data: tree }),
+    "GET /api/store/filters": json(200, {
+      data: [facet(), facet({ key: "subject", label: "المادة", options: [{ id: 15, label: "علوم", count: 9 }] })],
+    }),
+    "GET /api/store/products": json(200, page(products, { total: 31 })),
+  });
+}
+
+beforeEach(() => {
+  router.replace.mockReset();
+  pathname.value = "/c/prep";
+  searchParams.value = new URLSearchParams();
+});
+
+describe("ProductListing", () => {
+  it("shows the category, its subcategories and its products", async () => {
+    stubCatalog();
+    renderWithQuery(<ProductListing category="prep" />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "المرحلة الإعدادية" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "أولى إعدادي" })).toHaveAttribute("href", "/c/first-prep");
+    expect(await screen.findByRole("link", { name: "الأضواء علوم أولى إعدادي" })).toBeInTheDocument();
+    expect(screen.getByText("31 منتج")).toBeInTheDocument();
+  });
+
+  it("BR-P08 asks the API for the selection in the URL", async () => {
+    searchParams.value = new URLSearchParams("f[grade]=7&sort=price");
+    const fetchMock = stubCatalog();
+    renderWithQuery(<ProductListing category="prep" />);
+
+    await screen.findByRole("link", { name: "الأضواء علوم أولى إعدادي" });
+
+    const [products] = callsTo(fetchMock, "GET /api/store/products");
+    const [filters] = callsTo(fetchMock, "GET /api/store/filters");
+    expect(products?.url.search).toBe("?category=prep&sort=price&f%5Bgrade%5D=7&page=1&per_page=24");
+    expect(filters?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
+  });
+
+  it("BR-P08 D18 lists the facets in the server's order with their counts", async () => {
+    stubCatalog();
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+
+    await user.click(await screen.findByRole("button", { name: "تصفية" }));
+
+    const drawer = await screen.findByRole("dialog", { name: "تصفية المنتجات" });
+    const groups = within(drawer).getAllByRole("group");
+    expect(groups.map((group) => group.querySelector("legend")?.textContent)).toEqual(["السنة الدراسية", "المادة"]);
+    expect(within(groups[0] as HTMLElement).getByRole("radio", { name: /أولى إعدادي\s*16/ })).toBeInTheDocument();
+  });
+
+  it("BR-P08 choosing an option writes f[key] into the URL", async () => {
+    stubCatalog();
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية" }));
+
+    await user.click(await screen.findByRole("radio", { name: /أولى إعدادي/ }));
+
+    expect(router.replace).toHaveBeenCalledWith("/c/prep?f%5Bgrade%5D=7", { scroll: false });
+  });
+
+  it("BR-P08 a second facet is added to the first (AND)", async () => {
+    searchParams.value = new URLSearchParams("f[grade]=7");
+    stubCatalog();
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية (1)" }));
+
+    await user.click(await screen.findByRole("radio", { name: /علوم/ }));
+
+    expect(router.replace).toHaveBeenCalledWith("/c/prep?f%5Bgrade%5D=7&f%5Bsubject%5D=15", { scroll: false });
+  });
+
+  it("starts with the URL's selection checked, and clearing removes every facet", async () => {
+    searchParams.value = new URLSearchParams("f[grade]=8&q=علوم");
+    stubCatalog();
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية (1)" }));
+
+    expect(await screen.findByRole("radio", { name: /ثانية إعدادي/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "مسح الكل" }));
+
+    expect(router.replace).toHaveBeenCalledWith("/c/prep?q=%D8%B9%D9%84%D9%88%D9%85", { scroll: false });
+  });
+
+  it("keeps keyboard focus inside the open drawer and closes on Escape", async () => {
+    stubCatalog();
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية" }));
+    const drawer = await screen.findByRole("dialog");
+
+    for (let step = 0; step < 8; step++) {
+      await user.tab();
+      expect(drawer).toContainElement(document.activeElement as HTMLElement);
+    }
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("changing the sort keeps the facets", async () => {
+    searchParams.value = new URLSearchParams("f[grade]=7");
+    stubCatalog();
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+
+    await user.selectOptions(await screen.findByRole("combobox", { name: "الترتيب" }), "-price");
+
+    expect(router.replace).toHaveBeenCalledWith("/c/prep?sort=-price&f%5Bgrade%5D=7", { scroll: false });
+  });
+
+  it("links to the price list of the same selection (BR-P13)", async () => {
+    searchParams.value = new URLSearchParams("f[grade]=7");
+    stubCatalog();
+    renderWithQuery(<ProductListing category="prep" />);
+
+    expect(await screen.findByRole("link", { name: "قائمة الأسعار" })).toHaveAttribute(
+      "href",
+      "/price-list?f%5Bgrade%5D=7&category=prep",
+    );
+  });
+
+  it("says when nothing matches", async () => {
+    stubCatalog([]);
+    renderWithQuery(<ProductListing category="prep" />);
+
+    expect(await screen.findByText("لا توجد منتجات مطابقة")).toBeInTheDocument();
+  });
+
+  it("shows not found for an unknown category", async () => {
+    stubCatalog();
+    renderWithQuery(<ProductListing category="nope" />);
+
+    expect(await screen.findByRole("heading", { name: "القسم غير موجود" })).toBeInTheDocument();
+  });
+
+  it("search results show the term and do not query without one", async () => {
+    pathname.value = "/search";
+    const fetchMock = stubCatalog();
+    renderWithQuery(<ProductListing search />);
+
+    expect(await screen.findByRole("heading", { name: "اكتب كلمة للبحث" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "تصفية" })).not.toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET /api/store/products")).toHaveLength(0);
+  });
+
+  it("search results reuse the listing with q", async () => {
+    pathname.value = "/search";
+    searchParams.value = new URLSearchParams("q=علوم");
+    const fetchMock = stubCatalog();
+    renderWithQuery(<ProductListing search />);
+
+    expect(await screen.findByRole("heading", { name: "نتائج البحث عن «علوم»" })).toBeInTheDocument();
+    await screen.findByRole("link", { name: "الأضواء علوم أولى إعدادي" });
+    expect(callsTo(fetchMock, "GET /api/store/products")[0]?.url.searchParams.get("q")).toBe("علوم");
+  });
+});

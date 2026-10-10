@@ -1,12 +1,16 @@
 "use client";
 
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
-import { ApiError, StoreUnavailableError } from "@/lib/api/errors";
+import { ApiError, isApiError, StoreUnavailableError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/keys";
+import { ar } from "@/lib/copy/ar";
+
+const NETWORK_TOAST = "network";
 
 /** Retries only what may succeed on a second try: network errors and 5xx, at most twice. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
@@ -25,6 +29,18 @@ export function makeQueryClient(): QueryClient {
         if (error instanceof StoreUnavailableError) {
           void queryClient.invalidateQueries({ queryKey: queryKeys.tenant });
         }
+
+        // A read that failed for lack of connection (after its retries): one toast, whose action reloads
+        // every query that is in error. Forms show their own errors, so mutations are left alone.
+        if (isApiError(error, "network_error")) {
+          toast.error(ar.errors.network_error, {
+            id: NETWORK_TOAST,
+            action: {
+              label: ar.retry,
+              onClick: () => void queryClient.refetchQueries({ predicate: (query) => query.state.status === "error" }),
+            },
+          });
+        }
       },
     }),
     defaultOptions: {
@@ -35,8 +51,25 @@ export function makeQueryClient(): QueryClient {
   return queryClient;
 }
 
+/** Tells the shopper when the phone loses or regains its connection. */
+export function useConnectionToasts(): void {
+  useEffect(() => {
+    const offline = () => toast.warning(ar.offline, { id: NETWORK_TOAST });
+    const online = () => toast.success(ar.online, { id: NETWORK_TOAST });
+
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", online);
+
+    return () => {
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", online);
+    };
+  }, []);
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
+  useConnectionToasts();
 
   return (
     <QueryClientProvider client={queryClient}>

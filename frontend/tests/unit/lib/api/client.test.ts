@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { apiFetch, refreshCsrfCookie, setUnauthenticatedHandler, surfaceOf } from "@/lib/api/client";
+import {
+  apiFetch,
+  apiFetchPage,
+  refreshCsrfCookie,
+  setUnauthenticatedHandler,
+  surfaceOf,
+  withQuery,
+} from "@/lib/api/client";
 import { ApiError, StoreUnavailableError } from "@/lib/api/errors";
 
 import { csrfCookie, envelopeError, json, requestOf, stubFetch } from "../../http";
@@ -196,5 +203,65 @@ describe("surfaceOf", () => {
     ["/sanctum/csrf-cookie", "store"],
   ])("maps %s to %s", (path, surface) => {
     expect(surfaceOf(path)).toBe(surface);
+  });
+});
+
+describe("apiFetch headers", () => {
+  it("D55 sends extra headers such as Idempotency-Key", async () => {
+    const fetchMock = stubFetch(csrfCookie(), json(201, { data: { order: 1 } }));
+
+    await apiFetch("/api/store/checkout", { method: "POST", body: {}, headers: { "Idempotency-Key": "checkout-1" } });
+
+    expect(requestOf(fetchMock, 1).headers["Idempotency-Key"]).toBe("checkout-1");
+  });
+
+  it("never lets an extra header replace Accept", async () => {
+    const fetchMock = stubFetch(json(200, { data: 1 }));
+
+    await apiFetch("/api/store/x", { headers: { Accept: "text/html" } });
+
+    expect(requestOf(fetchMock, 0).headers.Accept).toBe("application/json");
+  });
+});
+
+describe("apiFetchPage", () => {
+  it("keeps meta next to the rows of a Laravel page", async () => {
+    stubFetch(json(200, { data: [{ id: 1 }], links: {}, meta: { current_page: 1, last_page: 3 } }));
+
+    await expect(apiFetchPage("/api/store/products")).resolves.toEqual({
+      data: [{ id: 1 }],
+      meta: { current_page: 1, last_page: 3 },
+    });
+  });
+
+  it("treats a body without data and meta as server_error", async () => {
+    stubFetch(json(200, { data: { id: 1 } }));
+
+    await expect(apiFetchPage("/api/store/products")).rejects.toMatchObject({ code: "server_error" });
+  });
+
+  it("throws the envelope error like apiFetch", async () => {
+    stubFetch(envelopeError(422, "validation_failed", "راجع البيانات"));
+
+    await expect(apiFetchPage("/api/store/products?sort=x")).rejects.toMatchObject({
+      status: 422,
+      code: "validation_failed",
+    });
+  });
+});
+
+describe("withQuery", () => {
+  it("BR-P08 writes facets as f[key]=value", () => {
+    expect(withQuery("/api/store/products", { category: "prep", f: { grade: ["7"], subject: ["15"] }, page: 2 })).toBe(
+      "/api/store/products?category=prep&f%5Bgrade%5D=7&f%5Bsubject%5D=15&page=2",
+    );
+  });
+
+  it("skips empty values", () => {
+    expect(withQuery("/api/store/orders", { status: undefined, q: "", x: null })).toBe("/api/store/orders");
+  });
+
+  it("repeats a key for an array", () => {
+    expect(withQuery("/x", { id: ["1", "2"] })).toBe("/x?id=1&id=2");
   });
 });

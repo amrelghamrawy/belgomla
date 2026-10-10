@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDate, formatDateTime } from "@/lib/format/date";
-import { formatMoney } from "@/lib/format/money";
+import { formatMoney, formatPercent } from "@/lib/format/money";
+import { phoneField } from "@/lib/forms/phone";
+import { formatPhone, whatsappLink } from "@/lib/format/phone";
 
 describe("formatMoney", () => {
   it.each([
@@ -36,5 +38,42 @@ describe("formatDate", () => {
 describe("formatDateTime", () => {
   it("shows the Cairo time with Arabic day period", () => {
     expect(formatDateTime("2026-01-15T10:05:00Z")).toBe("15 يناير 2026 في 12:05 م");
+  });
+});
+
+describe("formatPercent", () => {
+  it.each([
+    ["25.00", "25"],
+    ["12.50", "12.5"],
+    ["7.25", "7.25"],
+    ["10", "10"],
+  ])("shows %s as %s", (percent, expected) => {
+    expect(formatPercent(percent)).toBe(expected);
+  });
+});
+
+describe("formatPhone", () => {
+  it("shows an E.164 Egyptian number the local way", () => {
+    expect(formatPhone("+201012345678")).toBe("01012345678");
+  });
+
+  it("leaves any other number as it is", () => {
+    expect(formatPhone("+966501234567")).toBe("+966501234567");
+  });
+});
+
+describe("whatsappLink", () => {
+  it("links to a chat with the digits only", () => {
+    expect(whatsappLink("+20 100 123 4567")).toBe("https://wa.me/201001234567");
+  });
+});
+
+describe("phoneField", () => {
+  it.each(["01012345678", "+201012345678", "010 1234 5678", "0101-234-5678"])("accepts %s", (phone) => {
+    expect(phoneField().safeParse(phone).success).toBe(true);
+  });
+
+  it.each(["", "0101234567", "01312345678"])("rejects %j", (phone) => {
+    expect(phoneField().safeParse(phone).success).toBe(false);
   });
 });

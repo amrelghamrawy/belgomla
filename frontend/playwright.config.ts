@@ -9,6 +9,8 @@ const launchOptions = { args: ["--host-resolver-rules=MAP *.gomal.test 127.0.0.1
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  // php artisan serve answers one request at a time: parallel workers starve each other.
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

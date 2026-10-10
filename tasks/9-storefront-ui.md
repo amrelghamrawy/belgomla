@@ -1,6 +1,6 @@
 # Task 9 — Storefront UI
 
-Status: **not started**. Requires Tasks 1–8. Read `CLAUDE.md`, `rules/*.md` (incl. `03-frontend.md`), then this file.
+Status: **done**, with one open item: Lighthouse mobile performance measures 78–81, not ≥ 90 (see the delivery notes at the end).
 
 ## Goal
 
@@ -45,4 +45,39 @@ Flows above pass on a phone-sized viewport against the real backend; `npm run ty
 
 ## Open questions
 
-- D41: Home page content for merchants without categories yet (show "قريبًا"?). Default: empty-state with WhatsApp contact button.
+- D41: Home page content for merchants without categories yet. Resolved with its default (06-open-decisions): an empty state with the WhatsApp (or phone) contact button.
+
+## Delivery notes (commits d7f1718 backend, FRONTEND_COMMIT frontend)
+
+**Results:**
+- Backend `composer test` is green: 2694 tests (2651 passed + 43 arch tests flagged deprecated by PHP 8.5), +26 over Task 8.
+- Frontend `typecheck`, `lint` and `build` are green.
+- 303 Vitest tests pass (+194).
+- 16 Playwright tests pass (8 per project: mobile 390×844 and desktop 1280×800), run on 2026-10-10 against `php artisan serve` + `next dev` with the database freshly seeded:
+  - register → OTP (`/api/_test/last-otp`) → category → grade facet (URL) → product (related editions) → quantity 6 → cart (MOV bar) → new address → checkout → success → order page → cancel with reason → orders list;
+  - a guest sees prices and is sent to log in from add-to-cart;
+  - the price list in print media (snapshot, header/footer/buttons hidden) and the share button;
+  - Task 8's four smoke flows.
+- Curl smoke through `alnoor.gomal.test:8000`: facets with counts, `f[grade]` filtering (16 products), price list meta, register → `/api/_test/last-otp` code.
+- Every screen was checked at 360px (screenshots) and on the desktop project. Lighthouse accessibility is 98–100.
+- Rule ids covered by tests: BR-P04, BR-P08, BR-P10, BR-P13, BR-PR04, BR-PR06, BR-PR10, BR-MOQ01, BR-MOV01/02, BR-CU03–CU08, BR-O02, D1, D2, D6, D18, D21, D37, D41, D50–D53, D55, D57, D61–D63.
+
+**Open item: Lighthouse mobile performance on `/c/[slug]` (24 products) is 78–81, below the 90 target.**
+- Measured with `next start` + `php artisan serve`, Lighthouse 12 (simulated throttling): FCP 0.9 s, LCP 4.3–4.8 s, TBT 160–290 ms, CLS 0. Observed (unthrottled) LCP is 0.5–0.8 s. With devtools throttling: about 70.
+- Already done: the first page and the category tree are rendered on the server (`lib/server/store-data.ts` → `HydrationBoundary`, no refetch on hydration). Zod and the OTP input were moved off the page's bundle, and the header's account/cart links do not prefetch. Together these took the score from 69 to about 80 and TBT from 440 ms to about 200 ms.
+- What remains: the listing streams in a Suspense boundary (request-time data under `cacheComponents`). It is revealed after the framework scripts load, so Lighthouse's model charges all of React's hydration (react-dom alone is 74 KB gzip) to LCP.
+- Next step, if the target stands: render the grid as Server Components with only the facet drawer, sort and "load more" as client islands, and re-measure on the production stack (Nginx + PHP-FPM, where the API answers much faster than `artisan serve`).
+
+What differs from the plan above, and why:
+- **Backend additions:** the plan said "against the real backend". To make that possible:
+  - all 25 missing storefront operations were added to the OpenAPI spec, each response checked against its schema (`OpenApiStorefrontTest`);
+  - cart lines carry `product_slug` (checkout errors link back to the product) and `conversion_factor` (`available` is in base units);
+  - a demo catalog seeder (34 books, MOV 500);
+  - public image URLs are relative (D61);
+  - invitation links point to `/account/invite/{token}`.
+- **`/api/_test/last-otp`:** registered in the `local` and `testing` environments, not `testing` only (D62). Playwright reuses the dev backend, which runs as `local`.
+- **Facets:** a facet takes one value (`f[key]=id`, the backend's rule), so each group is a radio group with "الكل", and groups combine with AND.
+- **Profile:** `/account` is read-only (D63): the API has no profile update.
+- **Password reset:** the verified code travels from `/account/verify` to `/account/reset` in memory only. A reload starts again at `/account/forgot`.
+- **http:** dev and LAN stores are not a secure context. The checkout key uses `crypto.getRandomValues` and the share button falls back to a selection copy (rules/03 §4).
+- **Open decisions:** D41 (home without categories → WhatsApp/phone contact) and D61–D63 were added with their defaults.

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { apiFetch, loginPaths, type Surface } from "@/lib/api/client";
 import { isApiError } from "@/lib/api/errors";
@@ -34,6 +36,24 @@ export function useCustomerSession() {
     queryKey: queryKeys.customerSession,
     queryFn: () => meOrNull<Customer>("/api/store/me"),
   });
+}
+
+/**
+ * For pages that need a logged-in customer (cart, checkout, account): sends a guest to the login page with
+ * `?next=` back here. `data` is the customer once known; render nothing while it is undefined or null.
+ */
+export function useRequiredCustomer() {
+  const router = useRouter();
+  const session = useCustomerSession();
+
+  useEffect(() => {
+    if (session.data === null) {
+      const next = window.location.pathname + window.location.search;
+      router.replace(`${loginPaths.store}?next=${encodeURIComponent(next)}`);
+    }
+  }, [router, session.data]);
+
+  return session;
 }
 
 export function useDashboardLogin() {

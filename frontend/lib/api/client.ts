@@ -1,6 +1,7 @@
 import { ar } from "@/lib/copy/ar";
 
 import { ApiError, StoreUnavailableError, type ApiErrorCode, type ErrorDetails } from "./errors";
+import type { PaginationMeta } from "./types";
 
 /** Which UI a call belongs to; decides where a 401 sends the user. */
 export type Surface = "store" | "dashboard";
@@ -11,7 +12,51 @@ export type ApiOptions = {
   /** Defaults to true. Session probes (`me`) and the auth endpoints pass false and handle 401 themselves. */
   redirectOn401?: boolean;
   signal?: AbortSignal;
+  /** Extra request headers, e.g. `Idempotency-Key` on checkout (D55). */
+  headers?: Record<string, string>;
 };
+
+/** A Laravel page (08 §0): the rows plus `meta`; `links` are not needed by the UI. */
+export type Page<T, M = PaginationMeta> = { data: T[]; meta: M };
+
+type QueryValue = string | number | boolean | null | undefined | readonly string[];
+
+/**
+ * Builds `path?query`, skipping empty values. A record value becomes bracketed keys, e.g.
+ * `{ f: { grade: ["7"] } }` → `f[grade]=7` (the facet format, BR-P08); arrays repeat the key.
+ */
+export function withQuery(
+  path: string,
+  params: Record<string, QueryValue | Record<string, readonly string[]>>,
+): string {
+  const query = new URLSearchParams();
+  const append = (key: string, value: QueryValue) => {
+    if (value === null || value === undefined || value === "") {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => query.append(key, item));
+      return;
+    }
+
+    query.append(key, String(value));
+  };
+
+  for (const [key, value] of Object.entries(params)) {
+    if (isRecord(value)) {
+      for (const [nested, nestedValue] of Object.entries(value)) {
+        append(`${key}[${nested}]`, nestedValue);
+      }
+    } else {
+      append(key, value);
+    }
+  }
+
+  const search = query.toString();
+
+  return search === "" ? path : `${path}?${search}`;
+}
 
 type UnauthenticatedHandler = (surface: Surface) => void;
 
@@ -73,6 +118,7 @@ export async function refreshCsrfCookie(): Promise<void> {
 
 function request(path: string, options: ApiOptions): Promise<Response> {
   const headers: Record<string, string> = {
+    ...options.headers,
     Accept: "application/json",
     "X-Requested-With": "XMLHttpRequest",
   };
@@ -128,6 +174,24 @@ async function toApiError(response: Response): Promise<ApiError> {
  * Resolves to the envelope's `data` (undefined for 204) or throws an ApiError.
  */
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const body = await call(path, options);
+
+  return (isRecord(body) && "data" in body ? body.data : body) as T;
+}
+
+/** Like apiFetch for a list with `meta` (a Laravel page, or the price list): keeps `meta` next to the rows. */
+export async function apiFetchPage<T, M = PaginationMeta>(path: string, options: ApiOptions = {}): Promise<Page<T, M>> {
+  const body = await call(path, options);
+
+  if (!isRecord(body) || !Array.isArray(body.data) || !isRecord(body.meta)) {
+    throw new ApiError(0, "server_error", ar.errors.server_error);
+  }
+
+  return { data: body.data as T[], meta: body.meta as M };
+}
+
+/** Sends the request with CSRF bootstrap, the single 419 retry and the 401 hook; returns the parsed body. */
+async function call(path: string, options: ApiOptions): Promise<unknown> {
   const mutating = (options.method ?? "GET") !== "GET";
 
   if (mutating && readCsrfToken() === null) {
@@ -143,7 +207,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   }
 
   if (response.status === 204) {
-    return undefined as T;
+    return undefined;
   }
 
   if (!response.ok) {
@@ -156,7 +220,5 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     throw error;
   }
 
-  const body = await readJson(response);
-
-  return (isRecord(body) && "data" in body ? body.data : body) as T;
+  return readJson(response);
 }
