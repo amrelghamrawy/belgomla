@@ -20,6 +20,9 @@ export const queryKeys = {
   order: (number: number) => ["store", "orders", "detail", number] as const,
 
   // Dashboard (tasks/10)
+  dashboardSettings: ["dashboard", "settings"] as const,
+  dashboardUsers: ["dashboard", "users"] as const,
+  dashboardAudit: (params: ListParams) => ["dashboard", "audit", params] as const,
   dashboardNotifications: ["dashboard", "notifications"] as const,
   dashboardOverview: ["dashboard", "reports", "overview"] as const,
   dashboardSales: (params: ListParams) => ["dashboard", "reports", "sales", params] as const,
