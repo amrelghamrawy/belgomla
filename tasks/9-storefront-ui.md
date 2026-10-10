@@ -47,7 +47,7 @@ Flows above pass on a phone-sized viewport against the real backend; `npm run ty
 
 - D41: Home page content for merchants without categories yet. Resolved with its default (06-open-decisions): an empty state with the WhatsApp (or phone) contact button.
 
-## Delivery notes (commits d7f1718 backend, FRONTEND_COMMIT frontend)
+## Delivery notes (commits d7f1718 backend, 009b240 frontend)
 
 **Results:**
 - Backend `composer test` is green: 2694 tests (2651 passed + 43 arch tests flagged deprecated by PHP 8.5), +26 over Task 8.
