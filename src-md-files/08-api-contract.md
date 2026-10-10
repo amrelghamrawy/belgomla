@@ -201,7 +201,8 @@ Delivered in Task 5:
 - OTP errors: `422 otp_invalid` (`details.attempts_left` on a wrong code), `422 otp_expired`, `422 otp_attempts_exceeded`; `429 rate_limited` with `details.retry_after` for the 6th code within an hour or `channel=sms` within 60 s.
 - `verify-otp` with `purpose=register` answers the customer (session started, status `active` or `pending_approval`); with `purpose=password_reset` it only checks the code (attempt counted, code kept) and answers `204`. `reset-password` uses the code up and answers `204`.
 - `login` errors: `422 invalid_credentials`; after the password matched, `403 pending_approval | blocked | phone_not_verified`; `429 rate_limited` after 5 failures per phone+IP per minute; `400 stateful_request_required` without a SPA origin (also on `verify-otp` and `invitation/{token}` POST).
-- `invitation/{token}`: unknown, used, expired, superseded (re-sent) or no-longer-invited → `404 not_found`. `phone_masked` looks like `+20101****678`.
+- `invitation/{token}`: unknown, used, expired, superseded (re-sent) or no-longer-invited → `404 not_found`. `phone_masked` looks like `+20101****678`. The message links to the storefront page `https://{host}/account/invite/{token}` (`CUSTOMER_INVITATION_URL`).
+- Test helper (D62): `GET /api/_test/last-otp?phone=` → `{ data: { code } }` (the newest OTP sent to that phone on this tenant) or `404`. Registered only when the app environment is `local` or `testing`; Playwright uses it to finish the register flow.
 - `me`, `logout`: any logged-in customer, whatever the status. Profile: `{ id, name, phone, status, status_label, phone_verified_at, created_at }`.
 
 ---
@@ -238,7 +239,9 @@ Cart response:
       {
         "sku_id": 501,
         "product_name": "...",
+        "product_slug": "...",
         "unit": "كرتونة",
+        "conversion_factor": 20,
         "quantity": 12,
         "unit_price": "85.00",
         "tier_min_quantity": 10,
@@ -254,7 +257,7 @@ Cart response:
 }
 ```
 
-Delivered in Task 5: every cart write answers this same body. `quantity`, `moq` are in selling units, `available` in base units (D37). A line that cannot be ordered is `422 cart_line_invalid` with `items: [{ sku_id, reason: below_moq|insufficient_stock|product_inactive, moq?|available? }]` (`available` here in selling units). Unknown or another tenant's SKU, or a SKU not in the cart for PATCH/DELETE → `404`. `mov.enabled` is false when the setting is on without an amount. Guest `POST /cart/items`: `403 prices_hidden` when `require_login_for_prices` is on, else `401` (D53).
+Delivered in Task 5: every cart write answers this same body. `quantity`, `moq` are in selling units, `available` in base units (D37). A line that cannot be ordered is `422 cart_line_invalid` with `items: [{ sku_id, reason: below_moq|insufficient_stock|product_inactive, moq?|available? }]` (`available` here in selling units). Unknown or another tenant's SKU, or a SKU not in the cart for PATCH/DELETE → `404`. `mov.enabled` is false when the setting is on without an amount. Guest `POST /cart/items`: `403 prices_hidden` when `require_login_for_prices` is on, else `401` (D53). Task 9 added `product_slug` (link back to the product page) and `conversion_factor` (so the storefront can cap the quantity at `available / conversion_factor`) to each line.
 
 ### Checkout (BR-PR06, section 12 of the domain model)
 

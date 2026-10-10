@@ -56,7 +56,7 @@ test('BR-CU08 merchant creates → invites → customer opens the link → sets 
     $this->tenantJson('POST', "/api/dashboard/customers/{$id}/invite")->assertOk();
     $token = lastInvitationToken();
 
-    expect(lastMessageText())->toContain("https://alnoor.gomal.test/invite/{$token}");
+    expect(lastMessageText())->toContain("https://alnoor.gomal.test/account/invite/{$token}");
     $this->tenantJson('GET', "/api/store/auth/invitation/{$token}")->assertOk()->assertJsonPath('data.name', 'مكتبة الأمل');
     $this->tenantJson('POST', "/api/store/auth/invitation/{$token}", ['password' => 'secret123'])->assertOk()->assertJsonPath('data.status', 'active');
     $this->tenantJson('POST', '/api/store/auth/logout')->assertNoContent();

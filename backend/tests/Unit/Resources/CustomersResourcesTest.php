@@ -75,7 +75,7 @@ test('BR-CU03 the address resource key set', function (): void {
 
 test('BR-CU06 the cart resource matches the contract, money as strings', function (): void {
     $cart = new PricedCart(
-        lines: [new PricedCartLine(501, 'علوم', 'كرتونة', 12, new ResolvedPrice('85.00', 10, null, null, '1020.00'), 5, 140)],
+        lines: [new PricedCartLine(501, 'علوم', 'olom', 'كرتونة', 20, 12, new ResolvedPrice('85.00', 10, null, null, '1020.00'), 5, 140)],
         removed: [['product_name' => 'قديم', 'reason' => 'inactive']],
         itemsTotal: '1020.00',
         movEnabled: true,
@@ -85,7 +85,7 @@ test('BR-CU06 the cart resource matches the contract, money as strings', functio
 
     expect(rendered(new CartResource($cart), storeRequest('/api/store/cart')))->toBe([
         'items' => [[
-            'sku_id' => 501, 'product_name' => 'علوم', 'unit' => 'كرتونة', 'quantity' => 12, 'unit_price' => '85.00',
+            'sku_id' => 501, 'product_name' => 'علوم', 'product_slug' => 'olom', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 12, 'unit_price' => '85.00',
             'tier_min_quantity' => 10, 'line_total' => '1020.00', 'moq' => 5, 'available' => 140,
         ]],
         'removed_items' => [['product_name' => 'قديم', 'reason' => 'inactive']],

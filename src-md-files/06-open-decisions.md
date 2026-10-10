@@ -47,6 +47,10 @@ Each item below has a **default** already written into the other documents so wo
 | D38 | Component library                                          | shadcn/ui (Radix, `radix-nova` style) with its RTL mode (`rtl: true`), which uses logical classes. Accepted in Task 8. | rules/03 §1 |
 | D39 | Digits in prices and numbers                               | Western digits: `150.00 ج.م`, `1,250.50 ج.م`. Dates use Arabic month names with Western digits (`2 يوليو 2026`). Accepted in Task 8. | rules/03 §3, 01 §6 |
 | D40 | UI font                                                    | IBM Plex Sans Arabic (400/500/700, Arabic + Latin subsets) via `next/font`. Accepted in Task 8. | rules/03 §1 |
+| D41 | Store home when the merchant has no categories yet         | An empty state ("قريبًا") with the store's WhatsApp contact button (and phone when there is no WhatsApp) instead of the category grid. | tasks/9, 01 §7 |
+| D61 | Public image URLs                                          | The `public` disk returns relative URLs (`/storage/...`, `PUBLIC_DISK_URL`), so logos and product images load from the tenant host the shopper is on. Nginx serves `/storage` (tasks/11); in dev, Next proxies it like `/api`. | Tech §8, rules/03 §4 |
+| D62 | Reading an OTP in end-to-end tests                         | `GET /api/_test/last-otp?phone=` returns the newest OTP sent to that phone on the tenant. The route is registered only in the `local` and `testing` environments, never in production. | tasks/9, 08 §2 |
+| D63 | Customer profile editing                                   | Not in V1: the API has no profile-update endpoint, so `/account` shows name, phone and status read-only. The merchant edits customer details from the dashboard. | BR-CU04, 08 §2 |
 
 These are treated as accepted defaults unless the product owner objects.
 

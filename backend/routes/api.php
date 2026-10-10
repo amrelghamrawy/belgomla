@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 |   routes/api/store/<module>.php      -> /api/store/...      (public + customer guard)
 |   routes/api/dashboard/<module>.php  -> /api/dashboard/...  (tenant_user guard)
 |   routes/api/webhooks.php            -> /api/webhooks/...   (platform host hooks.{base_domain}, provider secrets)
+|   routes/api/testing.php             -> /api/_test/...      (local + testing environments only, D62)
 |
 */
 
@@ -38,3 +39,9 @@ Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.ac
     require __DIR__.'/api/dashboard/reports.php';
     require __DIR__.'/api/dashboard/audit.php';
 });
+
+if (app()->environment('local', 'testing')) {
+    Route::prefix('_test')->name('testing.')->middleware(['tenant'])->group(function (): void {
+        require __DIR__.'/api/testing.php';
+    });
+}

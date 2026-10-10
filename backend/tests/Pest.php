@@ -236,6 +236,45 @@ function openApiSchema(string $name): array
 }
 
 /**
+ * The keys a schema promises (`required`) and allows (`properties`), merged through `allOf`.
+ *
+ * @return array{required: list<string>, properties: list<string>}
+ */
+function openApiKeys(string $name): array
+{
+    $schema = openApiSchema($name);
+    /** @var list<array<string, mixed>> $parts */
+    $parts = $schema['allOf'] ?? [$schema];
+    $required = [];
+    $properties = [];
+
+    foreach ($parts as $part) {
+        $part = isset($part['$ref']) && is_string($part['$ref']) ? openApiSchema(basename($part['$ref'])) : $part;
+        /** @var list<string> $partRequired */
+        $partRequired = $part['required'] ?? [];
+        /** @var array<string, mixed> $partProperties */
+        $partProperties = $part['properties'] ?? [];
+        $required = [...$required, ...$partRequired];
+        $properties = [...$properties, ...array_keys($partProperties)];
+    }
+
+    return ['required' => $required, 'properties' => $properties];
+}
+
+/**
+ * Asserts a response object has every required key of the schema and no key the schema does not document.
+ *
+ * @param  array<string, mixed>  $data
+ */
+function expectDocumentedShape(array $data, string $schema): void
+{
+    $keys = openApiKeys($schema);
+
+    expect(array_values(array_diff($keys['required'], array_keys($data))))->toBe([], "{$schema} misses required keys")
+        ->and(array_values(array_diff(array_keys($data), $keys['properties'])))->toBe([], "{$schema} has undocumented keys");
+}
+
+/**
  * Every error code the backend throws: `new self(403, 'code', ...)` in exceptions, ApiException helpers
  * (`forbidden('code', ...)`), `ApiResponse::error(401, 'code', ...)` in bootstrap/app.php, and the customer
  * statuses that CustomerNotActive uses as codes.

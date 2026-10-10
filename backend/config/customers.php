@@ -21,7 +21,7 @@ return [
     */
     'invitation' => [
         'ttl_days' => 7,
-        'url' => env('CUSTOMER_INVITATION_URL', 'https://{host}/invite/{token}'),
+        'url' => env('CUSTOMER_INVITATION_URL', 'https://{host}/account/invite/{token}'),
     ],
 
     /*

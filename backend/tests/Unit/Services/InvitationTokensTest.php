@@ -18,7 +18,7 @@ test('BR-CU08 only the sha256 of a token is stored', function (): void {
 test('BR-CU08 the link points at the current tenant storefront', function (): void {
     $link = $this->inTenant(fn () => app(InvitationTokens::class)->link('tok123'));
 
-    expect($link)->toBe('https://alnoor.gomal.test/invite/tok123');
+    expect($link)->toBe('https://alnoor.gomal.test/account/invite/tok123');
 });
 
 test('the link format is configurable', function (): void {

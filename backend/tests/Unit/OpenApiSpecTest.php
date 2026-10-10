@@ -12,7 +12,7 @@ test('every path and method in the spec is a registered route', function (): voi
     $documented = collect($paths)
         ->flatMap(fn (array $operations, string $path): array => array_map(
             fn (string $method): string => mb_strtoupper($method).' '.mb_ltrim($path, '/'),
-            array_keys($operations),
+            array_intersect(array_keys($operations), ['get', 'post', 'put', 'patch', 'delete']),
         ))
         ->sort()
         ->values()

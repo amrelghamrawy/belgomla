@@ -13,21 +13,21 @@ use Illuminate\Database\Seeder;
 final class DatabaseSeeder extends Seeder
 {
     /**
-     * Local development seed: one school-books tenant.
+     * Local development seed: one school-books tenant with a demo catalog (StorefrontDemoSeeder).
      * Dashboard: owner@alnoor.test / password
      */
     public function run(CreateTenant $createTenant): void
     {
-        if (Tenant::query()->where('subdomain', 'alnoor')->exists()) {
-            return;
+        if (Tenant::query()->where('subdomain', 'alnoor')->doesntExist()) {
+            $createTenant->handle(new NewTenantData(
+                subdomain: 'alnoor',
+                name: 'مكتبة النور',
+                ownerEmail: 'owner@alnoor.test',
+                ownerPassword: 'password',
+                vertical: Vertical::SchoolBooks,
+            ));
         }
 
-        $createTenant->handle(new NewTenantData(
-            subdomain: 'alnoor',
-            name: 'مكتبة النور',
-            ownerEmail: 'owner@alnoor.test',
-            ownerPassword: 'password',
-            vertical: Vertical::SchoolBooks,
-        ));
+        $this->call(StorefrontDemoSeeder::class);
     }
 }

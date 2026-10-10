@@ -41,7 +41,9 @@ final readonly class CartPricer
             $lines[] = new PricedCartLine(
                 skuId: $sku->id,
                 productName: $sku->product->name,
+                productSlug: $sku->product->slug,
                 unit: $sku->sellingUnit->name,
+                conversionFactor: $sku->conversion_factor,
                 quantity: $item->quantity,
                 price: $price,
                 moq: $sku->moq,

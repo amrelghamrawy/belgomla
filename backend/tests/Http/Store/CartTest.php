@@ -56,7 +56,9 @@ test('BR-CU06 BR-PR04 adding a sku returns the cart with the price resolved for 
             'items' => [[
                 'sku_id' => $this->sku->id,
                 'product_name' => 'الأضواء علوم',
+                'product_slug' => $this->sku->product->slug,
                 'unit' => 'كرتونة',
+                'conversion_factor' => 20,
                 'quantity' => 6,
                 'unit_price' => '90.00',
                 'tier_min_quantity' => null,

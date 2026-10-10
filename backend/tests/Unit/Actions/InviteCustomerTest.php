@@ -29,7 +29,7 @@ test('BR-CU08 the first invitation stores the token hash for 7 days and sends th
     expect($invitation->only(['customer_id', 'token_hash', 'sent_count', 'used_at']))->toBe(['customer_id' => $this->customer->id, 'token_hash' => app(InvitationTokens::class)->hash($token), 'sent_count' => 1, 'used_at' => null])
         ->and($invitation->expires_at->toIso8601String())->toBe(now()->addDays(7)->toIso8601String())
         ->and(OutboundMessage::query()->sole()->purpose)->toBe(MessagePurpose::Invitation)
-        ->and(lastMessageText())->toBe("أهلًا مكتبة الأمل، دعاك مكتبة النور للطلب من متجره.\nاضغط الرابط لتحديد كلمة المرور وتفعيل حسابك (صالح 7 أيام):\nhttps://alnoor.gomal.test/invite/{$token}")
+        ->and(lastMessageText())->toBe("أهلًا مكتبة الأمل، دعاك مكتبة النور للطلب من متجره.\nاضغط الرابط لتحديد كلمة المرور وتفعيل حسابك (صالح 7 أيام):\nhttps://alnoor.gomal.test/account/invite/{$token}")
         ->and(AuditLog::query()->sole()->only(['action', 'new_values']))->toBe(['action' => 'customer.invited', 'new_values' => ['sent_count' => 1]]);
 });
 

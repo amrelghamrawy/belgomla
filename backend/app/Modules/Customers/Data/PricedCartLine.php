@@ -15,7 +15,9 @@ final readonly class PricedCartLine
     public function __construct(
         public int $skuId,
         public string $productName,
+        public string $productSlug,
         public string $unit,
+        public int $conversionFactor,
         public int $quantity,
         public ResolvedPrice $price,
         public int $moq,

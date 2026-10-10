@@ -25,7 +25,7 @@ test('BR-CU08 inviting sends a whatsapp message with a 7-day link, audited', fun
     $message = $this->inTenant(fn () => OutboundMessage::query()->sole());
     expect($message->purpose)->toBe(MessagePurpose::Invitation)
         ->and($message->to_phone)->toBe('+201012345678')
-        ->and(lastMessageText())->toContain('https://alnoor.gomal.test/invite/'.lastInvitationToken())
+        ->and(lastMessageText())->toContain('https://alnoor.gomal.test/account/invite/'.lastInvitationToken())
         ->and($this->inTenant(fn () => AuditLog::query()->sole()->only(['action', 'entity_id', 'actor_id', 'new_values'])))
         ->toBe(['action' => 'customer.invited', 'entity_id' => $this->customer->id, 'actor_id' => $this->me->id, 'new_values' => ['sent_count' => 1]]);
     Queue::assertPushed(SendMessage::class);

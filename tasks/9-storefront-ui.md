@@ -37,7 +37,7 @@ The customer-facing store on mobile first: home, category browsing, faceted prod
 ## Tests
 
 - Vitest + Testing Library: facet URL sync, quantity stepper MOQ/stock rules, MOV bar, checkout error mapping, OTP resend countdown (fake timers).
-- Playwright: register → OTP (read from the backend log driver through a tiny test-only endpoint `GET /api/_test/last-otp` enabled only when `APP_ENV=testing`) → browse → add to cart → checkout → see order; price list print view snapshot.
+- Playwright: register → OTP (read from the backend log driver through a tiny test-only endpoint `GET /api/_test/last-otp` registered only in the `local` and `testing` environments, D62) → browse → add to cart → checkout → see order; price list print view snapshot.
 
 ## Definition of done
 

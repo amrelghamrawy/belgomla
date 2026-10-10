@@ -18,7 +18,19 @@
             "name": "store-auth"
         },
         {
+            "name": "store-account"
+        },
+        {
+            "name": "store-cart"
+        },
+        {
+            "name": "store-orders"
+        },
+        {
             "name": "dashboard-auth"
+        },
+        {
+            "name": "testing"
         }
     ],
     "paths": {
@@ -166,6 +178,1179 @@
                 }
             }
         },
+        "/api/store/categories": {
+            "get": {
+                "operationId": "storeCategories",
+                "tags": [
+                    "store"
+                ],
+                "summary": "The active category tree (08 §1, D31)",
+                "responses": {
+                    "200": {
+                        "description": "Root categories with their children",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Category"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/store/filters": {
+            "get": {
+                "operationId": "storeFilters",
+                "tags": [
+                    "store"
+                ],
+                "summary": "Facets with counts for the current selection (BR-P08, D18 order)",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Category"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Facets"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Search"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Facets in the merchant's filter order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Facet"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/products": {
+            "get": {
+                "operationId": "storeProducts",
+                "tags": [
+                    "store"
+                ],
+                "summary": "Active and coming-soon products, faceted and searchable (BR-P08)",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Category"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Facets"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Search"
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "name",
+                                "-created_at",
+                                "price",
+                                "-price"
+                            ]
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of products",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StoreProduct"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/products/{slug}": {
+            "get": {
+                "operationId": "storeProduct",
+                "tags": [
+                    "store"
+                ],
+                "summary": "One product with its gallery and related editions (BR-P10)",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The product",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StoreProductDetail"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/price-list": {
+            "get": {
+                "operationId": "storePriceList",
+                "tags": [
+                    "store"
+                ],
+                "summary": "Printable price list for a facet selection (BR-P13)",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Category"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Facets"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Search"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rows sorted by name, capped",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PriceListRow"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PriceListMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/register": {
+            "post": {
+                "operationId": "storeRegister",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Self-registration; sends an OTP (BR-CU04, BR-CU07)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/OtpSent"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/verify-otp": {
+            "post": {
+                "operationId": "storeVerifyOtp",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Checks an OTP; for `register` it activates the customer and starts the session",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerifyOtpRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registered and logged in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "Password-reset code is valid (not consumed)"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/resend-otp": {
+            "post": {
+                "operationId": "storeResendOtp",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Sends a new OTP; `channel=sms` is the \"send by SMS\" link (BR-CU07)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResendOtpRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/OtpSent"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/forgot-password": {
+            "post": {
+                "operationId": "storeForgotPassword",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Sends a password-reset OTP; same answer for unknown phones (D52)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "phone"
+                                ],
+                                "properties": {
+                                    "phone": {
+                                        "type": "string",
+                                        "maxLength": 30
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/OtpSent"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/reset-password": {
+            "post": {
+                "operationId": "storeResetPassword",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Sets a new password with the reset OTP; the customer then logs in",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResetPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Password changed"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/invitation/{token}": {
+            "parameters": [
+                {
+                    "name": "token",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9]{40}$"
+                    }
+                }
+            ],
+            "get": {
+                "operationId": "storeInvitation",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "The invitation behind a link (BR-CU08)",
+                "responses": {
+                    "200": {
+                        "description": "Invitation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Invitation"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "storeAcceptInvitation",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Sets the password, verifies the phone and starts the session (BR-CU08)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "password"
+                                ],
+                                "properties": {
+                                    "password": {
+                                        "type": "string",
+                                        "minLength": 8,
+                                        "maxLength": 200
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Activated and logged in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/addresses": {
+            "get": {
+                "operationId": "storeAddresses",
+                "tags": [
+                    "store-account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The customer's addresses",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Address"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "storeCreateAddress",
+                "tags": [
+                    "store-account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddressRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Address"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/addresses/{address}": {
+            "parameters": [
+                {
+                    "name": "address",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    }
+                }
+            ],
+            "put": {
+                "operationId": "storeUpdateAddress",
+                "tags": [
+                    "store-account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddressRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Address"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "storeDeleteAddress",
+                "tags": [
+                    "store-account"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Archived"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/cart": {
+            "get": {
+                "operationId": "storeCart",
+                "tags": [
+                    "store-cart"
+                ],
+                "summary": "The cart priced now; inactive lines are removed and reported once (BR-P04, BR-PR04)",
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/Cart"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "storeClearCart",
+                "tags": [
+                    "store-cart"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Emptied"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/cart/items": {
+            "post": {
+                "operationId": "storeAddCartItem",
+                "tags": [
+                    "store-cart"
+                ],
+                "summary": "Adds a SKU (or adds to its quantity); guests get 403 prices_hidden or 401 (D53)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "sku_id",
+                                    "quantity"
+                                ],
+                                "properties": {
+                                    "sku_id": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                    },
+                                    "quantity": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 100000
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/Cart"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/cart/items/{sku}": {
+            "parameters": [
+                {
+                    "name": "sku",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    }
+                }
+            ],
+            "patch": {
+                "operationId": "storeUpdateCartItem",
+                "tags": [
+                    "store-cart"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "quantity"
+                                ],
+                                "properties": {
+                                    "quantity": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 100000
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/Cart"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "storeRemoveCartItem",
+                "tags": [
+                    "store-cart"
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/Cart"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/checkout": {
+            "post": {
+                "operationId": "storeCheckout",
+                "tags": [
+                    "store-orders"
+                ],
+                "summary": "Places the order from the cart (BR-PR06); retry-safe with Idempotency-Key (D55)",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_\\-:.]{1,255}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "address_id"
+                                ],
+                                "properties": {
+                                    "address_id": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                    },
+                                    "customer_note": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 1000
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Placed; the cart is emptied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "required": [
+                                                "order"
+                                            ],
+                                            "properties": {
+                                                "order": {
+                                                    "$ref": "#/components/schemas/OrderDetail"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "description": "checkout_failed with `items` (CheckoutProblem) and, for the minimum order value, `details.mov`; cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key.\n",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/orders": {
+            "get": {
+                "operationId": "storeOrders",
+                "tags": [
+                    "store-orders"
+                ],
+                "summary": "The customer's orders, newest first (D6)",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/OrderStatus"
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of orders (without items and history)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Order"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/orders/{order}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/OrderNumber"
+                }
+            ],
+            "get": {
+                "operationId": "storeOrder",
+                "tags": [
+                    "store-orders"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The order with items and status history",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/OrderDetail"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/orders/{order}/cancel": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/OrderNumber"
+                }
+            ],
+            "post": {
+                "operationId": "storeCancelOrder",
+                "tags": [
+                    "store-orders"
+                ],
+                "summary": "Cancels a pending order with a reason (BR-O02)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "reason"
+                                ],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 300
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The cancelled order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/OrderDetail"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/_test/last-otp": {
+            "get": {
+                "operationId": "testLastOtp",
+                "tags": [
+                    "testing"
+                ],
+                "summary": "The newest OTP sent to a phone on this tenant (D62; local and testing environments only)",
+                "parameters": [
+                    {
+                        "name": "phone",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "required": [
+                                                "code"
+                                            ],
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "pattern": "^\\d{6}$"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/dashboard/auth/login": {
             "post": {
                 "operationId": "dashboardLogin",
@@ -269,6 +1454,67 @@
         }
     },
     "components": {
+        "parameters": {
+            "Category": {
+                "name": "category",
+                "in": "query",
+                "description": "Category slug; its descendants are included. An unknown slug lists nothing.",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 120
+                }
+            },
+            "Facets": {
+                "name": "f",
+                "in": "query",
+                "description": "`f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08).",
+                "style": "deepObject",
+                "explode": true,
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 50
+                    }
+                }
+            },
+            "Search": {
+                "name": "q",
+                "in": "query",
+                "description": "Every word must match the folded name, a SKU code or a select option label (D32).",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 100
+                }
+            },
+            "Page": {
+                "name": "page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "PerPage": {
+                "name": "per_page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 24
+                }
+            },
+            "OrderNumber": {
+                "name": "order",
+                "in": "path",
+                "required": true,
+                "description": "The per-tenant order number (BR-O09)",
+                "schema": {
+                    "type": "integer"
+                }
+            }
+        },
         "responses": {
             "Error": {
                 "description": "Error envelope (08 §0)",
@@ -276,6 +1522,42 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "OtpSent": {
+                "description": "An OTP was sent",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/components/schemas/OtpSent"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Cart": {
+                "description": "The whole cart, priced now",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/components/schemas/Cart"
+                                }
+                            }
                         }
                     }
                 }
@@ -609,6 +1891,1182 @@
                         "format": "date-time"
                     }
                 }
+            },
+            "PaginationLinks": {
+                "type": "object",
+                "required": [
+                    "first",
+                    "last",
+                    "prev",
+                    "next"
+                ],
+                "properties": {
+                    "first": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "prev": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "next": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                }
+            },
+            "PaginationMeta": {
+                "type": "object",
+                "required": [
+                    "current_page",
+                    "from",
+                    "last_page",
+                    "links",
+                    "path",
+                    "per_page",
+                    "to",
+                    "total"
+                ],
+                "properties": {
+                    "current_page": {
+                        "type": "integer"
+                    },
+                    "from": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "last_page": {
+                        "type": "integer"
+                    },
+                    "links": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "per_page": {
+                        "type": "integer"
+                    },
+                    "to": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "Category": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "image_url",
+                    "children"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "image_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "children": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Category"
+                        }
+                    }
+                }
+            },
+            "FacetOption": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "label",
+                    "count"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Select option id, or \"true\"/\"false\" for a boolean field; sent back as `f[<key>]=<id>`.",
+                        "type": [
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "Facet": {
+                "type": "object",
+                "required": [
+                    "key",
+                    "label",
+                    "type",
+                    "options"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "select",
+                            "boolean"
+                        ]
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FacetOption"
+                        }
+                    }
+                }
+            },
+            "CustomFieldValue": {
+                "type": "object",
+                "required": [
+                    "key",
+                    "label",
+                    "value"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    }
+                }
+            },
+            "PriceTier": {
+                "type": "object",
+                "required": [
+                    "min_quantity",
+                    "unit_price"
+                ],
+                "properties": {
+                    "min_quantity": {
+                        "type": "integer"
+                    },
+                    "unit_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                }
+            },
+            "StoreSku": {
+                "description": "Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21).\n",
+                "type": "object",
+                "required": [
+                    "id",
+                    "code",
+                    "unit",
+                    "conversion_factor",
+                    "moq",
+                    "in_stock"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
+                    "moq": {
+                        "type": "integer"
+                    },
+                    "cover_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "base_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "discount_percent": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tiers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PriceTier"
+                        }
+                    },
+                    "available": {
+                        "type": "integer"
+                    },
+                    "in_stock": {
+                        "type": "boolean"
+                    },
+                    "coming_soon": {
+                        "type": "boolean",
+                        "const": true
+                    }
+                }
+            },
+            "StoreProduct": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "description",
+                    "status",
+                    "main_image_url",
+                    "category",
+                    "custom_fields",
+                    "sku"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "coming_soon"
+                        ]
+                    },
+                    "main_image_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "category": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "id",
+                                    "name"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "integer"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "custom_fields": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CustomFieldValue"
+                        }
+                    },
+                    "sku": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/StoreSku"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "prices_hidden": {
+                        "description": "Present (true) only when the tenant hides prices from guests (BR-CU04).",
+                        "type": "boolean",
+                        "const": true
+                    }
+                }
+            },
+            "ProductImage": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "url",
+                    "is_main",
+                    "sort_order"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "is_main": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "RelatedProduct": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "direction",
+                    "product"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "revision_of",
+                            "companion"
+                        ]
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": [
+                            "outgoing",
+                            "incoming"
+                        ]
+                    },
+                    "product": {
+                        "$ref": "#/components/schemas/StoreProduct"
+                    }
+                }
+            },
+            "StoreProductDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/StoreProduct"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "gallery",
+                            "related"
+                        ],
+                        "properties": {
+                            "gallery": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/ProductImage"
+                                }
+                            },
+                            "related": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/RelatedProduct"
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "PriceListRow": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "code",
+                    "unit",
+                    "moq",
+                    "availability"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "unit": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "moq": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "cover_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "base_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "availability": {
+                        "type": "string",
+                        "enum": [
+                            "available",
+                            "coming_soon"
+                        ]
+                    }
+                }
+            },
+            "PriceListMeta": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "truncated",
+                    "prices_hidden"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "truncated": {
+                        "type": "boolean"
+                    },
+                    "prices_hidden": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "OtpPurpose": {
+                "type": "string",
+                "enum": [
+                    "register",
+                    "password_reset"
+                ]
+            },
+            "OtpSent": {
+                "type": "object",
+                "required": [
+                    "otp_sent_via"
+                ],
+                "properties": {
+                    "otp_sent_via": {
+                        "type": "string",
+                        "enum": [
+                            "whatsapp",
+                            "sms"
+                        ]
+                    }
+                }
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "phone",
+                    "password"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 30
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 200
+                    }
+                }
+            },
+            "VerifyOtpRequest": {
+                "type": "object",
+                "required": [
+                    "phone",
+                    "code",
+                    "purpose"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 30
+                    },
+                    "code": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                    },
+                    "purpose": {
+                        "$ref": "#/components/schemas/OtpPurpose"
+                    }
+                }
+            },
+            "ResendOtpRequest": {
+                "type": "object",
+                "required": [
+                    "phone",
+                    "purpose"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 30
+                    },
+                    "purpose": {
+                        "$ref": "#/components/schemas/OtpPurpose"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "enum": [
+                            "whatsapp",
+                            "sms"
+                        ]
+                    }
+                }
+            },
+            "ResetPasswordRequest": {
+                "type": "object",
+                "required": [
+                    "phone",
+                    "code",
+                    "password"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 30
+                    },
+                    "code": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 200
+                    }
+                }
+            },
+            "Invitation": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "phone_masked",
+                    "expires_at"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "phone_masked": {
+                        "type": "string",
+                        "examples": [
+                            "+20101****678"
+                        ]
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "Address": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "label",
+                    "governorate",
+                    "city",
+                    "address_line",
+                    "landmark",
+                    "phone",
+                    "is_default"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "governorate": {
+                        "type": "string"
+                    },
+                    "city": {
+                        "type": "string"
+                    },
+                    "address_line": {
+                        "type": "string"
+                    },
+                    "landmark": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "E.164; the customer's phone when none was given"
+                    },
+                    "is_default": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "AddressRequest": {
+                "type": "object",
+                "required": [
+                    "label",
+                    "governorate",
+                    "city",
+                    "address_line"
+                ],
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "maxLength": 50
+                    },
+                    "governorate": {
+                        "type": "string",
+                        "maxLength": 50
+                    },
+                    "city": {
+                        "type": "string",
+                        "maxLength": 80
+                    },
+                    "address_line": {
+                        "type": "string",
+                        "maxLength": 300
+                    },
+                    "landmark": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 200
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 30
+                    },
+                    "is_default": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "CartItem": {
+                "type": "object",
+                "required": [
+                    "sku_id",
+                    "product_name",
+                    "product_slug",
+                    "unit",
+                    "conversion_factor",
+                    "quantity",
+                    "unit_price",
+                    "tier_min_quantity",
+                    "line_total",
+                    "moq",
+                    "available"
+                ],
+                "properties": {
+                    "sku_id": {
+                        "type": "integer"
+                    },
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "product_slug": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "Selling units"
+                    },
+                    "unit_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "tier_min_quantity": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "line_total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "moq": {
+                        "type": "integer"
+                    },
+                    "available": {
+                        "type": "integer",
+                        "description": "Base units (D37)"
+                    }
+                }
+            },
+            "RemovedCartItem": {
+                "type": "object",
+                "required": [
+                    "product_name",
+                    "reason"
+                ],
+                "properties": {
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "const": "inactive"
+                    }
+                }
+            },
+            "Cart": {
+                "type": "object",
+                "required": [
+                    "items",
+                    "removed_items",
+                    "items_total",
+                    "mov"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CartItem"
+                        }
+                    },
+                    "removed_items": {
+                        "description": "Lines removed because their product is no longer active, reported once (BR-P04).",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RemovedCartItem"
+                        }
+                    },
+                    "items_total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "mov": {
+                        "type": "object",
+                        "required": [
+                            "enabled",
+                            "amount",
+                            "satisfied"
+                        ],
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "amount": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/Money"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "satisfied": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "LineProblem": {
+                "description": "One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units.",
+                "type": "object",
+                "required": [
+                    "sku_id",
+                    "reason"
+                ],
+                "properties": {
+                    "sku_id": {
+                        "type": "integer"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "insufficient_stock",
+                            "below_moq",
+                            "product_inactive"
+                        ]
+                    },
+                    "requested": {
+                        "type": "integer"
+                    },
+                    "available": {
+                        "type": "integer"
+                    },
+                    "moq": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "OrderStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "confirmed",
+                    "preparing",
+                    "out_for_delivery",
+                    "delivered",
+                    "cancelled"
+                ]
+            },
+            "OrderItem": {
+                "type": "object",
+                "required": [
+                    "sku_id",
+                    "product_name",
+                    "sku_code",
+                    "sku_name",
+                    "unit",
+                    "conversion_factor",
+                    "quantity",
+                    "cover_price",
+                    "unit_price",
+                    "discount_percent",
+                    "tier_min_quantity",
+                    "line_total"
+                ],
+                "properties": {
+                    "sku_id": {
+                        "type": "integer"
+                    },
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "sku_name": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "cover_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "unit_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "discount_percent": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tier_min_quantity": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "line_total": {
+                        "$ref": "#/components/schemas/Money"
+                    }
+                }
+            },
+            "OrderHistoryEntry": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "at",
+                    "by"
+                ],
+                "properties": {
+                    "from": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/OrderStatus"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "to": {
+                        "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "by": {
+                        "type": "string",
+                        "enum": [
+                            "customer",
+                            "tenant_user",
+                            "system"
+                        ]
+                    }
+                }
+            },
+            "Order": {
+                "type": "object",
+                "required": [
+                    "number",
+                    "status",
+                    "status_label",
+                    "placed_at",
+                    "items_total",
+                    "order_total",
+                    "collection_status",
+                    "collected_amount",
+                    "delivery",
+                    "customer_note",
+                    "cancel_reason",
+                    "cancelled_by"
+                ],
+                "properties": {
+                    "number": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "status_label": {
+                        "type": "string"
+                    },
+                    "placed_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "items_total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "order_total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "collection_status": {
+                        "type": "string",
+                        "enum": [
+                            "unpaid",
+                            "partially_collected",
+                            "collected"
+                        ]
+                    },
+                    "collected_amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "delivery": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "phone",
+                            "address"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "phone": {
+                                "type": "string"
+                            },
+                            "address": {
+                                "type": "object",
+                                "required": [
+                                    "label",
+                                    "governorate",
+                                    "city",
+                                    "address_line",
+                                    "landmark"
+                                ],
+                                "properties": {
+                                    "label": {
+                                        "type": "string"
+                                    },
+                                    "governorate": {
+                                        "type": "string"
+                                    },
+                                    "city": {
+                                        "type": "string"
+                                    },
+                                    "address_line": {
+                                        "type": "string"
+                                    },
+                                    "landmark": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "customer_note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancel_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancelled_by": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "customer",
+                            "tenant_user",
+                            null
+                        ]
+                    }
+                }
+            },
+            "OrderDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Order"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "items",
+                            "history"
+                        ],
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/OrderItem"
+                                }
+                            },
+                            "history": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/OrderHistoryEntry"
+                                }
+                            }
+                        }
+                    }
+                ]
             },
             "DashboardLoginRequest": {
                 "type": "object",

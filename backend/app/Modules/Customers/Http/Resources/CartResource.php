@@ -29,7 +29,9 @@ final class CartResource extends JsonResource
             'items' => array_map(fn (PricedCartLine $line): array => [
                 'sku_id' => $line->skuId,
                 'product_name' => $line->productName,
+                'product_slug' => $line->productSlug,
                 'unit' => $line->unit,
+                'conversion_factor' => $line->conversionFactor,
                 'quantity' => $line->quantity,
                 'unit_price' => $line->price->unitPrice,
                 'tier_min_quantity' => $line->price->tierMinQuantity,
