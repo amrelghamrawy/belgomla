@@ -1,0 +1,721 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "BelGomla API",
+        "version": "1.0.0",
+        "description": "Every tenant lives on its own host ({tenant}.gomalecommerce.app); the host decides the tenant, never a header or payload. Auth is a Sanctum SPA cookie session: GET /sanctum/csrf-cookie first, then send the XSRF-TOKEN cookie back as the X-XSRF-TOKEN header. All text is Arabic, dates are ISO-8601 UTC and money is a \"150.00\" string.\n"
+    },
+    "servers": [
+        {
+            "url": "/"
+        }
+    ],
+    "tags": [
+        {
+            "name": "store"
+        },
+        {
+            "name": "store-auth"
+        },
+        {
+            "name": "dashboard-auth"
+        }
+    ],
+    "paths": {
+        "/sanctum/csrf-cookie": {
+            "get": {
+                "operationId": "csrfCookie",
+                "summary": "Sets the XSRF-TOKEN cookie",
+                "responses": {
+                    "204": {
+                        "description": "Cookie set"
+                    }
+                }
+            }
+        },
+        "/api/store/tenant": {
+            "get": {
+                "operationId": "storeTenant",
+                "tags": [
+                    "store"
+                ],
+                "summary": "Store identity and branding (08 §1)",
+                "responses": {
+                    "200": {
+                        "description": "Tenant settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TenantSettings"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/login": {
+            "post": {
+                "operationId": "storeLogin",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Customer login with phone and password (08 §2)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CustomerLoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Logged in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/auth/logout": {
+            "post": {
+                "operationId": "storeLogout",
+                "tags": [
+                    "store-auth"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Logged out"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/me": {
+            "get": {
+                "operationId": "storeMe",
+                "tags": [
+                    "store-auth"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The logged-in customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/auth/login": {
+            "post": {
+                "operationId": "dashboardLogin",
+                "tags": [
+                    "dashboard-auth"
+                ],
+                "summary": "Merchant user login with email and password (08 §4)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DashboardLoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Logged in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TenantUser"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/auth/logout": {
+            "post": {
+                "operationId": "dashboardLogout",
+                "tags": [
+                    "dashboard-auth"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Logged out"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/me": {
+            "get": {
+                "operationId": "dashboardMe",
+                "tags": [
+                    "dashboard-auth"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The logged-in user and their tenant",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DashboardMe"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "responses": {
+            "Error": {
+                "description": "Error envelope (08 §0)",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "schemas": {
+            "Money": {
+                "type": "string",
+                "pattern": "^-?\\d+\\.\\d{2}$",
+                "examples": [
+                    "150.00"
+                ]
+            },
+            "ErrorCode": {
+                "description": "Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.",
+                "type": "string",
+                "enum": [
+                    "address_locked",
+                    "already_voided",
+                    "blocked",
+                    "cannot_disable_self",
+                    "cart_empty",
+                    "cart_line_invalid",
+                    "category_cycle",
+                    "checkout_failed",
+                    "cover_price_required",
+                    "csrf_token_mismatch",
+                    "duplicate_code",
+                    "duplicate_key",
+                    "duplicate_label",
+                    "duplicate_name",
+                    "duplicate_relation",
+                    "email_taken",
+                    "exceeds_balance",
+                    "field_type_locked",
+                    "forbidden",
+                    "gallery_full",
+                    "has_collections",
+                    "http_error",
+                    "idempotency_in_progress",
+                    "idempotency_key_reused",
+                    "in_use",
+                    "insufficient_stock",
+                    "invalid_credentials",
+                    "invalid_idempotency_key",
+                    "invalid_phone",
+                    "invalid_subdomain",
+                    "invalid_tiers",
+                    "invalid_transition",
+                    "invalid_vertical",
+                    "inventory_below_reserved",
+                    "invited",
+                    "last_active_user",
+                    "not_found",
+                    "order_cancelled",
+                    "otp_attempts_exceeded",
+                    "otp_expired",
+                    "otp_invalid",
+                    "pending_approval",
+                    "pending_verification",
+                    "phone_not_verified",
+                    "phone_taken",
+                    "prices_hidden",
+                    "rate_limited",
+                    "reserved_subdomain",
+                    "server_error",
+                    "stateful_request_required",
+                    "store_unavailable",
+                    "subdomain_taken",
+                    "tenant_suspended",
+                    "unauthenticated",
+                    "use_invitation",
+                    "user_disabled",
+                    "validation_failed"
+                ]
+            },
+            "ErrorEnvelope": {
+                "type": "object",
+                "required": [
+                    "error"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "required": [
+                            "code",
+                            "message"
+                        ],
+                        "properties": {
+                            "code": {
+                                "$ref": "#/components/schemas/ErrorCode"
+                            },
+                            "message": {
+                                "type": "string",
+                                "description": "Arabic text, safe to show as is."
+                            },
+                            "details": {
+                                "description": "Per-field messages on validation_failed; extra data on some codes (attempts_left, retry_after).",
+                                "type": "object",
+                                "additionalProperties": true
+                            },
+                            "items": {
+                                "description": "Per-line problems (checkout_failed, cart_line_invalid).",
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "WorkingHours": {
+                "type": "object",
+                "required": [
+                    "day",
+                    "from",
+                    "to"
+                ],
+                "properties": {
+                    "day": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6,
+                        "description": "0 = Sunday"
+                    },
+                    "from": {
+                        "type": "string",
+                        "examples": [
+                            "09:00"
+                        ]
+                    },
+                    "to": {
+                        "type": "string",
+                        "examples": [
+                            "17:00"
+                        ]
+                    }
+                }
+            },
+            "TenantSettings": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "subdomain",
+                    "logo_url",
+                    "favicon_url",
+                    "colors",
+                    "phone",
+                    "whatsapp",
+                    "address",
+                    "description",
+                    "working_hours",
+                    "currency",
+                    "require_login_for_prices",
+                    "require_customer_approval",
+                    "mov"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "subdomain": {
+                        "type": "string"
+                    },
+                    "logo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "favicon_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "colors": {
+                        "type": "object",
+                        "required": [
+                            "primary",
+                            "secondary"
+                        ],
+                        "properties": {
+                            "primary": {
+                                "type": "string",
+                                "examples": [
+                                    "#0A5C36"
+                                ]
+                            },
+                            "secondary": {
+                                "type": "string",
+                                "examples": [
+                                    "#FFFFFF"
+                                ]
+                            }
+                        }
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "whatsapp": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "working_hours": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WorkingHours"
+                        }
+                    },
+                    "currency": {
+                        "type": "string",
+                        "const": "EGP"
+                    },
+                    "require_login_for_prices": {
+                        "type": "boolean"
+                    },
+                    "require_customer_approval": {
+                        "type": "boolean"
+                    },
+                    "mov": {
+                        "type": "object",
+                        "required": [
+                            "enabled",
+                            "amount"
+                        ],
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "amount": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/Money"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "CustomerLoginRequest": {
+                "type": "object",
+                "required": [
+                    "phone",
+                    "password"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 30,
+                        "examples": [
+                            "01012345678"
+                        ]
+                    },
+                    "password": {
+                        "type": "string",
+                        "maxLength": 200
+                    }
+                }
+            },
+            "Customer": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "phone",
+                    "status",
+                    "status_label",
+                    "phone_verified_at",
+                    "created_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "E.164",
+                        "examples": [
+                            "+201012345678"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending_verification",
+                            "invited",
+                            "pending_approval",
+                            "active",
+                            "blocked"
+                        ]
+                    },
+                    "status_label": {
+                        "type": "string"
+                    },
+                    "phone_verified_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "DashboardLoginRequest": {
+                "type": "object",
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string"
+                    }
+                }
+            },
+            "TenantUser": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "role",
+                    "status",
+                    "last_login_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "owner"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "disabled"
+                        ]
+                    },
+                    "last_login_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                }
+            },
+            "Tenant": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "subdomain",
+                    "status",
+                    "vertical"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "subdomain": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "suspended"
+                        ]
+                    },
+                    "vertical": {
+                        "type": "string",
+                        "enum": [
+                            "school-books",
+                            "stationery",
+                            "hardware",
+                            "none"
+                        ]
+                    }
+                }
+            },
+            "DashboardMe": {
+                "type": "object",
+                "required": [
+                    "user",
+                    "tenant"
+                ],
+                "properties": {
+                    "user": {
+                        "$ref": "#/components/schemas/TenantUser"
+                    },
+                    "tenant": {
+                        "$ref": "#/components/schemas/Tenant"
+                    }
+                }
+            }
+        }
+    }
+}

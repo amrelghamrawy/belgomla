@@ -54,6 +54,12 @@ test('login validates its input', function (array $body, string $field): void {
     'missing password' => [['email' => 'a@b.c'], 'password'],
 ]);
 
+test('validation messages are in Arabic with Arabic field names', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/auth/login', ['email' => 'a@b.c'])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.password.0', 'كلمة المرور مطلوب.');
+});
+
 test('BR-T03 a user of another tenant cannot log in on this host', function (): void {
     $other = $this->otherTenant();
     $this->makeOwner($other, ['email' => 'owner@other.test', 'password' => 'secret123']);

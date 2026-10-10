@@ -201,6 +201,72 @@ function lastInvitationToken(): string
     return $match[1];
 }
 
+/**
+ * The hand-written OpenAPI spec (backend/openapi/openapi.yaml), parsed.
+ *
+ * @return array<string, mixed>
+ */
+function openApiSpec(): array
+{
+    $spec = Symfony\Component\Yaml\Yaml::parseFile(__DIR__.'/../openapi/openapi.yaml');
+
+    if (! is_array($spec)) {
+        throw new RuntimeException('openapi.yaml is not a map.');
+    }
+
+    /** @var array<string, mixed> $spec */
+    return $spec;
+}
+
+/**
+ * A component schema of the OpenAPI spec, e.g. openApiSchema('TenantSettings').
+ *
+ * @return array<string, mixed>
+ */
+function openApiSchema(string $name): array
+{
+    $schema = data_get(openApiSpec(), "components.schemas.{$name}");
+
+    if (! is_array($schema)) {
+        throw new RuntimeException("No schema {$name} in openapi.yaml.");
+    }
+
+    /** @var array<string, mixed> $schema */
+    return $schema;
+}
+
+/**
+ * Every error code the backend throws: `new self(403, 'code', ...)` in exceptions, ApiException helpers
+ * (`forbidden('code', ...)`), `ApiResponse::error(401, 'code', ...)` in bootstrap/app.php, and the customer
+ * statuses that CustomerNotActive uses as codes.
+ *
+ * @return list<string>
+ */
+function emittedErrorCodes(): array
+{
+    $files = [
+        ...glob(__DIR__.'/../app/Modules/*/Exceptions/*.php') ?: [],
+        ...glob(__DIR__.'/../app/Support/*.php') ?: [],
+        ...glob(__DIR__.'/../app/Support/Http/Middleware/*.php') ?: [],
+        __DIR__.'/../bootstrap/app.php',
+    ];
+
+    $codes = array_map(
+        fn (App\Modules\Customers\Enums\CustomerStatus $status): string => $status->value,
+        array_filter(App\Modules\Customers\Enums\CustomerStatus::cases(), fn (App\Modules\Customers\Enums\CustomerStatus $status): bool => $status !== App\Modules\Customers\Enums\CustomerStatus::Active),
+    );
+
+    foreach ($files as $file) {
+        preg_match_all("/(?:(?:\b\d{3}|error\(\s*\\\$e->getStatusCode\(\)),\s*|(?:forbidden|conflict|unprocessable|unavailable)\()'([a-z_]+)'/", (string) file_get_contents($file), $matches);
+        $codes = [...$codes, ...$matches[1]];
+    }
+
+    $codes = array_values(array_unique($codes));
+    sort($codes);
+
+    return $codes;
+}
+
 /** A started in-memory session, for actions that log a customer in. */
 function arraySession(): Illuminate\Session\Store
 {

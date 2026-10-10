@@ -2,6 +2,8 @@
 
 REST API served by Laravel under the tenant host: `https://{tenant}.gomalecommerce.app/api/...` (Tech §5). Tenant is resolved from `Host` only.
 
+Machine-readable twin: `backend/openapi/openapi.yaml` (OpenAPI 3.1, hand-written), compiled to `backend/openapi.json` by `php artisan api:openapi`, from which the frontend generates its types (Task 8). It covers the endpoints the UI uses so far; Tasks 9 and 10 extend it. Tests keep it honest: every documented path is a registered route, its `ErrorCode` enum equals the codes the backend throws, and documented response keys match real responses.
+
 ---
 
 ## 0. Conventions
@@ -44,10 +46,16 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 
 | HTTP | code                       | When                                                      |
 | ---- | -------------------------- | --------------------------------------------------------- |
+| 400  | `stateful_request_required` | login/OTP/invitation POST without a SPA origin (no session) |
 | 401  | `unauthenticated`          | no/invalid session, tenant mismatch                       |
-| 403  | `forbidden`                | customer not `active`, tenant suspended (dashboard)       |
+| 403  | `forbidden`                | a policy denied the action                                |
+| 403  | `pending_approval` / `blocked` / `phone_not_verified` / `invited` / `pending_verification` | customer not `active` (the code is the status, BR-CU05) |
+| 403  | `tenant_suspended`         | tenant suspended (dashboard, BR-T07)                      |
+| 403  | `user_disabled`            | disabled dashboard user logging in                        |
 | 404  | `not_found`                | missing **or belongs to another tenant** (BR-T04)         |
-| 409  | `conflict`                 | invalid state transition, duplicate code/phone            |
+| 409  | `duplicate_name` / `duplicate_key` / `duplicate_label` / `duplicate_code` / `duplicate_relation`, `in_use`, `field_type_locked` | catalog conflicts (no generic `conflict` code) |
+| 409  | `phone_taken`, `use_invitation`, `email_taken`, `subdomain_taken`, `cannot_disable_self`, `last_active_user` | account conflicts |
+| 419  | `csrf_token_mismatch`      | CSRF token expired; fetch `/sanctum/csrf-cookie` and retry once |
 | 422  | `validation_failed`        | field validation                                          |
 | 422  | `checkout_failed`          | one or more checkout assertions failed (`items[]` filled) |
 | 422  | `inventory_below_reserved` | BR-INV08 (`details.orders[]` filled)                      |
@@ -66,6 +74,9 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 422  | `idempotency_key_reused`   | same `Idempotency-Key` with a different body (D55)        |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
 | 503  | `store_unavailable`        | tenant suspended (storefront)                             |
+| 500  | `server_error`             | unexpected failure (no internals unless `app.debug`)      |
+
+The complete list (also `otp_*`, `invalid_credentials`, `insufficient_stock`, `invalid_phone`, `category_cycle`, `gallery_full`, …) is the `ErrorCode` enum in `backend/openapi/openapi.yaml`.
 
 ### Common rules
 
@@ -83,8 +94,9 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 Branding and settings needed to render the store.
 
 ```json
-{ "data": { "name": "مكتبة النور", "logo_url": "...", "favicon_url": "...", "colors": {"primary":"#0A5","secondary":"#FFF"},
-  "phone": "+20...", "whatsapp": "+20...", "address": "...", "description": "...", "working_hours": [...],
+{ "data": { "name": "مكتبة النور", "subdomain": "alnoor", "logo_url": "...", "favicon_url": "...", "colors": {"primary":"#0A5","secondary":"#FFF"},
+  "phone": "+20...", "whatsapp": "+20...", "address": "...", "description": "...",
+  "working_hours": [{ "day": 0, "from": "09:00", "to": "17:00" }],   // day 0 = Sunday; [] when not set
   "currency": "EGP", "require_login_for_prices": false, "require_customer_approval": false,
   "mov": { "enabled": true, "amount": "1000.00" } } }
 ```
@@ -300,13 +312,13 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 
 ## 4. Dashboard — Auth
 
-| Method | Path                         | Body              |
-| ------ | ---------------------------- | ----------------- |
-| POST   | `/api/dashboard/auth/login`  | `email, password` |
-| POST   | `/api/dashboard/auth/logout` |                   |
-| GET    | `/api/dashboard/me`          |                   |
+| Method | Path                         | Body              | Answer |
+| ------ | ---------------------------- | ----------------- | ------ |
+| POST   | `/api/dashboard/auth/login`  | `email, password` | `{ data: { id, name, email, role, status, last_login_at } }` |
+| POST   | `/api/dashboard/auth/logout` |                   | `204`  |
+| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, status, last_login_at }, tenant: { name, subdomain, status, vertical } } }` |
 
-Suspended tenant → `403 tenant_suspended`.
+`login` errors: `422 invalid_credentials`, `403 user_disabled`, `429 rate_limited` after 5 failures per tenant+email+IP per minute, `400 stateful_request_required` without a SPA origin. Suspended tenant → `403 tenant_suspended`. The email is matched case-insensitively.
 
 ---
 
@@ -592,6 +604,7 @@ php artisan tenant:create alnoor "مكتبة النور" --owner-email=... --own
 php artisan tenant:suspend alnoor
 php artisan tenant:activate alnoor
 php artisan tenant:list
+php artisan api:openapi          # compile backend/openapi/openapi.yaml → backend/openapi.json (Task 8)
 ```
 
 ---

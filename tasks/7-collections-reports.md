@@ -85,7 +85,7 @@ What differs from the plan above, and why:
 - New Support: `Money::subtract`, `BusinessCalendar` (Cairo days → UTC bounds, D60), and `config('app.business_timezone')`.
 - `collections.recorded_by` is nullable (a system actor); 07 §8 updated. `CashCollection` exposes the user ids only, because Tenancy models stay inside Tenancy.
 - Cross-host tests on routes with a bound id: route binding (tenant-scoped) runs before `session.tenant`, so an id that only exists in the session's own store is a 404 on another host. The tests therefore use an id that exists on the other host, which must be `401`.
-- Not done: `lang/ar/validation.php` (left over from Task 6) is still missing. It is better done with the frontend foundation (Task 8), where the messages are shown.
+- Not done: `lang/ar/validation.php` (left over from Task 6) is still missing. It is better done with the frontend foundation (Task 8), where the messages are shown. **Done in Task 8** (`backend/lang/ar/validation.php`, `APP_LOCALE=ar`).
 - Follow-up: the orders list (Task 6) still filters `from`/`to` by UTC days; align it with D60 when the dashboard UI uses it.
 
 Manual checks (`php artisan serve`, curl with `--resolve` and the SPA origin, owner session):

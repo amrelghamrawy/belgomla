@@ -44,6 +44,9 @@ Each item below has a **default** already written into the other documents so wo
 | D58 | Week start of the sales report                            | Saturday (the Egyptian working week), not ISO Monday. A week bucket is labelled with its Saturday; the first bucket starts on the Saturday on or before `from`. | D5, 08 §11 |
 | D59 | What a customer owes (outstanding)                         | Σ (order_total − collected_amount) over **delivered** orders only. A deposit on an order not yet delivered shows on the statement (`balance`) but neither adds to nor lowers the outstanding figure. Used by the customer list/page, the statement summary, the outstanding report and the overview. | BR-C03, D24 |
 | D60 | Business time zone for days                                | Africa/Cairo (`config('app.business_timezone')`). Report buckets, "today" and the `from`/`to` day filters of collections, reports and the audit log are Cairo days; timestamps stay UTC. The orders list (Task 6) still filters by UTC days until it is aligned. | D5, 08 §0 |
+| D38 | Component library                                          | shadcn/ui (Radix, `radix-nova` style) with its RTL mode (`rtl: true`), which uses logical classes. Accepted in Task 8. | rules/03 §1 |
+| D39 | Digits in prices and numbers                               | Western digits: `150.00 ج.م`, `1,250.50 ج.م`. Dates use Arabic month names with Western digits (`2 يوليو 2026`). Accepted in Task 8. | rules/03 §3, 01 §6 |
+| D40 | UI font                                                    | IBM Plex Sans Arabic (400/500/700, Arabic + Latin subsets) via `next/font`. Accepted in Task 8. | rules/03 §1 |
 
 These are treated as accepted defaults unless the product owner objects.
 

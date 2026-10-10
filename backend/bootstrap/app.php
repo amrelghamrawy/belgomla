@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Customers\Http\Middleware\EnsureCustomerActive;
 use App\Modules\Customers\Http\Middleware\RejectGuestsWhenPricesHidden;
+use App\Modules\Platform\Console\OpenApiCommand;
 use App\Modules\Tenancy\Console\TenantActivateCommand;
 use App\Modules\Tenancy\Console\TenantCreateCommand;
 use App\Modules\Tenancy\Console\TenantListCommand;
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
         TenantSuspendCommand::class,
         TenantActivateCommand::class,
         TenantListCommand::class,
+        OpenApiCommand::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA: cookie sessions for requests coming from tenant hosts (Tech §6).
