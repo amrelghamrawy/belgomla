@@ -1,6 +1,6 @@
 # Task 8 — Frontend foundation (Next.js, RTL, auth, API client)
 
-Status: **not started**. Requires Task 0 (Tenancy API) only; later UI tasks depend on this. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (see the delivery notes at the end). Requires Task 0 (Tenancy API) only; later UI tasks depend on this. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -46,3 +46,24 @@ Frontend runs on `http://alnoor.gomal.test:3000` with the hosts entry; login wor
 - D38: Component library (shadcn/ui vs Mantine RTL). Default: shadcn/ui.
 - D39: Digits in prices (Western `150.00` vs Arabic-Indic). Default: Western.
 - D40: Fonts (IBM Plex Sans Arabic vs Cairo). Default: IBM Plex Sans Arabic.
+
+## Delivery notes (commits 3243b71 backend, c195b49 frontend)
+
+**Results:**
+- Backend `composer test` is green: 2668 tests (2625 passed + 43 arch tests flagged deprecated by PHP 8.5), +10 over Task 7.
+- Frontend `typecheck`, `lint` and `build` are green.
+- 109 Vitest tests pass.
+- 8 Playwright tests pass (4 flows × mobile 390px and desktop), against `php artisan serve` + `next dev`.
+- Curl smoke through `alnoor.gomal.test:3000`: tenant 200, csrf-cookie 204, dashboard login 200, me 200, unknown tenant 404.
+
+What differs from the plan above, and why:
+- **Proxy:** `next.config.ts` rewrites are not used.
+  - Why: Next's external-rewrite proxy replaces `Host` with the destination host, and Laravel resolves the tenant from `Host` only.
+  - Instead: route handlers `app/api/[...path]` and `app/sanctum/[...path]` (`lib/server/backend-proxy.ts`) forward to `BACKEND_HOST:BACKEND_PORT` with the original Host. The Node side therefore needs no DNS for the tenant host.
+  - Production: Nginx handles these paths before Next (tasks/11).
+- **OpenAPI:** hand-written YAML (`backend/openapi/openapi.yaml`), compiled by `php artisan api:openapi` (new `Platform` module). Tests tie it to the routes, the thrown error codes and the real response keys.
+- **Tailwind:** uses the PostCSS plugin, which is the documented path, instead of the scaffold's undocumented turbopack loader. shadcn's own `--rtl` mode produces logical classes.
+- **Error messages:** `messageFor()` shows the backend's Arabic envelope message first, because it is more specific, and falls back to `ar.errors`. `ar.errors` covers every code in the spec.
+- **Hosts entry:** the browser still needs `127.0.0.1 alnoor.gomal.test` for manual use. Playwright maps `*.gomal.test` itself (`--host-resolver-rules`), so e2e runs without it.
+- **Validation messages:** `lang/ar/validation.php`, left over from Tasks 6–7, is done here, with `APP_LOCALE=ar`.
+- **Open decisions:** D38–D40 are accepted with their defaults (06-open-decisions).

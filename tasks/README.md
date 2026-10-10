@@ -12,7 +12,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | 5  | [Customers](5-customers.md)            | Customers (+ cart)            | done        | 04c5b76 |
 | 6  | [Orders & Checkout](6-orders.md)       | Orders, Notifications         | done        | ed252a5 |
 | 7  | [Collections & Reports](7-collections-reports.md) | Collections, Reports, Audit API | done        | 0c2f33a |
-| 8  | [Frontend foundation](8-frontend-foundation.md) | frontend/ (Next.js)   | not started |        |
+| 8  | [Frontend foundation](8-frontend-foundation.md) | frontend/ (Next.js)   | done        | c195b49 |
 | 9  | [Storefront UI](9-storefront-ui.md)    | frontend/ storefront          | not started |        |
 | 10 | [Dashboard UI](10-dashboard-ui.md)     | frontend/ dashboard           | not started |        |
 | 11 | [Release](11-release.md)               | infra, seed, go-live checks   | not started |        |
