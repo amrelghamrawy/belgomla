@@ -596,7 +596,7 @@ Webhooks are platform-level (not tenant hosts): they are served only on `https:/
 
 - **Auth:** Hypersender has no webhook signature. Each instance is configured in the Hypersender dashboard to send `Authorization: <MESSAGING_WEBHOOK_SECRET>` (`Bearer <secret>` also accepted); anything else is `401 unauthenticated`, and an empty secret refuses every call.
 - **Body:** `{ event, data }` as Hypersender sends it; `422 validation_failed` without them.
-- **Responses:** `200 { "data": { "received": true } }`; events that are not delivery statuses (heartbeats, incoming messages) are acknowledged and dropped; a status for a message we never sent is `404 not_found`. Processing is queued (`ProcessProviderWebhook`) and idempotent: a final message ignores replays.
+- **Responses:** `200 { "data": { "received": true } }`; an SMS app `phone.heartbeat.received` is stored in `sms_phone_heartbeats` (our receive time) for the monitor's 2-hour offline alert (D49, tasks/11); other events that are not delivery statuses (incoming messages) are acknowledged and dropped; a status for a message we never sent is `404 not_found`. Processing is queued (`ProcessProviderWebhook`) and idempotent: a final message ignores replays.
 
 ---
 

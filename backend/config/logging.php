@@ -75,6 +75,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // platform:monitor findings and operator alerts (tasks/11, D65).
+        'monitor' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/monitor.log'),
+            'level' => 'info',
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

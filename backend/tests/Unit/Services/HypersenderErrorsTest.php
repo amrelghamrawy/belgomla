@@ -99,6 +99,15 @@ test('webhook events we do not track are ignored', function (Channel $channel, a
     'sms status without ids' => [Channel::Sms, ['event' => 'message.phone.sent', 'data' => ['status' => 'sent']]],
 ]);
 
+test('D49 only an sms heartbeat event yields a phone id', function (Channel $channel, array $payload, ?string $expected): void {
+    expect((new HypersenderErrors)->heartbeatPhoneId($channel, $payload))->toBe($expected);
+})->with([
+    'sms heartbeat' => [Channel::Sms, fixture('hypersender/webhook-heartbeat'), '9defcf1e-552c-4bef-a843-872edec576ef'],
+    'heartbeat on the whatsapp route' => [Channel::WhatsApp, fixture('hypersender/webhook-heartbeat'), null],
+    'heartbeat without a phone id' => [Channel::Sms, ['event' => 'phone.heartbeat.received', 'data' => []], null],
+    'a delivery status' => [Channel::Sms, fixture('hypersender/webhook-sms-delivered'), null],
+]);
+
 test('whatsapp acks map to sent, delivered and failed', function (int $ack, array $expected): void {
     $payload = fixture('hypersender/webhook-message-ack');
     $payload['data']['payload']['ack'] = $ack;

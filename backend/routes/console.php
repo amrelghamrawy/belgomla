@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function (): void {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+/*
+| Run every minute in production by belgomla-scheduler.timer (deploy/systemd). The health monitor is not here:
+| deploy/monitor.sh runs `platform:monitor` with the external /up results, so open problems are judged in one place.
+*/
+
+Schedule::command('queue:prune-failed --hours=720')->daily();

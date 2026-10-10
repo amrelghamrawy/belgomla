@@ -6,6 +6,7 @@ use App\Modules\Messaging\Enums\MessageStatus;
 use App\Modules\Messaging\Jobs\ProcessProviderWebhook;
 use App\Modules\Messaging\Jobs\SendMessage;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Messaging\Queries\LastPhoneHeartbeatQuery;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
@@ -89,8 +90,33 @@ test('a status for an unknown message is 404 json', function (): void {
         ->assertExactJson(['error' => ['code' => 'not_found', 'message' => 'العنصر غير موجود']]);
 });
 
-test('events that are not delivery statuses are acknowledged', function (): void {
+test('D49 an sms phone heartbeat is acknowledged and stored', function (): void {
     hook('sms', fixture('hypersender/webhook-heartbeat'))
+        ->assertOk()
+        ->assertExactJson(['data' => ['received' => true]]);
+
+    $this->assertDatabaseHas('sms_phone_heartbeats', ['phone_id' => '9defcf1e-552c-4bef-a843-872edec576ef']);
+});
+
+test('a repeated heartbeat moves the last seen time forward', function (): void {
+    $this->travelTo(now()->subHour());
+    hook('sms', fixture('hypersender/webhook-heartbeat'))->assertOk();
+    $this->travelBack();
+
+    hook('sms', fixture('hypersender/webhook-heartbeat'))->assertOk();
+
+    $this->assertDatabaseCount('sms_phone_heartbeats', 1);
+    expect(app(LastPhoneHeartbeatQuery::class)->get()?->diffInMinutes(now(), absolute: true))->toBeLessThan(1);
+});
+
+test('a heartbeat with a wrong secret is not stored', function (): void {
+    hook('sms', fixture('hypersender/webhook-heartbeat'), 'wrong')->assertUnauthorized();
+
+    $this->assertDatabaseCount('sms_phone_heartbeats', 0);
+});
+
+test('events that are not delivery statuses are acknowledged', function (): void {
+    hook('whatsapp', ['event' => 'message.any', 'data' => ['payload' => ['id' => 'false_201@c.us_X']]])
         ->assertOk()
         ->assertExactJson(['data' => ['received' => true]]);
 });

@@ -21,6 +21,7 @@ use App\Modules\Customers\Models\CustomerOtp;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Messaging\Models\SmsPhoneHeartbeat;
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -46,7 +47,7 @@ use Illuminate\Support\Facades\Schema;
 const MODELS_WITHOUT_FACTORY = [TenantSetting::class, AuditLog::class];
 
 /** Platform-level models that are not tenant-owned. */
-const PLATFORM_MODELS = [Tenant::class, TenantSetting::class];
+const PLATFORM_MODELS = [Tenant::class, TenantSetting::class, SmsPhoneHeartbeat::class];
 
 /**
  * Columns of a model's table whose name ends with one of the suffixes, minus the timestamps.
@@ -87,6 +88,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         InventoryMovement::class,
         SkuInventory::class,
         OutboundMessage::class,
+        SmsPhoneHeartbeat::class,
         MerchantNotification::class,
         Order::class,
         OrderItem::class,

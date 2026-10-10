@@ -6,6 +6,7 @@ use App\Modules\Messaging\Actions\AcceptHypersenderWebhook;
 use App\Modules\Messaging\Enums\Channel;
 use App\Modules\Messaging\Jobs\ProcessProviderWebhook;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Messaging\Models\SmsPhoneHeartbeat;
 use App\Support\ApiException;
 use Illuminate\Support\Facades\Queue;
 
@@ -23,10 +24,18 @@ test('a delivery status for a known message is queued for processing', function 
         && $job->payload === fixture('hypersender/webhook-message-ack'));
 });
 
-test('events that are not delivery statuses are acknowledged and dropped', function (): void {
+test('D49 an sms phone heartbeat is stored, not queued', function (): void {
     app(AcceptHypersenderWebhook::class)->handle(Channel::Sms, fixture('hypersender/webhook-heartbeat'));
 
+    expect(SmsPhoneHeartbeat::query()->sole()->phone_id)->toBe('9defcf1e-552c-4bef-a843-872edec576ef');
     Queue::assertNothingPushed();
+});
+
+test('events that are not delivery statuses are acknowledged and dropped', function (): void {
+    app(AcceptHypersenderWebhook::class)->handle(Channel::WhatsApp, ['event' => 'message.any', 'data' => ['payload' => ['id' => 'false_201@c.us_X']]]);
+
+    Queue::assertNothingPushed();
+    expect(SmsPhoneHeartbeat::query()->count())->toBe(0);
 });
 
 test('a status for a message we never sent is not found', function (): void {

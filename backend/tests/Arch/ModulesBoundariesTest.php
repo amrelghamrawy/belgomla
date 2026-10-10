@@ -414,3 +414,27 @@ test('reports contain only queries, their input, enums and http', function (): v
 
     expect($folders)->toBe(['Data', 'Enums', 'Http', 'Queries']);
 });
+
+/*
+| Platform (tasks/8 OpenAPI, tasks/11 monitoring) is operator tooling. It reads tenants through Tenancy's queries
+| and context (the Tenant model appears only as the row a query returns), the SMS heartbeat through Messaging's query, and alerts only through Messenger.
+*/
+
+arch('platform reaches other modules only through their queries, services, data, enums and the tenant context')
+    ->expect('App\Modules\Platform')
+    ->not->toUse([
+        App\Modules\Tenancy\Models\TenantUser::class,
+        App\Modules\Tenancy\Models\TenantSetting::class,
+        'App\Modules\Tenancy\Actions',
+        'App\Modules\Tenancy\Http',
+        'App\Modules\Messaging\Models',
+        'App\Modules\Messaging\Actions',
+        'App\Modules\Messaging\Contracts',
+        'App\Modules\Messaging\Http',
+        'App\Modules\Messaging\Jobs',
+        'App\Modules\Messaging\Services\Hypersender',
+    ]);
+
+arch('no business module depends on platform')
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
+    ->not->toUse('App\Modules\Platform');

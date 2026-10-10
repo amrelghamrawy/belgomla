@@ -16,7 +16,8 @@ use App\Modules\Messaging\Enums\Channel;
  * `errors.exists: false` = the number is not on WhatsApp (BR-CU07), 423 = Meta capped the instance.
  * SMS v1 message: `status` scheduled|sent|delivered|failed|expired.
  * Webhooks: WhatsApp `message.ack` (ack -1 error, 0 pending, 1 server, 2 device, 3 read, 4 played; payload id
- * `true_<chat>_<keyId>`), SMS `message.phone.sent|delivered`, `message.send.failed|expired`.
+ * `true_<chat>_<keyId>`), SMS `message.phone.sent|delivered`, `message.send.failed|expired`,
+ * `phone.heartbeat.received` (`data.phone_id`).
  */
 final readonly class HypersenderErrors
 {
@@ -119,6 +120,20 @@ final readonly class HypersenderErrors
         $reference = ['message_id' => $this->string($data, 'id'), 'request_id' => $this->string($data, 'request_id')];
 
         return $reference['message_id'] === null && $reference['request_id'] === null ? null : $reference;
+    }
+
+    /**
+     * The phone id of an SMS app `phone.heartbeat.received` webhook, or null for any other event (D49).
+     *
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function heartbeatPhoneId(Channel $channel, array $payload): ?string
+    {
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        return $channel === Channel::Sms && $this->string($payload, 'event') === 'phone.heartbeat.received'
+            ? $this->string($data, 'phone_id')
+            : null;
     }
 
     /**

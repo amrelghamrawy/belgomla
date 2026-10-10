@@ -437,6 +437,18 @@ Our own table, not Laravel's notifications table; the model is `Orders\Models\Me
 | fallback_of_id      | FK self      | nullable, **unique**; the SMS row points at the failed WhatsApp row; CHECK: only an SMS     |
 | cost                | numeric(8,4) | nullable (Hypersender reports no per-message cost)                                          |
 
+`system_alert` rows are the operator alerts of `platform:monitor` (tasks/11, D65), logged under the tenant named by `MONITOR_ALERT_TENANT`.
+
+### `sms_phone_heartbeats` (platform, D49, tasks/11)
+
+Not tenant-owned. One row per Hypersender SMS phone, upserted by every `phone.heartbeat.received` webhook; the monitor alerts after 2 hours without one.
+
+| Column       | Type         | Notes                                           |
+| ------------ | ------------ | ----------------------------------------------- |
+| id           | bigint PK    |                                                 |
+| phone_id     | varchar      | unique; Hypersender phone uuid                  |
+| last_seen_at | timestamp    | when we received the last heartbeat (our clock) |
+
 ---
 
 ## 10. Audit
