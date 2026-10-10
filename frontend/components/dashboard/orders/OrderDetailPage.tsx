@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Collection, DashboardOrderDetail } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
@@ -141,13 +141,15 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader>
               <CardTitle>{copy.delivery}</CardTitle>
-              {allowsAddressEdit(order.status) ? (
-                <Button variant="outline" size="sm" onClick={() => setEditingAddress(true)}>
-                  {copy.editAddress}
-                </Button>
-              ) : null}
+              <CardAction>
+                {allowsAddressEdit(order.status) ? (
+                  <Button variant="outline" size="sm" onClick={() => setEditingAddress(true)}>
+                    {copy.editAddress}
+                  </Button>
+                ) : null}
+              </CardAction>
             </CardHeader>
             <CardContent className="flex flex-col gap-1 text-sm" data-testid="delivery">
               <span className="font-medium">{order.delivery.name}</span>

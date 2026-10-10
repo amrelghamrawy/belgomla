@@ -3,10 +3,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
-import { useOverviewReport } from "@/lib/dashboard/reports";
+import { useOrders } from "@/lib/dashboard/orders";
+import { useLowStockReport, useOverviewReport } from "@/lib/dashboard/reports";
+import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
 
@@ -81,8 +83,78 @@ export function Overview() {
               </ul>
             </CardContent>
           </Card>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StaleOrders />
+            <LowStockList />
+          </div>
         </>
       )}
     </>
+  );
+}
+
+const STALE = { stale: "1", status: "pending", per_page: "5", sort: "placed_at" };
+
+/** D10: pending orders older than the stale threshold, oldest first. */
+function StaleOrders() {
+  const orders = useOrders(STALE);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{copy.staleOrders}</CardTitle>
+        <CardAction>
+          <Link href="/dashboard/orders?stale=1" className="text-primary text-sm hover:underline">
+            {copy.viewAll}
+          </Link>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {orders.data?.data.length === 0 && <p className="text-muted-foreground text-sm">{ar.dashboard.list.empty}</p>}
+        <ul className="flex flex-col divide-y" data-testid="stale-orders">
+          {orders.data?.data.map((order) => (
+            <li key={order.number} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <Link href={`/dashboard/orders/${order.number}`} className="font-medium hover:underline">
+                <bdi>#{order.number}</bdi>
+              </Link>
+              <span className="min-w-0 flex-1 truncate">{order.customer?.name ?? order.delivery.name}</span>
+              <span className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(order.placed_at)}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LowStockList() {
+  const lowStock = useLowStockReport(1, 5);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{copy.lowStockList}</CardTitle>
+        <CardAction>
+          <Link href="/dashboard/inventory?low_stock=1" className="text-primary text-sm hover:underline">
+            {copy.viewAll}
+          </Link>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {lowStock.data?.data.length === 0 && <p className="text-muted-foreground text-sm">{ar.dashboard.list.empty}</p>}
+        <ul className="flex flex-col divide-y" data-testid="low-stock">
+          {lowStock.data?.data.map((sku) => (
+            <li key={sku.sku_id} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <Link href={`/dashboard/inventory/${sku.sku_id}`} className="min-w-0 flex-1 truncate hover:underline">
+                {sku.product_name}
+              </Link>
+              <span className="font-semibold whitespace-nowrap">
+                {sku.available} / {sku.threshold}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

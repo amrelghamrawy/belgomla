@@ -22,6 +22,9 @@ export const queryKeys = {
   // Dashboard (tasks/10)
   dashboardNotifications: ["dashboard", "notifications"] as const,
   dashboardOverview: ["dashboard", "reports", "overview"] as const,
+  dashboardSales: (params: ListParams) => ["dashboard", "reports", "sales", params] as const,
+  dashboardOutstanding: (page: number) => ["dashboard", "reports", "outstanding", page] as const,
+  dashboardLowStock: (page: number, perPage: number) => ["dashboard", "reports", "low-stock", page, perPage] as const,
   dashboardCategories: ["dashboard", "categories"] as const,
   dashboardUnits: ["dashboard", "units"] as const,
   dashboardFields: ["dashboard", "fields"] as const,

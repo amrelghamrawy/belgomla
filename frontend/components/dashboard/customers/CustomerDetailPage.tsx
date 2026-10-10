@@ -11,7 +11,7 @@ import { TextField } from "@/components/shared/TextField";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FieldError, FieldLabel } from "@/components/ui/field";
@@ -389,11 +389,13 @@ function RecentOrders({ customer }: { customer: DashboardCustomer }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
+      <CardHeader>
         <CardTitle>{copy.recentOrders}</CardTitle>
-        <Button asChild variant="link">
-          <Link href={`/dashboard/orders?customer_id=${customer.id}`}>{copy.allOrders}</Link>
-        </Button>
+        <CardAction>
+          <Button asChild variant="link">
+            <Link href={`/dashboard/orders?customer_id=${customer.id}`}>{copy.allOrders}</Link>
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {orders.length === 0 ? (
