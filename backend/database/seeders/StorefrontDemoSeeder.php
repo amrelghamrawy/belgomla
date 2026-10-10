@@ -161,7 +161,7 @@ final class StorefrontDemoSeeder extends Seeder
                     coverPrice: number_format($cover, 2, '.', ''),
                 ),
             ),
-            description: "كتاب {$subject} لطلاب {$grade} من {$publisher}.",
+            description: $this->description($name, $grade, $subject, $publisher),
             customFields: [
                 'grade' => $this->option('grade', $grade),
                 'subject' => $this->option('subject', $subject),
@@ -171,6 +171,30 @@ final class StorefrontDemoSeeder extends Seeder
             status: $status,
             openingStock: $status === ProductStatus::ComingSoon ? 0 : 1000,
         );
+    }
+
+    /** A description as the publisher's back cover reads: what the book covers and how it teaches it. */
+    private function description(string $name, string $grade, string $subject, string $publisher): string
+    {
+        $covers = [
+            'عربي' => 'النحو والقراءة والنصوص والقصة والتعبير',
+            'إنجليزي' => 'القواعد والمفردات وقطع القراءة والكتابة',
+            'رياضيات' => 'الجبر والهندسة والإحصاء',
+            'علوم' => 'كل وحدات المنهج بالرسوم التوضيحية والأنشطة العملية',
+            'دراسات' => 'الجغرافيا والتاريخ بالخرائط والجداول الزمنية',
+        ][$subject];
+
+        if (str_starts_with($name, 'المراجعة النهائية')) {
+            return "مراجعة ليلة الامتحان في مادة {$subject} لطلاب {$grade}، الترم الأول، طبعة 2026/2027: ملخص المنهج كله في صفحات قليلة، أهم الأسئلة المتوقعة، و10 نماذج امتحانات بالإجابات النموذجية.";
+        }
+
+        $method = [
+            'الأضواء' => 'شرح مبسّط لكل درس، وتدريبات متدرجة من السهل للصعب، ونماذج امتحانات بالإجابات',
+            'المعلم' => 'ملخصات مركّزة، وأسئلة بنظام التقييمات الأسبوعية، واختبارات شهرية بالإجابات',
+            'سلاح التلميذ' => 'بنك أسئلة شامل بأفكار الامتحانات، وإجابات نموذجية مفصّلة لكل سؤال',
+        ][$publisher];
+
+        return "كتاب {$publisher} في مادة {$subject} لطلاب {$grade}، الترم الأول، طبعة 2026/2027 مطابقة للمنهج الجديد. يغطي {$covers}، مع {$method}.";
     }
 
     private function option(string $key, string $label): int

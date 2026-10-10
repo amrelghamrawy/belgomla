@@ -13,7 +13,8 @@ use Illuminate\Database\Seeder;
 final class DatabaseSeeder extends Seeder
 {
     /**
-     * Local development seed: one school-books tenant with a demo catalog (StorefrontDemoSeeder).
+     * Local development seed: one school-books tenant with a demo catalog (StorefrontDemoSeeder) and two months of
+     * customers, orders and collections (DemoActivitySeeder).
      * Dashboard: owner@alnoor.test / password
      */
     public function run(CreateTenant $createTenant): void
@@ -28,6 +29,6 @@ final class DatabaseSeeder extends Seeder
             ));
         }
 
-        $this->call(StorefrontDemoSeeder::class);
+        $this->call([StorefrontDemoSeeder::class, DemoActivitySeeder::class]);
     }
 }

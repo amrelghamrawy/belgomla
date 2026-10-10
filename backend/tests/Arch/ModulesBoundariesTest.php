@@ -41,7 +41,7 @@ arch('tenancy and audit do not depend on the business modules')
 
 arch('catalog models are used outside catalog only by pricing, inventory, customers, orders and the low-stock report')
     ->expect('App\Modules\Catalog\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Reports', 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Reports', 'Database\Factories', 'Database\Seeders']);
 
 arch('pricing only touches the catalog product and sku it is handed, plus the shared filter')
     ->expect('App\Modules\Pricing')
@@ -106,6 +106,7 @@ arch('inventory models are written only by the StockLedger and read by inventory
         App\Modules\Orders\Services\CheckoutValidator::class, // reads the stock rows checkout locked through the ledger
         App\Modules\Catalog\Models\Sku::class,
         'Database\Factories',
+        'Database\Seeders', // demo data: writes through actions, reads the models they return (rules/02 §1)
     ]);
 
 arch('catalog reaches inventory only through its actions and queries')
@@ -208,7 +209,7 @@ arch('customers price only through the pricing services and read stock only thro
 
 arch('customers models are used outside customers only by orders and collections')
     ->expect('App\Modules\Customers\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', App\Providers\CustomersServiceProvider::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', App\Providers\CustomersServiceProvider::class, 'Database\Factories', 'Database\Seeders']);
 
 arch('no earlier module depends on customers')
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory'])
@@ -294,6 +295,7 @@ arch('orders models are used outside orders only by collections and reports')
         'App\Modules\Reports', // reads orders for the overview and sales report
         App\Providers\OrdersServiceProvider::class,
         'Database\Factories',
+        'Database\Seeders', // demo data: writes through actions, reads the models they return (rules/02 §1)
     ]);
 
 arch('no earlier module depends on orders')

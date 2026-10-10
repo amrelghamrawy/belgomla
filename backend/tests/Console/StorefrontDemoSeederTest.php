@@ -71,3 +71,15 @@ test('seeding twice changes nothing', function (): void {
 
     expect($this->inTenant(fn (): int => Product::query()->count()))->toBe(34);
 });
+
+test('the books read like the publisher describes them, the revision edition as an exam review', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    [$book, $revision] = $this->inTenant(fn (): array => [
+        Product::query()->where('name', 'الأضواء عربي أولى إعدادي')->value('description'),
+        Product::query()->where('name', 'like', 'المراجعة النهائية%')->value('description'),
+    ]);
+
+    expect($book)->toBe('كتاب الأضواء في مادة عربي لطلاب أولى إعدادي، الترم الأول، طبعة 2026/2027 مطابقة للمنهج الجديد. يغطي النحو والقراءة والنصوص والقصة والتعبير، مع شرح مبسّط لكل درس، وتدريبات متدرجة من السهل للصعب، ونماذج امتحانات بالإجابات.')
+        ->and($revision)->toStartWith('مراجعة ليلة الامتحان في مادة عربي لطلاب أولى إعدادي');
+});
