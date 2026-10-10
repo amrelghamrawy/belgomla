@@ -1,0 +1,7 @@
+.next
+node_modules
+lib/api/schema.d.ts
+components/ui
+playwright-report
+test-results
+package-lock.json

@@ -10,7 +10,7 @@ A `frontend/` Next.js app served per tenant host, Arabic RTL mobile-first, with 
 
 | What      | Where                                                                                  |
 | --------- | -------------------------------------------------------------------------------------- |
-| Tech      | `04-technical-constraints.md` §1 frontend, §5 hosts/URLs (`/api` proxied to Laravel), §6 Sanctum, §7 RTL |
+| Tech      | `04-technical-constraints.md` §1 frontend, §5 hosts/URLs (`/api` proxied to Laravel), §6 Sanctum, §8 RTL |
 | Contract  | `08-api-contract.md` §0 envelopes and error codes, §2 auth, §4 dashboard auth          |
 | Product   | `01-product-scope.md` §6 language/UX, §7 branding fields                               |
 

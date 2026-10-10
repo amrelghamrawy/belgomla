@@ -27,7 +27,9 @@ backend/public/hot
 backend/public/storage
 backend/auth.json
 
-# Frontend (later)
+# Frontend (details in frontend/.gitignore)
 frontend/node_modules/
 frontend/.next/
 frontend/.env*.local
+frontend/test-results/
+frontend/playwright-report/
