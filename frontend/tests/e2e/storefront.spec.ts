@@ -38,7 +38,7 @@ test("a new shopper registers, orders a book and cancels the pending order", asy
   await expect(page).toHaveURL(/\/$/);
 
   // Browse a category and filter it by grade (BR-P08: the selection is in the URL).
-  await page.getByRole("link", { name: "المرحلة الإعدادية" }).click();
+  await page.getByRole("main").getByRole("link", { name: "المرحلة الإعدادية", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "المرحلة الإعدادية" })).toBeVisible();
   await page.getByRole("button", { name: "تصفية" }).click();
   await page.getByRole("radio", { name: /^أولى إعدادي/ }).click();

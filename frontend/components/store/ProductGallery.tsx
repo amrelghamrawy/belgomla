@@ -1,15 +1,22 @@
 "use client";
 
-import { ImageOffIcon } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { ProductImage } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { cn } from "@/lib/utils";
 
-/** The main image with thumbnails underneath; the main image comes first. */
-export function ProductGallery({ images, name }: { images: readonly ProductImage[]; name: string }) {
+/** The main image with thumbnails underneath; the main image comes first. Without images, `fallback` (a generated cover). */
+export function ProductGallery({
+  images,
+  name,
+  fallback,
+}: {
+  images: readonly ProductImage[];
+  name: string;
+  fallback: ReactNode;
+}) {
   const ordered = [...images].sort((a, b) => Number(b.is_main) - Number(a.is_main) || a.sort_order - b.sort_order);
   const [current, setCurrent] = useState(0);
   const shown = ordered[current] ?? ordered[0];
@@ -27,12 +34,8 @@ export function ProductGallery({ images, name }: { images: readonly ProductImage
             className="object-contain"
           />
         ) : (
-          <span
-            className="text-muted-foreground grid size-full place-items-center"
-            role="img"
-            aria-label={ar.product.noImage}
-          >
-            <ImageOffIcon className="size-12" />
+          <span className="bg-brand-soft block size-full p-4" role="img" aria-label={ar.product.noImage}>
+            {fallback}
           </span>
         )}
       </div>

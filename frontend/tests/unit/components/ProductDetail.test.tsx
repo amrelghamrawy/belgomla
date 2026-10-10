@@ -31,7 +31,7 @@ describe("ProductDetail", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "الأضواء علوم أولى إعدادي" })).toBeInTheDocument();
     expect(screen.getByText("90.00 ج.م")).toBeInTheDocument();
-    expect(screen.getByText("خصم 25%")).toBeInTheDocument();
+    expect(screen.getByText("هامش ربحك 25%")).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "أسعار الكميات" })).toHaveTextContent("من 10 كرتونة85.00 ج.م");
     expect(screen.getByText("(كرتونة = 20 نسخة)")).toBeInTheDocument();
     expect(screen.getByText("BK-001")).toBeInTheDocument();

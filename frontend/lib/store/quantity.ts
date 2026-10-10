@@ -1,4 +1,5 @@
-import type { Cart } from "@/lib/api/types";
+import type { Cart, StoreSku } from "@/lib/api/types";
+import { ar } from "@/lib/copy/ar";
 
 // Quantity rules the storefront enforces before the server does (BR-MOQ01, D37). The server stays the
 // authority; these keep the stepper from offering a quantity it will refuse.
@@ -28,6 +29,24 @@ export function clampQuantity(quantity: number, bounds: QuantityBounds): number 
   }
 
   return Math.min(Math.max(Math.trunc(quantity), bounds.min), Math.max(bounds.min, bounds.max));
+}
+
+/**
+ * The card's one-line pack summary: "كرتونة = 20 نسخة · أقل طلب 2" for a pack, "أقل طلب 3 نسخة" for a loose unit with
+ * an MOQ, "السعر لكل نسخة" otherwise; empty without a unit name.
+ */
+export function unitSummary(sku: Pick<StoreSku, "unit" | "conversion_factor" | "moq">): string {
+  if (sku.unit === null) {
+    return "";
+  }
+
+  if (sku.conversion_factor > 1) {
+    const pack = ar.product.conversion(sku.unit, sku.conversion_factor);
+
+    return sku.moq > 1 ? `${pack} · ${ar.catalog.minOrderShort(sku.moq)}` : pack;
+  }
+
+  return sku.moq > 1 ? ar.catalog.minOrder(sku.moq, sku.unit) : ar.catalog.perUnit(sku.unit);
 }
 
 /** "1020.50" → 102050. Cart totals and the minimum are never negative. */

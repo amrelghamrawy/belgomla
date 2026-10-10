@@ -1,6 +1,6 @@
+import { TrendingUpIcon } from "lucide-react";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import type { StoreSku } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { formatMoney, formatPercent } from "@/lib/format/money";
@@ -15,8 +15,9 @@ type PriceBlockProps = {
 };
 
 /**
- * Wholesale price, the cover price struck through and the implied discount (BR-PR10). When the store hides prices
- * from guests the same box shows a login link, so the layout does not shift either way.
+ * Wholesale price per selling unit, the retailer's margin (the discount off the cover price, BR-PR10, shown as
+ * "هامش ربحك" per D67), the cover price struck through and, on cards, the first quantity tier. When the store hides
+ * prices from guests the same box shows a login link, so the layout does not shift either way.
  */
 export function PriceBlock({ sku, pricesHidden, size = "sm", loginNext }: PriceBlockProps) {
   const large = size === "lg";
@@ -34,20 +35,31 @@ export function PriceBlock({ sku, pricesHidden, size = "sm", loginNext }: PriceB
     );
   }
 
+  const tier = large ? undefined : sku.tiers?.[0];
+
   return (
-    <div className={cn("flex flex-col justify-center", large ? "min-h-16 gap-1" : "min-h-11")}>
+    <div className={cn("flex flex-col items-start", large ? "min-h-16 gap-1.5" : "gap-1")}>
       {large && <span className="text-muted-foreground text-xs">{ar.product.wholesalePrice}</span>}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={cn("font-bold", large ? "text-2xl" : "text-base")}>{formatMoney(sku.base_price)}</span>
-        {sku.discount_percent && (
-          <Badge variant="secondary" className="text-primary">
-            {ar.product.discount(formatPercent(sku.discount_percent))}
-          </Badge>
-        )}
+      <div className="flex flex-wrap items-baseline gap-x-1.5">
+        <span className={cn("font-bold tracking-tight tabular-nums", large ? "text-3xl" : "text-xl")}>
+          {formatMoney(sku.base_price)}
+        </span>
+        {sku.unit !== null && <span className="text-muted-foreground text-xs">/ {sku.unit}</span>}
       </div>
+      {sku.discount_percent && (
+        <span className="bg-highlight-soft text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold">
+          <TrendingUpIcon className="size-3.5" aria-hidden />
+          {ar.product.margin(formatPercent(sku.discount_percent))}
+        </span>
+      )}
       {sku.cover_price && (
         <span className="text-muted-foreground text-xs">
-          {ar.product.coverPrice}: <s>{formatMoney(sku.cover_price)}</s>
+          {ar.product.coverPrice}: <s className="tabular-nums">{formatMoney(sku.cover_price)}</s>
+        </span>
+      )}
+      {tier?.unit_price && (
+        <span className="text-primary text-xs font-semibold">
+          {ar.product.tierShort(tier.min_quantity, sku.unit ?? "", formatMoney(tier.unit_price))}
         </span>
       )}
     </div>

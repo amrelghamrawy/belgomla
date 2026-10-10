@@ -14,6 +14,7 @@ import { useProduct } from "@/lib/store/catalog";
 import { useRouteParam } from "@/lib/store/route";
 
 import { AddToCartBar } from "./AddToCartBar";
+import { GeneratedCover } from "./GeneratedCover";
 import { PriceBlock } from "./PriceBlock";
 import { ProductCard } from "./ProductCard";
 import { ProductGallery } from "./ProductGallery";
@@ -48,11 +49,15 @@ export function ProductDetail() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 pt-4 pb-40 md:pb-8">
       <div className="grid gap-6 md:grid-cols-2">
-        <ProductGallery images={product.gallery} name={product.name} />
+        <ProductGallery
+          images={product.gallery}
+          name={product.name}
+          fallback={<GeneratedCover product={product} className="rounded-sm" />}
+        />
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             {product.category && <p className="text-muted-foreground text-sm">{product.category.name}</p>}
-            <h1 className="text-xl leading-8 font-bold">{product.name}</h1>
+            <h1 className="font-display text-2xl leading-9 font-bold">{product.name}</h1>
             {product.sku?.coming_soon && <Badge className="w-fit">{ar.catalog.comingSoon}</Badge>}
           </div>
           <PriceBlock

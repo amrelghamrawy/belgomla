@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canOrder, clampQuantity, movProgress, quantityBounds } from "@/lib/store/quantity";
+import { canOrder, clampQuantity, movProgress, quantityBounds, unitSummary } from "@/lib/store/quantity";
 
 describe("quantityBounds", () => {
   it("BR-MOQ01 starts at the MOQ and stops at what the stock covers in selling units (D37)", () => {
@@ -69,5 +69,17 @@ describe("movProgress", () => {
     ["there is no amount", { enabled: true, amount: null, satisfied: true }],
   ])("is null when %s", (_, mov) => {
     expect(movProgress({ items_total: "100.00", mov })).toBeNull();
+  });
+});
+
+describe("unitSummary", () => {
+  it.each([
+    ["a pack with an MOQ", { unit: "كرتونة", conversion_factor: 20, moq: 2 }, "كرتونة = 20 نسخة · أقل طلب 2"],
+    ["a pack without an MOQ", { unit: "كرتونة", conversion_factor: 20, moq: 1 }, "كرتونة = 20 نسخة"],
+    ["a loose unit with an MOQ", { unit: "نسخة", conversion_factor: 1, moq: 3 }, "أقل طلب 3 نسخة"],
+    ["a loose unit", { unit: "نسخة", conversion_factor: 1, moq: 1 }, "السعر لكل نسخة"],
+    ["no unit name", { unit: null, conversion_factor: 1, moq: 1 }, ""],
+  ])("summarises %s", (_case, sku, expected) => {
+    expect(unitSummary(sku)).toBe(expected);
   });
 });

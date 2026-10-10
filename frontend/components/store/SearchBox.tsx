@@ -35,13 +35,13 @@ export function SearchBox({ defaultValue = "", className }: { defaultValue?: str
         value={q}
         onChange={(event) => setQ(event.target.value)}
         placeholder={ar.store.searchPlaceholder}
-        className="h-11 pe-11"
+        className="bg-background h-11 rounded-full ps-4 pe-12"
       />
       <Button
         type="submit"
         variant="ghost"
         size="icon"
-        className="absolute end-0.5 size-10"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground absolute end-1 size-9 rounded-full"
         aria-label={ar.store.search}
       >
         <SearchIcon />

@@ -119,8 +119,8 @@ final class StorefrontDemoSeeder extends Seeder
 
         return new TenantSettingsData(
             name: null,
-            primaryColor: '#0A5C36',
-            secondaryColor: '#F5B400',
+            primaryColor: '#1F3C88',
+            secondaryColor: '#EF6A4C',
             phone: '+201001234567',
             whatsapp: '+201001234567',
             address: '12 شارع الفجالة، القاهرة',

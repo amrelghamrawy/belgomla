@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { applyBranding, luminance, readableOn } from "@/lib/auth/branding";
+import { applyBranding, canHighlight, contrastText, luminance, readableOn } from "@/lib/auth/branding";
 
 import { tenantSettings } from "../../fixtures";
 
@@ -19,6 +19,22 @@ describe("applyBranding", () => {
     expect(style.getPropertyValue("--brand-primary-foreground")).toBe("#ffffff");
     expect(style.getPropertyValue("--brand-secondary")).toBe("#FFFFFF");
     expect(style.getPropertyValue("--brand-secondary-foreground")).toBe("#111111");
+  });
+
+  it("uses a coloured secondary as the storefront highlight", () => {
+    applyBranding(tenantSettings({ colors: { primary: "#1F3C88", secondary: "#EF6A4C" } }));
+
+    const style = document.documentElement.style;
+    expect(style.getPropertyValue("--brand-highlight")).toBe("#EF6A4C");
+    expect(style.getPropertyValue("--brand-highlight-foreground")).toBe("#111111");
+  });
+
+  it("keeps the default highlight when the secondary is near white", () => {
+    document.documentElement.style.setProperty("--brand-highlight", "#EF6A4C");
+
+    applyBranding(tenantSettings({ colors: { primary: "#1F3C88", secondary: "#FAFAFA" } }));
+
+    expect(document.documentElement.style.getPropertyValue("--brand-highlight")).toBe("");
   });
 
   it("keeps the default theme for a colour that is not hex", () => {
@@ -76,5 +92,23 @@ describe("luminance and readableOn", () => {
     ["#1B3A8C", "#ffffff"],
   ])("picks readable text on %s", (hex, text) => {
     expect(readableOn(hex)).toBe(text);
+  });
+});
+
+describe("canHighlight and contrastText", () => {
+  it.each([
+    ["#EF6A4C", true],
+    ["#1F3C88", true],
+    ["#FFFFFF", false],
+    ["not-a-colour", false],
+  ])("decides whether %s can be the highlight", (hex, expected) => {
+    expect(canHighlight(hex)).toBe(expected);
+  });
+
+  it.each([
+    ["#EF6A4C", "#111111"],
+    ["#1F3C88", "#ffffff"],
+  ])("picks the higher-contrast text on %s", (hex, text) => {
+    expect(contrastText(hex)).toBe(text);
   });
 });

@@ -92,6 +92,16 @@ export function useFeaturedProducts() {
   });
 }
 
+/** A category's newest products, for its row on the home page (D67). */
+export function useCategoryProducts(slug: string) {
+  const params = { category: slug, sort: "-created_at", per_page: 8 } as const;
+
+  return useQuery({
+    queryKey: queryKeys.products(params),
+    queryFn: () => apiFetchPage<StoreProduct>(withQuery("/api/store/products", params)),
+  });
+}
+
 export function useProduct(slug: string) {
   return useQuery({
     queryKey: queryKeys.product(slug),
