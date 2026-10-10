@@ -47,7 +47,7 @@ All screens wired to the real API, no mocked data; `npm run typecheck && lint &&
 - D42: Dashboard default landing (overview vs orders). Default: overview.
 - D43: Table pagination size. Default: 24 (matches `PaginatedRequest`).
 
-## Delivery notes (commits 8ecc780 spec + shell, 7eccbe9 catalog, 3657316 inventory, aa7ddfc customers, 16ae1c3 orders + collections, 328ffe4 reports, a41a980 settings/users/audit, then the e2e commit)
+## Delivery notes (commits 8ecc780 spec + shell, 7eccbe9 catalog, 3657316 inventory, aa7ddfc customers, 16ae1c3 orders + collections, 328ffe4 reports, a41a980 settings/users/audit, 33d231b e2e)
 
 Delivered as vertical slices, one commit per area with its tests (agreed with the product owner at the start).
 
