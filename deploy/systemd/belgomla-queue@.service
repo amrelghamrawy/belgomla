@@ -1,0 +1,20 @@
+# Queue worker N (tasks/11): `systemctl enable --now belgomla-queue@1 belgomla-queue@2`.
+# Horizon is not used. Every job in V1 runs on the `messaging` queue (Tech §13), so it is listed first.
+# --max-time recycles the worker hourly; deploy.sh restarts workers so they load new code.
+[Unit]
+Description=BelGomla queue worker %i
+After=network.target redis-server.service postgresql.service
+Wants=redis-server.service
+
+[Service]
+User=belgomla
+Group=belgomla
+WorkingDirectory=/srv/belgomla/backend
+ExecStart=/usr/bin/php artisan queue:work redis --queue=messaging,default --tries=3 --backoff=10 --max-time=3600 --sleep=3
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

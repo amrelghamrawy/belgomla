@@ -1,0 +1,10 @@
+# Health monitor (tasks/11): /up per tenant host + platform:monitor. Fails while a problem is open.
+[Unit]
+Description=BelGomla health monitor
+After=network.target
+
+[Service]
+Type=oneshot
+User=belgomla
+Group=belgomla
+ExecStart=/srv/belgomla/deploy/monitor.sh

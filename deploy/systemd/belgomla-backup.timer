@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the BelGomla backup nightly at 01:00 UTC (03:00-04:00 Africa/Cairo; the VM clock is UTC)
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

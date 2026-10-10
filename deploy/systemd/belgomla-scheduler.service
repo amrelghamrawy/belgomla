@@ -1,0 +1,11 @@
+# Laravel scheduler tick, started every minute by belgomla-scheduler.timer (routes/console.php).
+[Unit]
+Description=BelGomla scheduler tick
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=oneshot
+User=belgomla
+Group=belgomla
+WorkingDirectory=/srv/belgomla/backend
+ExecStart=/usr/bin/php artisan schedule:run --no-interaction

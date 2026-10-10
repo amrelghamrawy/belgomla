@@ -1,0 +1,11 @@
+# Nightly backup (tasks/11): pg_dump + storage/app/public to the S3-compatible bucket, 30-day retention.
+[Unit]
+Description=BelGomla nightly backup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=belgomla
+Group=belgomla
+ExecStart=/srv/belgomla/deploy/backup.sh

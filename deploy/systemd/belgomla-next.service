@@ -1,0 +1,19 @@
+# Next.js storefront + dashboard (`next start` on 127.0.0.1:3000, behind nginx).
+# BACKEND_HOST/BACKEND_PORT in frontend.env point the server-side prefetch at nginx's internal :8081 listener.
+[Unit]
+Description=BelGomla Next.js
+After=network.target nginx.service
+
+[Service]
+User=belgomla
+Group=belgomla
+WorkingDirectory=/srv/belgomla/frontend
+EnvironmentFile=/etc/belgomla/frontend.env
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/npx --no-install next start -p 3000 -H 127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
