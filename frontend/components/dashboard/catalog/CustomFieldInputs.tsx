@@ -6,6 +6,7 @@ import type { FieldDefinition } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { type CustomFieldDrafts, visibleDefinitions } from "@/lib/dashboard/custom-fields";
 
+import { LabelText } from "../common/LabelText";
 import { NativeSelect } from "../common/NativeSelect";
 
 const copy = ar.dashboard.productForm;
@@ -36,11 +37,12 @@ export function CustomFieldInputs({ definitions, values, onChange, errors }: Pro
         const value = values[definition.key] ?? "";
         const error = errors[definition.key];
         const archived = definition.status === "archived";
-        const label = `${definition.label}${definition.is_required ? " *" : ""}`;
 
         return (
           <Field key={definition.key} data-invalid={error !== undefined}>
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            <FieldLabel htmlFor={id}>
+              <LabelText text={definition.label} need={definition.is_required ? "required" : "optional"} />
+            </FieldLabel>
             {definition.type === "select" ? (
               <NativeSelect
                 id={id}

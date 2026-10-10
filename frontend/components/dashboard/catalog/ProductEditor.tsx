@@ -35,6 +35,7 @@ import {
 } from "@/lib/dashboard/product-form";
 import { useRecomputePricing } from "@/lib/dashboard/pricing";
 
+import { LabelText } from "../common/LabelText";
 import { NativeSelect } from "../common/NativeSelect";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { CustomFieldInputs } from "./CustomFieldInputs";
@@ -200,10 +201,13 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   const text = (
     name: "name" | "code" | "conversion_factor" | "moq" | "opening_stock" | "cover_price",
     label: string,
+    need: "required" | "optional",
     ltr = false,
   ) => (
     <Field data-invalid={errors[name] !== undefined}>
-      <FieldLabel htmlFor={`product-${name}`}>{label}</FieldLabel>
+      <FieldLabel htmlFor={`product-${name}`}>
+        <LabelText text={label} need={need} />
+      </FieldLabel>
       <Input
         id={`product-${name}`}
         dir={ltr ? "ltr" : undefined}
@@ -217,7 +221,9 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
 
   const unitSelect = (name: "selling_unit_id" | "base_unit_id", label: string) => (
     <Field data-invalid={errors[name] !== undefined}>
-      <FieldLabel htmlFor={`product-${name}`}>{label}</FieldLabel>
+      <FieldLabel htmlFor={`product-${name}`}>
+        <LabelText text={label} need="required" />
+      </FieldLabel>
       <NativeSelect id={`product-${name}`} aria-invalid={errors[name] !== undefined} {...form.register(name)}>
         <option value="">{copy.chooseUnit}</option>
         {activeUnits.map((unit) => (
@@ -248,6 +254,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+      <p className="text-muted-foreground text-xs">{ar.dashboard.requiredLegend}</p>
       <Tabs dir="rtl" value={tab} onValueChange={(value) => setTab(value as Tab)}>
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="basics">{copy.tabs.basics}</TabsTrigger>
@@ -259,9 +266,11 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
 
         <TabsContent value="basics" forceMount className="data-[state=inactive]:hidden">
           <div className="grid gap-4 pt-4 md:grid-cols-2">
-            {text("name", copy.name)}
+            {text("name", copy.name, "required")}
             <Field data-invalid={errors.category_id !== undefined}>
-              <FieldLabel htmlFor="product-category_id">{copy.category}</FieldLabel>
+              <FieldLabel htmlFor="product-category_id">
+                <LabelText text={copy.category} need="required" />
+              </FieldLabel>
               <NativeSelect
                 id="product-category_id"
                 aria-invalid={errors.category_id !== undefined}
@@ -277,7 +286,9 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
               <FieldError errors={[errors.category_id]} />
             </Field>
             <Field className="md:col-span-2">
-              <FieldLabel htmlFor="product-description">{copy.description}</FieldLabel>
+              <FieldLabel htmlFor="product-description">
+                <LabelText text={copy.description} need="optional" />
+              </FieldLabel>
               <Textarea id="product-description" rows={3} {...form.register("description")} />
             </Field>
             {creating && (
@@ -292,11 +303,11 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
                 </NativeSelect>
               </Field>
             )}
-            {text("code", copy.code, true)}
+            {text("code", copy.code, "required", true)}
             {unitSelect("selling_unit_id", copy.sellingUnit)}
             {unitSelect("base_unit_id", copy.baseUnit)}
-            {text("conversion_factor", copy.conversion, true)}
-            {creating && text("opening_stock", copy.openingStock, true)}
+            {text("conversion_factor", copy.conversion, "required", true)}
+            {creating && text("opening_stock", copy.openingStock, "optional", true)}
           </div>
         </TabsContent>
 
@@ -319,14 +330,14 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
 
         <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
           <div className="grid gap-4 pt-4 md:grid-cols-2">
-            {text("cover_price", copy.coverPrice, true)}
+            {text("cover_price", copy.coverPrice, "optional", true)}
             <Controller
               control={form.control}
               name="base_value"
               render={({ field }) => (
                 <PriceInput
                   id="product-base_value"
-                  label={copy.basePrice}
+                  label={<LabelText text={copy.basePrice} need="required" />}
                   mode={baseMode}
                   onModeChange={(mode) => form.setValue("base_mode", mode)}
                   value={field.value}
@@ -336,7 +347,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
                 />
               )}
             />
-            {text("moq", copy.moq, true)}
+            {text("moq", copy.moq, "required", true)}
             <div className="md:col-span-2">
               {serverTierProblems.length > 0 && (
                 <Alert variant="destructive" className="mb-3">

@@ -49,7 +49,7 @@ describe("CustomFieldInputs", () => {
     selectField({ id: 4, key: "note", label: "ملاحظة", type: "text", is_required: false, sort_order: 4, options: [] }),
   ];
 
-  it("renders each definition with its own input and marks required ones", () => {
+  it("renders each definition with its own input and marks required and optional ones", () => {
     render(<CustomFieldInputs definitions={definitions} values={{}} onChange={vi.fn()} errors={{}} />);
 
     const grade = screen.getByLabelText("الصف *");
@@ -58,13 +58,13 @@ describe("CustomFieldInputs", () => {
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual(["اختر", "الأول", "الثاني"]);
-    expect(screen.getByLabelText("الصفحات")).toHaveAttribute("type", "number");
+    expect(screen.getByLabelText("الصفحات (اختياري)")).toHaveAttribute("type", "number");
     expect(
-      within(screen.getByLabelText("ملون"))
+      within(screen.getByLabelText("ملون (اختياري)"))
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual(["اختر", "نعم", "لا"]);
-    expect(screen.getByLabelText("ملاحظة")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("ملاحظة (اختياري)")).toHaveAttribute("type", "text");
   });
 
   it("keeps an archived option selectable only while it is the current value", () => {
@@ -222,21 +222,39 @@ describe("ProductForm", () => {
     expect(await screen.findByText("سعر شريحة 10 أعلى من السعر الأساسي")).toBeVisible();
   });
 
+  it("marks the required fields with * and the optional ones, with a legend", async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<ProductForm product={null} definitions={[]} units={units} categories={categories} />);
+
+    expect(screen.getByText("الحقول المعلَّمة بعلامة * إجبارية.")).toBeInTheDocument();
+    for (const label of ["اسم المنتج *", "القسم *", "كود الصنف (SKU) *", "وحدة البيع *", "الوحدة الأساسية *"]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByLabelText("الوصف (اختياري)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+
+    expect(screen.getByLabelText("سعر الغلاف (اختياري)")).toBeInTheDocument();
+    expect(screen.getByLabelText("سعر الجملة *")).toBeInTheDocument();
+    expect(screen.getByLabelText("الحد الأدنى للطلب (بوحدة البيع) *")).toBeInTheDocument();
+    expect(screen.getByText("شرائح الكمية").closest("legend")).toHaveTextContent("شرائح الكمية (اختياري)");
+  });
+
   it("creates a product with status and opening stock, then opens it", async () => {
     const fetchMock = stubApi({ "POST /api/dashboard/products": json(201, { data: dashboardProduct({ id: 9 }) }) });
     const user = userEvent.setup();
     renderWithQuery(<ProductForm product={null} definitions={[]} units={units} categories={categories} />);
 
-    await user.type(screen.getByLabelText("اسم المنتج"), "كتاب جديد");
-    await user.selectOptions(screen.getByLabelText("القسم"), "1");
-    await user.type(screen.getByLabelText("كود الصنف (SKU)"), "NEW-1");
-    await user.selectOptions(screen.getByLabelText("وحدة البيع"), "2");
-    await user.selectOptions(screen.getByLabelText("الوحدة الأساسية"), "1");
-    await user.clear(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع"));
-    await user.type(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع"), "20");
-    await user.type(screen.getByLabelText("الرصيد الافتتاحي (بالوحدة الأساسية)"), "200");
+    await user.type(screen.getByLabelText("اسم المنتج *"), "كتاب جديد");
+    await user.selectOptions(screen.getByLabelText("القسم *"), "1");
+    await user.type(screen.getByLabelText("كود الصنف (SKU) *"), "NEW-1");
+    await user.selectOptions(screen.getByLabelText("وحدة البيع *"), "2");
+    await user.selectOptions(screen.getByLabelText("الوحدة الأساسية *"), "1");
+    await user.clear(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"));
+    await user.type(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"), "20");
+    await user.type(screen.getByLabelText("الرصيد الافتتاحي (بالوحدة الأساسية) (اختياري)"), "200");
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
-    await user.type(screen.getByLabelText("سعر الجملة"), "50.00");
+    await user.type(screen.getByLabelText("سعر الجملة *"), "50.00");
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/dashboard/products/9"));

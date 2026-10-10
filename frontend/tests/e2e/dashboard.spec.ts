@@ -43,17 +43,17 @@ test("a merchant builds a category, unit, custom field and product, sees it on t
 
   // The product with its custom field, price and opening stock.
   await page.goto("/dashboard/products/new");
-  await page.getByLabel("اسم المنتج", { exact: true }).fill(product);
-  await page.getByLabel("القسم", { exact: true }).selectOption({ label: category });
+  await page.getByLabel("اسم المنتج *", { exact: true }).fill(product);
+  await page.getByLabel("القسم *", { exact: true }).selectOption({ label: category });
   await page.getByLabel("كود الصنف (SKU)").fill(`E2E-${run}`);
-  await page.getByLabel("وحدة البيع", { exact: true }).selectOption({ label: unit });
-  await page.getByLabel("الوحدة الأساسية", { exact: true }).selectOption({ label: unit });
+  await page.getByLabel("وحدة البيع *", { exact: true }).selectOption({ label: unit });
+  await page.getByLabel("الوحدة الأساسية *", { exact: true }).selectOption({ label: unit });
   await page.getByLabel("الرصيد الافتتاحي (بالوحدة الأساسية)").fill("50");
   await page.getByRole("tab", { name: "الحقول" }).click();
   await page.getByLabel(field).selectOption({ label: "أحمد" });
   await page.getByRole("tab", { name: "التسعير" }).click();
-  await page.getByLabel("سعر الغلاف", { exact: true }).fill("100.00");
-  await page.getByLabel("سعر الجملة", { exact: true }).fill("80.00");
+  await page.getByLabel("سعر الغلاف (اختياري)", { exact: true }).fill("100.00");
+  await page.getByLabel("سعر الجملة *", { exact: true }).fill("80.00");
   await expect(page.getByTestId("product-base_value-hint")).toHaveText("خصم 20.00% من سعر الغلاف");
   await page.getByRole("button", { name: "حفظ" }).first().click();
   await expect(page).toHaveURL(/\/dashboard\/products\/\d+$/);

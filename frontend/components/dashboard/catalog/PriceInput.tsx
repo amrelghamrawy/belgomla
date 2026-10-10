@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -13,7 +15,7 @@ export type PriceMode = "price" | "percent";
 
 type Props = {
   id: string;
-  label: string;
+  label: ReactNode;
   mode: PriceMode;
   onModeChange: (mode: PriceMode) => void;
   value: string;

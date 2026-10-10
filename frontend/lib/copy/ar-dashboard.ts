@@ -573,4 +573,6 @@ export const dashboard = {
   yes: "نعم",
   no: "لا",
   none: "—",
+  optional: "(اختياري)",
+  requiredLegend: "الحقول المعلَّمة بعلامة * إجبارية.",
 };

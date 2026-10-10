@@ -9,6 +9,7 @@ import { ar } from "@/lib/copy/ar";
 import { type TierDraft, tierPrice } from "@/lib/dashboard/price-math";
 import { formatMoney } from "@/lib/format/money";
 
+import { LabelText } from "../common/LabelText";
 import { NativeSelect } from "../common/NativeSelect";
 
 const copy = ar.dashboard.productForm;
@@ -28,7 +29,9 @@ export function TiersEditor({ tiers, onChange, cover, problems }: Props) {
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="font-medium">{copy.tiers}</legend>
+      <legend className="font-medium">
+        <LabelText text={copy.tiers} need="optional" />
+      </legend>
       <p className="text-muted-foreground text-xs">{copy.tiersHint}</p>
       {tiers.map((tier, index) => {
         const price = tierPrice(tier, cover);
