@@ -89,6 +89,7 @@ Which file to write:
 - `<html lang="ar" dir="rtl">` once in the root layout; Radix gets `DirectionProvider dir="rtl"`.
 - **Logical utilities only**: `ms-/me-/ps-/pe-`, `start-/end-`, `text-start/text-end`, `rounded-s/e`, `border-s/e`. Physical `ml-/mr-/pl-/pr-/left-/right-/text-left/text-right/rounded-l/r/border-l/r` are rejected by ESLint (`no-restricted-syntax` on class strings). The one exemption is `slide-in-from-left/right` and `slide-out-to-left/right`: shadcn keys them off Radix's physical `data-[side=…]`.
 - Design at **360px first**; add `sm:`/`md:`/`lg:` only to enlarge. Never design desktop first and squeeze.
+- A grid without `grid-cols-*` on phones sizes its column to the widest child: a table inside overflows the page. Give such grids `grid-cols-1` and their flex children `min-w-0`. `tests/e2e/dashboard.spec.ts` checks every dashboard screen for horizontal scroll on both projects.
 - Touch targets ≥ 44px (`h-11` for primary buttons and inputs on the storefront).
 - The primary mobile action (add to cart, checkout, save) sits in a sticky bottom bar on phones.
 - Latin/number runs inside Arabic text: phones, emails, SKU codes and order numbers are wrapped in `<bdi>` or rendered with `dir="ltr"` (inputs for phone/email/password use `dir="ltr"` + `text-start`).
@@ -149,6 +150,7 @@ Which file to write:
   - The backend must be seeded (`php artisan migrate:fresh --seed`: the alnoor tenant + StorefrontDemoSeeder catalog).
   - `workers: 1`: `php artisan serve` answers one request at a time, parallel workers starve it into timeouts.
   - Calls a test makes itself go through the page (`page.evaluate(fetch)`), not `page.request`: Node does not get Chromium's host mapping. OTPs come from `GET /api/_test/last-otp` (D62); each run registers a new phone (5 OTPs per phone per hour).
+  - Shared helpers live in `tests/e2e/helpers.ts`: `api()` (a CSRF-aware JSON call from the page), `loginAsOwner()`, `placeShopperOrder()` (a shopper in their own browser context registers and checks out through the store API). Specs that change data scope it to names made in the run, so the seeded catalog other specs rely on stays as is.
 - jsdom gaps are filled in `tests/unit/setup.ts` (ResizeObserver for Radix, elementFromPoint for input-otp), assigned rather than `vi.stubGlobal` because `unstubGlobals` resets stubs after each test. `userEvent.setup()` installs its own `navigator.clipboard`: use `fireEvent` when a test stubs the clipboard.
 - Tests that run Node-only code (the proxy) start with `// @vitest-environment node`.
 - Inside `<main>`, query alerts as `getByRole('main').getByRole('alert')`: Next adds its own `role="alert"` route announcer to every page.

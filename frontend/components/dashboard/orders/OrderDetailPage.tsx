@@ -74,8 +74,8 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
           </AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>{copy.items}</CardTitle>
@@ -122,7 +122,7 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
           </Card>
           <CollectionsCard collections={order.collections} />
         </div>
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <CardHeader>
               <CardTitle>{copy.customer}</CardTitle>
