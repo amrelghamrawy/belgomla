@@ -1,4 +1,14 @@
-import type { DashboardMe, MerchantNotification, OverviewReport, TenantUser } from "@/lib/api/types";
+import type {
+  DashboardCategory,
+  DashboardMe,
+  DashboardProduct,
+  DashboardSku,
+  FieldDefinition,
+  MerchantNotification,
+  OverviewReport,
+  TenantUser,
+  Unit,
+} from "@/lib/api/types";
 
 import { json, stubApi } from "./http";
 import { page, tenantSettings } from "./fixtures";
@@ -58,4 +68,80 @@ export function shellRoutes(notifications: MerchantNotification[] = [], unread =
 
 export function stubDashboard(routes: Parameters<typeof stubApi>[0] = {}) {
   return stubApi({ ...shellRoutes(), ...routes });
+}
+
+export function unit(overrides: Partial<Unit> = {}): Unit {
+  return { id: 1, name: "نسخة", status: "active", ...overrides };
+}
+
+export function category(overrides: Partial<DashboardCategory> = {}): DashboardCategory {
+  return {
+    id: 1,
+    name: "المرحلة الابتدائية",
+    slug: "primary",
+    image_url: null,
+    parent_id: null,
+    sort_order: 0,
+    status: "active",
+    children: [],
+    ...overrides,
+  };
+}
+
+/** A select field "الصف" with two active options and one archived. */
+export function selectField(overrides: Partial<FieldDefinition> = {}): FieldDefinition {
+  return {
+    id: 1,
+    key: "grade",
+    label: "الصف",
+    type: "select",
+    is_required: true,
+    show_on_storefront: true,
+    is_filterable: true,
+    filter_order: 1,
+    sort_order: 1,
+    status: "active",
+    options: [
+      { id: 11, label: "الأول", sort_order: 1, status: "active" },
+      { id: 12, label: "الثاني", sort_order: 2, status: "active" },
+      { id: 13, label: "القديم", sort_order: 3, status: "archived" },
+    ],
+    ...overrides,
+  };
+}
+
+export function dashboardSku(overrides: Partial<DashboardSku> = {}): DashboardSku {
+  return {
+    id: 5,
+    code: "ADW-SCI-1",
+    selling_unit: { id: 2, name: "كرتونة" },
+    base_unit: { id: 1, name: "نسخة" },
+    conversion_factor: 20,
+    cover_price: "120.00",
+    base_price: "90.00",
+    base_price_percent: "25.00",
+    moq: 5,
+    tiers: [{ min_quantity: 10, unit_price: "84.00", discount_percent: "30.00" }],
+    inventory: { on_hand: 400, reserved: 0, available: 400 },
+    ...overrides,
+  };
+}
+
+export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): DashboardProduct {
+  return {
+    id: 3,
+    name: "الأضواء علوم",
+    slug: "adwaa-science",
+    description: null,
+    status: "active",
+    category: { id: 1, name: "المرحلة الابتدائية" },
+    custom_fields: { grade: 11 },
+    sku: dashboardSku(),
+    main_image_url: null,
+    images: [],
+    relations: [],
+    created_at: "2026-10-01T08:00:00Z",
+    updated_at: "2026-10-01T08:00:00Z",
+    ...overrides,
+  };
 }

@@ -128,14 +128,18 @@ function request(path: string, options: ApiOptions): Promise<Response> {
     headers["X-XSRF-TOKEN"] = token;
   }
 
-  if (options.body !== undefined) {
+  // FormData (image uploads) goes as multipart: the browser writes the Content-Type with its boundary.
+  const multipart = options.body instanceof FormData;
+
+  if (options.body !== undefined && !multipart) {
     headers["Content-Type"] = "application/json";
   }
 
   return send(path, {
     method: options.method ?? "GET",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body:
+      options.body === undefined ? undefined : multipart ? (options.body as FormData) : JSON.stringify(options.body),
     signal: options.signal,
   });
 }

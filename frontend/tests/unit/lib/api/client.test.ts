@@ -62,6 +62,20 @@ describe("apiFetch", () => {
     });
   });
 
+  it("sends FormData as multipart, leaving the Content-Type to the browser", async () => {
+    document.cookie = "XSRF-TOKEN=abc; path=/";
+    const fetchMock = stubFetch(json(201, { data: { id: 1 } }));
+    const form = new FormData();
+    form.append("file", new Blob(["x"], { type: "image/png" }), "cover.png");
+
+    await apiFetch("/api/dashboard/products/1/images", { method: "POST", body: form });
+
+    const { init, headers } = requestOf(fetchMock, 0);
+    expect(init.body).toBe(form);
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(headers["X-XSRF-TOKEN"]).toBe("abc");
+  });
+
   it("sends the decoded XSRF-TOKEN cookie as X-XSRF-TOKEN", async () => {
     document.cookie = "XSRF-TOKEN=a%3Db; path=/";
     const fetchMock = stubFetch(json(200, { data: {} }));
