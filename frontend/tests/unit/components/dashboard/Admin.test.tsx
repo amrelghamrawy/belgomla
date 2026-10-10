@@ -194,6 +194,7 @@ describe("audit", () => {
     const user = userEvent.setup();
     renderWithQuery(<AuditPage />);
 
+    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
     await user.type(screen.getByLabelText("رقم الدفعة"), "abc");
     await user.click(screen.getByRole("button", { name: "تطبيق" }));
 

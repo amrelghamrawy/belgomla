@@ -51,6 +51,11 @@ export function pageOf(query: ListQuery): number {
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
+/** How many of `keys` are set, plus every facet `f[...]` when `facets` is on: the count on a filter button. */
+export function activeFilters(query: ListQuery, keys: readonly string[], facets = false): number {
+  return Object.keys(query).filter((key) => keys.includes(key) || (facets && /^f\[[^\]]+\]$/.test(key))).length;
+}
+
 /** Whether any filter (anything but the page) is set. */
 export function hasFilters(query: ListQuery): boolean {
   return Object.keys(query).some((key) => key !== "page");

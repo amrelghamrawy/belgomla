@@ -10,13 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SalesGrouping } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
-import { pageOf } from "@/lib/dashboard/list-query";
+import { activeFilters, pageOf } from "@/lib/dashboard/list-query";
 import { useLowStockReport, useOutstandingReport, useSalesReport } from "@/lib/dashboard/reports";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -64,7 +65,14 @@ export function SalesSection({ query, setQuery }: SectionProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-2">
+      <FilterPanel
+        active={activeFilters(query, ["from", "to", "group"])}
+        leading={
+          <Button variant="outline" onClick={() => setTable(!table)} aria-pressed={table}>
+            {table ? copy.showChart : copy.showTable}
+          </Button>
+        }
+      >
         <label className="flex flex-col gap-1 text-xs">
           {ar.dashboard.list.from}
           <Input
@@ -92,10 +100,7 @@ export function SalesSection({ query, setQuery }: SectionProps) {
             </option>
           ))}
         </NativeSelect>
-        <Button variant="outline" onClick={() => setTable(!table)} aria-pressed={table}>
-          {table ? copy.showChart : copy.showTable}
-        </Button>
-      </div>
+      </FilterPanel>
       {report.isError && <ErrorBlock error={report.error} onRetry={() => void report.refetch()} />}
       {report.isPending && <LoadingBlock rows={4} />}
       {report.data && (

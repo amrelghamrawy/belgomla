@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { FilterPanel } from "@/components/dashboard/common/FilterPanel";
 import { Pager } from "@/components/dashboard/common/Pager";
 import { ReasonDialog } from "@/components/dashboard/common/ReasonDialog";
 import { Button } from "@/components/ui/button";
@@ -91,5 +92,45 @@ describe("Pager", () => {
     rerender(<Pager meta={page([], { total: 3 }).meta} onPage={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: "التالي" })).not.toBeInTheDocument();
+  });
+});
+
+describe("FilterPanel", () => {
+  it("keeps the filters hidden until the filter button opens them", async () => {
+    const user = userEvent.setup();
+    render(
+      <FilterPanel active={0} leading={<input aria-label="بحث" />}>
+        <select aria-label="الحالة" />
+      </FilterPanel>,
+    );
+
+    expect(screen.getByLabelText("بحث")).toBeInTheDocument();
+    expect(screen.queryByLabelText("الحالة")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "تصفية" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+
+    expect(screen.getByLabelText("الحالة")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(toggle);
+
+    expect(screen.queryByLabelText("الحالة")).not.toBeInTheDocument();
+  });
+
+  it("shows how many filters are set and a clear link while closed", async () => {
+    const onClear = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <FilterPanel active={2} onClear={onClear}>
+        <select aria-label="الحالة" />
+      </FilterPanel>,
+    );
+
+    expect(screen.getByRole("button", { name: "تصفية، 2 مفعّلة" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "مسح التصفية" }));
+
+    expect(onClear).toHaveBeenCalledOnce();
   });
 });

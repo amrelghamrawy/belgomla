@@ -15,8 +15,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { BulkAdjustResult, InventoryRow } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { INVENTORY_LIST_KEYS, useBulkAdjustStock, useInventory } from "@/lib/dashboard/inventory";
+import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -49,19 +51,31 @@ export function InventoryPage() {
           </Button>
         }
       />
-      <div className="flex flex-wrap items-center gap-2">
-        <form onSubmit={search} role="search" className="flex gap-2">
-          <Input
-            aria-label={ar.dashboard.list.search}
-            placeholder={ar.dashboard.list.searchPlaceholder}
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            className="max-w-xs"
-          />
-          <Button type="submit" variant="outline">
-            {ar.dashboard.list.search}
-          </Button>
-        </form>
+      <FilterPanel
+        active={activeFilters(query, ["sort", "low_stock"])}
+        onClear={
+          hasFilters(query)
+            ? () => {
+                setQ("");
+                setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
+              }
+            : undefined
+        }
+        leading={
+          <form onSubmit={search} role="search" className="flex gap-2">
+            <Input
+              aria-label={ar.dashboard.list.search}
+              placeholder={ar.dashboard.list.searchPlaceholder}
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              className="max-w-xs"
+            />
+            <Button type="submit" variant="outline">
+              {ar.dashboard.list.search}
+            </Button>
+          </form>
+        }
+      >
         <NativeSelect
           aria-label={copy.sort}
           value={query.sort ?? "code"}
@@ -73,7 +87,7 @@ export function InventoryPage() {
             </option>
           ))}
         </NativeSelect>
-        <div className="flex items-center gap-2">
+        <div className="flex h-10 items-center gap-2">
           <Switch
             id="inventory-low-stock"
             checked={query.low_stock === "1"}
@@ -81,7 +95,7 @@ export function InventoryPage() {
           />
           <Label htmlFor="inventory-low-stock">{copy.lowStockOnly}</Label>
         </div>
-      </div>
+      </FilterPanel>
       {inventory.isError && <ErrorBlock error={inventory.error} onRetry={() => void inventory.refetch()} />}
       {inventory.isPending && <LoadingBlock />}
       {inventory.data !== undefined && rows.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}

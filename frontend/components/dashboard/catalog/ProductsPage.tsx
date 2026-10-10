@@ -23,10 +23,11 @@ import {
   useFields,
 } from "@/lib/dashboard/catalog";
 import { activeOnly, flatten } from "@/lib/dashboard/category-tree";
-import { hasFilters } from "@/lib/dashboard/list-query";
+import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatMoney } from "@/lib/format/money";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -178,99 +179,98 @@ function Filters({ query, setQuery, categories, facets }: FiltersProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <form onSubmit={search} className="flex gap-2" role="search">
-        <Input
-          aria-label={ar.dashboard.list.search}
-          placeholder={ar.dashboard.list.searchPlaceholder}
-          value={q}
-          onChange={(event) => setQ(event.target.value)}
-          className="max-w-sm"
-        />
-        <Button type="submit" variant="outline">
-          {ar.dashboard.list.search}
-        </Button>
-      </form>
-      <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect
-          aria-label={copy.category}
-          value={query.category ?? ""}
-          onChange={(event) => setQuery({ category: event.target.value })}
-        >
-          <option value="">{copy.allCategories}</option>
-          {categories.map(({ node, depth }) => (
-            <option key={node.id} value={node.id}>
-              {`${"— ".repeat(depth)}${node.name}`}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          aria-label={copy.status}
-          value={query.status ?? ""}
-          onChange={(event) => setQuery({ status: event.target.value })}
-        >
-          <option value="">{copy.allStatuses}</option>
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {ar.dashboard.productStatuses[status]}
-            </option>
-          ))}
-        </NativeSelect>
-        {facets.map((facet) => (
-          <NativeSelect
-            key={facet.key}
-            aria-label={facet.label}
-            value={query[`f[${facet.key}]`] ?? ""}
-            onChange={(event) => setQuery({ [`f[${facet.key}]`]: event.target.value })}
-          >
-            <option value="">{`${facet.label}: ${copy.anyValue}`}</option>
-            {facet.type === "boolean" ? (
-              <>
-                <option value="true">{ar.dashboard.yes}</option>
-                <option value="false">{ar.dashboard.no}</option>
-              </>
-            ) : (
-              facet.options
-                .filter((option) => option.status === "active")
-                .map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))
-            )}
-          </NativeSelect>
-        ))}
-        <NativeSelect
-          aria-label={copy.sort}
-          value={query.sort ?? "-created_at"}
-          onChange={(event) => setQuery({ sort: event.target.value === "-created_at" ? null : event.target.value })}
-        >
-          {Object.entries(copy.sorts).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </NativeSelect>
-        <div className="flex items-center gap-2">
-          <Switch
-            id="low-stock"
-            checked={query.low_stock === "1"}
-            onCheckedChange={(checked) => setQuery({ low_stock: checked ? "1" : null })}
-          />
-          <Label htmlFor="low-stock">{copy.lowStockOnly}</Label>
-        </div>
-        {hasFilters(query) && (
-          <Button
-            variant="link"
-            onClick={() => {
+    <FilterPanel
+      active={activeFilters(query, ["category", "status", "sort", "low_stock"], true)}
+      onClear={
+        hasFilters(query)
+          ? () => {
               setQ("");
               setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
-            }}
-          >
-            {ar.dashboard.list.clearFilters}
+            }
+          : undefined
+      }
+      leading={
+        <form onSubmit={search} className="flex gap-2" role="search">
+          <Input
+            aria-label={ar.dashboard.list.search}
+            placeholder={ar.dashboard.list.searchPlaceholder}
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            className="max-w-sm"
+          />
+          <Button type="submit" variant="outline">
+            {ar.dashboard.list.search}
           </Button>
-        )}
+        </form>
+      }
+    >
+      <NativeSelect
+        aria-label={copy.category}
+        value={query.category ?? ""}
+        onChange={(event) => setQuery({ category: event.target.value })}
+      >
+        <option value="">{copy.allCategories}</option>
+        {categories.map(({ node, depth }) => (
+          <option key={node.id} value={node.id}>
+            {`${"— ".repeat(depth)}${node.name}`}
+          </option>
+        ))}
+      </NativeSelect>
+      <NativeSelect
+        aria-label={copy.status}
+        value={query.status ?? ""}
+        onChange={(event) => setQuery({ status: event.target.value })}
+      >
+        <option value="">{copy.allStatuses}</option>
+        {STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {ar.dashboard.productStatuses[status]}
+          </option>
+        ))}
+      </NativeSelect>
+      {facets.map((facet) => (
+        <NativeSelect
+          key={facet.key}
+          aria-label={facet.label}
+          value={query[`f[${facet.key}]`] ?? ""}
+          onChange={(event) => setQuery({ [`f[${facet.key}]`]: event.target.value })}
+        >
+          <option value="">{`${facet.label}: ${copy.anyValue}`}</option>
+          {facet.type === "boolean" ? (
+            <>
+              <option value="true">{ar.dashboard.yes}</option>
+              <option value="false">{ar.dashboard.no}</option>
+            </>
+          ) : (
+            facet.options
+              .filter((option) => option.status === "active")
+              .map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))
+          )}
+        </NativeSelect>
+      ))}
+      <NativeSelect
+        aria-label={copy.sort}
+        value={query.sort ?? "-created_at"}
+        onChange={(event) => setQuery({ sort: event.target.value === "-created_at" ? null : event.target.value })}
+      >
+        {Object.entries(copy.sorts).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </NativeSelect>
+      <div className="flex items-center gap-2">
+        <Switch
+          id="low-stock"
+          checked={query.low_stock === "1"}
+          onCheckedChange={(checked) => setQuery({ low_stock: checked ? "1" : null })}
+        />
+        <Label htmlFor="low-stock">{copy.lowStockOnly}</Label>
       </div>
-    </div>
+    </FilterPanel>
   );
 }

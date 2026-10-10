@@ -27,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { CustomerStatus } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { CUSTOMER_LIST_KEYS, useCreateCustomer, useCustomers, useInviteCustomer } from "@/lib/dashboard/customers";
+import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { phoneField } from "@/lib/forms/phone";
 import { applyServerErrors } from "@/lib/forms/server-errors";
@@ -34,6 +35,7 @@ import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -57,19 +59,31 @@ export function CustomersPage() {
   return (
     <>
       <PageHeader title={copy.title} actions={<Button onClick={() => setCreating(true)}>{copy.add}</Button>} />
-      <div className="flex flex-wrap items-center gap-2">
-        <form onSubmit={search} role="search" className="flex gap-2">
-          <Input
-            aria-label={ar.dashboard.list.search}
-            placeholder={ar.dashboard.list.searchPlaceholder}
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            className="max-w-xs"
-          />
-          <Button type="submit" variant="outline">
-            {ar.dashboard.list.search}
-          </Button>
-        </form>
+      <FilterPanel
+        active={activeFilters(query, ["status"])}
+        onClear={
+          hasFilters(query)
+            ? () => {
+                setQ("");
+                setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
+              }
+            : undefined
+        }
+        leading={
+          <form onSubmit={search} role="search" className="flex gap-2">
+            <Input
+              aria-label={ar.dashboard.list.search}
+              placeholder={ar.dashboard.list.searchPlaceholder}
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              className="max-w-xs"
+            />
+            <Button type="submit" variant="outline">
+              {ar.dashboard.list.search}
+            </Button>
+          </form>
+        }
+      >
         <NativeSelect
           aria-label={copy.status}
           value={query.status ?? ""}
@@ -82,7 +96,7 @@ export function CustomersPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FilterPanel>
       {customers.isError && <ErrorBlock error={customers.error} onRetry={() => void customers.refetch()} />}
       {customers.isPending && <LoadingBlock />}
       {customers.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}

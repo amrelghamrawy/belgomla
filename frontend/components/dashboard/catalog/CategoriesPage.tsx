@@ -41,6 +41,7 @@ import { activeOnly, applyOrder, flatten, reorderSiblings, subtreeIds } from "@/
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { cn } from "@/lib/utils";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { NativeSelect } from "../common/NativeSelect";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 
@@ -63,14 +64,16 @@ export function CategoriesPage() {
         description={copy.description}
         actions={<Button onClick={() => setEditing({ mode: "create", parentId: null })}>{copy.add}</Button>}
       />
-      <div className="flex items-center gap-2">
-        <Switch
-          id="show-archived"
-          checked={showArchived}
-          onCheckedChange={(checked) => setQuery({ archived: checked ? "1" : null })}
-        />
-        <Label htmlFor="show-archived">{copy.showArchived}</Label>
-      </div>
+      <FilterPanel active={showArchived ? 1 : 0}>
+        <div className="flex h-10 items-center gap-2">
+          <Switch
+            id="show-archived"
+            checked={showArchived}
+            onCheckedChange={(checked) => setQuery({ archived: checked ? "1" : null })}
+          />
+          <Label htmlFor="show-archived">{copy.showArchived}</Label>
+        </div>
+      </FilterPanel>
       {categories.isError && <ErrorBlock error={categories.error} onRetry={() => void categories.refetch()} />}
       {categories.isPending && <LoadingBlock />}
       {categories.data !== undefined && tree.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}

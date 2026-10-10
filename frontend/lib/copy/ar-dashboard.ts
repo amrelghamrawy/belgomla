@@ -44,6 +44,7 @@ export const dashboard = {
     search: "بحث",
     searchPlaceholder: "ابحث…",
     filters: "تصفية",
+    filtersActive: (n: number) => `تصفية، ${n} مفعّلة`,
     clearFilters: "مسح التصفية",
     all: "الكل",
     actions: "إجراءات",

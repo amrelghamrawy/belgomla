@@ -10,11 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { AuditLog } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { AUDIT_LIST_KEYS, auditDiff, useAuditLog } from "@/lib/dashboard/admin";
-import { hasFilters } from "@/lib/dashboard/list-query";
+import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
 import { cn } from "@/lib/utils";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 
@@ -54,42 +55,42 @@ export function AuditPage() {
   return (
     <>
       <PageHeader title={copy.title} description={copy.description} />
-      <form onSubmit={apply} className="flex flex-wrap items-end gap-2">
-        {TEXT_FILTERS.map((key) => (
-          <label key={key} className="flex flex-col gap-1 text-xs">
-            {FILTER_LABELS[key]}
-            <Input
-              dir="ltr"
-              className={cn("text-start", key === "batch_id" ? "w-80" : "w-32")}
-              value={drafts[key] ?? ""}
-              onChange={(event) => setDrafts({ ...drafts, [key]: event.target.value })}
-            />
+      <FilterPanel
+        active={activeFilters(query, AUDIT_LIST_KEYS)}
+        onClear={
+          hasFilters(query)
+            ? () => {
+                setDrafts({});
+                setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
+              }
+            : undefined
+        }
+      >
+        <form onSubmit={apply} className="flex flex-wrap items-end gap-2">
+          {TEXT_FILTERS.map((key) => (
+            <label key={key} className="flex flex-col gap-1 text-xs">
+              {FILTER_LABELS[key]}
+              <Input
+                dir="ltr"
+                className={cn("text-start", key === "batch_id" ? "w-80" : "w-32")}
+                value={drafts[key] ?? ""}
+                onChange={(event) => setDrafts({ ...drafts, [key]: event.target.value })}
+              />
+            </label>
+          ))}
+          <label className="flex flex-col gap-1 text-xs">
+            {ar.dashboard.list.from}
+            <Input type="date" value={query.from ?? ""} onChange={(event) => setQuery({ from: event.target.value })} />
           </label>
-        ))}
-        <label className="flex flex-col gap-1 text-xs">
-          {ar.dashboard.list.from}
-          <Input type="date" value={query.from ?? ""} onChange={(event) => setQuery({ from: event.target.value })} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs">
-          {ar.dashboard.list.to}
-          <Input type="date" value={query.to ?? ""} onChange={(event) => setQuery({ to: event.target.value })} />
-        </label>
-        <Button type="submit" variant="outline">
-          {copy.apply}
-        </Button>
-        {hasFilters(query) && (
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => {
-              setDrafts({});
-              setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
-            }}
-          >
-            {ar.dashboard.list.clearFilters}
+          <label className="flex flex-col gap-1 text-xs">
+            {ar.dashboard.list.to}
+            <Input type="date" value={query.to ?? ""} onChange={(event) => setQuery({ to: event.target.value })} />
+          </label>
+          <Button type="submit" variant="outline">
+            {copy.apply}
           </Button>
-        )}
-      </form>
+        </form>
+      </FilterPanel>
       {problem !== null && <FieldError role="alert">{problem}</FieldError>}
       {audit.isError && <ErrorBlock error={audit.error} onRetry={() => void audit.refetch()} />}
       {audit.isPending && <LoadingBlock />}

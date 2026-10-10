@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasFilters, listSearch, pageOf, readListQuery } from "@/lib/dashboard/list-query";
+import { activeFilters, hasFilters, listSearch, pageOf, readListQuery } from "@/lib/dashboard/list-query";
 
 describe("readListQuery", () => {
   it("keeps the list's own keys, the page and facets, and drops the rest and empty values", () => {
@@ -38,5 +38,15 @@ describe("pageOf and hasFilters", () => {
   it("ignores the page when telling whether filters are set", () => {
     expect(hasFilters({ page: "2" })).toBe(false);
     expect(hasFilters({ q: "علوم" })).toBe(true);
+  });
+});
+
+describe("activeFilters", () => {
+  it("counts the given keys that are set, and facets only when asked", () => {
+    const query = { q: "علوم", status: "active", sort: "name", page: "2", "f[grade]": "12" };
+
+    expect(activeFilters(query, ["status", "sort", "low_stock"])).toBe(2);
+    expect(activeFilters(query, ["status", "sort"], true)).toBe(3);
+    expect(activeFilters({}, ["status"])).toBe(0);
   });
 });

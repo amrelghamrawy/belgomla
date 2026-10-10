@@ -45,6 +45,7 @@ describe("SalesSection", () => {
     );
 
     await screen.findByTestId("sales-total");
+    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
     await user.selectOptions(screen.getByLabelText("التجميع"), "month");
 
     const url = callsTo(fetchMock, "GET /api/dashboard/reports/sales")[0]?.url;

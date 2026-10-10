@@ -330,6 +330,7 @@ describe("CategoriesPage", () => {
 
     expect(callsTo(fetchMock, "POST /api/dashboard/categories/2/archive")).toHaveLength(1);
     expect(screen.queryByText("مؤرشف")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
     await user.click(screen.getByLabelText("عرض الأقسام المؤرشفة"));
     expect(router.replace).toHaveBeenCalledWith("/?archived=1", { scroll: false });
   });

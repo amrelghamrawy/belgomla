@@ -10,13 +10,14 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
-import { hasFilters } from "@/lib/dashboard/list-query";
+import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { ORDER_LIST_KEYS, useOrders } from "@/lib/dashboard/orders";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -58,19 +59,31 @@ export function OrdersPage() {
           );
         })}
       </nav>
-      <div className="flex flex-wrap items-end gap-2">
-        <form onSubmit={search} role="search" className="flex gap-2">
-          <Input
-            aria-label={ar.dashboard.list.search}
-            placeholder={copy.number}
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            className="w-40"
-          />
-          <Button type="submit" variant="outline">
-            {ar.dashboard.list.search}
-          </Button>
-        </form>
+      <FilterPanel
+        active={activeFilters(query, ["collection_status", "from", "to", "sort", "stale"])}
+        onClear={
+          hasFilters(query)
+            ? () => {
+                setQ("");
+                setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
+              }
+            : undefined
+        }
+        leading={
+          <form onSubmit={search} role="search" className="flex gap-2">
+            <Input
+              aria-label={ar.dashboard.list.search}
+              placeholder={copy.number}
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              className="w-40"
+            />
+            <Button type="submit" variant="outline">
+              {ar.dashboard.list.search}
+            </Button>
+          </form>
+        }
+      >
         <NativeSelect
           aria-label={copy.collection}
           value={query.collection_status ?? ""}
@@ -110,18 +123,7 @@ export function OrdersPage() {
           />
           <Label htmlFor="orders-stale">{copy.staleOnly}</Label>
         </div>
-        {hasFilters(query) && (
-          <Button
-            variant="link"
-            onClick={() => {
-              setQ("");
-              setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
-            }}
-          >
-            {ar.dashboard.list.clearFilters}
-          </Button>
-        )}
-      </div>
+      </FilterPanel>
       {query.customer_id !== undefined && (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
           {copy.customerFilter(query.customer_id)}

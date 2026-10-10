@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ar } from "@/lib/copy/ar";
-import { hasFilters } from "@/lib/dashboard/list-query";
+import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { COLLECTION_LIST_KEYS, useCollections, useVoidCollection } from "@/lib/dashboard/orders";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import type { Collection } from "@/lib/api/types";
 
+import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { ReasonDialog } from "../common/ReasonDialog";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -36,21 +37,33 @@ export function CollectionsPage() {
   return (
     <>
       <PageHeader title={copy.title} />
-      <div className="flex flex-wrap items-end gap-2">
-        <form onSubmit={filterOrder} className="flex gap-2">
-          <Input
-            aria-label={copy.orderFilter}
-            placeholder={copy.orderFilter}
-            dir="ltr"
-            inputMode="numeric"
-            className="w-36 text-start"
-            value={order}
-            onChange={(event) => setOrder(event.target.value)}
-          />
-          <Button type="submit" variant="outline">
-            {copy.apply}
-          </Button>
-        </form>
+      <FilterPanel
+        active={activeFilters(query, ["from", "to"])}
+        onClear={
+          hasFilters(query)
+            ? () => {
+                setOrder("");
+                setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
+              }
+            : undefined
+        }
+        leading={
+          <form onSubmit={filterOrder} className="flex gap-2">
+            <Input
+              aria-label={copy.orderFilter}
+              placeholder={copy.orderFilter}
+              dir="ltr"
+              inputMode="numeric"
+              className="w-36 text-start"
+              value={order}
+              onChange={(event) => setOrder(event.target.value)}
+            />
+            <Button type="submit" variant="outline">
+              {copy.apply}
+            </Button>
+          </form>
+        }
+      >
         <label className="flex flex-col gap-1 text-xs">
           {ar.dashboard.list.from}
           <Input type="date" value={query.from ?? ""} onChange={(event) => setQuery({ from: event.target.value })} />
@@ -59,18 +72,7 @@ export function CollectionsPage() {
           {ar.dashboard.list.to}
           <Input type="date" value={query.to ?? ""} onChange={(event) => setQuery({ to: event.target.value })} />
         </label>
-        {hasFilters(query) && (
-          <Button
-            variant="link"
-            onClick={() => {
-              setOrder("");
-              setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])));
-            }}
-          >
-            {ar.dashboard.list.clearFilters}
-          </Button>
-        )}
-      </div>
+      </FilterPanel>
       {query.customer_id !== undefined && (
         <p className="text-muted-foreground text-sm">{copy.customerFilter(query.customer_id)}</p>
       )}
