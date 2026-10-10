@@ -8,7 +8,8 @@ test("the price list prints as a clean table", async ({ page }) => {
   await page.getByRole("link", { name: "المرحلة الإعدادية" }).click();
   await page.getByRole("link", { name: "أولى إعدادي", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "أولى إعدادي" })).toBeVisible();
-  await page.getByRole("link", { name: "قائمة الأسعار" }).click();
+  const slug = decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1) ?? "");
+  await page.goto(`/price-list?category=${encodeURIComponent(slug)}`);
 
   await expect(page).toHaveURL(/\/price-list\?category=/);
   await expect(page.getByTestId("price-list").getByRole("row")).toHaveCount(17);

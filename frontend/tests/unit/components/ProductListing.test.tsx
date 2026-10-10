@@ -156,15 +156,12 @@ describe("ProductListing", () => {
     expect(router.replace).toHaveBeenCalledWith("/c/prep?sort=-price&f%5Bgrade%5D=7", { scroll: false });
   });
 
-  it("links to the price list of the same selection (BR-P13)", async () => {
-    searchParams.value = new URLSearchParams("f[grade]=7");
+  it("has no price-list link of its own; the header carries it", async () => {
     stubCatalog();
     renderWithQuery(<ProductListing category="prep" />);
 
-    expect(await screen.findByRole("link", { name: "قائمة الأسعار" })).toHaveAttribute(
-      "href",
-      "/price-list?f%5Bgrade%5D=7&category=prep",
-    );
+    await screen.findByRole("combobox", { name: "الترتيب" });
+    expect(screen.queryByRole("link", { name: "قائمة الأسعار" })).not.toBeInTheDocument();
   });
 
   it("says when nothing matches", async () => {

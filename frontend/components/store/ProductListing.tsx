@@ -9,7 +9,7 @@ import { StatusPage } from "@/components/shared/StatusPage";
 import { Button } from "@/components/ui/button";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { categoryPath, useCategories, useFilters, useProductsInfinite } from "@/lib/store/catalog";
-import { listingSearch, parseListing, priceListHref, type Listing } from "@/lib/store/listing";
+import { listingSearch, parseListing, type Listing } from "@/lib/store/listing";
 
 import { CategoryBreadcrumbs } from "./CategoryBreadcrumbs";
 import { FacetDrawer } from "./FacetDrawer";
@@ -92,12 +92,6 @@ export function ProductListing(props: ProductListingProps) {
             onChange={(f) => navigate({ ...listing, f })}
           />
           <SortSelect value={listing.sort} onChange={(sort) => navigate({ ...listing, sort })} />
-          <Link
-            href={priceListHref(listing)}
-            className="text-primary ms-auto text-sm underline-offset-4 hover:underline"
-          >
-            {ar.store.priceList}
-          </Link>
         </div>
       )}
 
