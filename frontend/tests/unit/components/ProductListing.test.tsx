@@ -14,7 +14,15 @@ const tree = [
     name: "المرحلة الإعدادية",
     slug: "prep",
     image_url: null,
-    children: [{ id: 2, name: "أولى إعدادي", slug: "first-prep", image_url: null, children: [] }],
+    children: [
+      {
+        id: 2,
+        name: "أولى إعدادي",
+        slug: "first-prep",
+        image_url: null,
+        children: [{ id: 3, name: "الترم الأول", slug: "first-term", image_url: null, children: [] }],
+      },
+    ],
   },
 ];
 
@@ -45,6 +53,20 @@ describe("ProductListing", () => {
     expect(screen.getByText("31 منتج")).toBeInTheDocument();
   });
 
+  it("shows every parent of a subcategory in the breadcrumbs", async () => {
+    pathname.value = "/c/first-term";
+    stubCatalog();
+    renderWithQuery(<ProductListing category="first-term" />);
+
+    const crumbs = await screen.findByRole("navigation", { name: "مسار التصفح" });
+    expect(within(crumbs).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["الرئيسية", "/"],
+      ["المرحلة الإعدادية", "/c/prep"],
+      ["أولى إعدادي", "/c/first-prep"],
+    ]);
+    expect(within(crumbs).getByText("الترم الأول")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { level: 1, name: "الترم الأول" })).toBeInTheDocument();
+  });
   it("BR-P08 asks the API for the selection in the URL", async () => {
     searchParams.value = new URLSearchParams("f[grade]=7&sort=price");
     const fetchMock = stubCatalog();

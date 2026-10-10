@@ -164,6 +164,7 @@ export const ar = {
     },
   },
   catalog: {
+    breadcrumbs: "مسار التصفح",
     filters: "تصفية",
     filtersTitle: "تصفية المنتجات",
     clearFilters: "مسح الكل",

@@ -39,6 +39,22 @@ export function findCategory(tree: readonly Category[], slug: string): Category 
   return null;
 }
 
+/** The categories from the root down to the one with this slug (itself last), for the breadcrumbs; null if unknown. */
+export function categoryPath(tree: readonly Category[], slug: string): Category[] | null {
+  for (const category of tree) {
+    if (category.slug === slug) {
+      return [category];
+    }
+
+    const path = categoryPath(category.children, slug);
+
+    if (path !== null) {
+      return [category, ...path];
+    }
+  }
+
+  return null;
+}
 export type CategoryOption = { slug: string; name: string; depth: number };
 
 /** The tree flattened in display order (each parent before its children), for a category picker. */

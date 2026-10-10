@@ -8,9 +8,10 @@ import { useCallback, useMemo } from "react";
 import { StatusPage } from "@/components/shared/StatusPage";
 import { Button } from "@/components/ui/button";
 import { ar, messageFor } from "@/lib/copy/ar";
-import { findCategory, useCategories, useFilters, useProductsInfinite } from "@/lib/store/catalog";
+import { categoryPath, useCategories, useFilters, useProductsInfinite } from "@/lib/store/catalog";
 import { listingSearch, parseListing, priceListHref, type Listing } from "@/lib/store/listing";
 
+import { CategoryBreadcrumbs } from "./CategoryBreadcrumbs";
 import { FacetDrawer } from "./FacetDrawer";
 import { LoadMore } from "./LoadMore";
 import { ProductGrid, ProductGridSkeleton } from "./ProductGrid";
@@ -30,7 +31,8 @@ export function ProductListing(props: ProductListingProps) {
   const listing = useMemo(() => parseListing(searchParams, categorySlug), [searchParams, categorySlug]);
 
   const categories = useCategories();
-  const category = categorySlug !== undefined && categories.data ? findCategory(categories.data, categorySlug) : null;
+  const path = categorySlug !== undefined && categories.data ? categoryPath(categories.data, categorySlug) : null;
+  const category = path?.at(-1) ?? null;
   const searching = "search" in props;
   const searchReady = !searching || listing.q !== undefined;
 
@@ -57,6 +59,8 @@ export function ProductListing(props: ProductListingProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-4">
+      {path !== null && <CategoryBreadcrumbs path={path} />}
+
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-bold">{title}</h1>
         {total !== undefined && <p className="text-muted-foreground text-sm">{ar.catalog.resultsCount(total)}</p>}

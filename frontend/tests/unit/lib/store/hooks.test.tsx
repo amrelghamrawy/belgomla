@@ -2,7 +2,7 @@ import { act, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { queryKeys } from "@/lib/api/keys";
-import { categoryOptions, findCategory, useProductsInfinite } from "@/lib/store/catalog";
+import { categoryOptions, categoryPath, findCategory, useProductsInfinite } from "@/lib/store/catalog";
 import { newIdempotencyKey } from "@/lib/api/idempotency";
 import { useCheckout } from "@/lib/store/checkout";
 import { useAddToCart } from "@/lib/store/cart";
@@ -30,6 +30,39 @@ describe("findCategory", () => {
 
   it("is null for an unknown slug", () => {
     expect(findCategory(tree, "nope")).toBeNull();
+  });
+});
+
+describe("categoryPath", () => {
+  const tree = [
+    {
+      id: 1,
+      name: "ابتدائي",
+      slug: "primary",
+      image_url: null,
+      children: [
+        {
+          id: 2,
+          name: "رابعة ابتدائي",
+          slug: "fourth",
+          image_url: null,
+          children: [{ id: 3, name: "الترم الأول", slug: "term-1", image_url: null, children: [] }],
+        },
+      ],
+    },
+    { id: 4, name: "إعدادي", slug: "prep", image_url: null, children: [] },
+  ];
+
+  it("lists every parent from the root down, ending with the category itself", () => {
+    expect(categoryPath(tree, "term-1")?.map((category) => category.slug)).toEqual(["primary", "fourth", "term-1"]);
+  });
+
+  it("is just the category for a root", () => {
+    expect(categoryPath(tree, "prep")?.map((category) => category.slug)).toEqual(["prep"]);
+  });
+
+  it("is null for an unknown slug", () => {
+    expect(categoryPath(tree, "nope")).toBeNull();
   });
 });
 
