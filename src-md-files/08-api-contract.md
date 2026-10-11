@@ -60,7 +60,7 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 422  | `checkout_failed`          | one or more checkout assertions failed (`items[]` filled) |
 | 422  | `inventory_below_reserved` | BR-INV08 (`details.orders[]` filled)                      |
 | 422  | `invalid_tiers`            | BR-PR05 / D28 (`details.tiers[]`: one message per problem) |
-| 422  | `cover_price_required`     | BR-PR10: a % price on a SKU without a cover price         |
+| 422  | `cover_price_required`     | BR-PR10: a % price on a SKU without a reference price; the message says سعر الغلاف for books, سعر القطاعي otherwise (D68) |
 | 403  | `prices_hidden`            | guest add-to-cart while `require_login_for_prices` (D53)  |
 | 422  | `cart_line_invalid`        | a cart line below MOQ, above stock, or of an inactive product (`items[]` filled) |
 | 422  | `cart_empty`               | checkout with an empty cart (D57)                         |
@@ -109,7 +109,7 @@ Full active tree: `[{ id, name, slug, image_url, children: [...] }]`.
 
 ### `GET /api/store/filters`
 
-Facet definitions in `filter_order`, with options and counts for the **current selection**.
+Facet definitions in `filter_order`, with options and counts for the **current selection**. Inside a `category`, only the fields of its section and the section-less ones are facets (D69); without a category every filterable field is.
 
 Query: same filter params as the product list (`category`, `f[grade]=12`, `f[subject]=40`, `q`).
 
@@ -173,7 +173,7 @@ Detail notes (Task 1): `gallery` items are `{ id, url, is_main, sort_order }`; `
 
 Same filters as the product list; returns all matching products (no pagination, max 2000) in a compact shape for the printable page (BR-P13).
 
-Row: `{ id, name, slug, code, unit, moq, cover_price, base_price, availability: "available"|"coming_soon" }`; `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list.
+Row: `{ id, name, slug, kind, code, unit, moq, cover_price, base_price, availability: "available"|"coming_soon" }`; `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
 
 ---
 
@@ -345,8 +345,10 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | Method | Path                                     | Notes                                                |
 | ------ | ---------------------------------------- | ---------------------------------------------------- |
 | GET    | `/api/dashboard/categories`              | tree incl. archived (`?status=`)                     |
-| POST   | `/api/dashboard/categories`              | `name, parent_id?, image?, sort_order?`              |
-| PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `sort_order?`; move = change `parent_id`; cycle → `422 category_cycle` |
+| POST   | `/api/dashboard/categories`              | `name, parent_id?, kind?, image?, sort_order?`; `kind` (D68) for roots only, default `general`; sent with a `parent_id` → `422` on `kind` |
+| PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `kind?` (roots only; absent = keep), `sort_order?`; move = change `parent_id` (the subtree takes the new root's kind); cycle → `422 category_cycle` |
+
+Category shapes (store and dashboard) carry `kind`; product shapes carry `category: { id, name, kind }` (`CategoryRef`).
 | POST   | `/api/dashboard/categories/{id}/archive` | allowed with products (BR-P06); products stay linked |
 | POST   | `/api/dashboard/categories/{id}/restore` |                                                      |
 | POST   | `/api/dashboard/categories/reorder`      | `[ {id, sort_order} ]`                               |
@@ -360,8 +362,8 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | Method | Path                                                    | Notes                                                                                                    |
 | ------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | GET    | `/api/dashboard/fields`                                 | definitions + options                                                                                    |
-| POST   | `/api/dashboard/fields`                                 | `key, label, type, is_required, show_on_storefront, is_filterable, filter_order, sort_order, options[]?` |
-| PUT    | `/api/dashboard/fields/{id}`                            | `type` change rejected when values exist (`409`)                                                         |
+| POST   | `/api/dashboard/fields`                                 | `key, label, type, kind?, is_required, show_on_storefront, is_filterable, filter_order, sort_order, options[]?`; `kind` null/absent = every section (D69) |
+| PUT    | `/api/dashboard/fields/{id}`                            | `type` change rejected when values exist (`409`); `kind` absent = keep, null = every section              |
 | POST   | `/api/dashboard/fields/{id}/archive`                    |                                                                                                          |
 | POST   | `/api/dashboard/fields/{id}/options`                    | `label, sort_order`                                                                                      |
 | PUT    | `/api/dashboard/fields/{id}/options/{optionId}`         | rename / reorder                                                                                         |

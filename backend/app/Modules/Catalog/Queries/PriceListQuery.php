@@ -26,7 +26,7 @@ final readonly class PriceListQuery
 
         $rows = $this->filtered->builder($filter)
             ->tap(new VisibleOnStore)
-            ->with('sku.sellingUnit')
+            ->with(['category', 'sku.sellingUnit'])
             ->orderBy('products.name')
             ->orderBy('products.id')
             ->limit($limit + 1)

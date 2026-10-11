@@ -21,11 +21,12 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final readonly class ProductReferences
 {
-    public function check(ProductData $data, ?Product $existing = null): void
+    /** Returns the (new) category so callers can read its kind (D69). */
+    public function check(ProductData $data, ?Product $existing = null): Category
     {
         $sku = $existing?->sku;
 
-        $this->category($data->categoryId, $existing?->category_id);
+        $category = $this->category($data->categoryId, $existing?->category_id);
         $this->unit('sku.selling_unit_id', $data->sku->sellingUnitId, $sku?->selling_unit_id);
         $this->unit('sku.base_unit_id', $data->sku->baseUnitId, $sku?->base_unit_id);
 
@@ -37,15 +38,19 @@ final readonly class ProductReferences
         if ($taken) {
             throw CatalogConflict::duplicateSkuCode();
         }
+
+        return $category;
     }
 
-    private function category(int $id, ?int $current): void
+    private function category(int $id, ?int $current): Category
     {
         $category = Category::query()->find($id) ?? throw InvalidCatalogInput::unknownReference('category_id');
 
         if ($category->status === ArchiveStatus::Archived && $id !== $current) {
             throw InvalidCatalogInput::archivedReference('category_id');
         }
+
+        return $category;
     }
 
     private function unit(string $field, int $id, ?int $current): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Http\Requests\StoreCategoryRequest;
 use App\Modules\Catalog\Http\Requests\StoreFieldRequest;
@@ -69,18 +70,29 @@ test('field data from a create request carries key, typed flags and trimmed opti
         ->and($data->isRequired)->toBeFalse()
         ->and($data->showOnStorefront)->toBeNull()
         ->and($data->filterOrder)->toBe(2)
+        ->and($data->kind)->toBeNull()
+        ->and($data->kindGiven)->toBeFalse()
         ->and($data->sortOrder)->toBeNull()
         ->and($data->options)->toBe(['أولى', 'ثانية']);
 });
 
 test('field data from an update request has no key and no options', function (): void {
     $data = FieldDefinitionData::fromRequest(validatedRequest(UpdateFieldRequest::class, 'PUT', [
-        'label' => 'x', 'type' => 'boolean', 'show_on_storefront' => false,
+        'label' => 'x', 'type' => 'boolean', 'show_on_storefront' => false, 'kind' => 'toys',
     ]));
 
     expect($data->key)->toBeNull()
         ->and($data->options)->toBe([])
         ->and($data->type)->toBe(FieldType::Boolean)
         ->and($data->showOnStorefront)->toBeFalse()
+        ->and($data->kind)->toBe(CategoryKind::Toys)
+        ->and($data->kindGiven)->toBeTrue()
         ->and($data->isFilterable)->toBeNull();
+});
+
+test('D69 FieldDefinitionData tells a kind sent as null apart from a kind not sent', function (): void {
+    $data = FieldDefinitionData::fromRequest(validatedRequest(UpdateFieldRequest::class, 'PUT', ['label' => 'x', 'type' => 'text', 'kind' => null]));
+
+    expect($data->kind)->toBeNull()
+        ->and($data->kindGiven)->toBeTrue();
 });

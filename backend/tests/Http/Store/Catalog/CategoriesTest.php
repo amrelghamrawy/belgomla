@@ -14,9 +14,10 @@ test('BR-P06 the store tree shows active categories with nested children in the 
 
     $this->tenantJson('GET', '/api/store/categories')
         ->assertOk()
-        ->assertExactJsonStructure(['data' => ['*' => ['id', 'name', 'slug', 'image_url', 'children' => ['*' => ['id', 'name', 'slug', 'image_url', 'children']]]]])
+        ->assertExactJsonStructure(['data' => ['*' => ['id', 'name', 'slug', 'kind', 'image_url', 'children' => ['*' => ['id', 'name', 'slug', 'kind', 'image_url', 'children']]]]])
         ->assertJsonPath('data.0.id', $root->id)
         ->assertJsonPath('data.0.slug', 'إعدادي')
+        ->assertJsonPath('data.0.kind', 'general')
         ->assertJsonPath('data.0.children.0.id', $child->id)
         ->assertJsonPath('data.0.children.0.children.0.id', $grandchild->id);
 });

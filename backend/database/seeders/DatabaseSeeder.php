@@ -13,8 +13,9 @@ use Illuminate\Database\Seeder;
 final class DatabaseSeeder extends Seeder
 {
     /**
-     * Local development seed: one school-books tenant with a demo catalog (StorefrontDemoSeeder) and two months of
-     * customers, orders and collections (DemoActivitySeeder).
+     * Local development seed: one tenant created as school-books (its template is applied at creation) with a demo
+     * catalog of books, school supplies and toys (StorefrontDemoSeeder, which adds the stationery template and a
+     * toys field) and two months of customers, orders and collections (DemoActivitySeeder).
      * Dashboard: owner@alnoor.test / password
      */
     public function run(CreateTenant $createTenant): void

@@ -135,6 +135,8 @@ Categories are a tree of unlimited depth. Any category can have sub-categories (
 
 A product belongs to exactly one category (any level). Listing a category shows products of that category and all its descendants.
 
+Every root category belongs to a **section** (`kind`, D68): `books` (كتب خارجية), `stationery` (أدوات دراسية), `toys` (ألعاب) or `general`. The merchant sets it when creating or editing a root; sub-categories inherit it and cannot carry their own (`422`), and moving a subtree under another root re-kinds it. A product's kind is its category's kind; it decides what the SKU's reference price is called (BR-PR10) and which custom fields apply (BR-P08).
+
 ### BR-P08 — Custom Product Fields
 
 A tenant can define its own custom product fields (e.g. Brand, Material, Country of origin) without a code change.
@@ -151,7 +153,7 @@ A custom field definition has:
 
 Rules:
 
-- Definitions are tenant-scoped and apply to all products of the tenant.
+- Definitions are tenant-scoped. A definition is bound to one section (`kind`, D69) or to none (null = every section). It applies to a product when its kind is null or equals the kind of the product's category: only applicable fields are shown on the form and the storefront, required, or offered as facets inside a category (outside any category every filterable field is a facet). A value sent for a non-applicable field is rejected (`422 validation_failed`, "هذا الحقل لا ينطبق على قسم هذا المنتج") unless it is the stored value; stored values of non-applicable fields are kept and hidden, like archived ones, so a product moved to another section loses nothing.
 - Values are stored per product as `{ key: value }` (JSONB), validated against the definition on save.
 - Deleting a definition is soft (archive); existing values are kept but hidden.
 - Changing a field's type after values exist is not allowed in V1.
@@ -182,6 +184,8 @@ The platform ships predefined custom-field templates per vertical. A template is
 | `academic_year` | العام الدراسي  | select | yes        | 2025/2026، 2026/2027                                                                |
 
 Other initial templates: `stationery` (brand, color, size), `hardware` (brand, material, size). A tenant can also start with no template.
+
+Templates carry the section their fields belong to (D69): every school-books field is bound to `books`, every stationery field to `stationery`, hardware fields to no section. A store that sells several sections applies several templates (the demo seeder applies school-books and stationery and adds a toys-only `age` field).
 
 ### BR-P10 — Product Relations
 
@@ -383,7 +387,7 @@ Later catalog changes must not modify historical orders.
 
 In the school-book trade every book has a printed **cover price** (سعر الغلاف), and wholesale prices are negotiated as a **discount percentage off the cover price** ("الأضواء بخصم 25%"). The model supports this without changing the pricing engine:
 
-- A SKU has an optional `cover_price` (سعر الغلاف). When set, the storefront shows cover price, wholesale price and the implied discount.
+- A SKU has an optional reference price, stored and sent as `cover_price`. For products of the `books` section it is the printed cover price (سعر الغلاف); for every other section it is the retail price (سعر القطاعي), also optional (D68). The name follows the product's category kind everywhere it is shown (storefront, dashboard form, price list, the `cover_price_required` message); the column, the API field and the mechanics below do not change. When set, the storefront shows the reference price, the wholesale price and the implied discount.
 - `base_price` and tier prices can be entered **either** as an absolute unit price **or** as a discount percentage off `cover_price`. The dashboard converts the percentage to an absolute `unit_price` at save time; the stored and snapshotted value is always the absolute price, plus the percentage used, for display.
 - Changing `cover_price` later does not silently recompute prices; the dashboard offers "recompute from percentages" as an explicit action (audited). It re-derives the base price and every tier that has a stored percentage from the current cover price; absolute prices stay.
 - Pricing resolution (BR-PR04) is unchanged.

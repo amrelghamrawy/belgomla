@@ -11,7 +11,10 @@ import {
   toPiasters,
 } from "@/lib/dashboard/price-math";
 
-const messages = ar.dashboard.productForm.tierErrors;
+const messages = {
+  ...ar.dashboard.productForm.tierErrors,
+  percentNeedsCover: ar.dashboard.productForm.tierErrors.percentNeedsCover("سعر الغلاف"),
+};
 
 describe("priceFromPercent", () => {
   it("D27 rounds half-up to the piaster: 120.00 at 25% is 90.00, 10.10 at 25% is 7.58", () => {

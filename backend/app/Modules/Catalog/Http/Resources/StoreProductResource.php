@@ -24,7 +24,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * Storefront product (08-api-contract.md §1). Custom fields are shown as `{key, label, value}` with the
- * option label, only for active fields marked `show_on_storefront`. When prices are hidden (D1) the
+ * option label, only for active fields marked `show_on_storefront` that apply to the category's section (D69). When prices are hidden (D1) the
  * SKU prices are omitted and `prices_hidden: true` is added. `coming_soon` products are listed with
  * `in_stock: false, coming_soon: true` and no `available` (BR-P04). The detail page adds `gallery` and `related` (BR-P10).
  *
@@ -76,7 +76,7 @@ final class StoreProductResource extends JsonResource
             'description' => $product->description,
             'status' => $product->status->value,
             'main_image_url' => $mainImage instanceof ProductImage ? $mainImage->url() : null,
-            'category' => $category instanceof Category ? ['id' => $category->id, 'name' => $category->name] : null,
+            'category' => $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null,
             'custom_fields' => $this->customFields(),
             'sku' => $sku instanceof Sku ? $this->sku($sku) : null,
             'prices_hidden' => $this->when($this->pricesHidden, true),
@@ -94,9 +94,14 @@ final class StoreProductResource extends JsonResource
     private function customFields(): array
     {
         $values = $this->resource->custom_fields;
+        $category = $this->resource->relationLoaded('category') ? $this->resource->category : null;
         $shown = [];
 
         foreach ($this->fields as $key => $definition) {
+            if ($category instanceof Category && ! $definition->appliesTo($category->kind)) {
+                continue;
+            }
+
             $value = array_key_exists($key, $values) ? $this->display($definition, $values[$key]) : null;
 
             if ($value !== null) {

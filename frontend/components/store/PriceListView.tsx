@@ -57,7 +57,9 @@ function copyWithSelection(text: string): boolean {
 
 /**
  * `/price-list?category=&f[...]=&q=`: a print-friendly table of every product in the selection (BR-P13): name,
- * code, unit, cover and wholesale price, MOQ, availability. The browser's print-to-PDF is the V1 export.
+ * code, unit, reference and wholesale price, MOQ, availability. The reference column is named after the chosen
+ * category's section (سعر الغلاف for books, سعر القطاعي otherwise, D68) and both ways when the list mixes
+ * sections. The browser's print-to-PDF is the V1 export.
  */
 export function PriceListView() {
   const router = useRouter();
@@ -149,7 +151,7 @@ export function PriceListView() {
                 </th>
                 {!pricesHidden && (
                   <th scope="col" className="border-b p-2 text-start">
-                    {ar.priceList.cover}
+                    {ar.product.referencePrice(category?.kind ?? null)}
                   </th>
                 )}
                 {!pricesHidden && (

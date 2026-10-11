@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\ApplyVerticalTemplate;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
@@ -21,7 +22,7 @@ test('BR-P09 the school-books template creates the 7 filterable select fields in
 
     expect($created)->toBe(['grade', 'subject', 'publisher', 'term', 'track', 'edition_type', 'academic_year'])
         ->and($fields->pluck('key')->all())->toBe($created)
-        ->and($fields->every(fn (ProductFieldDefinition $f): bool => $f->type === FieldType::Select && $f->is_filterable))->toBeTrue()
+        ->and($fields->every(fn (ProductFieldDefinition $f): bool => $f->type === FieldType::Select && $f->is_filterable && $f->kind === CategoryKind::Books))->toBeTrue()
         ->and(ProductFieldOption::query()->where('label', 'أولى إعدادي')->exists())->toBeTrue()
         ->and(ProductFieldOption::query()->where('label', 'الأضواء')->exists())->toBeTrue();
 });

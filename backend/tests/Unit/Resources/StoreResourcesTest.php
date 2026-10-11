@@ -115,12 +115,13 @@ test('the facet resource key set', function (): void {
 });
 
 test('BR-P13 the price list row key set, with and without prices', function (): void {
-    $product = Product::factory()->withSku(['code' => 'A-1', 'cover_price' => '10', 'base_price' => '8'])->create()->load('sku.sellingUnit');
+    $product = Product::factory()->withSku(['code' => 'A-1', 'cover_price' => '10', 'base_price' => '8'])->create()->load(['category', 'sku.sellingUnit']);
 
     $visible = rendered(new PriceListRowResource($product, false), storeRequest());
     $hidden = rendered(new PriceListRowResource($product, true), storeRequest());
 
-    expect(array_keys($visible))->toBe(['id', 'name', 'slug', 'code', 'unit', 'moq', 'cover_price', 'base_price', 'availability'])
+    expect(array_keys($visible))->toBe(['id', 'name', 'slug', 'kind', 'code', 'unit', 'moq', 'cover_price', 'base_price', 'availability'])
+        ->and($visible['kind'])->toBe('general')
         ->and($visible['availability'])->toBe('available')
         ->and($hidden)->not->toHaveKeys(['cover_price', 'base_price']);
 });

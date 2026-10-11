@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -9,7 +10,7 @@ use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\ProductImage;
 
 const STORE_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name'],
+    'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name', 'kind'],
     'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'],
 ];
 
@@ -81,6 +82,23 @@ test('BR-P08 custom fields not shown on the storefront and archived fields are l
 
     $this->tenantJson('GET', '/api/store/products')
         ->assertJsonPath('data.0.custom_fields', [['key' => 'colored', 'label' => 'ملون', 'value' => 'نعم']]);
+});
+
+test('D69 a store product shows only the custom fields of its section and the section-less ones', function (): void {
+    $this->inTenant(function (): void {
+        $toys = Category::factory()->kind(CategoryKind::Toys)->create();
+        ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create(['key' => 'publisher', 'label' => 'الشركة']);
+        ProductFieldDefinition::factory()->forKind(CategoryKind::Toys)->create(['key' => 'age', 'label' => 'العمر']);
+        ProductFieldDefinition::factory()->create(['key' => 'origin', 'label' => 'بلد المنشأ']);
+        Product::factory()->withSku()->create(['category_id' => $toys->id, 'custom_fields' => ['publisher' => 'X', 'age' => '3+', 'origin' => 'مصر']]);
+    });
+
+    $this->tenantJson('GET', '/api/store/products')
+        ->assertJsonPath('data.0.category.kind', 'toys')
+        ->assertJsonPath('data.0.custom_fields', [
+            ['key' => 'age', 'label' => 'العمر', 'value' => '3+'],
+            ['key' => 'origin', 'label' => 'بلد المنشأ', 'value' => 'مصر'],
+        ]);
 });
 
 test('D1 prices are hidden from guests when the tenant requires login for prices', function (): void {

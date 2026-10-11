@@ -582,6 +582,7 @@ export interface paths {
         /** The whole category tree, archived nodes included unless filtered */
         get: operations["dashboardCategories"];
         put?: never;
+        /** Creates a category; `kind` is accepted for roots only (children inherit it, default general) */
         post: operations["dashboardCreateCategory"];
         delete?: never;
         options?: never;
@@ -615,7 +616,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Renames and/or moves a category with its subtree; parent_id null makes it a root */
+        /** Renames, re-kinds and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only */
         put: operations["dashboardUpdateCategory"];
         post?: never;
         delete?: never;
@@ -1664,10 +1665,21 @@ export interface components {
             to: number | null;
             total: number;
         };
+        /**
+         * @description The section of a root category, inherited by its subtree and products (D68). Decides what cover_price means: the printed cover price for books, the retail price otherwise
+         * @enum {string}
+         */
+        CategoryKind: "books" | "stationery" | "toys" | "general";
+        CategoryRef: {
+            id: number;
+            name: string;
+            kind: components["schemas"]["CategoryKind"];
+        };
         Category: {
             id: number;
             name: string;
             slug: string;
+            kind: components["schemas"]["CategoryKind"];
             image_url: string | null;
             children: components["schemas"]["Category"][];
         };
@@ -1717,10 +1729,7 @@ export interface components {
             /** @enum {string} */
             status: "active" | "coming_soon";
             main_image_url: string | null;
-            category: {
-                id: number;
-                name: string;
-            } | null;
+            category: components["schemas"]["CategoryRef"] | null;
             custom_fields: components["schemas"]["CustomFieldValue"][];
             sku: components["schemas"]["StoreSku"] | null;
             /**
@@ -1750,6 +1759,7 @@ export interface components {
             id: number;
             name: string;
             slug: string;
+            kind: components["schemas"]["CategoryKind"] | null;
             code: string | null;
             unit: string | null;
             moq: number | null;
@@ -1973,6 +1983,7 @@ export interface components {
             id: number;
             name: string;
             slug: string;
+            kind: components["schemas"]["CategoryKind"];
             image_url: string | null;
             parent_id: number | null;
             sort_order: number;
@@ -1997,6 +2008,8 @@ export interface components {
             key: string;
             label: string;
             type: components["schemas"]["FieldType"];
+            /** @description The section this field applies to; null = every section (D69) */
+            kind: components["schemas"]["CategoryKind"] | null;
             is_required: boolean;
             show_on_storefront: boolean;
             is_filterable: boolean;
@@ -2008,6 +2021,8 @@ export interface components {
         FieldRequest: {
             label: string;
             type: components["schemas"]["FieldType"];
+            /** @description Bind the field to one section; null or absent = every section (D69) */
+            kind?: components["schemas"]["CategoryKind"] | null;
             is_required?: boolean;
             show_on_storefront?: boolean;
             is_filterable?: boolean;
@@ -2043,7 +2058,7 @@ export interface components {
             slug: string;
             description: string | null;
             status: components["schemas"]["ProductStatus"];
-            category: components["schemas"]["IdName"] | null;
+            category: components["schemas"]["CategoryRef"] | null;
             /** @description Field key → option id (select), number, boolean or text */
             custom_fields: {
                 [key: string]: string | number | boolean;
@@ -3725,11 +3740,13 @@ export interface operations {
                 "application/json": {
                     name: string;
                     parent_id?: number | null;
+                    kind?: components["schemas"]["CategoryKind"] | null;
                     sort_order?: number;
                 };
                 "multipart/form-data": {
                     name: string;
                     parent_id?: number;
+                    kind?: components["schemas"]["CategoryKind"];
                     sort_order?: number;
                     /** Format: binary */
                     image?: string;
@@ -3780,6 +3797,7 @@ export interface operations {
                 "application/json": {
                     name: string;
                     parent_id: number | null;
+                    kind?: components["schemas"]["CategoryKind"] | null;
                     sort_order?: number;
                 };
             };

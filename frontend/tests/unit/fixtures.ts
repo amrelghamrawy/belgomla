@@ -72,7 +72,7 @@ export function storeProduct(overrides: Partial<StoreProductDetail> = {}): Store
     description: null,
     status: "active",
     main_image_url: null,
-    category: { id: 3, name: "أولى إعدادي" },
+    category: { id: 3, name: "أولى إعدادي", kind: "books" },
     custom_fields: [{ key: "grade", label: "السنة الدراسية", value: "أولى إعدادي" }],
     sku: storeSku(),
     gallery: [],

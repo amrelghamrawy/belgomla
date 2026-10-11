@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Actions\ApplyVerticalTemplate;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\RelationType;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Inventory\Models\SkuInventory;
@@ -18,7 +20,7 @@ beforeEach(function (): void {
     $this->inTenant(fn (): array => app(ApplyVerticalTemplate::class)->handle(Vertical::SchoolBooks));
 });
 
-test('the demo catalog seeds books, categories, stock and the store settings', function (): void {
+test('the demo catalog seeds books, supplies, toys, categories, stock and the store settings', function (): void {
     $this->seed(StorefrontDemoSeeder::class);
 
     [$products, $comingSoon, $categories, $stocked] = $this->inTenant(fn (): array => [
@@ -29,13 +31,46 @@ test('the demo catalog seeds books, categories, stock and the store settings', f
     ]);
     $settings = TenantSetting::query()->whereKey($this->tenant->id)->sole();
 
-    expect($products)->toBe(34)
+    expect($products)->toBe(44)
         ->and($comingSoon)->toBe(1)
-        ->and($categories)->toBe(6)
-        ->and($stocked)->toBe(33)
+        ->and($categories)->toBe(11)
+        ->and($stocked)->toBe(43)
         ->and($settings->mov_enabled)->toBeTrue()
         ->and($settings->mov_amount)->toBe('500.00')
         ->and($settings->whatsapp)->toBe('+201001234567');
+});
+
+test('D68 the demo catalog has the three sections as roots, each subtree of its kind', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $roots = $this->inTenant(fn (): array => Category::query()->whereNull('parent_id')->orderBy('sort_order')->get()->map(fn (Category $c): array => [$c->name, $c->kind->value])->all());
+    $grade = $this->inTenant(fn (): Category => Category::query()->where('name', 'أولى إعدادي')->sole());
+
+    expect($roots)->toBe([['كتب خارجية', 'books'], ['أدوات دراسية', 'stationery'], ['ألعاب', 'toys']])
+        ->and($grade->kind)->toBe(CategoryKind::Books);
+});
+
+test('D69 the demo fields are bound to their sections, so a toys category offers only the age facet', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $toys = $this->inTenant(fn (): Category => Category::query()->where('name', 'ألعاب')->sole());
+    $kinds = $this->inTenant(fn (): array => ProductFieldDefinition::query()->orderBy('key')->pluck('kind', 'key')->map(fn (?CategoryKind $k): ?string => $k?->value)->all());
+
+    expect($kinds)->toBe([
+        'academic_year' => 'books', 'age' => 'toys', 'brand' => 'stationery', 'color' => 'stationery', 'edition_type' => 'books',
+        'grade' => 'books', 'publisher' => 'books', 'size' => 'stationery', 'subject' => 'books', 'term' => 'books', 'track' => 'books',
+    ])
+        ->and($this->tenantJson('GET', "/api/store/filters?category={$toys->slug}")->assertOk()->json('data.*.key'))->toBe(['age']);
+});
+
+test('D68 toys carry a retail price or none, and the store names their section', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $response = $this->tenantJson('GET', '/api/store/products?q=شطرنج')->assertOk();
+
+    expect($response->json('data.0.category.kind'))->toBe('toys')
+        ->and($response->json('data.0.sku.cover_price'))->toBeNull()
+        ->and($response->json('data.0.custom_fields.*.key'))->toBe(['age']);
 });
 
 test('the final revision edition is linked to its main book', function (): void {
@@ -53,7 +88,7 @@ test('the store lists the seeded books with the grade facet', function (): void 
     $response = $this->tenantJson('GET', '/api/store/filters')->assertOk();
 
     expect($response->json('data.0.key'))->toBe('grade')
-        ->and($this->tenantJson('GET', '/api/store/products?per_page=24')->json('meta.total'))->toBe(34);
+        ->and($this->tenantJson('GET', '/api/store/products?per_page=24')->json('meta.total'))->toBe(44);
 });
 
 test('a database with other test data still gets the demo catalog, reusing its units', function (): void {
@@ -61,7 +96,7 @@ test('a database with other test data still gets the demo catalog, reusing its u
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): array => [Product::query()->count(), Unit::query()->count()]))->toBe([34, 3]);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Unit::query()->count()]))->toBe([44, 3]);
 });
 
 test('seeding twice changes nothing', function (): void {
@@ -69,7 +104,7 @@ test('seeding twice changes nothing', function (): void {
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): int => Product::query()->count()))->toBe(34);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([44, 11, 11]);
 });
 
 test('the books read like the publisher describes them, the revision edition as an exam review', function (): void {

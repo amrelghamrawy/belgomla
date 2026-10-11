@@ -16,7 +16,7 @@ test('BR-P13 the price list returns compact rows for the selection, by name, unp
     $this->tenantJson('GET', '/api/store/price-list')
         ->assertOk()
         ->assertExactJsonStructure([
-            'data' => ['*' => ['id', 'name', 'slug', 'code', 'unit', 'moq', 'cover_price', 'base_price', 'availability']],
+            'data' => ['*' => ['id', 'name', 'slug', 'kind', 'code', 'unit', 'moq', 'cover_price', 'base_price', 'availability']],
             'meta' => ['count', 'truncated', 'prices_hidden'],
         ])
         ->assertJsonPath('meta', ['count' => 2, 'truncated' => false, 'prices_hidden' => false])

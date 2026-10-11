@@ -7,17 +7,20 @@ namespace App\Modules\Catalog\Queries;
 use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\FieldType;
+use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Scopes\VisibleOnStore;
 use App\Modules\Catalog\Services\FacetCacheVersion;
 use App\Modules\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 
 /**
  * Storefront facets (BR-P08, D18): every active filterable field in `filter_order`, with its options
  * and the number of visible products each option would leave, given the *other* selected facets
- * (a facet never filters its own counts). Options with no products are left out.
+ * (a facet never filters its own counts). Options with no products are left out. Inside a category,
+ * only the fields of its section (and the section-less ones) are facets (D69).
  *
  * One grouped query per facet; the result is cached per tenant + selection and invalidated by bumping
  * the tenant's FacetCacheVersion on any product, field, option or category change (Tech §9b).
@@ -49,11 +52,16 @@ final readonly class FacetQuery
      */
     private function compute(ProductFilterData $filter): array
     {
+        $category = $this->filtered->resolveCategory($filter);
+
         $definitions = ProductFieldDefinition::query()
             ->with('options')
             ->where('status', ArchiveStatus::Active)
             ->where('is_filterable', true)
             ->whereIn('type', [FieldType::Select, FieldType::Boolean])
+            ->when($category instanceof Category, fn (Builder $query): Builder => $query->where(
+                fn (Builder $query): Builder => $query->whereNull('kind')->orWhere('kind', $category?->kind),
+            ))
             ->orderBy('filter_order')
             ->orderBy('id')
             ->get();

@@ -1,6 +1,30 @@
-import type { DashboardCategory } from "@/lib/api/types";
+import type { CategoryKind, DashboardCategory } from "@/lib/api/types";
 
 // Pure helpers over the dashboard category tree (08 §6: GET categories returns roots with children).
+
+/**
+ * The section kind of a category anywhere in the whole tree, archived nodes included (a product may still sit
+ * in an archived category and needs its kind for the price label and the fields, D68). Null when unknown.
+ */
+export function kindOfCategory(nodes: readonly DashboardCategory[], id: number | null): CategoryKind | null {
+  if (id === null) {
+    return null;
+  }
+
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node.kind;
+    }
+
+    const found = kindOfCategory(node.children, id);
+
+    if (found !== null) {
+      return found;
+    }
+  }
+
+  return null;
+}
 
 /** The tree without archived nodes (an archived node hides its subtree too). */
 export function activeOnly(nodes: readonly DashboardCategory[]): DashboardCategory[] {

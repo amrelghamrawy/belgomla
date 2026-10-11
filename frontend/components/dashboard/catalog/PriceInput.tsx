@@ -20,16 +20,18 @@ type Props = {
   onModeChange: (mode: PriceMode) => void;
   value: string;
   onChange: (value: string) => void;
-  /** The cover price as typed, or null when there is none (a percentage then cannot be used). */
+  /** The reference price as typed, or null when there is none (a percentage then cannot be used). */
   cover: string | null;
+  /** What the reference price is called for this product's section (ar.product.referencePrice, D68). */
+  referenceLabel: string;
   error?: string;
 };
 
 /**
- * A price entered either as an amount or as a discount off the cover price (BR-PR10). Shows what the other
+ * A price entered either as an amount or as a discount off the reference price (BR-PR10). Shows what the other
  * form means: "= 90.00 ج.م" for a percentage, "خصم 25%" for an amount. The server computes the stored price.
  */
-export function PriceInput({ id, label, mode, onModeChange, value, onChange, cover, error }: Props) {
+export function PriceInput({ id, label, mode, onModeChange, value, onChange, cover, referenceLabel, error }: Props) {
   const computed = mode === "percent" && cover !== null ? priceFromPercent(cover, value) : null;
   const implied = mode === "price" && cover !== null ? percentFromPrice(cover, value) : null;
 
@@ -63,9 +65,9 @@ export function PriceInput({ id, label, mode, onModeChange, value, onChange, cov
         />
       </div>
       <p className="text-muted-foreground min-h-5 text-xs" data-testid={`${id}-hint`}>
-        {mode === "percent" && cover === null && copy.percentNeedsCover}
+        {mode === "percent" && cover === null && copy.percentNeedsCover(referenceLabel)}
         {computed !== null && copy.equalsPrice(formatMoney(computed))}
-        {implied !== null && copy.impliedDiscount(implied)}
+        {implied !== null && copy.impliedDiscount(implied, referenceLabel)}
       </p>
       {error !== undefined && <FieldError>{error}</FieldError>}
     </Field>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Observers\FacetCacheObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -17,13 +18,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A tenant-defined custom product field (BR-P08).
+ * A tenant-defined custom product field (BR-P08). `kind` binds it to one section; null = every section (D69).
  *
  * @property int $id
  * @property int $tenant_id
  * @property string $key
  * @property string $label
  * @property FieldType $type
+ * @property CategoryKind|null $kind
  * @property bool $is_required
  * @property bool $show_on_storefront
  * @property bool $is_filterable
@@ -64,6 +66,12 @@ final class ProductFieldDefinition extends Model
         return $this->hasMany(ProductFieldOption::class, 'definition_id')->orderBy('sort_order')->orderBy('id');
     }
 
+    /** True when the field applies to products of this section (BR-P08, D69). */
+    public function appliesTo(CategoryKind $kind): bool
+    {
+        return $this->kind === null || $this->kind === $kind;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -71,6 +79,7 @@ final class ProductFieldDefinition extends Model
     {
         return [
             'type' => FieldType::class,
+            'kind' => CategoryKind::class,
             'is_required' => 'boolean',
             'show_on_storefront' => 'boolean',
             'is_filterable' => 'boolean',

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Catalog\Enums\CategoryKind;
+use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Pricing\Models\SkuPriceTier;
 
@@ -29,13 +31,19 @@ test('BR-PR10 recompute applies the stored percentages to the new cover price, a
         ->and($logs->pluck('actor_id')->unique()->all())->toBe([$this->me->id]);
 });
 
-test('BR-PR10 recompute without a cover price is refused with cover_price_required', function (): void {
-    $product = $this->inTenant(fn () => Product::factory()->withSku(['cover_price' => null, 'base_price' => '90.00', 'base_price_percent' => '25.00'])->create());
+test('BR-PR10 recompute without a reference price is refused with cover_price_required, named after the section', function (CategoryKind $kind, string $message): void {
+    $product = $this->inTenant(fn () => Product::factory()
+        ->for(Category::factory()->kind($kind))
+        ->withSku(['cover_price' => null, 'base_price' => '90.00', 'base_price_percent' => '25.00'])
+        ->create());
 
     $this->tenantJson('POST', "/api/dashboard/products/{$product->id}/pricing/recompute")
         ->assertUnprocessable()
-        ->assertExactJson(['error' => ['code' => 'cover_price_required', 'message' => 'أدخل سعر الغلاف أولًا لحساب السعر بنسبة الخصم']]);
-});
+        ->assertExactJson(['error' => ['code' => 'cover_price_required', 'message' => $message]]);
+})->with([
+    'books say cover price' => [CategoryKind::Books, 'أدخل سعر الغلاف أولًا لحساب السعر بنسبة الخصم'],
+    'toys say retail price' => [CategoryKind::Toys, 'أدخل سعر القطاعي أولًا لحساب السعر بنسبة الخصم'],
+]);
 
 test('BR-T04 recomputing another tenant product is 404 and changes nothing', function (): void {
     $foreign = $this->inTenant(

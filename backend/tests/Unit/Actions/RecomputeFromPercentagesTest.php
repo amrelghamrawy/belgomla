@@ -61,7 +61,7 @@ test('BR-PR10 stored percentages without a cover price cannot be recomputed', fu
     } catch (MissingCoverPrice $e) {
         expect($e->status)->toBe(422)
             ->and($e->errorCode)->toBe('cover_price_required')
-            ->and($e->getMessage())->toBe('أدخل سعر الغلاف أولًا لحساب السعر بنسبة الخصم');
+            ->and($e->getMessage())->toBe('أدخل سعر القطاعي أولًا لحساب السعر بنسبة الخصم');
     }
 
     expect($sku->refresh()->base_price)->toBe('90.00');

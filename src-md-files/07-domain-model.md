@@ -101,6 +101,7 @@ erDiagram
 | path       | varchar(500) | materialized `/1/7/23/`, rebuilt on move (Tech §9b)     |
 | sort_order | int          |                                                         |
 | image_path | varchar      | nullable                                                |
+| kind       | varchar(20)  | `books`, `stationery`, `toys`, `general` (default); set on roots, copied to the subtree like `path` (D68) |
 | status     | enum         | `active`, `archived` (BR-P06)                           |
 
 ### `units`
@@ -124,6 +125,7 @@ erDiagram
 | is_required        | boolean      |                                         |
 | show_on_storefront | boolean      |                                         |
 | is_filterable      | boolean      | app check: only for `select`/`boolean`  |
+| kind               | varchar(20)  | nullable; the section the field applies to, null = every section (D69) |
 | filter_order       | int          | facet order on storefront               |
 | sort_order         | int          | order on product page / form            |
 | status             | enum         | `active`, `archived`                    |
@@ -189,7 +191,7 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 | selling_unit_id    | FK units      | BR-U02                                                |
 | base_unit_id       | FK units      |                                                       |
 | conversion_factor  | int           | **check ≥ 1**; base units per selling unit            |
-| cover_price        | numeric(12,2) | nullable (سعر الغلاف)                                 |
+| cover_price        | numeric(12,2) | nullable; the reference price: سعر الغلاف for `books`, سعر القطاعي otherwise (D68) |
 | base_price         | numeric(12,2) | **check > 0**, per selling unit                       |
 | base_price_percent | numeric(5,2)  | nullable; % off cover price used to derive base_price |
 | moq                | int           | **check ≥ 1**, default 1 (BR-MOQ01)                   |

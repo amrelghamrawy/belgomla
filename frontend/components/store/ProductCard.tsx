@@ -68,7 +68,12 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
             {pack}
           </p>
         )}
-        <PriceBlock sku={product.sku} pricesHidden={product.prices_hidden === true} loginNext={href} />
+        <PriceBlock
+          sku={product.sku}
+          pricesHidden={product.prices_hidden === true}
+          kind={product.category?.kind ?? null}
+          loginNext={href}
+        />
         <div className="mt-auto pt-2">
           <QuickAdd product={product} />
         </div>

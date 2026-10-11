@@ -12,7 +12,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 
 const DASHBOARD_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name'], 'custom_fields',
+    'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name', 'kind'], 'custom_fields',
     'sku' => ['id', 'code', 'selling_unit' => ['id', 'name'], 'base_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq'],
     'main_image_url', 'created_at', 'updated_at',
 ];

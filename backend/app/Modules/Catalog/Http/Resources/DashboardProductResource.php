@@ -54,13 +54,13 @@ final class DashboardProductResource extends JsonResource
     }
 
     /**
-     * @return array{id: int, name: string}|null
+     * @return array{id: int, name: string, kind: string}|null
      */
     private function category(): ?array
     {
         $category = $this->resource->relationLoaded('category') ? $this->resource->category : null;
 
-        return $category instanceof Category ? ['id' => $category->id, 'name' => $category->name] : null;
+        return $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null;
     }
 
     private function mainImage(): ?ProductImage

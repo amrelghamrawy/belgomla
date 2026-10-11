@@ -56,6 +56,23 @@ final readonly class FilteredProductsQuery
     }
 
     /**
+     * The category the selection points at (id on the dashboard, slug on the store), or null when the
+     * selection has none or names an unknown one. FacetQuery uses it to pick the section's fields (D69).
+     */
+    public function resolveCategory(ProductFilterData $filter): ?Category
+    {
+        if ($filter->categoryId !== null) {
+            return Category::query()->find($filter->categoryId);
+        }
+
+        if ($filter->categorySlug !== null) {
+            return Category::query()->where('slug', $filter->categorySlug)->first();
+        }
+
+        return null;
+    }
+
+    /**
      * @param  Builder<Product>  $query
      */
     private function category(Builder $query, ProductFilterData $filter): void
@@ -64,9 +81,7 @@ final readonly class FilteredProductsQuery
             return;
         }
 
-        $category = $filter->categoryId !== null
-            ? Category::query()->find($filter->categoryId)
-            : Category::query()->where('slug', $filter->categorySlug)->first();
+        $category = $this->resolveCategory($filter);
 
         if (! $category instanceof Category) {
             $query->whereRaw('1 = 0');

@@ -96,7 +96,8 @@ test('D28 a tier priced above the base price is refused with invalid_tiers', fun
 test('BR-PR10 a percent on a sku without a cover price is refused with cover_price_required', function (): void {
     $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)(['cover_price' => null]))
         ->assertUnprocessable()
-        ->assertJsonPath('error.code', 'cover_price_required');
+        ->assertJsonPath('error.code', 'cover_price_required')
+        ->assertJsonPath('error.message', 'أدخل سعر القطاعي أولًا لحساب السعر بنسبة الخصم');
 
     $this->assertDatabaseHas('skus', ['id' => $this->product->sku->id, 'cover_price' => '120.00']);
 });

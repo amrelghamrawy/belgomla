@@ -861,6 +861,7 @@ paths:
     post:
       operationId: dashboardCreateCategory
       tags: [dashboard-catalog]
+      summary: Creates a category; `kind` is accepted for roots only (children inherit it, default general)
       requestBody:
         required: true
         content:
@@ -871,6 +872,10 @@ paths:
               properties:
                 name: { type: string, maxLength: 100 }
                 parent_id: { type: [integer, 'null'] }
+                kind:
+                  oneOf:
+                    - $ref: '#/components/schemas/CategoryKind'
+                    - type: 'null'
                 sort_order: { type: integer, minimum: 0, maximum: 100000 }
           multipart/form-data:
             schema:
@@ -879,6 +884,7 @@ paths:
               properties:
                 name: { type: string, maxLength: 100 }
                 parent_id: { type: integer }
+                kind: { $ref: '#/components/schemas/CategoryKind' }
                 sort_order: { type: integer }
                 image: { type: string, format: binary }
       responses:
@@ -916,7 +922,7 @@ paths:
     put:
       operationId: dashboardUpdateCategory
       tags: [dashboard-catalog]
-      summary: Renames and/or moves a category with its subtree; parent_id null makes it a root
+      summary: Renames, re-kinds and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only
       requestBody:
         required: true
         content:
@@ -927,6 +933,10 @@ paths:
               properties:
                 name: { type: string, maxLength: 100 }
                 parent_id: { type: [integer, 'null'] }
+                kind:
+                  oneOf:
+                    - $ref: '#/components/schemas/CategoryKind'
+                    - type: 'null'
                 sort_order: { type: integer, minimum: 0, maximum: 100000 }
       responses:
         '200': { $ref: '#/components/responses/DashboardCategory' }
@@ -2725,13 +2735,27 @@ components:
         to: { type: [integer, 'null'] }
         total: { type: integer }
 
+    CategoryKind:
+      type: string
+      description: 'The section of a root category, inherited by its subtree and products (D68). Decides what cover_price means: the printed cover price for books, the retail price otherwise'
+      enum: [books, stationery, toys, general]
+
+    CategoryRef:
+      type: object
+      required: [id, name, kind]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/CategoryKind' }
+
     Category:
       type: object
-      required: [id, name, slug, image_url, children]
+      required: [id, name, slug, kind, image_url, children]
       properties:
         id: { type: integer }
         name: { type: string }
         slug: { type: string }
+        kind: { $ref: '#/components/schemas/CategoryKind' }
         image_url: { type: [string, 'null'] }
         children:
           type: array
@@ -2820,11 +2844,7 @@ components:
         main_image_url: { type: [string, 'null'] }
         category:
           oneOf:
-            - type: object
-              required: [id, name]
-              properties:
-                id: { type: integer }
-                name: { type: string }
+            - $ref: '#/components/schemas/CategoryRef'
             - type: 'null'
         custom_fields:
           type: array
@@ -2874,11 +2894,15 @@ components:
 
     PriceListRow:
       type: object
-      required: [id, name, slug, code, unit, moq, availability]
+      required: [id, name, slug, kind, code, unit, moq, availability]
       properties:
         id: { type: integer }
         name: { type: string }
         slug: { type: string }
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/CategoryKind'
+            - type: 'null'
         code: { type: [string, 'null'] }
         unit: { type: [string, 'null'] }
         moq: { type: [integer, 'null'] }
@@ -3219,11 +3243,12 @@ components:
 
     DashboardCategory:
       type: object
-      required: [id, name, slug, image_url, parent_id, sort_order, status, children]
+      required: [id, name, slug, kind, image_url, parent_id, sort_order, status, children]
       properties:
         id: { type: integer }
         name: { type: string }
         slug: { type: string }
+        kind: { $ref: '#/components/schemas/CategoryKind' }
         image_url: { type: [string, 'null'] }
         parent_id: { type: [integer, 'null'] }
         sort_order: { type: integer }
@@ -3255,12 +3280,17 @@ components:
 
     FieldDefinition:
       type: object
-      required: [id, key, label, type, is_required, show_on_storefront, is_filterable, filter_order, sort_order, status, options]
+      required: [id, key, label, type, kind, is_required, show_on_storefront, is_filterable, filter_order, sort_order, status, options]
       properties:
         id: { type: integer }
         key: { type: string }
         label: { type: string }
         type: { $ref: '#/components/schemas/FieldType' }
+        kind:
+          description: 'The section this field applies to; null = every section (D69)'
+          oneOf:
+            - $ref: '#/components/schemas/CategoryKind'
+            - type: 'null'
         is_required: { type: boolean }
         show_on_storefront: { type: boolean }
         is_filterable: { type: boolean }
@@ -3277,6 +3307,11 @@ components:
       properties:
         label: { type: string, maxLength: 100 }
         type: { $ref: '#/components/schemas/FieldType' }
+        kind:
+          description: 'Bind the field to one section; null or absent = every section (D69)'
+          oneOf:
+            - $ref: '#/components/schemas/CategoryKind'
+            - type: 'null'
         is_required: { type: boolean }
         show_on_storefront: { type: boolean }
         is_filterable: { type: boolean }
@@ -3343,7 +3378,7 @@ components:
         status: { $ref: '#/components/schemas/ProductStatus' }
         category:
           oneOf:
-            - $ref: '#/components/schemas/IdName'
+            - $ref: '#/components/schemas/CategoryRef'
             - type: 'null'
         custom_fields:
           type: object

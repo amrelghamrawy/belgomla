@@ -7,20 +7,22 @@ import { StoreBottomNav } from "@/components/store/StoreBottomNav";
 import { StoreFooter } from "@/components/store/StoreFooter";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHome } from "@/components/store/StoreHome";
+import type { Category } from "@/lib/api/types";
 
 import { cart, cartItem, customer, page, storeProduct, tenantSettings } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { pathname, renderWithQuery } from "../render";
 
-const tree = [
+const tree: Category[] = [
   {
     id: 1,
     name: "المرحلة الإعدادية",
     slug: "prep",
+    kind: "books",
     image_url: null,
-    children: [{ id: 2, name: "أولى إعدادي", slug: "prep-1", image_url: null, children: [] }],
+    children: [{ id: 2, name: "أولى إعدادي", slug: "prep-1", kind: "books", image_url: null, children: [] }],
   },
-  { id: 3, name: "المرحلة الثانوية", slug: "secondary", image_url: null, children: [] },
+  { id: 3, name: "المرحلة الثانوية", slug: "secondary", kind: "books", image_url: null, children: [] },
 ];
 const storeWithMinimum = tenantSettings({
   whatsapp: "+201001234567",

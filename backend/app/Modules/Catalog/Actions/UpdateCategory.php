@@ -6,15 +6,18 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Data\CategoryData;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Services\CategoryPath;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Renames and/or moves a category. A move rewrites the materialized path of the whole subtree in one
- * statement; moving under itself or a descendant throws CategoryCycle (BR-P06). Owns its transaction.
- * The slug is kept on rename so shared links keep working.
+ * Renames, re-kinds and/or moves a category. A move rewrites the materialized path of the whole subtree
+ * in one statement; moving under itself or a descendant throws CategoryCycle (BR-P06). The kind follows
+ * the same rule (D68): under a parent it is the parent's, as a root it is the one sent (or kept), and a
+ * change is written to the whole subtree. Owns its transaction. The slug is kept on rename so shared
+ * links keep working.
  */
 final readonly class UpdateCategory
 {
@@ -26,12 +29,16 @@ final readonly class UpdateCategory
     public function handle(Category $category, CategoryData $data): Category
     {
         $parent = $this->parent($data->parentId);
+        $kind = $parent instanceof Category ? $parent->kind : ($data->kind ?? $category->kind);
         $old = $this->snapshot($category);
 
-        return DB::transaction(function () use ($category, $data, $parent, $old): Category {
-            if ($category->parent_id !== $data->parentId) {
-                $this->rewriteSubtree($category->path, $this->paths->under($category, $parent));
+        return DB::transaction(function () use ($category, $data, $parent, $kind, $old): Category {
+            $moved = $category->parent_id !== $data->parentId;
+
+            if ($moved || $kind !== $category->kind) {
+                $this->rewriteSubtree($category->path, $moved ? $this->paths->under($category, $parent) : null, $kind);
                 $category->parent_id = $data->parentId;
+                $category->kind = $kind;
             }
 
             $category->name = $data->name;
@@ -55,13 +62,16 @@ final readonly class UpdateCategory
     }
 
     /** Paths only contain digits and slashes, so the new prefix can be inlined safely. */
-    private function rewriteSubtree(string $from, string $to): void
+    private function rewriteSubtree(string $from, ?string $to, CategoryKind $kind): void
     {
-        $offset = mb_strlen($from) + 1;
+        $values = ['kind' => $kind->value];
 
-        Category::query()
-            ->where('path', 'like', $from.'%')
-            ->update(['path' => DB::raw("'".preg_replace('/[^0-9\/]/', '', $to)."' || substr(path, {$offset})")]);
+        if ($to !== null) {
+            $offset = mb_strlen($from) + 1;
+            $values['path'] = DB::raw("'".preg_replace('/[^0-9\/]/', '', $to)."' || substr(path, {$offset})");
+        }
+
+        Category::query()->where('path', 'like', $from.'%')->update($values);
     }
 
     /**
@@ -69,6 +79,12 @@ final readonly class UpdateCategory
      */
     private function snapshot(Category $category): array
     {
-        return ['name' => $category->name, 'parent_id' => $category->parent_id, 'sort_order' => $category->sort_order, 'path' => $category->path];
+        return [
+            'name' => $category->name,
+            'parent_id' => $category->parent_id,
+            'kind' => $category->kind->value,
+            'sort_order' => $category->sort_order,
+            'path' => $category->path,
+        ];
     }
 }

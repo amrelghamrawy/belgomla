@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 /*
-| BR-P09 school-books template (D17, D18: facet order Grade → Subject → Publisher, then the rest).
+| BR-P09 school-books template (D17, D18: facet order Grade → Subject → Publisher, then the rest). Every field
+| is bound to the books section (D69).
 | Applied once at tenant creation; the merchant owns and edits the fields afterwards.
 */
 
@@ -12,6 +13,7 @@ return [
         'key' => 'grade',
         'label' => 'السنة الدراسية',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 1,
         'sort_order' => 1,
@@ -26,6 +28,7 @@ return [
         'key' => 'subject',
         'label' => 'المادة',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 2,
         'sort_order' => 2,
@@ -38,6 +41,7 @@ return [
         'key' => 'publisher',
         'label' => 'الشركة',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 3,
         'sort_order' => 3,
@@ -47,6 +51,7 @@ return [
         'key' => 'term',
         'label' => 'الترم',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 4,
         'sort_order' => 4,
@@ -56,6 +61,7 @@ return [
         'key' => 'track',
         'label' => 'المسار',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 5,
         'sort_order' => 5,
@@ -65,6 +71,7 @@ return [
         'key' => 'edition_type',
         'label' => 'نوع النسخة',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 6,
         'sort_order' => 6,
@@ -74,6 +81,7 @@ return [
         'key' => 'academic_year',
         'label' => 'العام الدراسي',
         'type' => 'select',
+        'kind' => 'books',
         'is_filterable' => true,
         'filter_order' => 7,
         'sort_order' => 7,

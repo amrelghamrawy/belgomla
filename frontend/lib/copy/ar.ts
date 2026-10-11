@@ -1,4 +1,5 @@
 import type { ApiErrorCode } from "@/lib/api/errors";
+import type { CategoryKind } from "@/lib/api/types";
 import { dashboard } from "@/lib/copy/ar-dashboard";
 
 // Every Arabic string the UI shows (rules/03 §5). No i18n framework in V1: Arabic only.
@@ -17,7 +18,7 @@ const errors: Record<ApiErrorCode, string> = {
   cart_line_invalid: "بعض أصناف السلة لم تعد متاحة بالكمية المطلوبة",
   category_cycle: "لا يمكن نقل القسم داخل أحد أقسامه الفرعية",
   checkout_failed: "تعذر إتمام الطلب، راجع السلة",
-  cover_price_required: "سعر الغلاف مطلوب",
+  cover_price_required: "أدخل السعر المرجعي (الغلاف أو القطاعي) أولًا لاستخدام النسبة",
   csrf_token_mismatch: "انتهت صلاحية الجلسة، أعد تحميل الصفحة",
   duplicate_code: "الكود مستخدم من قبل",
   duplicate_key: "المفتاح مستخدم من قبل",
@@ -164,6 +165,12 @@ export const ar = {
     },
   },
   catalog: {
+    /** The sections a root category can belong to (D68). */
+    kinds: { books: "كتب خارجية", stationery: "أدوات دراسية", toys: "ألعاب", general: "عام" } satisfies Record<
+      CategoryKind,
+      string
+    >,
+    kindAll: "كل الأقسام",
     breadcrumbs: "مسار التصفح",
     filters: "تصفية",
     filtersTitle: "تصفية المنتجات",
@@ -199,7 +206,12 @@ export const ar = {
     inCart: (quantity: number, unit: string) => `${quantity} ${unit} في السلة`,
   },
   product: {
-    coverPrice: "سعر الغلاف",
+    /**
+     * What a SKU's optional reference price is called (BR-PR10, D68): the printed cover price for books, the
+     * retail price for every other section; both names when the section is not known yet.
+     */
+    referencePrice: (kind: CategoryKind | null) =>
+      kind === "books" ? "سعر الغلاف" : kind === null ? "سعر الغلاف / القطاعي" : "سعر القطاعي",
     wholesalePrice: "سعر الجملة",
     margin: (percent: string) => `هامش ربحك ${percent}%`,
     tierShort: (min: number, unit: string, price: string) => `من ${min} ${unit}: ${price}`,
@@ -234,7 +246,6 @@ export const ar = {
     name: "المنتج",
     code: "الكود",
     unit: "الوحدة",
-    cover: "سعر الغلاف",
     wholesale: "سعر الجملة",
     moq: "أقل كمية",
     availability: "التوفر",

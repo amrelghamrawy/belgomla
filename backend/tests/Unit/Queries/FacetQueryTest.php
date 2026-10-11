@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Data\ProductFilterData;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -42,6 +43,28 @@ test('archived, non-filterable and text fields are never facets', function (): v
     ProductFieldDefinition::factory()->create(['key' => 'isbn', 'is_filterable' => true]);
 
     expect(array_column(app(FacetQuery::class)->get(new ProductFilterData), 'key'))->toBe(['colored', 'grade']);
+});
+
+test('D69 inside a category only the facets of its section and the section-less ones are offered', function (): void {
+    $toys = Category::factory()->kind(CategoryKind::Toys)->create();
+    $age = ProductFieldDefinition::factory()->select()->filterable()->forKind(CategoryKind::Toys)->create(['key' => 'age', 'filter_order' => 0]);
+    $three = ProductFieldOption::factory()->for($age, 'definition')->create();
+    $this->grade->update(['kind' => CategoryKind::Books]);
+    Product::factory()->create(['category_id' => $toys->id, 'custom_fields' => ['age' => $three->id, 'grade' => $this->first->id, 'colored' => true]]);
+
+    $facets = app(FacetQuery::class)->get(new ProductFilterData(categorySlug: $toys->slug));
+
+    expect(array_column($facets, 'key'))->toBe(['age', 'colored']);
+});
+
+test('D69 without a category every section offers its facets', function (): void {
+    $this->grade->update(['kind' => CategoryKind::Books]);
+
+    expect(array_column(app(FacetQuery::class)->get(new ProductFilterData), 'key'))->toBe(['colored', 'grade']);
+});
+
+test('D69 an unknown category slug keeps every facet definition and counts nothing', function (): void {
+    expect(app(FacetQuery::class)->get(new ProductFilterData(categorySlug: 'nope')))->toBe([]);
 });
 
 test('Tech §9b counts are cached per selection: the second call runs no query', function (): void {

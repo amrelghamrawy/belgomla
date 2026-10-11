@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Observers\CategoryObserver;
 use App\Modules\Catalog\Observers\FacetCacheObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Category tree of unlimited depth (BR-P06). `path` is the materialized "/1/7/23/" chain, own id last.
+ * `kind` is set on roots and copied down the tree like `path` (D68).
  *
  * @property int $id
  * @property int $tenant_id
@@ -27,6 +29,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $name
  * @property string $slug
  * @property string $path
+ * @property CategoryKind $kind
  * @property int $sort_order
  * @property string|null $image_path
  * @property ArchiveStatus $status
@@ -48,6 +51,7 @@ final class Category extends Model
         'status' => 'active',
         'sort_order' => 0,
         'path' => '/',
+        'kind' => 'general',
     ];
 
     protected static function newFactory(): CategoryFactory
@@ -91,6 +95,7 @@ final class Category extends Model
     {
         return [
             'status' => ArchiveStatus::class,
+            'kind' => CategoryKind::class,
             'sort_order' => 'integer',
         ];
     }

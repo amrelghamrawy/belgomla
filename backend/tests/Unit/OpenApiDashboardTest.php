@@ -59,7 +59,7 @@ test('a created product matches DashboardProduct with its SKU, tiers, stock, ima
     $data = $this->tenantJson('GET', "/api/dashboard/products/{$id}")->assertOk()->json('data');
 
     expectDocumentedShape($data, 'DashboardProduct');
-    expectDocumentedShape($data['category'], 'IdName');
+    expectDocumentedShape($data['category'], 'CategoryRef');
     expectDocumentedShape($data['sku'], 'DashboardSku');
     expectDocumentedShape($data['sku']['selling_unit'], 'IdName');
     expectDocumentedShape($data['sku']['tiers'][0], 'DashboardTier');

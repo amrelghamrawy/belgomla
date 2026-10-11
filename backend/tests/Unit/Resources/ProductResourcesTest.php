@@ -30,7 +30,7 @@ test('the dashboard product resource key set without detail relations', function
         ->and($data['sku']['cover_price'])->toBe('120.00')
         ->and($data['sku']['base_price'])->toBe('90.00')
         ->and($data['custom_fields'])->toBe(['brand' => 'Bic'])
-        ->and($data['category'])->toBe(['id' => $product->category->id, 'name' => $product->category->name])
+        ->and($data['category'])->toBe(['id' => $product->category->id, 'name' => $product->category->name, 'kind' => 'general'])
         ->and($data['created_at'])->toBe($product->created_at->toIso8601String());
 });
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Http\Resources;
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
@@ -14,7 +15,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * BR-P13 compact price-list row: name, code, unit, MOQ, cover and wholesale price, availability.
+ * BR-P13 compact price-list row: name, section kind, code, unit, MOQ, reference and wholesale price, availability.
  * Prices follow the same visibility rule as the product list (D1).
  *
  * @property-read Product $resource
@@ -44,11 +45,13 @@ final class PriceListRowResource extends JsonResource
     {
         $sku = $this->resource->relationLoaded('sku') ? $this->resource->sku : null;
         $unit = $sku instanceof Sku && $sku->relationLoaded('sellingUnit') ? $sku->sellingUnit : null;
+        $category = $this->resource->relationLoaded('category') ? $this->resource->category : null;
 
         return [
             'id' => $this->resource->id,
             'name' => $this->resource->name,
             'slug' => $this->resource->slug,
+            'kind' => $category instanceof Category ? $category->kind->value : null,
             'code' => $sku?->code,
             'unit' => $unit instanceof Unit ? $unit->name : null,
             'moq' => $sku?->moq,

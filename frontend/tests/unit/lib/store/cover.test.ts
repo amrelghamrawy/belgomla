@@ -53,7 +53,11 @@ describe("coverFor", () => {
 
   it("falls back to the category and the product name without book fields", () => {
     const cover = coverFor(
-      storeProduct({ name: "كشكول 100 ورقة", custom_fields: [], category: { id: 9, name: "كشاكيل" } }),
+      storeProduct({
+        name: "كشكول 100 ورقة",
+        custom_fields: [],
+        category: { id: 9, name: "كشاكيل", kind: "stationery" },
+      }),
     );
 
     expect(cover).toMatchObject({ title: "كشاكيل", subtitle: "كشكول 100 ورقة", badge: null, note: null });

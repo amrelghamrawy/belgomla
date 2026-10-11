@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { bulkFilterOf } from "@/lib/dashboard/catalog";
-import { activeOnly, applyOrder, flatten, reorderSiblings, subtreeIds } from "@/lib/dashboard/category-tree";
+import {
+  activeOnly,
+  applyOrder,
+  flatten,
+  kindOfCategory,
+  reorderSiblings,
+  subtreeIds,
+} from "@/lib/dashboard/category-tree";
 import { customFieldProblems, customFieldsBody, visibleDefinitions } from "@/lib/dashboard/custom-fields";
 import { productBody, productDefaults } from "@/lib/dashboard/product-form";
 
@@ -87,7 +94,7 @@ describe("custom fields", () => {
   ];
 
   it("converts drafts to API values and leaves empty ones out", () => {
-    expect(customFieldsBody(definitions, { grade: "12", pages: "120", color: "false", old: "" })).toEqual({
+    expect(customFieldsBody(definitions, { grade: "12", pages: "120", color: "false", old: "" }, "general")).toEqual({
       grade: 12,
       pages: 120,
       color: false,
@@ -95,19 +102,76 @@ describe("custom fields", () => {
   });
 
   it("shows archived fields only while the product holds a value", () => {
-    expect(visibleDefinitions(definitions, {}).map((definition) => definition.key)).toEqual([
+    expect(visibleDefinitions(definitions, {}, "general").map((definition) => definition.key)).toEqual([
       "grade",
       "pages",
       "color",
     ]);
-    expect(visibleDefinitions(definitions, { old: "x" }).map((definition) => definition.key)).toContain("old");
+    expect(visibleDefinitions(definitions, { old: "x" }, "general").map((definition) => definition.key)).toContain(
+      "old",
+    );
   });
 
   it("flags a missing required field and a number that is not one", () => {
-    expect(customFieldProblems(definitions, { pages: "abc" }, { required: "مطلوب", number: "رقم" })).toEqual({
-      grade: "مطلوب",
-      pages: "رقم",
+    expect(customFieldProblems(definitions, { pages: "abc" }, "general", { required: "مطلوب", number: "رقم" })).toEqual(
+      {
+        grade: "مطلوب",
+        pages: "رقم",
+      },
+    );
+  });
+
+  describe("D69 fields bound to a section", () => {
+    const sectioned = [
+      selectField({ id: 1, key: "grade", kind: "books" }),
+      selectField({ id: 5, key: "age", label: "العمر", type: "text", kind: "toys", is_required: true, options: [] }),
+      selectField({ id: 6, key: "origin", label: "المنشأ", type: "text", kind: null, is_required: false, options: [] }),
+    ];
+
+    it("shows only the fields of the product's section and the section-less ones", () => {
+      expect(visibleDefinitions(sectioned, {}, "toys").map((definition) => definition.key)).toEqual(["age", "origin"]);
+      expect(visibleDefinitions(sectioned, { grade: "11" }, "toys").map((definition) => definition.key)).toEqual([
+        "age",
+        "origin",
+      ]);
     });
+
+    it("shows only the section-less fields until a category is chosen", () => {
+      expect(visibleDefinitions(sectioned, {}, null).map((definition) => definition.key)).toEqual(["origin"]);
+    });
+
+    it("leaves the values of another section's fields out of the body", () => {
+      expect(customFieldsBody(sectioned, { grade: "11", age: "3+", origin: "مصر" }, "toys")).toEqual({
+        age: "3+",
+        origin: "مصر",
+      });
+    });
+
+    it("requires only the fields of the product's section", () => {
+      expect(customFieldProblems(sectioned, {}, "books", { required: "مطلوب", number: "رقم" })).toEqual({
+        grade: "مطلوب",
+      });
+      expect(customFieldProblems(sectioned, {}, "toys", { required: "مطلوب", number: "رقم" })).toEqual({
+        age: "مطلوب",
+      });
+    });
+  });
+});
+
+describe("kindOfCategory", () => {
+  const tree = [
+    category({ id: 1, kind: "books", children: [category({ id: 3, name: "رابعة", parent_id: 1, kind: "books" })] }),
+    category({ id: 2, name: "ألعاب", kind: "toys", status: "archived" }),
+  ];
+
+  it("D68 finds the kind anywhere in the tree, archived nodes included", () => {
+    expect(kindOfCategory(tree, 3)).toBe("books");
+    expect(kindOfCategory(tree, 2)).toBe("toys");
+  });
+
+  it("is null without a category or for an unknown one", () => {
+    expect(kindOfCategory(tree, null)).toBeNull();
+    expect(kindOfCategory(tree, 99)).toBeNull();
   });
 });
 
@@ -127,9 +191,9 @@ describe("product form", () => {
   it("sends status and opening stock on create only", () => {
     const values = { ...productDefaults(dashboardProduct()), opening_stock: "100" };
 
-    expect(productBody(values, [selectField()], true)).toMatchObject({ status: "active", opening_stock: 100 });
-    expect(productBody(values, [selectField()], false)).not.toHaveProperty("opening_stock");
-    expect(productBody(values, [selectField()], false).sku).toMatchObject({
+    expect(productBody(values, [selectField()], true, "books")).toMatchObject({ status: "active", opening_stock: 100 });
+    expect(productBody(values, [selectField()], false, "books")).not.toHaveProperty("opening_stock");
+    expect(productBody(values, [selectField()], false, "books").sku).toMatchObject({
       base_price: null,
       base_price_percent: "25.00",
       tiers: [{ min_quantity: 10, discount_percent: "30.00" }],

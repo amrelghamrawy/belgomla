@@ -15,7 +15,8 @@ use InvalidArgumentException;
 
 /**
  * Turns entered pricing into the concrete values a SKU stores, and checks them, without writing:
- * percentages become absolute prices off the cover price (BR-PR10), thresholds are unique (BR-PR05),
+ * percentages become absolute prices off the reference price (`cover_price`: the cover price of a book,
+ * the retail price otherwise, BR-PR10), thresholds are unique (BR-PR05),
  * every price is above zero (BR-PR01, BR-PR05) and no tier costs more than the base price (D28).
  * UpdateSkuPricing writes the plan; bulk preview only plans.
  *
@@ -58,7 +59,7 @@ final readonly class SkuPricePlanner
     public function plan(Sku $sku, SkuPricingData $data): array
     {
         $cover = $data->coverPriceGiven ? $data->coverPrice : $sku->cover_price;
-        $basePrice = $data->basePrice ?? $this->fromPercent($cover, $data->basePricePercent);
+        $basePrice = $data->basePrice ?? $this->fromPercent($sku, $cover, $data->basePricePercent);
 
         if (Money::compare($basePrice, '0') <= 0) {
             throw InvalidPricingInput::basePriceNotPositive();
@@ -68,7 +69,7 @@ final readonly class SkuPricePlanner
             ? ($sku->exists ? $this->current($sku)['tiers'] : [])
             : array_map(fn (TierData $tier): array => [
                 'min_quantity' => $tier->minQuantity,
-                'unit_price' => $tier->unitPrice ?? $this->fromPercent($cover, $tier->discountPercent),
+                'unit_price' => $tier->unitPrice ?? $this->fromPercent($sku, $cover, $tier->discountPercent),
                 'discount_percent' => $tier->discountPercent,
             ], $data->tiers);
 
@@ -84,14 +85,18 @@ final readonly class SkuPricePlanner
         ];
     }
 
-    private function fromPercent(?string $cover, ?string $percent): string
+    /**
+     * The section kind is read only on the failure path, through the SKU's product and category
+     * (a relation walk, not a Catalog model dependency), so the message names the price correctly (D68).
+     */
+    private function fromPercent(Sku $sku, ?string $cover, ?string $percent): string
     {
         if ($percent === null) {
             throw new InvalidArgumentException('A price needs an absolute amount or a discount percent.');
         }
 
         if ($cover === null) {
-            throw MissingCoverPrice::make();
+            throw MissingCoverPrice::for($sku->product->category->kind);
         }
 
         return $this->percent->priceFromPercent($cover, $percent);

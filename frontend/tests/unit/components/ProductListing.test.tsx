@@ -59,7 +59,11 @@ describe("ProductListing", () => {
     renderWithQuery(<ProductListing category="first-term" />);
 
     const crumbs = await screen.findByRole("navigation", { name: "مسار التصفح" });
-    expect(within(crumbs).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+    expect(
+      within(crumbs)
+        .getAllByRole("link")
+        .map((link) => [link.textContent, link.getAttribute("href")]),
+    ).toEqual([
       ["الرئيسية", "/"],
       ["المرحلة الإعدادية", "/c/prep"],
       ["أولى إعدادي", "/c/first-prep"],
@@ -125,7 +129,11 @@ describe("ProductListing", () => {
   });
 
   it("shows the first eight options of a long group until «show all», and searches a group past twelve", async () => {
-    const options = Array.from({ length: 14 }, (_, index) => ({ id: 100 + index, label: `مادة ${index + 1}`, count: 1 }));
+    const options = Array.from({ length: 14 }, (_, index) => ({
+      id: 100 + index,
+      label: `مادة ${index + 1}`,
+      count: 1,
+    }));
     stubApi({
       "GET /api/store/categories": json(200, { data: tree }),
       "GET /api/store/filters": json(200, { data: [facet({ key: "subject", label: "المادة", options })] }),
@@ -143,7 +151,11 @@ describe("ProductListing", () => {
     await user.click(within(drawer).getByRole("button", { name: "عرض أقل" }));
 
     await user.type(within(drawer).getByRole("searchbox", { name: "ابحث في المادة" }), "مادة 13");
-    expect(within(drawer).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["مادة 131"]);
+    expect(
+      within(drawer)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual(["مادة 131"]);
 
     await user.clear(within(drawer).getByRole("searchbox"));
     await user.type(within(drawer).getByRole("searchbox"), "رياضيات");

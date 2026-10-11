@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { DashboardProduct, FieldDefinition, ProductStatus } from "@/lib/api/types";
+import type { CategoryKind, DashboardProduct, FieldDefinition, ProductStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 
 import { type CustomFieldDrafts, customFieldsBody, draftsFromProduct } from "./custom-fields";
@@ -51,7 +51,12 @@ export const productSchema = z
   .superRefine((values, context) => {
     if (values.base_mode === "percent") {
       if (values.cover_price === "") {
-        context.addIssue({ code: "custom", path: ["base_value"], message: copy.percentNeedsCover });
+        // The schema is shared by every section, so the message names the reference price both ways.
+        context.addIssue({
+          code: "custom",
+          path: ["base_value"],
+          message: copy.percentNeedsCover(ar.product.referencePrice(null)),
+        });
       } else if (toBasisPoints(values.base_value) === null) {
         context.addIssue({ code: "custom", path: ["base_value"], message: copy.invalidPercent });
       }
@@ -96,19 +101,21 @@ export function productDefaults(product: DashboardProduct | null): ProductFormVa
 
 /**
  * The API body. Prices go as the merchant entered them: `base_price` or `base_price_percent`, and per tier
- * `unit_price` or `discount_percent` (BR-PR10). `status` and `opening_stock` only on create.
+ * `unit_price` or `discount_percent` (BR-PR10). Custom fields are those of the chosen category's section
+ * (D69). `status` and `opening_stock` only on create.
  */
 export function productBody(
   values: ProductFormValues,
   definitions: readonly FieldDefinition[],
   creating: boolean,
+  kind: CategoryKind | null,
 ): ProductCreateInput {
   const percent = values.base_mode === "percent";
   const body: ProductCreateInput = {
     name: values.name.trim(),
     category_id: Number(values.category_id),
     description: values.description.trim() === "" ? null : values.description.trim(),
-    custom_fields: customFieldsBody(definitions, values.custom as CustomFieldDrafts),
+    custom_fields: customFieldsBody(definitions, values.custom as CustomFieldDrafts, kind),
     sku: {
       code: values.code.trim(),
       selling_unit_id: Number(values.selling_unit_id),

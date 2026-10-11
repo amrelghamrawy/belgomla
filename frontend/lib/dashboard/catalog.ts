@@ -6,6 +6,7 @@ import { apiFetch, apiFetchPage, withQuery } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/keys";
 import type {
   BulkStatusResult,
+  CategoryKind,
   DashboardCategory,
   DashboardProduct,
   FieldDefinition,
@@ -34,9 +35,10 @@ export function useDashboardCategories() {
   });
 }
 
-export type CategoryInput = { name: string; parent_id: number | null };
+/** `kind` is sent for roots only; a child inherits its parent's (D68). */
+export type CategoryInput = { name: string; parent_id: number | null; kind?: CategoryKind | null };
 
-/** Creates a category, or renames/moves one (PUT with parent_id: null makes it a root). */
+/** Creates a category, or renames/moves/re-kinds one (PUT with parent_id: null makes it a root). */
 export function useSaveCategory() {
   const queryClient = useQueryClient();
 

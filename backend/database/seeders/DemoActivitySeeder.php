@@ -118,7 +118,9 @@ final class DemoActivitySeeder extends Seeder
             }
 
             $this->actorId = TenantUser::query()->orderBy('id')->first()?->id;
+            // The demo customers are bookshops: they order the books, not the supplies or toys (D68).
             $skus = Sku::query()
+                ->where('code', 'like', 'BK-%')
                 ->whereHas('product', fn (Builder $query): Builder => $query->where('status', ProductStatus::Active))
                 ->orderBy('code')
                 ->get(['id', 'code', 'moq', 'conversion_factor']);

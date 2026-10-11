@@ -22,17 +22,19 @@ test('the category resource has the store key set and hides dashboard fields on 
 
     $data = rendered(new CategoryResource($category), storeRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'image_url', 'children'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'image_url', 'children'])
+        ->and($data['kind'])->toBe('general')
         ->and($data['image_url'])->toEndWith('/storage/tenants/1/categories/a.png')
         ->and($data['children'])->toBe([]);
 });
 
 test('the category resource adds parent, order and status on the dashboard', function (): void {
-    $category = Category::factory()->archived()->create(['sort_order' => 4])->refresh();
+    $category = Category::factory()->archived()->books()->create(['sort_order' => 4])->refresh();
 
     $data = rendered(new CategoryResource($category), dashboardRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'image_url', 'parent_id', 'sort_order', 'status', 'children'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'image_url', 'parent_id', 'sort_order', 'status', 'children'])
+        ->and($data['kind'])->toBe('books')
         ->and($data['status'])->toBe('archived')
         ->and($data['sort_order'])->toBe(4);
 });
@@ -61,9 +63,10 @@ test('the field resource key set, options empty when not loaded', function (): v
     $data = rendered(new FieldDefinitionResource($field), dashboardRequest());
 
     expect(array_keys($data))->toBe([
-        'id', 'key', 'label', 'type', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status', 'options',
+        'id', 'key', 'label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status', 'options',
     ])
         ->and($data['type'])->toBe('select')
+        ->and($data['kind'])->toBeNull()
         ->and($data['options'])->toBe([]);
 });
 

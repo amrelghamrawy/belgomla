@@ -50,7 +50,7 @@ describe("CustomFieldInputs", () => {
   ];
 
   it("renders each definition with its own input and marks required and optional ones", () => {
-    render(<CustomFieldInputs definitions={definitions} values={{}} onChange={vi.fn()} errors={{}} />);
+    render(<CustomFieldInputs definitions={definitions} values={{}} kind="general" onChange={vi.fn()} errors={{}} />);
 
     const grade = screen.getByLabelText("الصف *");
     expect(
@@ -68,7 +68,15 @@ describe("CustomFieldInputs", () => {
   });
 
   it("keeps an archived option selectable only while it is the current value", () => {
-    render(<CustomFieldInputs definitions={definitions} values={{ grade: "13" }} onChange={vi.fn()} errors={{}} />);
+    render(
+      <CustomFieldInputs
+        definitions={definitions}
+        values={{ grade: "13" }}
+        kind="general"
+        onChange={vi.fn()}
+        errors={{}}
+      />,
+    );
 
     expect(screen.getByRole("option", { name: "القديم" })).toBeInTheDocument();
   });
@@ -79,6 +87,7 @@ describe("CustomFieldInputs", () => {
       <CustomFieldInputs
         definitions={definitions}
         values={{}}
+        kind="general"
         onChange={onChange}
         errors={{ grade: "هذا الحقل مطلوب" }}
       />,
@@ -88,6 +97,24 @@ describe("CustomFieldInputs", () => {
 
     expect(onChange).toHaveBeenCalledWith("grade", "12");
     expect(screen.getByText("هذا الحقل مطلوب")).toBeInTheDocument();
+  });
+
+  it("D69 shows only the fields of the product's section, and a hint until a category is chosen", () => {
+    const sectioned = [
+      selectField({ kind: "books" }),
+      selectField({ id: 5, key: "age", label: "العمر", type: "text", kind: "toys", options: [] }),
+    ];
+    const { rerender } = render(
+      <CustomFieldInputs definitions={sectioned} values={{}} kind="toys" onChange={vi.fn()} errors={{}} />,
+    );
+
+    expect(screen.getByLabelText("العمر *")).toBeInTheDocument();
+    expect(screen.queryByLabelText("الصف *")).not.toBeInTheDocument();
+
+    rerender(<CustomFieldInputs definitions={sectioned} values={{}} kind={null} onChange={vi.fn()} errors={{}} />);
+
+    expect(screen.getByText("الحقول تتبع قسم المنتج: اختر القسم أولًا لتظهر حقوله.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("العمر *")).not.toBeInTheDocument();
   });
 });
 
@@ -102,6 +129,7 @@ describe("PriceInput", () => {
         value="25"
         onChange={vi.fn()}
         cover="10.10"
+        referenceLabel="سعر الغلاف"
       />,
     );
 
@@ -116,10 +144,26 @@ describe("PriceInput", () => {
         value="90"
         onChange={vi.fn()}
         cover="120.00"
+        referenceLabel="سعر الغلاف"
       />,
     );
 
     expect(screen.getByTestId("p-hint")).toHaveTextContent("خصم 25.00% من سعر الغلاف");
+
+    rerender(
+      <PriceInput
+        id="p"
+        label="سعر الجملة"
+        mode="price"
+        onModeChange={vi.fn()}
+        value="90"
+        onChange={vi.fn()}
+        cover="120.00"
+        referenceLabel="سعر القطاعي"
+      />,
+    );
+
+    expect(screen.getByTestId("p-hint")).toHaveTextContent("خصم 25.00% من سعر القطاعي");
   });
 
   it("disables the percentage without a cover price", () => {
@@ -132,6 +176,7 @@ describe("PriceInput", () => {
         value="90"
         onChange={vi.fn()}
         cover={null}
+        referenceLabel="سعر الغلاف"
       />,
     );
 
@@ -234,10 +279,39 @@ describe("ProductForm", () => {
 
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
 
-    expect(screen.getByLabelText("سعر الغلاف (اختياري)")).toBeInTheDocument();
+    expect(screen.getByLabelText("سعر الغلاف / القطاعي (اختياري)")).toBeInTheDocument();
     expect(screen.getByLabelText("سعر الجملة *")).toBeInTheDocument();
     expect(screen.getByLabelText("الحد الأدنى للطلب (بوحدة البيع) *")).toBeInTheDocument();
     expect(screen.getByText("شرائح الكمية").closest("legend")).toHaveTextContent("شرائح الكمية (اختياري)");
+  });
+
+  it("D68 names the reference price after the chosen category's section and shows that section's fields", async () => {
+    const user = userEvent.setup();
+    const sectioned = [
+      selectField({ kind: "books" }),
+      selectField({ id: 5, key: "age", label: "العمر", type: "text", kind: "toys", is_required: false, options: [] }),
+    ];
+    renderWithQuery(
+      <ProductForm
+        product={null}
+        definitions={sectioned}
+        units={units}
+        categories={[category(), category({ id: 2, name: "ألعاب", kind: "toys" })]}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText("القسم *"), "1");
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(screen.getByLabelText("سعر الغلاف (اختياري)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "البيانات" }));
+    await user.selectOptions(screen.getByLabelText("القسم *"), "2");
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(screen.getByLabelText("سعر القطاعي (اختياري)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "الحقول" }));
+    expect(screen.getByLabelText("العمر (اختياري)")).toBeInTheDocument();
+    expect(screen.queryByLabelText("الصف *")).not.toBeInTheDocument();
   });
 
   it("creates a product with status and opening stock, then opens it", async () => {
@@ -291,6 +365,34 @@ describe("CategoriesPage", () => {
       .getAllByRole("option")
       .map((option) => option.textContent);
     expect(options).toEqual(["بدون (قسم رئيسي)", "المرحلة الإعدادية"]);
+  });
+
+  it("D68 a root category gets a section kind, sent with the body; a child inherits and sends none", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/categories": json(200, { data: tree }),
+      "POST /api/dashboard/categories": json(201, { data: category({ id: 9, kind: "toys" }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CategoriesPage />);
+
+    expect(await screen.findAllByText("كتب خارجية")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "إضافة قسم" }));
+    await user.type(screen.getByLabelText("اسم القسم"), "ألعاب");
+    await user.selectOptions(screen.getByLabelText("نوع القسم"), "toys");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/categories")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/dashboard/categories")[0]?.body).toEqual({
+      name: "ألعاب",
+      parent_id: null,
+      kind: "toys",
+    });
+
+    await user.click(screen.getByRole("button", { name: "إضافة قسم" }));
+    await user.selectOptions(screen.getByLabelText("القسم الأب"), "1");
+
+    expect(screen.queryByLabelText("نوع القسم")).not.toBeInTheDocument();
+    expect(screen.getByText("يرث نوع القسم الرئيسي: كتب خارجية")).toBeInTheDocument();
   });
 
   it("moves a category and surfaces the backend's category_cycle message", async () => {
@@ -368,8 +470,24 @@ describe("FieldDialog", () => {
       key: "grade",
       label: "الصف",
       type: "select",
+      kind: null,
       options: ["الأول", "الثاني"],
     });
+  });
+
+  it("D69 binds a field to a section", async () => {
+    const fetchMock = stubApi({ "POST /api/dashboard/fields": json(201, { data: selectField({ kind: "toys" }) }) });
+    const user = userEvent.setup();
+    renderWithQuery(<FieldDialog field={null} onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("الاسم الظاهر"), "العمر");
+    await user.type(screen.getByLabelText("المفتاح (بالإنجليزية)"), "age");
+    await user.selectOptions(screen.getByLabelText("النوع"), "text");
+    await user.selectOptions(screen.getByLabelText("القسم"), "toys");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/fields")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/dashboard/fields")[0]?.body).toMatchObject({ key: "age", kind: "toys" });
   });
 
   it("warns that the type locks once used and shows field_type_locked from the backend", async () => {

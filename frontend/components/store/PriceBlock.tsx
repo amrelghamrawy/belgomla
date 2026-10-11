@@ -1,7 +1,7 @@
 import { TrendingUpIcon } from "lucide-react";
 import Link from "next/link";
 
-import type { StoreSku } from "@/lib/api/types";
+import type { CategoryKind, StoreSku } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { formatMoney, formatPercent } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
@@ -9,17 +9,19 @@ import { cn } from "@/lib/utils";
 type PriceBlockProps = {
   sku: StoreSku | null;
   pricesHidden: boolean;
+  /** The product's section (D68): names the reference price "سعر الغلاف" for books, "سعر القطاعي" otherwise. */
+  kind: CategoryKind | null;
   size?: "sm" | "lg";
   /** Where the login link returns to when prices are hidden (D1). */
   loginNext?: string;
 };
 
 /**
- * Wholesale price per selling unit, the retailer's margin (the discount off the cover price, BR-PR10, shown as
- * "هامش ربحك" per D67), the cover price struck through and, on cards, the first quantity tier. When the store hides
- * prices from guests the same box shows a login link, so the layout does not shift either way.
+ * Wholesale price per selling unit, the retailer's margin (the discount off the reference price, BR-PR10, shown
+ * as "هامش ربحك" per D67), the reference price struck through and, on cards, the first quantity tier. When the
+ * store hides prices from guests the same box shows a login link, so the layout does not shift either way.
  */
-export function PriceBlock({ sku, pricesHidden, size = "sm", loginNext }: PriceBlockProps) {
+export function PriceBlock({ sku, pricesHidden, kind, size = "sm", loginNext }: PriceBlockProps) {
   const large = size === "lg";
 
   if (pricesHidden || sku?.base_price === undefined) {
@@ -54,7 +56,7 @@ export function PriceBlock({ sku, pricesHidden, size = "sm", loginNext }: PriceB
       )}
       {sku.cover_price && (
         <span className="text-muted-foreground text-xs">
-          {ar.product.coverPrice}: <s className="tabular-nums">{formatMoney(sku.cover_price)}</s>
+          {ar.product.referencePrice(kind)}: <s className="tabular-nums">{formatMoney(sku.cover_price)}</s>
         </span>
       )}
       {tier?.unit_price && (

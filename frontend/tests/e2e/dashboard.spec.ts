@@ -18,10 +18,11 @@ test("a merchant builds a category, unit, custom field and product, sees it on t
   const product = `كتاب اختبار ${run}`;
   await loginAsOwner(page);
 
-  // Category (08 §6).
+  // A books category (08 §6, D68): its products call the reference price "سعر الغلاف".
   await page.goto("/dashboard/categories");
   await page.getByRole("button", { name: "إضافة قسم" }).click();
   await page.getByLabel("اسم القسم").fill(category);
+  await page.getByLabel("نوع القسم").selectOption("books");
   await page.getByRole("button", { name: "حفظ" }).click();
   await expect(page.getByText(category)).toBeVisible();
 

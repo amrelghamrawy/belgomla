@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import type { FieldDefinition, FieldOption } from "@/lib/api/types";
+import type { CategoryKind, FieldDefinition, FieldOption } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import {
   FIELD_TYPES,
@@ -32,8 +32,9 @@ import { NativeSelect } from "../common/NativeSelect";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 
 const copy = ar.dashboard.fields;
+const KINDS: readonly CategoryKind[] = ["books", "stationery", "toys", "general"];
 
-/** Mirrors StoreFieldRequest / UpdateFieldRequest. */
+/** Mirrors StoreFieldRequest / UpdateFieldRequest. `kind` "" stands for every section (null on the API, D69). */
 const schema = z.object({
   key: z
     .string()
@@ -42,6 +43,7 @@ const schema = z.object({
     .regex(/^[a-z][a-z0-9_]*$/, copy.keyHint),
   label: z.string().trim().min(1, ar.validation.required).max(100),
   type: z.enum(["text", "number", "select", "boolean"]),
+  kind: z.enum(["", "books", "stationery", "toys", "general"]),
   is_required: z.boolean(),
   show_on_storefront: z.boolean(),
   is_filterable: z.boolean(),
@@ -52,7 +54,7 @@ const schema = z.object({
 
 type FieldForm = z.infer<typeof schema>;
 
-const FORM_FIELDS = ["key", "label", "type", "filter_order", "sort_order", "options"] as const;
+const FORM_FIELDS = ["key", "label", "type", "kind", "filter_order", "sort_order", "options"] as const;
 
 /** Custom field definitions: a table, a create/edit dialog, and the options editor of select fields. */
 export function FieldsPage() {
@@ -79,6 +81,7 @@ export function FieldsPage() {
                 <TableHead>{copy.label}</TableHead>
                 <TableHead>{copy.key}</TableHead>
                 <TableHead>{copy.type}</TableHead>
+                <TableHead>{copy.kind}</TableHead>
                 <TableHead>{copy.flags}</TableHead>
                 <TableHead>{copy.filterOrder}</TableHead>
                 <TableHead>{ar.dashboard.list.actions}</TableHead>
@@ -99,6 +102,7 @@ export function FieldsPage() {
                     <bdi>{field.key}</bdi>
                   </TableCell>
                   <TableCell>{copy.types[field.type]}</TableCell>
+                  <TableCell>{field.kind === null ? copy.kindAll : ar.catalog.kinds[field.kind]}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {[
                       field.is_required && copy.isRequired,
@@ -157,6 +161,7 @@ export function FieldDialog({ field, onClose }: { field: FieldDefinition | null;
       key: field?.key ?? "",
       label: field?.label ?? "",
       type: field?.type ?? "select",
+      kind: field?.kind ?? "",
       is_required: field?.is_required ?? false,
       show_on_storefront: field?.show_on_storefront ?? true,
       is_filterable: field?.is_filterable ?? false,
@@ -181,6 +186,7 @@ export function FieldDialog({ field, onClose }: { field: FieldDefinition | null;
         key: field === null ? values.key : undefined,
         label: values.label,
         type: values.type,
+        kind: values.kind === "" ? null : values.kind,
         is_required: values.is_required,
         show_on_storefront: values.show_on_storefront,
         is_filterable: values.is_filterable,
@@ -265,6 +271,19 @@ export function FieldDialog({ field, onClose }: { field: FieldDefinition | null;
               </Alert>
             )}
             <FieldError errors={[errors.type]} />
+          </Field>
+          <Field data-invalid={errors.kind !== undefined}>
+            <FieldLabel htmlFor="field-kind">{copy.kind}</FieldLabel>
+            <NativeSelect id="field-kind" {...form.register("kind")}>
+              <option value="">{copy.kindAll}</option>
+              {KINDS.map((value) => (
+                <option key={value} value={value}>
+                  {ar.catalog.kinds[value]}
+                </option>
+              ))}
+            </NativeSelect>
+            <p className="text-muted-foreground text-xs">{copy.kindHint}</p>
+            <FieldError errors={[errors.kind]} />
           </Field>
           <div className="flex flex-wrap gap-4">
             {flag("is_required", copy.isRequired)}

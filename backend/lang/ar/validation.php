@@ -174,6 +174,8 @@ return [
         'amount' => 'المبلغ',
         'base_price' => 'السعر الأساسي',
         'base_price_percent' => 'نسبة السعر',
+        'cover_price' => 'السعر المرجعي',
+        'sku.cover_price' => 'السعر المرجعي',
         'channel' => 'قناة الإرسال',
         'city' => 'المدينة',
         'code' => 'الكود',

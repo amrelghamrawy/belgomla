@@ -18,12 +18,14 @@ type Props = {
   tiers: TierDraft[];
   onChange: (tiers: TierDraft[]) => void;
   cover: string | null;
+  /** What the reference price is called for this product's section (D68). */
+  referenceLabel: string;
   /** Problems by row index (tierProblems), shown under each row. */
   problems: Record<number, string>;
 };
 
-/** Quantity tiers: "from N units" at a price or a percentage off the cover price (BR-PR04, BR-PR10). */
-export function TiersEditor({ tiers, onChange, cover, problems }: Props) {
+/** Quantity tiers: "from N units" at a price or a percentage off the reference price (BR-PR04, BR-PR10). */
+export function TiersEditor({ tiers, onChange, cover, referenceLabel, problems }: Props) {
   const update = (index: number, patch: Partial<TierDraft>) =>
     onChange(tiers.map((tier, at) => (at === index ? { ...tier, ...patch } : tier)));
 
@@ -55,7 +57,7 @@ export function TiersEditor({ tiers, onChange, cover, problems }: Props) {
                 onChange={(event) => update(index, { mode: event.target.value as TierDraft["mode"] })}
               >
                 <option value="price">{copy.byPrice}</option>
-                <option value="percent">{copy.byPercent}</option>
+                <option value="percent">{copy.byPercent(referenceLabel)}</option>
               </NativeSelect>
               <Input
                 aria-label={`${copy.tierValue} ${index + 1}`}

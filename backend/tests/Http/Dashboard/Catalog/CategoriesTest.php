@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-const DASHBOARD_CATEGORY_KEYS = ['id', 'name', 'slug', 'image_url', 'parent_id', 'sort_order', 'status', 'children'];
+const DASHBOARD_CATEGORY_KEYS = ['id', 'name', 'slug', 'kind', 'image_url', 'parent_id', 'sort_order', 'status', 'children'];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -65,6 +66,7 @@ test('an owner creates a root category with an arabic slug, audited', function (
         ->assertJsonPath('data.name', 'كتب إعدادي')
         ->assertJsonPath('data.slug', 'كتب-إعدادي')
         ->assertJsonPath('data.parent_id', null)
+        ->assertJsonPath('data.kind', 'general')
         ->assertJsonPath('data.sort_order', 3)
         ->assertJsonPath('data.status', 'active');
 
@@ -74,6 +76,31 @@ test('an owner creates a root category with an arabic slug, audited', function (
     $this->assertDatabaseHas('audit_logs', [
         'tenant_id' => $this->tenant->id, 'action' => 'category.created', 'entity_id' => $id, 'actor_id' => $this->me->id,
     ]);
+});
+
+test('D68 an owner creates a root category of a given kind', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'ألعاب', 'kind' => 'toys'])
+        ->assertCreated()
+        ->assertJsonPath('data.kind', 'toys');
+
+    $this->assertDatabaseHas('categories', ['tenant_id' => $this->tenant->id, 'name' => 'ألعاب', 'kind' => 'toys']);
+});
+
+test('D68 a sub-category inherits the kind of its parent and may send kind only as null', function (): void {
+    $parent = $this->inTenant(fn () => Category::factory()->books()->create());
+
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'أولى إعدادي', 'parent_id' => $parent->id, 'kind' => null])
+        ->assertCreated()
+        ->assertJsonPath('data.kind', 'books');
+});
+
+test('D68 a kind sent for a sub-category is rejected', function (): void {
+    $parent = $this->inTenant(fn () => Category::factory()->books()->create());
+
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'x', 'parent_id' => $parent->id, 'kind' => 'toys'])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonPath('error.details.kind.0', 'القسم الفرعي يرث نوع القسم الرئيسي.');
 });
 
 test('BR-P06 a sub-category gets the parent path as prefix', function (): void {
@@ -111,6 +138,7 @@ test('category creation validation', function (array $body, string $field): void
     'parent not an integer' => [['name' => 'x', 'parent_id' => 'abc'], 'parent_id'],
     'negative sort order' => [['name' => 'x', 'sort_order' => -1], 'sort_order'],
     'image is not an image' => [['name' => 'x', 'image' => 'not-a-file'], 'image'],
+    'unknown kind' => [['name' => 'x', 'kind' => 'furniture'], 'kind'],
 ]);
 
 test('BR-T04 a parent from another tenant is rejected as unknown', function (): void {
@@ -156,6 +184,39 @@ test('BR-P06 moving a category moves its whole subtree', function (): void {
     $this->assertDatabaseHas('categories', ['id' => $a->id, 'path' => "/{$a->id}/"]);
 });
 
+test('D68 changing the kind of a root re-kinds its whole subtree, audited', function (): void {
+    [$root, $child] = $this->inTenant(function (): array {
+        $root = Category::factory()->books()->create();
+
+        return [$root, Category::factory()->childOf($root)->create()];
+    });
+
+    $this->tenantJson('PUT', "/api/dashboard/categories/{$root->id}", ['name' => $root->name, 'parent_id' => null, 'kind' => 'stationery'])
+        ->assertOk()
+        ->assertJsonPath('data.kind', 'stationery');
+
+    $this->assertDatabaseHas('categories', ['id' => $child->id, 'kind' => 'stationery']);
+    $this->assertDatabaseHas('audit_logs', [
+        'tenant_id' => $this->tenant->id, 'action' => 'category.updated', 'entity_id' => $root->id,
+        'old_values' => json_encode(['kind' => 'books']), 'new_values' => json_encode(['kind' => 'stationery']),
+    ]);
+});
+
+test('D68 a subtree moved under a root of another kind takes that kind', function (): void {
+    [$toys, $child, $grandchild] = $this->inTenant(function (): array {
+        $books = Category::factory()->books()->create();
+        $child = Category::factory()->childOf($books)->create();
+
+        return [Category::factory()->kind(CategoryKind::Toys)->create(), $child, Category::factory()->childOf($child)->create()];
+    });
+
+    $this->tenantJson('PUT', "/api/dashboard/categories/{$child->id}", ['name' => $child->name, 'parent_id' => $toys->id])
+        ->assertOk()
+        ->assertJsonPath('data.kind', 'toys');
+
+    $this->assertDatabaseHas('categories', ['id' => $grandchild->id, 'kind' => 'toys']);
+});
+
 test('BR-P06 a category cannot be moved under its own descendant', function (): void {
     [$root, $child] = $this->inTenant(function (): array {
         $root = Category::factory()->create();
@@ -188,7 +249,16 @@ test('category update validation', function (array $body, string $field): void {
     'missing name' => [['parent_id' => null], 'name'],
     'parent_id must be present' => [['name' => 'x'], 'parent_id'],
     'sort order not an integer' => [['name' => 'x', 'parent_id' => null, 'sort_order' => 'first'], 'sort_order'],
+    'unknown kind' => [['name' => 'x', 'parent_id' => null, 'kind' => 'furniture'], 'kind'],
 ]);
+
+test('D68 a kind sent while moving under a parent is rejected', function (): void {
+    [$root, $other] = $this->inTenant(fn (): array => [Category::factory()->create(), Category::factory()->create()]);
+
+    $this->tenantJson('PUT', "/api/dashboard/categories/{$other->id}", ['name' => 'x', 'parent_id' => $root->id, 'kind' => 'toys'])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['error' => ['details' => ['kind']]]);
+});
 
 test('BR-T04 updating a category of another tenant is 404 and untouched', function (): void {
     $foreign = $this->inTenant(fn () => Category::factory()->create(['name' => 'original']), $this->otherTenant());

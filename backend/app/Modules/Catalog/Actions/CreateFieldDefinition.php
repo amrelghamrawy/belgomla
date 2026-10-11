@@ -39,6 +39,7 @@ final readonly class CreateFieldDefinition
                 'key' => $key,
                 'label' => $data->label,
                 'type' => $data->type,
+                'kind' => $data->kind,
                 'is_required' => $data->isRequired ?? false,
                 'show_on_storefront' => $data->showOnStorefront ?? true,
                 'is_filterable' => $data->isFilterable ?? false,
@@ -51,7 +52,7 @@ final readonly class CreateFieldDefinition
             }
 
             $this->audit->log('field.created', $definition, null, $definition->only([
-                'key', 'label', 'type', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order',
+                'key', 'label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order',
             ]) + ['options' => $data->options]);
 
             return $definition->refresh()->load('options');

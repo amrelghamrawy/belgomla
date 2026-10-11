@@ -34,8 +34,8 @@ final readonly class CreateProduct
 
     public function handle(ProductData $data, ?int $createdBy = null): Product
     {
-        $this->references->check($data);
-        $customFields = $this->fields->validate($data->customFields);
+        $category = $this->references->check($data);
+        $customFields = $this->fields->validate($data->customFields, $category->kind);
 
         return DB::transaction(function () use ($data, $customFields, $createdBy): Product {
             $product = Product::query()->create([

@@ -23,8 +23,8 @@ import {
   useSetProductStatus,
   useUnits,
 } from "@/lib/dashboard/catalog";
-import { activeOnly, flatten } from "@/lib/dashboard/category-tree";
-import { customFieldProblems } from "@/lib/dashboard/custom-fields";
+import { activeOnly, flatten, kindOfCategory } from "@/lib/dashboard/category-tree";
+import { customFieldProblems, visibleDefinitions } from "@/lib/dashboard/custom-fields";
 import { priceFromPercent, tierProblems } from "@/lib/dashboard/price-math";
 import {
   productBody,
@@ -102,10 +102,14 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
     defaultValues: productDefaults(product),
   });
   const errors = form.formState.errors;
-  const [coverPrice, baseMode, baseValue] = useWatch({
+  const [coverPrice, baseMode, baseValue, categoryId] = useWatch({
     control: form.control,
-    name: ["cover_price", "base_mode", "base_value"],
+    name: ["cover_price", "base_mode", "base_value", "category_id"],
   });
+  // The chosen category's section (D68): names the reference price and picks the custom fields (D69).
+  const kind = kindOfCategory(categories, categoryId === "" ? null : Number(categoryId));
+  const referenceLabel = ar.product.referencePrice(kind);
+  const tierMessages = { ...copy.tierErrors, percentNeedsCover: copy.tierErrors.percentNeedsCover(referenceLabel) };
   const cover = coverPrice.trim() === "" ? null : coverPrice.trim();
   const basePrice =
     baseMode === "percent" ? (cover === null ? null : priceFromPercent(cover, baseValue)) : baseValue.trim() || null;
@@ -120,8 +124,8 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   const submit = form.handleSubmit((valid) => {
     setError(null);
     setServerTierProblems([]);
-    const tiers = tierProblems(valid.tiers, { cover, basePrice }, copy.tierErrors);
-    const custom = customFieldProblems(definitions, valid.custom, {
+    const tiers = tierProblems(valid.tiers, { cover, basePrice }, tierMessages);
+    const custom = customFieldProblems(definitions, valid.custom, kind, {
       required: copy.required,
       number: copy.invalidInteger,
     });
@@ -139,7 +143,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
     }
 
     save.mutate(
-      { id: product?.id, body: productBody(valid, definitions, creating) },
+      { id: product?.id, body: productBody(valid, definitions, creating, kind) },
       {
         onSuccess: (saved) => {
           toast.success(creating ? copy.created : copy.saved);
@@ -173,12 +177,20 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
       }
 
       const custom: Record<string, string> = {};
+      const hidden: string[] = [];
 
       for (const definition of definitions) {
         const message = failure.fieldMessage(`custom_fields.${definition.key}`);
 
-        if (message !== null) {
+        if (message === null) {
+          continue;
+        }
+
+        // A field of another section has no input on this form (D69): its message goes to the page alert.
+        if (visibleDefinitions(definitions, form.getValues("custom"), kind).includes(definition)) {
           custom[definition.key] = message;
+        } else {
+          hidden.push(`${definition.label}: ${message}`);
         }
       }
 
@@ -188,6 +200,11 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
         setTab("fields");
       } else if (mapped) {
         setTab("basics");
+      }
+
+      if (hidden.length > 0) {
+        setError(hidden.join("، "));
+        return;
       }
 
       if (mapped || Object.keys(custom).length > 0) {
@@ -320,6 +337,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
                 <CustomFieldInputs
                   definitions={definitions}
                   values={field.value}
+                  kind={kind}
                   errors={fieldErrors}
                   onChange={(key, value) => field.onChange({ ...field.value, [key]: value })}
                 />
@@ -330,7 +348,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
 
         <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
           <div className="grid gap-4 pt-4 md:grid-cols-2">
-            {text("cover_price", copy.coverPrice, "optional", true)}
+            {text("cover_price", referenceLabel, "optional", true)}
             <Controller
               control={form.control}
               name="base_value"
@@ -343,6 +361,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
                   value={field.value}
                   onChange={field.onChange}
                   cover={cover}
+                  referenceLabel={referenceLabel}
                   error={errors.base_value?.message}
                 />
               )}
@@ -364,7 +383,13 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
                 control={form.control}
                 name="tiers"
                 render={({ field }) => (
-                  <TiersEditor tiers={field.value} onChange={field.onChange} cover={cover} problems={tierErrors} />
+                  <TiersEditor
+                    tiers={field.value}
+                    onChange={field.onChange}
+                    cover={cover}
+                    referenceLabel={referenceLabel}
+                    problems={tierErrors}
+                  />
                 )}
               />
             </div>

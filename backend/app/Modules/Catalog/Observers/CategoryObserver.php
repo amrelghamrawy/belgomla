@@ -8,8 +8,8 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Services\SlugGenerator;
 
 /**
- * Invariants only: the slug on create and the materialized path once the id is known.
- * Moving a category (path rebuild of the subtree) is done explicitly by CategoryPath in UpdateCategory.
+ * Invariants only: the slug and the inherited kind on create, and the materialized path once the id is
+ * known. Moving a category (path and kind rewrite of the subtree) is done explicitly by UpdateCategory.
  */
 final readonly class CategoryObserver
 {
@@ -22,15 +22,20 @@ final readonly class CategoryObserver
         if (($category->getAttributes()['slug'] ?? '') === '') {
             $category->slug = $this->slugs->unique(Category::class, $category->name, self::SLUG_LENGTH);
         }
+
+        if ($category->parent_id !== null) {
+            $category->kind = $this->parent($category)->kind;
+        }
     }
 
     public function created(Category $category): void
     {
-        $parentPath = $category->parent_id === null
-            ? '/'
-            : Category::query()->whereKey($category->parent_id)->value('path');
-
-        $category->path = (is_string($parentPath) ? $parentPath : '/').$category->id.'/';
+        $category->path = ($category->parent_id === null ? '/' : $this->parent($category)->path).$category->id.'/';
         $category->saveQuietly();
+    }
+
+    private function parent(Category $category): Category
+    {
+        return Category::query()->whereKey($category->parent_id)->firstOrFail(['id', 'path', 'kind']);
     }
 }

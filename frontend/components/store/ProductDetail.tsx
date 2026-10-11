@@ -63,6 +63,7 @@ export function ProductDetail() {
           <PriceBlock
             sku={product.sku}
             pricesHidden={product.prices_hidden === true}
+            kind={product.category?.kind ?? null}
             size="lg"
             loginNext={`/p/${encodeURIComponent(slug)}`}
           />

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Services;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Exceptions\InvalidCustomFields;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -16,7 +17,9 @@ use Illuminate\Database\Eloquent\Collection;
  *
  * The input replaces the active values (PUT semantics; null or "" clears a value). Values of archived
  * definitions, and archived options a product already holds, are carried over from $current untouched
- * ("existing values are kept but hidden").
+ * ("existing values are kept but hidden"). The same goes for definitions bound to another section
+ * than the product's category kind (D69): they cannot be sent, are never required, and stored values
+ * survive a move between sections.
  *
  * @phpstan-type FieldValue int|float|string|bool
  */
@@ -26,10 +29,11 @@ final readonly class CustomFieldValidator
 
     /**
      * @param  array<array-key, mixed>  $input
+     * @param  CategoryKind  $kind  the kind of the product's category
      * @param  array<string, FieldValue>  $current  the product's stored map (empty on create)
      * @return array<string, FieldValue>
      */
-    public function validate(array $input, array $current = []): array
+    public function validate(array $input, CategoryKind $kind, array $current = []): array
     {
         $definitions = $this->definitions();
         $values = [];
@@ -49,9 +53,11 @@ final readonly class CustomFieldValidator
                 continue;
             }
 
-            $result = $definition->status === ArchiveStatus::Archived
-                ? $this->unchanged($raw, $current[$key] ?? null)
-                : $this->value($definition, $raw, $current[$key] ?? null);
+            $result = match (true) {
+                ! $definition->appliesTo($kind) => $this->unchanged($raw, $current[$key] ?? null, 'هذا الحقل لا ينطبق على قسم هذا المنتج'),
+                $definition->status === ArchiveStatus::Archived => $this->unchanged($raw, $current[$key] ?? null, 'هذا الحقل مؤرشف'),
+                default => $this->value($definition, $raw, $current[$key] ?? null),
+            };
 
             if (is_string($result)) {
                 $errors[$key] = $result;
@@ -61,11 +67,13 @@ final readonly class CustomFieldValidator
         }
 
         foreach ($definitions as $key => $definition) {
-            if ($definition->status === ArchiveStatus::Active && $definition->is_required && ! array_key_exists($key, $values) && ! isset($errors[$key])) {
+            $applies = $definition->status === ArchiveStatus::Active && $definition->appliesTo($kind);
+
+            if ($applies && $definition->is_required && ! array_key_exists($key, $values) && ! isset($errors[$key])) {
                 $errors[$key] = 'هذا الحقل مطلوب';
             }
 
-            if ($definition->status === ArchiveStatus::Archived && array_key_exists($key, $current) && ! array_key_exists($key, $input)) {
+            if (! $applies && array_key_exists($key, $current) && ! array_key_exists($key, $input)) {
                 $values[$key] = $current[$key];
             }
         }
@@ -97,13 +105,13 @@ final readonly class CustomFieldValidator
     }
 
     /**
-     * An archived field accepts only the value the product already holds.
+     * An archived or out-of-section field accepts only the value the product already holds.
      *
      * @return array{0: FieldValue}|string
      */
-    private function unchanged(mixed $raw, int|float|string|bool|null $current): array|string
+    private function unchanged(mixed $raw, int|float|string|bool|null $current, string $error): array|string
     {
-        return $current !== null && $current === $raw ? [$current] : 'هذا الحقل مؤرشف';
+        return $current !== null && $current === $raw ? [$current] : $error;
     }
 
     /** Whole numbers are stored as integers ("12", 12.0 → 12) so facet and equality filters match. */

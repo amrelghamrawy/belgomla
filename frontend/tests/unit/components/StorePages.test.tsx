@@ -12,7 +12,7 @@ import { cart, cartItem, customer, facet, omit, page, storeProduct, tenantSettin
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { renderWithQuery, router, searchParams } from "../render";
 
-const tree = [{ id: 1, name: "المرحلة الإعدادية", slug: "prep", image_url: null, children: [] }];
+const tree = [{ id: 1, name: "المرحلة الإعدادية", slug: "prep", kind: "books", image_url: null, children: [] }];
 
 beforeEach(() => {
   router.push.mockReset();
@@ -107,6 +107,7 @@ describe("PriceListView", () => {
       id: 1,
       name: "الأضواء علوم",
       slug: "a",
+      kind: "books",
       code: "BK-001",
       unit: "نسخة",
       moq: 1,
@@ -118,6 +119,7 @@ describe("PriceListView", () => {
       id: 2,
       name: "المعلم علوم",
       slug: "b",
+      kind: "books",
       code: "BK-002",
       unit: "كرتونة",
       moq: 2,
@@ -146,9 +148,40 @@ describe("PriceListView", () => {
 
     const table = await screen.findByTestId("price-list");
     expect(screen.getByRole("heading", { name: "قائمة الأسعار — المرحلة الإعدادية" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "سعر الغلاف" })).toBeInTheDocument();
     expect(table).toHaveTextContent("الأضواء علومBK-001نسخة120.00 ج.م96.00 ج.م1متوفر");
     expect(table).toHaveTextContent("المعلم علومBK-002كرتونة—80.00 ج.م2قريبًا");
     expect(callsTo(fetchMock, "GET /api/store/price-list")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
+  });
+
+  it("D68 names the reference column after the category's section, and both ways without a category", async () => {
+    searchParams.value = new URLSearchParams("category=supplies");
+    stubApi({
+      "GET /api/store/tenant": json(200, { data: tenantSettings() }),
+      "GET /api/store/categories": json(200, {
+        data: [
+          ...tree,
+          { id: 2, name: "أدوات دراسية", slug: "supplies", kind: "stationery", image_url: null, children: [] },
+        ],
+      }),
+      "GET /api/store/filters": json(200, { data: [] }),
+      "GET /api/store/price-list": json(200, {
+        data: rows,
+        meta: { count: 2, truncated: false, prices_hidden: false },
+      }),
+    });
+    const { unmount } = renderWithQuery(<PriceListView />);
+
+    await screen.findByTestId("price-list");
+    expect(screen.getByRole("columnheader", { name: "سعر القطاعي" })).toBeInTheDocument();
+    unmount();
+
+    searchParams.value = new URLSearchParams();
+    stubList();
+    renderWithQuery(<PriceListView />);
+
+    await screen.findByTestId("price-list");
+    expect(screen.getByRole("columnheader", { name: "سعر الغلاف / القطاعي" })).toBeInTheDocument();
   });
 
   it("D1 leaves the price columns out when prices are hidden", async () => {

@@ -2,6 +2,7 @@ import { act, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { queryKeys } from "@/lib/api/keys";
+import type { Category } from "@/lib/api/types";
 import { categoryOptions, categoryPath, findCategory, useProductsInfinite } from "@/lib/store/catalog";
 import { newIdempotencyKey } from "@/lib/api/idempotency";
 import { useCheckout } from "@/lib/store/checkout";
@@ -14,13 +15,14 @@ import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderHookWithQuery } from "../../render";
 
 describe("findCategory", () => {
-  const tree = [
+  const tree: Category[] = [
     {
       id: 1,
       name: "إعدادي",
       slug: "prep",
+      kind: "general",
       image_url: null,
-      children: [{ id: 2, name: "أولى", slug: "first", image_url: null, children: [] }],
+      children: [{ id: 2, name: "أولى", slug: "first", kind: "general", image_url: null, children: [] }],
     },
   ];
 
@@ -34,23 +36,25 @@ describe("findCategory", () => {
 });
 
 describe("categoryPath", () => {
-  const tree = [
+  const tree: Category[] = [
     {
       id: 1,
       name: "ابتدائي",
       slug: "primary",
+      kind: "general",
       image_url: null,
       children: [
         {
           id: 2,
           name: "رابعة ابتدائي",
           slug: "fourth",
+          kind: "general",
           image_url: null,
-          children: [{ id: 3, name: "الترم الأول", slug: "term-1", image_url: null, children: [] }],
+          children: [{ id: 3, name: "الترم الأول", slug: "term-1", kind: "general", image_url: null, children: [] }],
         },
       ],
     },
-    { id: 4, name: "إعدادي", slug: "prep", image_url: null, children: [] },
+    { id: 4, name: "إعدادي", slug: "prep", kind: "general", image_url: null, children: [] },
   ];
 
   it("lists every parent from the root down, ending with the category itself", () => {
@@ -68,15 +72,16 @@ describe("categoryPath", () => {
 
 describe("categoryOptions", () => {
   it("flattens the tree with each parent before its children and their depth", () => {
-    const tree = [
+    const tree: Category[] = [
       {
         id: 1,
         name: "إعدادي",
         slug: "prep",
+        kind: "general",
         image_url: null,
-        children: [{ id: 2, name: "أولى", slug: "first", image_url: null, children: [] }],
+        children: [{ id: 2, name: "أولى", slug: "first", kind: "general", image_url: null, children: [] }],
       },
-      { id: 3, name: "ثانوي", slug: "sec", image_url: null, children: [] },
+      { id: 3, name: "ثانوي", slug: "sec", kind: "general", image_url: null, children: [] },
     ];
 
     expect(categoryOptions(tree)).toEqual([

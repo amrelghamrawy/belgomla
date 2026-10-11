@@ -25,7 +25,16 @@ describe("ProductCard", () => {
 
     expect(screen.getByText("90.00 ج.م")).toBeInTheDocument();
     expect(screen.getByText("120.00 ج.م")).toBeInTheDocument();
+    expect(screen.getByText(/سعر الغلاف:/)).toBeInTheDocument();
     expect(screen.getByText("هامش ربحك 25%")).toBeInTheDocument();
+  });
+
+  it("D68 calls the reference price the retail price outside the books section", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct({ category: { id: 9, name: "ألعاب", kind: "toys" } })} />);
+
+    expect(screen.getByText(/سعر القطاعي:/)).toBeInTheDocument();
+    expect(screen.queryByText(/سعر الغلاف/)).not.toBeInTheDocument();
   });
 
   it("shows the pack, the MOQ and the first quantity tier", () => {

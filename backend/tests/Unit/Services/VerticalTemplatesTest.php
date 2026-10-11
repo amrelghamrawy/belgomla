@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Services\VerticalTemplates;
 use App\Modules\Tenancy\Enums\Vertical;
@@ -12,6 +13,7 @@ test('BR-P09 the school-books template matches the documented table', function (
     expect(array_column($fields, 'key'))->toBe(['grade', 'subject', 'publisher', 'term', 'track', 'edition_type', 'academic_year'])
         ->and(array_column($fields, 'label'))->toBe(['السنة الدراسية', 'المادة', 'الشركة', 'الترم', 'المسار', 'نوع النسخة', 'العام الدراسي'])
         ->and(array_unique(array_map(fn (array $f): FieldType => $f['type'], $fields), SORT_REGULAR))->toBe([FieldType::Select])
+        ->and(array_unique(array_map(fn (array $f): ?CategoryKind => $f['kind'], $fields), SORT_REGULAR))->toBe([CategoryKind::Books])
         ->and(array_column($fields, 'filter_order'))->toBe([1, 2, 3, 4, 5, 6, 7])
         ->and($fields[3]['options'])->toBe(['الترم الأول', 'الترم الثاني', 'كامل العام'])
         ->and($fields[4]['options'])->toBe(['عربي', 'لغات'])
@@ -32,7 +34,16 @@ test('malformed template files fail loudly', function (string $contents, string 
     'not an array' => ['<?php return "x";', 'must return an array'],
     'field without key' => ['<?php return [["label" => "x", "type" => "text"]];', 'without key/label'],
     'unknown type' => ['<?php return [["key" => "k", "label" => "x", "type" => "date"]];', 'unknown type'],
+    'unknown kind' => ['<?php return [["key" => "k", "label" => "x", "type" => "text", "kind" => "furniture"]];', 'unknown kind'],
+    'kind that is not a string' => ['<?php return [["key" => "k", "label" => "x", "type" => "text", "kind" => 5]];', 'unknown kind'],
 ]);
+
+test('D69 the stationery template is bound to the stationery section and hardware to every section', function (): void {
+    $templates = app(VerticalTemplates::class);
+
+    expect(array_column($templates->fieldsFor(Vertical::Stationery), 'kind'))->toBe([CategoryKind::Stationery, CategoryKind::Stationery, CategoryKind::Stationery])
+        ->and(array_column($templates->fieldsFor(Vertical::Hardware), 'kind'))->toBe([null, null, null]);
+});
 
 test('optional template keys get defaults and non-string options are dropped', function (): void {
     $dir = sys_get_temp_dir().'/belgomla-verticals-'.uniqid();
@@ -40,7 +51,7 @@ test('optional template keys get defaults and non-string options are dropped', f
     file_put_contents($dir.'/hardware.php', '<?php return [["key" => "k", "label" => "x", "type" => "select", "options" => ["a", 5]]];');
 
     expect(new VerticalTemplates($dir)->fieldsFor(Vertical::Hardware))->toBe([[
-        'key' => 'k', 'label' => 'x', 'type' => FieldType::Select, 'is_filterable' => false,
+        'key' => 'k', 'label' => 'x', 'type' => FieldType::Select, 'kind' => null, 'is_filterable' => false,
         'filter_order' => 0, 'sort_order' => 0, 'options' => ['a'],
     ]]);
 });

@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { queryKeys } from "@/lib/api/keys";
-import type { DashboardCategory } from "@/lib/api/types";
+import type { CategoryKind, DashboardCategory } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import {
   useCategoryStatus,
@@ -37,7 +37,14 @@ import {
   useReorderCategories,
   useSaveCategory,
 } from "@/lib/dashboard/catalog";
-import { activeOnly, applyOrder, flatten, reorderSiblings, subtreeIds } from "@/lib/dashboard/category-tree";
+import {
+  activeOnly,
+  applyOrder,
+  flatten,
+  kindOfCategory,
+  reorderSiblings,
+  subtreeIds,
+} from "@/lib/dashboard/category-tree";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { cn } from "@/lib/utils";
 
@@ -46,10 +53,14 @@ import { NativeSelect } from "../common/NativeSelect";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 
 const copy = ar.dashboard.categories;
+const KINDS: readonly CategoryKind[] = ["books", "stationery", "toys", "general"];
 
 type Editing = { mode: "create"; parentId: number | null } | { mode: "edit"; category: DashboardCategory };
 
-/** The category tree: drag to reorder siblings, edit to rename or move, archive and restore (08 §6). */
+/**
+ * The category tree: drag to reorder siblings, edit to rename, move or re-kind, archive and restore (08 §6).
+ * Roots carry a section kind (D68) shown as a badge; children inherit it.
+ */
 export function CategoriesPage() {
   const [query, setQuery] = useListQuery(["archived"]);
   const categories = useDashboardCategories();
@@ -176,6 +187,7 @@ function CategoryRow({
         <span className={cn("min-w-0 flex-1 truncate", archived && "text-muted-foreground line-through")}>
           {node.name}
         </span>
+        {depth === 0 && <Badge variant="outline">{ar.catalog.kinds[node.kind]}</Badge>}
         {archived && <Badge variant="secondary">{copy.archivedNote}</Badge>}
         <Button variant="ghost" size="sm" onClick={() => onEdit(node)}>
           {ar.dashboard.edit}
@@ -204,10 +216,13 @@ function CategoryDialog({
   const [parentId, setParentId] = useState<number | null>(
     current?.parent_id ?? (editing.mode === "create" ? editing.parentId : null),
   );
+  const [kind, setKind] = useState<CategoryKind>(current?.kind ?? "general");
   const [error, setError] = useState<string | null>(null);
   // A category cannot move under itself or its own subtree (the backend answers 422 category_cycle).
   const blocked = current === null ? new Set<number>() : subtreeIds(current);
   const parents = flatten(activeOnly(tree)).filter(({ node }) => !blocked.has(node.id));
+  // The kind belongs to roots; a child takes its parent's and may not send one (D68).
+  const inherited = parentId === null ? null : kindOfCategory(tree, parentId);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -218,7 +233,7 @@ function CategoryDialog({
     }
 
     save.mutate(
-      { id: current?.id, name: name.trim(), parent_id: parentId },
+      { id: current?.id, name: name.trim(), parent_id: parentId, ...(parentId === null ? { kind } : {}) },
       {
         onSuccess: () => {
           toast.success(ar.dashboard.saved);
@@ -255,6 +270,27 @@ function CategoryDialog({
               ))}
             </NativeSelect>
           </Field>
+          {parentId === null ? (
+            <Field>
+              <FieldLabel htmlFor="category-kind">{copy.kind}</FieldLabel>
+              <NativeSelect
+                id="category-kind"
+                value={kind}
+                onChange={(event) => setKind(event.target.value as CategoryKind)}
+              >
+                {KINDS.map((value) => (
+                  <option key={value} value={value}>
+                    {ar.catalog.kinds[value]}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="text-muted-foreground text-xs">{copy.kindHint}</p>
+            </Field>
+          ) : (
+            inherited !== null && (
+              <p className="text-muted-foreground text-xs">{copy.kindInherited(ar.catalog.kinds[inherited])}</p>
+            )
+          )}
           {error !== null && <FieldError role="alert">{error}</FieldError>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
