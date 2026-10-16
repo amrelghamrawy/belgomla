@@ -85,13 +85,15 @@ describe("prefetchListing", () => {
     const listing = { category: "prep", f: { grade: "7" } };
 
     const client = new QueryClient();
-    hydrate(client, await prefetchListing(listing));
+    const prefetched = await prefetchListing(listing);
+    hydrate(client, prefetched.state);
 
     expect(client.getQueryData(queryKeys.products(apiParams(listing)))).toEqual({
       pages: [{ data: [product], meta }],
       pageParams: [1],
     });
     expect(client.getQueryData(queryKeys.categories)).toEqual([{ id: 1, slug: "prep", children: [] }]);
+    expect(prefetched.categories).toEqual([{ id: 1, slug: "prep", children: [] }]);
     expect(seen.find((call) => call.url?.startsWith("/api/store/products"))?.url).toBe(
       "/api/store/products?category=prep&f%5Bgrade%5D=7&page=1&per_page=24",
     );
@@ -101,9 +103,11 @@ describe("prefetchListing", () => {
     const { prefetchListing } = await import("@/lib/server/store-data");
 
     const client = new QueryClient();
-    hydrate(client, await prefetchListing({ f: {} }));
+    const prefetched = await prefetchListing({ f: {} });
+    hydrate(client, prefetched.state);
 
     expect(client.getQueryCache().getAll()).toHaveLength(0);
+    expect(prefetched.categories).toBeNull();
   });
 });
 

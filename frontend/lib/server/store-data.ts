@@ -73,11 +73,20 @@ function query(params: Record<string, unknown>): string {
   return search.toString();
 }
 
+export interface PrefetchedListing {
+  state: DehydratedState;
+  /**
+   * The tree again, for the listing to render with directly: the header (static shell) has already created an
+   * empty categories query, so HydrationBoundary only fills that one in an effect, after the first render.
+   */
+  categories: Category[] | null;
+}
+
 /**
  * The cache a listing page starts with: the category tree and the first page of products, under the exact keys
  * the client hooks use (catalog.ts), so TanStack Query renders them at once and only fetches what is missing.
  */
-export async function prefetchListing(listing: Listing): Promise<DehydratedState> {
+export async function prefetchListing(listing: Listing): Promise<PrefetchedListing> {
   const client = new QueryClient();
   const params = apiParams(listing);
 
@@ -93,11 +102,13 @@ export async function prefetchListing(listing: Listing): Promise<DehydratedState
     });
   }
 
-  if (isList<Category>(categories)) {
-    client.setQueryData(queryKeys.categories, categories.data);
+  const tree = isList<Category>(categories) ? categories.data : null;
+
+  if (tree !== null) {
+    client.setQueryData(queryKeys.categories, tree);
   }
 
-  return dehydrate(client);
+  return { state: dehydrate(client), categories: tree };
 }
 
 /** Next's searchParams object (`{ "f[grade]": "7" }`) as URLSearchParams, for parseListing. */

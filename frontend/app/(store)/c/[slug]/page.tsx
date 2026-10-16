@@ -18,11 +18,11 @@ export default function CategoryPage({ params, searchParams }: PageProps<"/c/[sl
 
 async function PrefetchedCategory({ params, searchParams }: PageProps<"/c/[slug]">) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const state = await prefetchListing(parseListing(toSearchParams(query), safeDecode(slug)));
+  const { state, categories } = await prefetchListing(parseListing(toSearchParams(query), safeDecode(slug)));
 
   return (
     <HydrationBoundary state={state}>
-      <CategoryListing />
+      <CategoryListing initialCategories={categories} />
     </HydrationBoundary>
   );
 }

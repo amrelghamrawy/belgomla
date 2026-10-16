@@ -3,24 +3,27 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ProductListing } from "@/components/store/ProductListing";
+import type { Category } from "@/lib/api/types";
 
 import { facet, page, storeProduct } from "../fixtures";
 import { callsTo, json, stubApi } from "../http";
 import { pathname, renderWithQuery, router, searchParams } from "../render";
 
-const tree = [
+const tree: Category[] = [
   {
     id: 1,
     name: "المرحلة الإعدادية",
     slug: "prep",
+    kind: "books",
     image_url: null,
     children: [
       {
         id: 2,
         name: "أولى إعدادي",
         slug: "first-prep",
+        kind: "books",
         image_url: null,
-        children: [{ id: 3, name: "الترم الأول", slug: "first-term", image_url: null, children: [] }],
+        children: [{ id: 3, name: "الترم الأول", slug: "first-term", kind: "books", image_url: null, children: [] }],
       },
     ],
   },
@@ -71,6 +74,17 @@ describe("ProductListing", () => {
     expect(within(crumbs).getByText("الترم الأول")).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { level: 1, name: "الترم الأول" })).toBeInTheDocument();
   });
+  it("renders the server's prefetched tree on the first render, so hydration matches the server HTML", () => {
+    pathname.value = "/c/first-term";
+    stubCatalog();
+    renderWithQuery(<ProductListing category="first-term" initialCategories={tree} />);
+
+    // Synchronously, before the browser's own categories call can answer.
+
+    expect(screen.getByRole("navigation", { name: "مسار التصفح" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "الترم الأول" })).toBeInTheDocument();
+  });
+
   it("BR-P08 asks the API for the selection in the URL", async () => {
     searchParams.value = new URLSearchParams("f[grade]=7&sort=price");
     const fetchMock = stubCatalog();

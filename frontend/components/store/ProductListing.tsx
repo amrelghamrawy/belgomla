@@ -7,6 +7,7 @@ import { useCallback, useMemo } from "react";
 
 import { StatusPage } from "@/components/shared/StatusPage";
 import { Button } from "@/components/ui/button";
+import type { Category } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { categoryPath, useCategories, useFilters, useProductsInfinite } from "@/lib/store/catalog";
 import { listingSearch, parseListing, type Listing } from "@/lib/store/listing";
@@ -17,7 +18,13 @@ import { LoadMore } from "./LoadMore";
 import { ProductGrid, ProductGridSkeleton } from "./ProductGrid";
 import { SortSelect } from "./SortSelect";
 
-type ProductListingProps = { category: string } | { search: true };
+type ProductListingProps =
+  | {
+      category: string;
+      /** The tree the server prefetched (prefetchListing): rendered until the hydrated cache takes over. */
+      initialCategories?: Category[] | null | undefined;
+    }
+  | { search: true };
 
 /**
  * A category page (`/c/[slug]`) or the search results (`/search?q=`): facets, sort and the product grid. The
@@ -31,7 +38,10 @@ export function ProductListing(props: ProductListingProps) {
   const listing = useMemo(() => parseListing(searchParams, categorySlug), [searchParams, categorySlug]);
 
   const categories = useCategories();
-  const path = categorySlug !== undefined && categories.data ? categoryPath(categories.data, categorySlug) : null;
+  // The server and the first client render must agree: on the client the header may already have fetched the
+  // tree while the prefetched one is still waiting for HydrationBoundary's effect, so both fall back to the prop.
+  const tree = categories.data ?? ("category" in props ? (props.initialCategories ?? undefined) : undefined);
+  const path = categorySlug !== undefined && tree ? categoryPath(tree, categorySlug) : null;
   const category = path?.at(-1) ?? null;
   const searching = "search" in props;
   const searchReady = !searching || listing.q !== undefined;
@@ -47,7 +57,7 @@ export function ProductListing(props: ProductListingProps) {
   );
   const loadMore = useCallback(() => void products.fetchNextPage(), [products]);
 
-  if (categorySlug !== undefined && categories.data !== undefined && category === null) {
+  if (categorySlug !== undefined && tree !== undefined && category === null) {
     return <StatusPage title={ar.catalog.categoryNotFound} action={<BackHome />} />;
   }
 
