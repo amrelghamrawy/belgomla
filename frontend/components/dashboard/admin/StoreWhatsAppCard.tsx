@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -11,12 +12,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FieldError } from "@/components/ui/field";
 import type { StoreWhatsApp } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
-import { needsRelink, useLinkWhatsApp, useStoreWhatsApp, useUnlinkWhatsApp } from "@/lib/dashboard/store-whatsapp";
+import {
+  needsLink,
+  needsRelink,
+  useLinkWhatsApp,
+  useStoreWhatsApp,
+  useUnlinkWhatsApp,
+} from "@/lib/dashboard/store-whatsapp";
 import { formatDate } from "@/lib/format/date";
+import { cn } from "@/lib/utils";
 
 import { ErrorBlock, LoadingBlock } from "../common/States";
 
 const copy = ar.dashboard.storeWhatsApp;
+const SETTINGS = "/dashboard/settings";
 
 function reasonText(reason: string | null): string | null {
   return reason === null || reason === "unlinked" ? null : (copy.reasons[reason] ?? copy.unknownReason);
@@ -163,22 +172,32 @@ export function StoreWhatsAppPanel({ status }: { status: StoreWhatsApp }) {
   );
 }
 
-/** Shown on every dashboard page while the store number is dropped, until the merchant links it again. */
+/**
+ * Shown at the top of every dashboard page while the store has no working WhatsApp number (D70): a warning
+ * while it is dropped, a reminder while it was never linked. The whole bar opens the settings, where the card
+ * is, so it is not shown there.
+ */
 export function StoreWhatsAppBanner() {
   const status = useStoreWhatsApp();
+  const path = usePathname();
 
-  if (!needsRelink(status.data)) {
+  if (!needsLink(status.data) || path.startsWith(SETTINGS)) {
     return null;
   }
 
+  const dropped = needsRelink(status.data);
+
   return (
-    <Alert variant="destructive" className="rounded-none border-x-0 border-t-0" data-testid="store-whatsapp-banner">
-      <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-        <span>{copy.dropped}</span>
-        <Link href="/dashboard/settings" className="font-medium underline">
-          {copy.droppedLink}
-        </Link>
-      </AlertDescription>
-    </Alert>
+    <Link
+      href={SETTINGS}
+      data-testid="store-whatsapp-banner"
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-2 text-sm hover:underline",
+        dropped ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground",
+      )}
+    >
+      <span>{dropped ? copy.dropped : copy.notLinked}</span>
+      <span className="font-medium">{dropped ? copy.droppedLink : copy.notLinkedLink}</span>
+    </Link>
   );
 }

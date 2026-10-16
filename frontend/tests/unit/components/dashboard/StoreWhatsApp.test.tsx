@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StoreWhatsAppBanner, StoreWhatsAppCard } from "@/components/dashboard/admin/StoreWhatsAppCard";
-import { needsRelink, PAIRING_POLL_MS } from "@/lib/dashboard/store-whatsapp";
+import { needsLink, needsRelink, PAIRING_POLL_MS } from "@/lib/dashboard/store-whatsapp";
 
 import { storeWhatsApp } from "../../dashboard-fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
-import { renderWithQuery } from "../../render";
+import { pathname, renderWithQuery } from "../../render";
 
 const PATH = "/api/dashboard/settings/whatsapp";
 const QR = "data:image/png;base64,iVBORw0KGgo=";
@@ -207,26 +207,61 @@ describe("StoreWhatsAppCard", () => {
 });
 
 describe("StoreWhatsAppBanner", () => {
-  it("asks to link the number again on every page while it is dropped", async () => {
+  beforeEach(() => {
+    pathname.value = "/dashboard/orders";
+  });
+
+  it("warns on every page while the number is dropped and opens the settings", async () => {
     stubApi({
       [`GET ${PATH}`]: json(200, { data: storeWhatsApp({ status: "logged_out", disconnect_reason: "logged_out" }) }),
     });
 
     renderWithQuery(<StoreWhatsAppBanner />);
 
-    expect(await screen.findByTestId("store-whatsapp-banner")).toHaveTextContent(
-      "انفصل رقم واتساب المتجر، والرسائل تُرسل الآن من رقم المنصة.",
-    );
-    expect(screen.getByRole("link", { name: "إعادة الربط" })).toHaveAttribute("href", "/dashboard/settings");
+    const banner = await screen.findByTestId("store-whatsapp-banner");
+    expect(banner).toHaveTextContent("انفصل رقم واتساب المتجر، والرسائل تُرسل الآن من رقم المنصة.");
+    expect(banner).toHaveAttribute("href", "/dashboard/settings");
   });
 
-  it("stays hidden while the number is fine", async () => {
-    const fetchMock = stubApi({ [`GET ${PATH}`]: json(200, { data: storeWhatsApp({ status: "connected" }) }) });
+  it.each([
+    ["never linked", storeWhatsApp()],
+    ["unlinked", storeWhatsApp({ disconnect_reason: "unlinked" })],
+    ["pairing", storeWhatsApp({ status: "pairing" })],
+  ])("reminds to link the number while it is %s, and the whole bar opens the settings", async (_name, status) => {
+    stubApi({ [`GET ${PATH}`]: json(200, { data: status }) });
+
+    renderWithQuery(<StoreWhatsAppBanner />);
+
+    const banner = await screen.findByRole("link", { name: /رقم واتساب المتجر غير مربوط/ });
+    expect(banner).toHaveTextContent("اربط رقمك من الإعدادات");
+    expect(banner).toHaveAttribute("href", "/dashboard/settings");
+  });
+
+  it.each([
+    ["the number is connected", storeWhatsApp({ status: "connected" }), "/dashboard/orders"],
+    ["the feature is off", storeWhatsApp({ enabled: false }), "/dashboard/orders"],
+    ["on the settings page, which has the card", storeWhatsApp(), "/dashboard/settings"],
+  ])("stays hidden when %s", async (_name, status, path) => {
+    pathname.value = path;
+    const fetchMock = stubApi({ [`GET ${PATH}`]: json(200, { data: status }) });
 
     renderWithQuery(<StoreWhatsAppBanner />);
 
     await waitFor(() => expect(callsTo(fetchMock, `GET ${PATH}`)).toHaveLength(1));
     expect(screen.queryByTestId("store-whatsapp-banner")).not.toBeInTheDocument();
+  });
+});
+
+describe("needsLink", () => {
+  it.each([
+    ["never linked", storeWhatsApp(), true],
+    ["pairing", storeWhatsApp({ status: "pairing" }), true],
+    ["logged out", storeWhatsApp({ status: "logged_out" }), true],
+    ["connected", storeWhatsApp({ status: "connected" }), false],
+    ["feature off", storeWhatsApp({ enabled: false }), false],
+    ["unknown", undefined, false],
+  ])("is %s → %s", (_name, status, expected) => {
+    expect(needsLink(status)).toBe(expected);
   });
 });
 

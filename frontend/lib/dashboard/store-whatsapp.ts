@@ -40,6 +40,11 @@ export function useUnlinkWhatsApp() {
   return useMutation({ mutationFn: () => apiFetch<StoreWhatsApp>(PATH, { method: "DELETE" }), onSuccess: store });
 }
 
+/** The feature is on and the store has no working number: never linked, unlinked, pairing or dropped. */
+export function needsLink(status: StoreWhatsApp | undefined): boolean {
+  return status?.enabled === true && status.status !== "connected";
+}
+
 /** The number dropped on its own (or was refused): the merchant should link it again. */
 export function needsRelink(status: StoreWhatsApp | undefined): boolean {
   return status?.enabled === true && (status.status === "logged_out" || status.status === "error");
