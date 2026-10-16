@@ -16,7 +16,7 @@ Product constraints it serves: **Arabic only, RTL-first, mobile-first** (01 §6,
 | Server state   | TanStack Query. No other global store                                                           |
 | Forms          | react-hook-form + zod (`@hookform/resolvers`), shadcn `Field` components for layout and errors  |
 | API types      | `openapi-typescript` from `backend/openapi.json` → `lib/api/schema.d.ts` (generated, never edited) |
-| Font           | IBM Plex Sans Arabic via `next/font/google` (D40); storefront headings Reem Kufi, `font-display` (D67) |
+| Font           | IBM Plex Sans Arabic via `next/font/google` (D40); storefront headings Cairo, `font-display` (D67) |
 | Storefront look | Brand-tinted neutrals (`.store-theme`), `highlight`/`brand-soft` tokens, `shadow-card`, `ledger` utility (D67) |
 | Unit tests     | Vitest + Testing Library + jsdom; `fetch` stubbed per test (`stubFetch` in `tests/unit/http.ts`) |
 | E2E            | Playwright, `mobile` (390×844) and `desktop` projects                                            |

@@ -14,7 +14,7 @@
   --color-brand-secondary-foreground: var(--brand-secondary-foreground, var(--secondary-foreground));
   --font-heading: var(--font-sans);
   /* Storefront identity (D67): display face for headings, highlight from the secondary colour, brand-tinted fills. */
-  --font-display: var(--font-reem-kufi), var(--font-sans);
+  --font-display: var(--font-cairo), var(--font-sans);
   --color-highlight: var(--highlight);
   --color-highlight-foreground: var(--highlight-foreground);
   --color-highlight-soft: var(--highlight-soft);
