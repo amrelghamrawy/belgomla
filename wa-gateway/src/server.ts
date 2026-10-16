@@ -45,6 +45,21 @@ export function buildServer({ manager, token, logger }: ServerDeps): FastifyInst
   // Unknown body fields are refused, not silently stripped (Fastify's default).
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024, ajv: { customOptions: { removeAdditional: false } } });
 
+  // Laravel's HTTP client sends `Content-Type: application/json` with an empty body on DELETE and bodiless POST.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
+    if (body === '') {
+      done(null, undefined);
+
+      return;
+    }
+
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(new GatewayError(400, 'invalid_json'), undefined);
+    }
+  });
+
   app.addHook('onRequest', async (request, reply) => {
     if (request.url === '/health') {
       return;
@@ -96,6 +111,10 @@ export function buildServer({ manager, token, logger }: ServerDeps): FastifyInst
 
     if (error.validation !== undefined) {
       return reply.code(400).send({ error: 'validation_failed' });
+    }
+
+    if (error.statusCode !== undefined && error.statusCode >= 400 && error.statusCode < 500) {
+      return reply.code(error.statusCode).send({ error: 'bad_request' });
     }
 
     logger.error({ err: error, method: request.method, url: request.url }, 'request failed');

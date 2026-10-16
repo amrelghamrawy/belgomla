@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Messaging\Http\Controllers\Webhooks\HypersenderWebhookController;
+use App\Modules\Messaging\Http\Controllers\Webhooks\WaGatewayWebhookController;
 use App\Modules\Messaging\Http\Middleware\VerifyHypersenderWebhook;
+use App\Modules\Messaging\Http\Middleware\VerifyWaGatewaySignature;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,3 +17,8 @@ Route::post('hypersender/{channel}', [HypersenderWebhookController::class, 'stor
     ->whereIn('channel', ['whatsapp', 'sms'])
     ->middleware(VerifyHypersenderWebhook::class)
     ->name('hypersender');
+
+// D70: the store-number gateway on the same machine, HMAC-signed.
+Route::post('wa-gateway', [WaGatewayWebhookController::class, 'store'])
+    ->middleware(VerifyWaGatewaySignature::class)
+    ->name('wa-gateway');

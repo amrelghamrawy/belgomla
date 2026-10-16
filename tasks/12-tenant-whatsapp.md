@@ -1,6 +1,6 @@
 # Task 12 — Store WhatsApp number (QR pairing per tenant)
 
-Status: **in progress**. Design approved 2026-10-16 (D70). Slices 2 (`wa-gateway/`) and 3 (schema, driver, routing, fallback chain) are done. Requires Tasks 4, 5, 10. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **in progress**. Design approved 2026-10-16 (D70). Slices 2 (`wa-gateway/`), 3 (schema, driver, routing, fallback chain) and 4 (webhook, actions, dashboard endpoints, reconcile, OpenAPI) are done. Changed from the plan: the merchant is not sent an in-app notification on a fatal drop yet. `notifications` belongs to Orders and is typed for orders, so the settings page and a dashboard banner (slice 5) show the state instead; a `whatsapp_dropped` notification type is a follow-up. Requires Tasks 4, 5, 10. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 

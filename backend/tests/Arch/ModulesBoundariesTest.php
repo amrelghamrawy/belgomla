@@ -166,7 +166,11 @@ arch('other modules reach messaging only through Messenger, its payload and enum
 
 arch('messaging does not depend on catalog, pricing or inventory')
     ->expect('App\Modules\Messaging')
-    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Audit', 'App\Modules\Customers', 'App\Modules\Orders']);
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders']);
+
+arch('D70 messaging reaches audit only through the AuditLogger, for linking and unlinking a store number')
+    ->expect('App\Modules\Messaging')
+    ->not->toUse(['App\Modules\Audit\Models', 'App\Modules\Audit\Http', 'App\Modules\Audit\Queries']);
 
 /*
 | Customers (tasks/5-customers.md). Customers reads the catalog Sku/Product of a cart line (through Catalog's

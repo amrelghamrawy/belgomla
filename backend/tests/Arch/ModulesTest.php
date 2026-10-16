@@ -48,6 +48,7 @@ arch('data classes are final readonly value objects')
         App\Modules\Messaging\Data\MessagePayload::class, // names fixed by tasks/4-messaging.md
         App\Modules\Messaging\Data\DriverResult::class,
         App\Modules\Messaging\Data\FallbackRoute::class, // value returned by Fallback (D70), not request input
+        App\Modules\Messaging\Data\StoreWhatsAppStatus::class, // read model shown by StoreWhatsAppResource (D70)
         App\Modules\Customers\Data\PricedCart::class, // read models built by CartPricer, not request input
         App\Modules\Customers\Data\PricedCartLine::class,
         App\Modules\Orders\Data\CheckoutLine::class, // checkout read models (CheckoutValidator, OrderStateMachine), not request input

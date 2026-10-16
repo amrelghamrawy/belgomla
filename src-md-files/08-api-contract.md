@@ -332,6 +332,9 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | GET    | `/api/dashboard/settings`      |                                             |
 | PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited    |
 | POST   | `/api/dashboard/settings/logo` | multipart; also `/favicon`                  |
+| GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
+| POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
+| DELETE | `/api/dashboard/settings/whatsapp` | unlink (logout from the phone, then delete the session); audited (`whatsapp.unlinked`); adds `logged_out_on_phone` |
 | GET    | `/api/dashboard/users`         | tenant users                                |
 | POST   | `/api/dashboard/users`         | `name, email, password`; role fixed `owner` |
 | PATCH  | `/api/dashboard/users/{id}`    | `status`, `password`                        |
@@ -593,10 +596,12 @@ Delivered in Task 7 (audit):
 | ------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | POST   | `/api/webhooks/hypersender/whatsapp`  | `message.ack` statuses (ack ≥ 2 delivered, −1 error); an error ack on a WhatsApp message → SMS fallback enqueued (BR-CU07)  |
 | POST   | `/api/webhooks/hypersender/sms`       | `message.phone.sent`, `message.phone.delivered`, `message.send.failed`, `message.send.expired`                              |
+| POST   | `/api/webhooks/wa-gateway`            | D70: `{ event, session_key, data, sent_at }` from wa-gateway: `gateway.started` → reconcile queued; `session.open { phone }` / `session.closed { reason, fatal }` → RecordConnectionEvent; `message.status { id, status: delivered\|read\|failed }` → store-number messages only (failed falls back). Unknown sessions or messages: `200`, dropped. |
 
 Webhooks are platform-level (not tenant hosts): they are served only on `https://hooks.{base_domain}/...` (`hooks.gomal.test` locally) and locate the tenant through the message (`provider_message_id`, `provider_request_id`, or our `uuid` sent as the SMS `request_id`).
 
 - **Auth:** Hypersender has no webhook signature. Each instance is configured in the Hypersender dashboard to send `Authorization: <MESSAGING_WEBHOOK_SECRET>` (`Bearer <secret>` also accepted); anything else is `401 unauthenticated`, and an empty secret refuses every call.
+- **wa-gateway auth:** `X-Gateway-Signature` = hex HMAC-SHA256 of `{X-Gateway-Timestamp}.{raw body}` under `WA_GATEWAY_WEBHOOK_SECRET`; a wrong signature, an empty secret or a timestamp more than 5 minutes off is `401 unauthenticated`.
 - **Body:** `{ event, data }` as Hypersender sends it; `422 validation_failed` without them.
 - **Responses:** `200 { "data": { "received": true } }`; an SMS app `phone.heartbeat.received` is stored in `sms_phone_heartbeats` (our receive time) for the monitor's 2-hour offline alert (D49, tasks/11); other events that are not delivery statuses (incoming messages) are acknowledged and dropped; a status for a message we never sent is `404 not_found`. Processing is queued (`ProcessProviderWebhook`) and idempotent: a final message ignores replays.
 
@@ -610,6 +615,7 @@ php artisan tenant:suspend alnoor
 php artisan tenant:activate alnoor
 php artisan tenant:list
 php artisan api:openapi          # compile backend/openapi/openapi.yaml → backend/openapi.json (Task 8)
+php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-gateway, remove stray sessions (every 5 min)
 ```
 
 ---

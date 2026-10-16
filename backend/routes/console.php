@@ -10,3 +10,6 @@ use Illuminate\Support\Facades\Schedule;
 */
 
 Schedule::command('queue:prune-failed --hours=720')->daily();
+
+// D70: wa-gateway runs exactly the connected store numbers (tasks/12 lesson 6).
+Schedule::command('messaging:wa-reconcile')->everyFiveMinutes()->withoutOverlapping();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Customers\Http\Middleware\EnsureCustomerActive;
 use App\Modules\Customers\Http\Middleware\RejectGuestsWhenPricesHidden;
+use App\Modules\Messaging\Console\WaReconcileCommand;
 use App\Modules\Platform\Console\MonitorCommand;
 use App\Modules\Platform\Console\OpenApiCommand;
 use App\Modules\Tenancy\Console\TenantActivateCommand;
@@ -44,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
         TenantListCommand::class,
         OpenApiCommand::class,
         MonitorCommand::class,
+        WaReconcileCommand::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA: cookie sessions for requests coming from tenant hosts (Tech §6).

@@ -1591,6 +1591,74 @@
                 }
             }
         },
+        "/api/dashboard/settings/whatsapp": {
+            "get": {
+                "operationId": "dashboardStoreWhatsApp",
+                "tags": [
+                    "dashboard-settings"
+                ],
+                "summary": "The store WhatsApp number (D70); while pairing, also the live QR. Poll every few seconds while pairing.",
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/StoreWhatsApp"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "dashboardStartWhatsAppPairing",
+                "tags": [
+                    "dashboard-settings"
+                ],
+                "summary": "Starts linking the store number by QR (audited). 404 when the feature is disabled, 409 whatsapp_already_connected, 503 wa_gateway_unavailable or wa_gateway_capacity.",
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/StoreWhatsApp"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "dashboardUnlinkWhatsApp",
+                "tags": [
+                    "dashboard-settings"
+                ],
+                "summary": "Unlinks the store number (audited); logged_out_on_phone is false when the phone may still list the device.",
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/StoreWhatsApp"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/dashboard/users": {
             "get": {
                 "operationId": "dashboardUsers",
@@ -5382,6 +5450,24 @@
                     }
                 }
             },
+            "StoreWhatsApp": {
+                "description": "The store WhatsApp number",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/components/schemas/StoreWhatsApp"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "TenantUser": {
                 "description": "The user",
                 "content": {
@@ -5688,7 +5774,10 @@
                     "unauthenticated",
                     "use_invitation",
                     "user_disabled",
-                    "validation_failed"
+                    "validation_failed",
+                    "wa_gateway_capacity",
+                    "wa_gateway_unavailable",
+                    "whatsapp_already_connected"
                 ]
             },
             "ErrorEnvelope": {
@@ -7281,6 +7370,69 @@
                         }
                     }
                 ]
+            },
+            "StoreWhatsApp": {
+                "type": "object",
+                "description": "D70. A store that never linked a number is disconnected; enabled false hides the section.",
+                "required": [
+                    "enabled",
+                    "status",
+                    "status_label",
+                    "phone",
+                    "connected_at",
+                    "disconnect_reason",
+                    "qr"
+                ],
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pairing",
+                            "connected",
+                            "disconnected",
+                            "logged_out",
+                            "error"
+                        ]
+                    },
+                    "status_label": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "E.164"
+                    },
+                    "connected_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "disconnect_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "unlinked, qr_expired, phone_in_use, or a gateway reason such as logged_out"
+                    },
+                    "qr": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "PNG data URL, only while pairing"
+                    },
+                    "logged_out_on_phone": {
+                        "type": "boolean",
+                        "description": "Only in the unlink response"
+                    }
+                }
             },
             "SettingsRequest": {
                 "type": "object",

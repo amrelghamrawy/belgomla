@@ -98,6 +98,33 @@ describe('sessions api', () => {
     expect(response.json()).toEqual({ logged_out: true });
   });
 
+  it('accepts a bodiless delete sent with a json content type, as laravel sends it', async () => {
+    const { h, app } = await server();
+    await h.manager.start(KEY);
+
+    const response = await app.inject({ method: 'DELETE', url: `/sessions/${KEY}`, headers: { ...AUTH, 'content-type': 'application/json' }, payload: '' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ logged_out: false });
+  });
+
+  it('accepts a bodiless start sent with a json content type', async () => {
+    const { app } = await server();
+
+    const response = await app.inject({ method: 'POST', url: `/sessions/${KEY}`, headers: { ...AUTH, 'content-type': 'application/json' }, payload: '' });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('answers 400 for a body that is not json', async () => {
+    const { app } = await server();
+
+    const response = await app.inject({ method: 'POST', url: `/sessions/${KEY}/messages`, headers: { ...AUTH, 'content-type': 'application/json' }, payload: '{nope' });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid_json' });
+  });
+
   it('lists live and stored sessions', async () => {
     const { h, app } = await server();
     await h.manager.start(KEY);
