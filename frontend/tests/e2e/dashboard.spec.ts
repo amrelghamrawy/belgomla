@@ -38,7 +38,9 @@ test("a merchant builds a category, unit, custom field and product, sees it on t
   const fieldDialog = page.getByRole("dialog");
   await fieldDialog.getByLabel("الاسم الظاهر").fill(field);
   await fieldDialog.getByLabel("المفتاح (بالإنجليزية)").fill(`author_${run}`);
-  await fieldDialog.getByLabel("الاختيارات").fill("أحمد\nمحمد");
+  await fieldDialog.getByLabel("اسم الاختيار 1").fill("أحمد");
+  await fieldDialog.getByRole("button", { name: "إضافة اختيار" }).click();
+  await fieldDialog.getByLabel("اسم الاختيار 2").fill("محمد");
   await fieldDialog.getByRole("button", { name: "حفظ" }).click();
   await expect(page.getByTestId(`field-author_${run}`)).toBeVisible();
 

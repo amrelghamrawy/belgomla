@@ -454,7 +454,7 @@ describe("UnitsPage", () => {
 });
 
 describe("FieldDialog", () => {
-  it("creates a select field with its options, one per line", async () => {
+  it("creates a select field with its options, one input per option", async () => {
     const fetchMock = stubApi({ "POST /api/dashboard/fields": json(201, { data: selectField() }) });
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -462,7 +462,9 @@ describe("FieldDialog", () => {
 
     await user.type(screen.getByLabelText("الاسم الظاهر"), "الصف");
     await user.type(screen.getByLabelText("المفتاح (بالإنجليزية)"), "grade");
-    await user.type(screen.getByLabelText("الاختيارات"), "الأول{enter}الثاني{enter}");
+    await user.type(screen.getByLabelText("اسم الاختيار 1"), "الأول");
+    await user.click(screen.getByRole("button", { name: "إضافة اختيار" }));
+    await user.type(screen.getByLabelText("اسم الاختيار 2"), "الثاني{enter}");
     await user.click(screen.getByRole("button", { name: "حفظ" }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -473,6 +475,46 @@ describe("FieldDialog", () => {
       kind: null,
       options: ["الأول", "الثاني"],
     });
+  });
+
+  it("adds a row on enter and drops a removed option", async () => {
+    const fetchMock = stubApi({ "POST /api/dashboard/fields": json(201, { data: selectField() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<FieldDialog field={null} onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("الاسم الظاهر"), "الصف");
+    await user.type(screen.getByLabelText("المفتاح (بالإنجليزية)"), "grade");
+    await user.type(screen.getByLabelText("اسم الاختيار 1"), "الأول{enter}");
+    await user.type(screen.getByLabelText("اسم الاختيار 2"), "الثاني{enter}");
+    await user.type(screen.getByLabelText("اسم الاختيار 3"), "الثالث");
+    await user.click(screen.getByRole("button", { name: "حذف الاختيار 2" }));
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/fields")).toHaveLength(1));
+    expect(screen.queryByLabelText("اسم الاختيار 3")).not.toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST /api/dashboard/fields")[0]?.body).toMatchObject({ options: ["الأول", "الثالث"] });
+  });
+
+  it("refuses a duplicated option before calling the api", async () => {
+    const fetchMock = stubApi({ "POST /api/dashboard/fields": json(201, { data: selectField() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<FieldDialog field={null} onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("الاسم الظاهر"), "الصف");
+    await user.type(screen.getByLabelText("المفتاح (بالإنجليزية)"), "grade");
+    await user.type(screen.getByLabelText("اسم الاختيار 1"), "الأول{enter}");
+    await user.type(screen.getByLabelText("اسم الاختيار 2"), " الأول ");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    expect(await screen.findByText("هذا الاختيار مكرر")).toBeInTheDocument();
+    expect(screen.getByLabelText("اسم الاختيار 2")).toHaveAttribute("aria-invalid", "true");
+    expect(callsTo(fetchMock, "POST /api/dashboard/fields")).toHaveLength(0);
+  });
+
+  it("keeps the last option row", () => {
+    renderWithQuery(<FieldDialog field={null} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "حذف الاختيار 1" })).toBeDisabled();
   });
 
   it("D69 binds a field to a section", async () => {

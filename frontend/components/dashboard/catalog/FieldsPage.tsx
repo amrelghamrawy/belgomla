@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type FormEvent, useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { PlusIcon, TrashIcon } from "lucide-react";
+import { type FormEvent, type KeyboardEvent, useState } from "react";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -15,7 +16,6 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import type { CategoryKind, FieldDefinition, FieldOption } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import {
@@ -49,7 +49,21 @@ const schema = z.object({
   is_filterable: z.boolean(),
   filter_order: z.string().regex(/^\d{1,6}$/, ar.dashboard.productForm.invalidInteger),
   sort_order: z.string().regex(/^\d{1,6}$/, ar.dashboard.productForm.invalidInteger),
-  options: z.string(),
+  // One row per option; blank rows are dropped on submit, the rest must be distinct (options.* distinct).
+  options: z
+    .array(z.object({ label: z.string().trim().max(100) }))
+    .superRefine((rows, context) => {
+      const seen = new Set<string>();
+      rows.forEach((row, index) => {
+        if (row.label === "") {
+          return;
+        }
+        if (seen.has(row.label)) {
+          context.addIssue({ code: "custom", path: [index, "label"], message: copy.duplicateOption });
+        }
+        seen.add(row.label);
+      });
+    }),
 });
 
 type FieldForm = z.infer<typeof schema>;
@@ -167,18 +181,16 @@ export function FieldDialog({ field, onClose }: { field: FieldDefinition | null;
       is_filterable: field?.is_filterable ?? false,
       filter_order: String(field?.filter_order ?? 0),
       sort_order: String(field?.sort_order ?? 0),
-      options: "",
+      options: [{ label: "" }],
     },
   });
   const type = useWatch({ control: form.control, name: "type" });
+  const optionRows = useFieldArray({ control: form.control, name: "options" });
   const errors = form.formState.errors;
 
   const submit = form.handleSubmit((values) => {
     setError(null);
-    const options = values.options
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "");
+    const options = values.options.map((row) => row.label).filter((label) => label !== "");
 
     save.mutate(
       {
@@ -307,11 +319,56 @@ export function FieldDialog({ field, onClose }: { field: FieldDefinition | null;
             </Field>
           </div>
           {field === null && type === "select" && (
-            <Field>
-              <FieldLabel htmlFor="field-options">{copy.options}</FieldLabel>
-              <Textarea id="field-options" rows={4} placeholder={copy.optionsHint} {...form.register("options")} />
-              <FieldError errors={[errors.options]} />
-            </Field>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-sm font-medium">{copy.options}</legend>
+              {optionRows.fields.map((row, index) => {
+                const rowError = errors.options?.[index]?.label;
+                // Enter adds the next row instead of submitting the dialog, so options can be typed in one go.
+                const addAfter = (event: KeyboardEvent<HTMLInputElement>) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    optionRows.insert(index + 1, { label: "" });
+                  }
+                };
+
+                return (
+                  <Field key={row.id} data-invalid={rowError !== undefined}>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        aria-label={`${copy.optionLabel} ${index + 1}`}
+                        placeholder={`${copy.optionLabel} ${index + 1}`}
+                        maxLength={100}
+                        aria-invalid={rowError !== undefined}
+                        onKeyDown={addAfter}
+                        {...form.register(`options.${index}.label`)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`${copy.removeOption} ${index + 1}`}
+                        disabled={optionRows.fields.length === 1}
+                        onClick={() => optionRows.remove(index)}
+                      >
+                        <TrashIcon />
+                      </Button>
+                    </div>
+                    <FieldError errors={[rowError]} />
+                  </Field>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => optionRows.append({ label: "" })}
+              >
+                <PlusIcon />
+                {copy.addOption}
+              </Button>
+              <FieldError errors={[errors.options?.root ?? errors.options]} />
+            </fieldset>
           )}
           {error !== null && <FieldError role="alert">{error}</FieldError>}
           <DialogFooter>
