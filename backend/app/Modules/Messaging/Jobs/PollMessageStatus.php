@@ -54,7 +54,7 @@ final class PollMessageStatus implements ShouldQueue
                 return;
             }
 
-            $result = $drivers->for($message->channel)->status($message);
+            $result = $drivers->forMessage($message)->status($message);
 
             if (! $result->final && $this->attempt >= self::maxAttempts()) {
                 $result = DriverResult::failed('poll_timeout', providerRequestId: $message->provider_request_id);

@@ -430,16 +430,33 @@ Our own table, not Laravel's notifications table; the model is `Orders\Models\Me
 | to_phone            | varchar(20)  | E.164 (`App\Support\PhoneNumber`)                                                           |
 | purpose             | enum         | `otp`, `invitation`, `system_alert`                                                         |
 | channel             | enum         | `whatsapp`, `sms`                                                                           |
-| provider            | varchar(30)  | `hypersender` (V1), `meta_cloud` reserved, `log` (development)                             |
+| provider            | varchar(30)  | `hypersender` (platform number), `wa_gateway` (store number, D70), `meta_cloud` reserved, `log` (development) |
 | provider_request_id | varchar      | nullable, indexed; Hypersender `queued_request_uuid` polled for the final result            |
 | provider_message_id | varchar      | nullable, indexed; WhatsApp `key.id` / SMS message id                                       |
 | status              | enum         | `queued`, `sent`, `delivered`, `failed`, `fell_back` (final: delivered, failed, fell_back) |
-| error_code          | varchar(50)  | nullable; e.g. `not_on_whatsapp`, `poll_timeout`, `sms_failed`, `provider_unreachable`       |
+| error_code          | varchar(50)  | nullable; e.g. `not_on_whatsapp`, `poll_timeout`, `sms_failed`, `provider_unreachable`, `session_not_open`, `gateway_unreachable` |
 | body                | text         | nullable, **encrypted**, never serialised; kept only until the SMS fallback can no longer be needed (cleared when final, or when an SMS is sent) |
-| fallback_of_id      | FK self      | nullable, **unique**; the SMS row points at the failed WhatsApp row; CHECK: only an SMS     |
+| fallback_of_id      | FK self      | nullable, **unique**; the copy points at the failed row (store number → platform number → SMS, D70); CHECK: a copy never uses `wa_gateway` |
 | cost                | numeric(8,4) | nullable (Hypersender reports no per-message cost)                                          |
 
 `system_alert` rows are the operator alerts of `platform:monitor` (tasks/11, D65), logged under the tenant named by `MONITOR_ALERT_TENANT`.
+
+### `whatsapp_connections` (D70, tasks/12)
+
+The store's own WhatsApp number, linked by QR through `wa-gateway/`. One row per tenant.
+
+| Column            | Type        | Notes                                                                          |
+| ----------------- | ----------- | ------------------------------------------------------------------------------ |
+| id                | bigint PK   |                                                                                |
+| tenant_id         | FK unique   | one number per store                                                           |
+| session_key       | uuid unique | the only id wa-gateway sees; replaced on every new pairing                     |
+| status            | enum        | `pairing`, `connected`, `disconnected`, `logged_out`, `error`                  |
+| phone             | varchar(20) | nullable, E.164; partial unique index where `status = connected` (one number, one store) |
+| disconnect_reason | varchar(50) | nullable; gateway reason (`logged_out`, `qr_expired`, …) or `phone_in_use`      |
+| connected_at      | timestamp   | nullable                                                                       |
+| last_event_at     | timestamp   | nullable; last gateway event for this number                                   |
+
+OTPs and invitations of a tenant with a `connected` row start on `wa_gateway`; everything else, and every fallback, uses the platform providers.
 
 ### `sms_phone_heartbeats` (platform, D49, tasks/11)
 

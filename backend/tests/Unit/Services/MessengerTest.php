@@ -11,6 +11,7 @@ use App\Modules\Messaging\Exceptions\InvalidPhoneNumber;
 use App\Modules\Messaging\Exceptions\MessagingRateLimited;
 use App\Modules\Messaging\Jobs\SendMessage;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Messaging\Services\Messenger;
 use Illuminate\Support\Facades\Queue;
 
@@ -81,4 +82,11 @@ test('the stored row is a tenant-owned outbound message', function (): void {
 
     $this->assertDatabaseHas('outbound_messages', ['tenant_id' => $this->tenant->id, 'to_phone' => '+201012345678', 'status' => 'queued', 'fallback_of_id' => null]);
     expect($this->inTenant(fn () => OutboundMessage::query()->count()))->toBe(1);
+});
+
+test('D70 an otp of a store with a connected number is logged on the store number', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    expect($this->inTenant(fn () => app(Messenger::class)->send(otp()))->provider)->toBe(Provider::WaGateway);
 });

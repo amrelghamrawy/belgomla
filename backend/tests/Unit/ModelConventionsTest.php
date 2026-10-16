@@ -22,6 +22,7 @@ use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Models\OutboundMessage;
 use App\Modules\Messaging\Models\SmsPhoneHeartbeat;
+use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -89,6 +90,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         SkuInventory::class,
         OutboundMessage::class,
         SmsPhoneHeartbeat::class,
+        WhatsAppConnection::class,
         MerchantNotification::class,
         Order::class,
         OrderItem::class,

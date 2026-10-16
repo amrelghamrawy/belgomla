@@ -78,11 +78,21 @@ test('database checks refuse unknown values and a whatsapp fallback', function (
     'unknown status' => [['status' => 'read'], 'outbound_messages_status_known'],
 ]);
 
-test('BR-CU07 only an sms can be a fallback', function (): void {
+test('D70 a fallback never goes through the store number again', function (): void {
     expect(fn () => $this->inTenant(function (): void {
-        $whatsapp = OutboundMessage::factory()->fellBack()->create();
-        OutboundMessage::factory()->whatsapp()->create(['fallback_of_id' => $whatsapp->id]);
-    }))->toThrow(QueryException::class, 'outbound_messages_fallback_is_sms');
+        $whatsapp = OutboundMessage::factory()->fellBack()->create(['provider' => Provider::WaGateway]);
+        OutboundMessage::factory()->whatsapp()->create(['fallback_of_id' => $whatsapp->id, 'provider' => Provider::WaGateway]);
+    }))->toThrow(QueryException::class, 'outbound_messages_fallback_known');
+});
+
+test('D70 a store number message may fall back to a platform whatsapp copy', function (): void {
+    $copy = $this->inTenant(function (): OutboundMessage {
+        $whatsapp = OutboundMessage::factory()->fellBack()->create(['provider' => Provider::WaGateway]);
+
+        return OutboundMessage::factory()->whatsapp()->create(['fallback_of_id' => $whatsapp->id, 'provider' => Provider::Hypersender]);
+    });
+
+    expect($copy->fallback_of_id)->not->toBeNull();
 });
 
 test('BR-CU07 a whatsapp message has at most one sms fallback', function (): void {

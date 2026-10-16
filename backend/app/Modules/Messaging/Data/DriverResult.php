@@ -7,7 +7,8 @@ namespace App\Modules\Messaging\Data;
 /**
  * What a driver learned from the provider about one message: accepted and still queued, sent, delivered,
  * or failed (with `notOnWhatsApp` when the number has no WhatsApp account, BR-CU07). `final` means no
- * further polling is needed.
+ * further polling is needed. `retryAfter` means the provider did not take the message yet and the send should
+ * be tried again in that many seconds; nothing is recorded.
  */
 final readonly class DriverResult
 {
@@ -19,7 +20,14 @@ final readonly class DriverResult
         public bool $notOnWhatsApp = false,
         public bool $final = false,
         public bool $delivered = false,
+        public ?int $retryAfter = null,
     ) {}
+
+    /** The provider's own send limit was reached (D70: per store number). */
+    public static function busy(int $retryAfter): self
+    {
+        return new self(true, retryAfter: $retryAfter);
+    }
 
     /** Accepted by the provider; the outcome comes later from polling or the webhook. */
     public static function queued(?string $providerRequestId = null, ?string $providerMessageId = null): self

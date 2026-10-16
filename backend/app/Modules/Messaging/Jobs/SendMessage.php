@@ -19,13 +19,16 @@ use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
 
 /**
- * Hands one queued message to its channel's driver (Tech §13). Waits instead of failing when the global
- * provider limit is reached (D46). An accepted-but-unfinished send is polled; a failure goes through
- * RecordDeliveryStatus, which falls back to SMS for WhatsApp (BR-CU07).
+ * Hands one queued message to its driver (Tech §13). Waits instead of failing when the global platform
+ * provider limit (D46) or a store number's own limit (D70) is reached. An accepted-but-unfinished send is
+ * polled; a failure goes through RecordDeliveryStatus, which queues the next channel (BR-CU07).
  */
 final class SendMessage implements ShouldQueue
 {
     use Queueable;
+
+    /** Providers outside the D46 platform limit: the log driver, and store numbers, which wa-gateway limits per number. */
+    private const array UNTHROTTLED = [Provider::Log, Provider::WaGateway];
 
     public function __construct(public readonly int $messageId)
     {
@@ -53,8 +56,8 @@ final class SendMessage implements ShouldQueue
                 return;
             }
 
-            $driver = $drivers->for($message->channel);
-            $delay = $driver->provider() === Provider::Log ? null : $limiter->providerDelay();
+            $driver = $drivers->forMessage($message);
+            $delay = in_array($driver->provider(), self::UNTHROTTLED, true) ? null : $limiter->providerDelay();
 
             if ($delay !== null) {
                 $this->release($delay);
@@ -63,6 +66,13 @@ final class SendMessage implements ShouldQueue
             }
 
             $result = $driver->send($message, MessagePayload::fromMessage($message));
+
+            if ($result->retryAfter !== null) {
+                $this->release($result->retryAfter);
+
+                return;
+            }
+
             $record->handle($message, $result);
 
             if (! $result->final) {

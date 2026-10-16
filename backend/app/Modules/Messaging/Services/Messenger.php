@@ -14,8 +14,9 @@ use Illuminate\Support\Str;
 
 /**
  * The only way other modules send WhatsApp/SMS (Tech §13, rules/02 §8). Normalises the phone, applies the
- * BR-CU07 per-phone limit, logs the message for the current tenant and queues it; delivery, polling and the
- * WhatsApp → SMS fallback happen in the Messaging jobs. Named exception to "services do not write"
+ * BR-CU07 per-phone limit, logs the message for the current tenant with the driver it starts on (the store's
+ * own number when connected, D70) and queues it; delivery, polling and the fallback chain happen in the
+ * Messaging jobs. Named exception to "services do not write"
  * (rules/02 §2): it creates the `outbound_messages` row; every later change goes through RecordDeliveryStatus.
  */
 final readonly class Messenger
@@ -33,7 +34,7 @@ final readonly class Messenger
             'to_phone' => $phone,
             'purpose' => $payload->purpose,
             'channel' => $payload->channel,
-            'provider' => $this->drivers->for($payload->channel)->provider(),
+            'provider' => $this->drivers->choose($payload->channel, $payload->purpose)->provider(),
             'status' => MessageStatus::Queued,
             'body' => $payload->text,
         ]);

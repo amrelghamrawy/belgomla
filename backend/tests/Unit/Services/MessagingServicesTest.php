@@ -8,12 +8,14 @@ use App\Modules\Messaging\Enums\Channel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Enums\Provider;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Messaging\Services\Fallback;
 use App\Modules\Messaging\Services\Hypersender\HypersenderSmsDriver;
 use App\Modules\Messaging\Services\Hypersender\HypersenderWhatsAppDriver;
 use App\Modules\Messaging\Services\LogDriver;
 use App\Modules\Messaging\Services\MessageContext;
 use App\Modules\Messaging\Services\MessageDrivers;
+use App\Modules\Messaging\Services\WaGateway\WaGatewayDriver;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
@@ -43,19 +45,97 @@ test('an unknown messaging driver is a configuration error', function (): void {
     app(MessageDrivers::class)->for(Channel::Sms);
 })->throws(RuntimeException::class, 'Unknown messaging driver [carrier-pigeon].');
 
-test('BR-CU07 only a failed whatsapp message falls back to sms', function (Channel $channel, DriverResult $result, bool $fallsBack): void {
-    $message = new OutboundMessage(['channel' => $channel]);
+test('BR-CU07 D70 the fallback chain is store number, platform number, then sms', function (Channel $channel, Provider $provider, DriverResult $result, ?array $next): void {
+    useHypersender();
+    $message = new OutboundMessage(['channel' => $channel, 'provider' => $provider]);
 
-    expect((new Fallback)->shouldFallBack($message, $result))->toBe($fallsBack);
+    $route = app(Fallback::class)->next($message, $result);
+
+    expect($route === null ? null : [$route->channel, $route->provider])->toBe($next);
 })->with([
-    'whatsapp, not on whatsapp' => [Channel::WhatsApp, DriverResult::failed('not_on_whatsapp', true), true],
-    'whatsapp, send failed' => [Channel::WhatsApp, DriverResult::failed('provider_error'), true],
-    'whatsapp, poll timeout' => [Channel::WhatsApp, DriverResult::failed('poll_timeout'), true],
-    'whatsapp, sent' => [Channel::WhatsApp, DriverResult::sent('msg-1'), false],
-    'whatsapp, queued' => [Channel::WhatsApp, DriverResult::queued('req-1'), false],
-    'whatsapp, delivered' => [Channel::WhatsApp, DriverResult::delivered('msg-1'), false],
-    'sms, failed' => [Channel::Sms, DriverResult::failed('sms_failed'), false],
-    'sms, not on whatsapp' => [Channel::Sms, DriverResult::failed('not_on_whatsapp', true), false],
+    'store number, send failed' => [Channel::WhatsApp, Provider::WaGateway, DriverResult::failed('session_not_open'), [Channel::WhatsApp, Provider::Hypersender]],
+    'store number, gateway down' => [Channel::WhatsApp, Provider::WaGateway, DriverResult::failed('gateway_unreachable'), [Channel::WhatsApp, Provider::Hypersender]],
+    'store number, not on whatsapp' => [Channel::WhatsApp, Provider::WaGateway, DriverResult::failed('not_on_whatsapp', true), [Channel::Sms, Provider::Hypersender]],
+    'store number, sent' => [Channel::WhatsApp, Provider::WaGateway, DriverResult::sent('msg-1'), null],
+    'platform, not on whatsapp' => [Channel::WhatsApp, Provider::Hypersender, DriverResult::failed('not_on_whatsapp', true), [Channel::Sms, Provider::Hypersender]],
+    'platform, send failed' => [Channel::WhatsApp, Provider::Hypersender, DriverResult::failed('provider_error'), [Channel::Sms, Provider::Hypersender]],
+    'platform, poll timeout' => [Channel::WhatsApp, Provider::Hypersender, DriverResult::failed('poll_timeout'), [Channel::Sms, Provider::Hypersender]],
+    'platform, sent' => [Channel::WhatsApp, Provider::Hypersender, DriverResult::sent('msg-1'), null],
+    'platform, queued' => [Channel::WhatsApp, Provider::Hypersender, DriverResult::queued('req-1'), null],
+    'platform, delivered' => [Channel::WhatsApp, Provider::Hypersender, DriverResult::delivered('msg-1'), null],
+    'sms, failed' => [Channel::Sms, Provider::Hypersender, DriverResult::failed('sms_failed'), null],
+    'sms, not on whatsapp' => [Channel::Sms, Provider::Hypersender, DriverResult::failed('not_on_whatsapp', true), null],
+]);
+
+test('the fallback copy uses the configured platform provider', function (): void {
+    config(['messaging.driver' => 'log']);
+    $message = new OutboundMessage(['channel' => Channel::WhatsApp, 'provider' => Provider::WaGateway]);
+
+    $route = app(Fallback::class)->next($message, DriverResult::failed('session_not_open'));
+
+    expect($route?->provider)->toBe(Provider::Log);
+});
+
+test('D70 an otp or invitation goes from the store number when it is connected', function (MessagePurpose $purpose): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    $driver = $this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::WhatsApp, $purpose));
+
+    expect($driver)->toBeInstanceOf(WaGatewayDriver::class);
+})->with([MessagePurpose::Otp, MessagePurpose::Invitation]);
+
+test('D70 the platform number is used while the store number is not connected', function (string $state): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->{$state}()->create());
+
+    $driver = $this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::WhatsApp, MessagePurpose::Otp));
+
+    expect($driver)->toBeInstanceOf(LogDriver::class);
+})->with(['pairing', 'disconnected', 'loggedOut', 'error']);
+
+test('D70 the platform number is used when the store has never linked one', function (): void {
+    useWaGateway();
+
+    expect($this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::WhatsApp, MessagePurpose::Otp)))->toBeInstanceOf(LogDriver::class);
+});
+
+test('D70 platform alerts never go from the store number', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    $driver = $this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::WhatsApp, MessagePurpose::SystemAlert));
+
+    expect($driver)->toBeInstanceOf(LogDriver::class);
+});
+
+test('D70 an sms never goes through the store number', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    $driver = $this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::Sms, MessagePurpose::Otp));
+
+    expect($driver)->toBeInstanceOf(LogDriver::class);
+});
+
+test('D70 a disabled gateway is never chosen, even for a connected store', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+    config(['messaging.wa_gateway.enabled' => false]);
+
+    $driver = $this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::WhatsApp, MessagePurpose::Otp));
+
+    expect($driver)->toBeInstanceOf(LogDriver::class);
+});
+
+test('a logged message is handled by the driver of its provider', function (Provider $provider, Channel $channel, string $driver): void {
+    useHypersender();
+
+    expect(app(MessageDrivers::class)->forMessage(new OutboundMessage(['provider' => $provider, 'channel' => $channel])))->toBeInstanceOf($driver);
+})->with([
+    'store number' => [Provider::WaGateway, Channel::WhatsApp, WaGatewayDriver::class],
+    'platform whatsapp' => [Provider::Hypersender, Channel::WhatsApp, HypersenderWhatsAppDriver::class],
+    'platform sms' => [Provider::Hypersender, Channel::Sms, HypersenderSmsDriver::class],
 ]);
 
 test('the log driver writes one line per message to the messages channel', function (): void {

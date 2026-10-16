@@ -25,6 +25,20 @@ return [
     ],
 
     /*
+    | The store's own WhatsApp number (D70, tasks/12): wa-gateway on the same machine holds one WhatsApp Web
+    | session per linked store. Disabled, every message uses the platform driver above and the dashboard
+    | hides the section.
+    */
+    'wa_gateway' => [
+        'enabled' => (bool) env('WA_GATEWAY_ENABLED', false),
+        'base_url' => env('WA_GATEWAY_URL', 'http://127.0.0.1:3100'),
+        'token' => env('WA_GATEWAY_TOKEN', ''),
+        // wa-gateway signs every webhook with HMAC-SHA256 under this secret. Empty means every webhook is refused.
+        'webhook_secret' => env('WA_GATEWAY_WEBHOOK_SECRET', ''),
+        'timeout' => 10,
+    ],
+
+    /*
     | Hypersender sends this value as the `Authorization` header of every webhook call (no HMAC exists).
     | Empty means every webhook is refused.
     */

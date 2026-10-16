@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Modules\Messaging\Enums\MessageStatus;
+use App\Modules\Messaging\Enums\Provider;
 use App\Modules\Messaging\Jobs\PollMessageStatus;
 use App\Modules\Messaging\Jobs\SendMessage;
 use App\Modules\Messaging\Models\OutboundMessage;
+use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Messaging\Services\MessagingRateLimiter;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Http\Client\ConnectionException;
@@ -134,4 +136,53 @@ test('the job runs on the messaging queue and retries for ten minutes with backo
     expect($job->queue)->toBe('messaging')
         ->and($job->backoff())->toBe([10, 30, 60])
         ->and($job->retryUntil()->getTimestamp())->toBe(now()->addMinutes(10)->getTimestamp());
+});
+
+test('D70 a store number message is sent through the gateway and is final', function (): void {
+    useWaGateway();
+    $connection = $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+    $message = $this->inTenant(fn () => OutboundMessage::factory()->create(['provider' => Provider::WaGateway]));
+    Http::fake(["127.0.0.1:3100/sessions/{$connection->session_key}/messages" => Http::response(['id' => '3EB0ABC'])]);
+
+    runJob(new SendMessage($message->id));
+
+    expect([messageRow($message)->status, messageRow($message)->provider_message_id])->toBe([MessageStatus::Sent, '3EB0ABC']);
+    Queue::assertNotPushed(PollMessageStatus::class);
+});
+
+test('D70 a store number message is not held by the platform provider limit', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+    $message = $this->inTenant(fn () => OutboundMessage::factory()->create(['provider' => Provider::WaGateway]));
+    array_map(fn (): ?int => app(MessagingRateLimiter::class)->providerDelay(), range(1, 10));
+    Http::fake(['127.0.0.1:3100/*' => Http::response(['id' => '3EB0ABC'])]);
+
+    runJob(new SendMessage($message->id));
+
+    expect(messageRow($message)->status)->toBe(MessageStatus::Sent);
+});
+
+test('D70 over the store number limit the job waits as long as the gateway says', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+    $message = $this->inTenant(fn () => OutboundMessage::factory()->create(['provider' => Provider::WaGateway]));
+    Http::fake(['127.0.0.1:3100/*' => Http::response(['error' => 'rate_limited', 'retry_after' => 42], 429)]);
+
+    $job = (new SendMessage($message->id))->withFakeQueueInteractions();
+    app()->call($job->handle(...));
+
+    $job->assertReleased(42);
+    expect([messageRow($message)->status, messageRow($message)->error_code])->toBe([MessageStatus::Queued, null]);
+});
+
+test('D70 a dropped store number hands the message to the platform number at once', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+    $message = $this->inTenant(fn () => OutboundMessage::factory()->create(['provider' => Provider::WaGateway]));
+    Http::fake(['127.0.0.1:3100/*' => Http::response(['error' => 'not_open'], 409)]);
+
+    runJob(new SendMessage($message->id));
+
+    expect([messageRow($message)->status, messageRow($message)->error_code])->toBe([MessageStatus::FellBack, 'session_not_open']);
+    $this->assertDatabaseHas('outbound_messages', ['fallback_of_id' => $message->id, 'channel' => 'whatsapp', 'provider' => 'hypersender']);
 });

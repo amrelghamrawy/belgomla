@@ -137,11 +137,16 @@ arch('message drivers implement the MessageDriver contract')
         App\Modules\Messaging\Services\LogDriver::class,
         App\Modules\Messaging\Services\Hypersender\HypersenderWhatsAppDriver::class,
         App\Modules\Messaging\Services\Hypersender\HypersenderSmsDriver::class,
+        App\Modules\Messaging\Services\WaGateway\WaGatewayDriver::class,
     ])
     ->toImplement(App\Modules\Messaging\Contracts\MessageDriver::class);
 
 arch('no other module references hypersender classes')
     ->expect('App\Modules\Messaging\Services\Hypersender')
+    ->toOnlyBeUsedIn(['App\Modules\Messaging']);
+
+arch('D70 no other module references the store-number gateway')
+    ->expect('App\Modules\Messaging\Services\WaGateway')
     ->toOnlyBeUsedIn(['App\Modules\Messaging']);
 
 arch('messaging models are only used inside messaging')

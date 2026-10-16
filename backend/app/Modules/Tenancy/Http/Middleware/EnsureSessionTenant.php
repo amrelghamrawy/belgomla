@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final readonly class EnsureSessionTenant
 {
-    public const SESSION_KEY = 'tenant_id';
+    public const string SESSION_KEY = 'tenant_id';
 
     public function __construct(private TenantContext $context) {}
 

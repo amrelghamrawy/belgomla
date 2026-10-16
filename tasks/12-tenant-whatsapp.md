@@ -1,6 +1,6 @@
 # Task 12 — Store WhatsApp number (QR pairing per tenant)
 
-Status: **in progress**. Design approved 2026-10-16 (D70). Slice 2 (`wa-gateway/`) is done. Requires Tasks 4, 5, 10. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **in progress**. Design approved 2026-10-16 (D70). Slices 2 (`wa-gateway/`) and 3 (schema, driver, routing, fallback chain) are done. Requires Tasks 4, 5, 10. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 

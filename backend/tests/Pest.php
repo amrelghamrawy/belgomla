@@ -160,6 +160,17 @@ function useHypersender(): void
     ]);
 }
 
+/** Turns the store-number gateway on (D70) with a fake address and secrets; pair with Http::fake(). */
+function useWaGateway(): void
+{
+    config([
+        'messaging.wa_gateway.enabled' => true,
+        'messaging.wa_gateway.base_url' => 'http://127.0.0.1:3100',
+        'messaging.wa_gateway.token' => 'gateway-token',
+        'messaging.wa_gateway.webhook_secret' => 'gateway-secret',
+    ]);
+}
+
 /** Runs a job's handle() through the container, like a worker would, even while Queue::fake() is on. */
 function runJob(App\Modules\Messaging\Jobs\SendMessage|App\Modules\Messaging\Jobs\PollMessageStatus|App\Modules\Messaging\Jobs\ProcessProviderWebhook $job): void
 {
