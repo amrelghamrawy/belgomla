@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/auth/tenant";
 import { ar } from "@/lib/copy/ar";
 import { formatPhone, whatsappLink } from "@/lib/format/phone";
 
+import { StoreHours } from "./StoreHours";
 import { StoreMark } from "./StoreMark";
 
 /** Contact details and opening hours from the store settings (01 §7), with the store's mark (D67). */
@@ -57,21 +58,7 @@ export function StoreFooter() {
             </p>
           )}
         </div>
-        {tenant.working_hours.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-muted-foreground text-xs font-semibold">{ar.store.workingHours}</p>
-            <ul className="flex flex-col gap-0.5">
-              {tenant.working_hours.map((slot) => (
-                <li key={`${slot.day}-${slot.from}`} className="flex justify-between gap-4 md:max-w-56">
-                  <span>{ar.store.days[slot.day]}</span>
-                  <bdi className="tabular-nums">
-                    {slot.from}–{slot.to}
-                  </bdi>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {tenant.working_hours.length > 0 && <StoreHours slots={tenant.working_hours} />}
       </div>
       <p className="text-muted-foreground mx-auto w-full max-w-6xl border-t px-4 py-3 text-xs">
         {ar.store.rights(tenant.name)}

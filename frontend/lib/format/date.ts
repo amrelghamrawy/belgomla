@@ -36,3 +36,11 @@ export function formatDate(iso: string): string {
 export function formatDateTime(iso: string): string {
   return dateTimeFormat.format(parse(iso));
 }
+
+/** A wall-clock "HH:MM" from the store settings → "9:00 ص" / "9:30 م" (12-hour, Western digits). */
+export function formatClock(time: string): string {
+  const [hours = 0, minutes = 0] = time.split(":").map(Number);
+  const hour = hours % 12 === 0 ? 12 : hours % 12;
+
+  return `${hour}:${String(minutes).padStart(2, "0")} ${hours % 24 < 12 ? "ص" : "م"}`;
+}

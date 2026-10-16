@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, formatDateTime } from "@/lib/format/date";
+import { formatClock, formatDate, formatDateTime } from "@/lib/format/date";
 import { formatMoney, formatPercent } from "@/lib/format/money";
 import { phoneField } from "@/lib/forms/phone";
 import { formatPhone, whatsappLink } from "@/lib/format/phone";
@@ -38,6 +38,18 @@ describe("formatDate", () => {
 describe("formatDateTime", () => {
   it("shows the Cairo time with Arabic day period", () => {
     expect(formatDateTime("2026-01-15T10:05:00Z")).toBe("15 يناير 2026 في 12:05 م");
+  });
+});
+
+describe("formatClock", () => {
+  it.each([
+    ["09:00", "9:00 ص"],
+    ["21:30", "9:30 م"],
+    ["12:00", "12:00 م"],
+    ["00:00", "12:00 ص"],
+    ["24:00", "12:00 ص"],
+  ])("shows the store hour %s as %s", (time, shown) => {
+    expect(formatClock(time)).toBe(shown);
   });
 });
 

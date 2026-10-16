@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CategoryGrid } from "@/components/store/CategoryGrid";
 import { OrderSheet } from "@/components/store/OrderSheet";
@@ -277,5 +277,54 @@ describe("StoreFooter (D67)", () => {
     expect(screen.getByRole("link", { name: "01001234567" })).toHaveAttribute("href", "tel:+201001234567");
     expect(screen.getByText("السبت")).toBeInTheDocument();
     expect(screen.getByText("© مكتبة النور. كل الحقوق محفوظة.")).toBeInTheDocument();
+  });
+
+  describe("opening hours", () => {
+    const week = [0, 1, 2, 3, 4, 6].map((day) => ({ day, from: "09:00", to: "21:00" }));
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function renderAt(iso: string) {
+      vi.setSystemTime(new Date(iso));
+      stubApi({ "GET /api/store/tenant": json(200, { data: tenantSettings({ working_hours: week }) }) });
+      renderWithQuery(<StoreFooter />);
+
+      return screen.findByRole("list");
+    }
+
+    it("folds days with the same hours into one row and marks the closed day", async () => {
+      const list = await renderAt("2026-10-15T08:00:00Z");
+      const rows = within(list).getAllByRole("listitem");
+
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveTextContent("السبت – الخميس");
+      expect(rows[0]).toHaveTextContent("9:00 ص – 9:00 م");
+      expect(rows[1]).toHaveTextContent("الجمعة");
+      expect(rows[1]).toHaveTextContent("مغلق");
+    });
+
+    it("says the store is open and highlights today on Cairo time", async () => {
+      // Thursday 08:00 UTC = 11:00 in Cairo (UTC+3).
+      const list = await renderAt("2026-10-15T08:00:00Z");
+
+      expect(screen.getByText("مفتوح الآن")).toBeInTheDocument();
+      expect(screen.getByText("· يغلق 9:00 م")).toBeInTheDocument();
+      expect(within(list).getAllByRole("listitem")[0]).toHaveAttribute("aria-current", "date");
+    });
+
+    it("says when a closed store opens next", async () => {
+      // Friday 10:00 UTC = 13:00 in Cairo, the day off.
+      const list = await renderAt("2026-10-16T10:00:00Z");
+
+      expect(screen.getByText("مغلق الآن")).toBeInTheDocument();
+      expect(screen.getByText("· يفتح غدًا 9:00 ص")).toBeInTheDocument();
+      expect(within(list).getAllByRole("listitem")[1]).toHaveAttribute("aria-current", "date");
+    });
   });
 });
