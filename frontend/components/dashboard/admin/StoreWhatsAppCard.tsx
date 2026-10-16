@@ -20,7 +20,6 @@ import {
   useUnlinkWhatsApp,
 } from "@/lib/dashboard/store-whatsapp";
 import { formatDate } from "@/lib/format/date";
-import { cn } from "@/lib/utils";
 
 import { ErrorBlock, LoadingBlock } from "../common/States";
 
@@ -173,9 +172,9 @@ export function StoreWhatsAppPanel({ status }: { status: StoreWhatsApp }) {
 }
 
 /**
- * Shown at the top of every dashboard page while the store has no working WhatsApp number (D70): a warning
- * while it is dropped, a reminder while it was never linked. The whole bar opens the settings, where the card
- * is, so it is not shown there.
+ * Shown in red at the top of every dashboard page while the store has no working WhatsApp number (D70): the
+ * drop text while it is dropped, a reminder while it was never linked. The whole bar opens the settings,
+ * where the card is, so it is not shown there.
  */
 export function StoreWhatsAppBanner() {
   const status = useStoreWhatsApp();
@@ -191,10 +190,7 @@ export function StoreWhatsAppBanner() {
     <Link
       href={SETTINGS}
       data-testid="store-whatsapp-banner"
-      className={cn(
-        "flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-2 text-sm hover:underline",
-        dropped ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground",
-      )}
+      className="bg-destructive/10 text-destructive flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-2 text-sm hover:underline"
     >
       <span>{dropped ? copy.dropped : copy.notLinked}</span>
       <span className="font-medium">{dropped ? copy.droppedLink : copy.notLinkedLink}</span>
