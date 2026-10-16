@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Recursive tree node. Store: `{ id, name, slug, kind, image_url, children }` (08-api-contract.md §1);
+ * Recursive tree node. Store: `{ id, name, slug, kind, icon, image_url, children }` (08-api-contract.md §1);
  * the dashboard adds parent_id, sort_order and status.
  *
  * @property-read Category $resource
@@ -28,6 +28,7 @@ final class CategoryResource extends JsonResource
             'name' => $this->resource->name,
             'slug' => $this->resource->slug,
             'kind' => $this->resource->kind->value,
+            'icon' => $this->resource->icon?->value,
             'image_url' => $this->resource->imageUrl(),
             'parent_id' => $this->when($dashboard, $this->resource->parent_id),
             'sort_order' => $this->when($dashboard, $this->resource->sort_order),

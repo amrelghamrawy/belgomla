@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-const DASHBOARD_CATEGORY_KEYS = ['id', 'name', 'slug', 'kind', 'image_url', 'parent_id', 'sort_order', 'status', 'children'];
+const DASHBOARD_CATEGORY_KEYS = ['id', 'name', 'slug', 'kind', 'icon', 'image_url', 'parent_id', 'sort_order', 'status', 'children'];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -67,6 +68,7 @@ test('an owner creates a root category with an arabic slug, audited', function (
         ->assertJsonPath('data.slug', 'كتب-إعدادي')
         ->assertJsonPath('data.parent_id', null)
         ->assertJsonPath('data.kind', 'general')
+        ->assertJsonPath('data.icon', null)
         ->assertJsonPath('data.sort_order', 3)
         ->assertJsonPath('data.status', 'active');
 
@@ -139,6 +141,7 @@ test('category creation validation', function (array $body, string $field): void
     'negative sort order' => [['name' => 'x', 'sort_order' => -1], 'sort_order'],
     'image is not an image' => [['name' => 'x', 'image' => 'not-a-file'], 'image'],
     'unknown kind' => [['name' => 'x', 'kind' => 'furniture'], 'kind'],
+    'unknown icon' => [['name' => 'x', 'icon' => 'rocket'], 'icon'],
 ]);
 
 test('BR-T04 a parent from another tenant is rejected as unknown', function (): void {
@@ -250,6 +253,7 @@ test('category update validation', function (array $body, string $field): void {
     'parent_id must be present' => [['name' => 'x'], 'parent_id'],
     'sort order not an integer' => [['name' => 'x', 'parent_id' => null, 'sort_order' => 'first'], 'sort_order'],
     'unknown kind' => [['name' => 'x', 'parent_id' => null, 'kind' => 'furniture'], 'kind'],
+    'unknown icon' => [['name' => 'x', 'parent_id' => null, 'icon' => 'rocket'], 'icon'],
 ]);
 
 test('D68 a kind sent while moving under a parent is rejected', function (): void {
@@ -343,4 +347,35 @@ test('BR-T04 reordering with a category of another tenant is rejected and nothin
 
     $this->assertDatabaseHas('categories', ['id' => $mine->id, 'sort_order' => 1]);
     $this->assertDatabaseHas('categories', ['id' => $foreign->id, 'sort_order' => 1]);
+});
+
+test('D73 an owner creates a category with an icon', function (): void {
+    $response = $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'أدوات دراسية', 'icon' => 'pencil'])
+        ->assertCreated()
+        ->assertJsonPath('data.icon', 'pencil');
+
+    $this->assertDatabaseHas('categories', ['id' => $response->json('data.id'), 'icon' => 'pencil']);
+});
+
+test('D73 an owner changes the icon of a category, audited with old and new values', function (): void {
+    $category = $this->inTenant(fn () => Category::factory()->create(['icon' => CategoryIcon::Pencil]));
+
+    $this->tenantJson('PUT', "/api/dashboard/categories/{$category->id}", ['name' => $category->name, 'parent_id' => null, 'icon' => 'backpack'])
+        ->assertOk()
+        ->assertJsonPath('data.icon', 'backpack');
+
+    $this->assertDatabaseHas('audit_logs', [
+        'tenant_id' => $this->tenant->id, 'action' => 'category.updated', 'entity_id' => $category->id,
+        'old_values' => json_encode(['icon' => 'pencil']), 'new_values' => json_encode(['icon' => 'backpack']),
+    ]);
+});
+
+test('D73 an update without an icon keeps it and an icon sent as null removes it', function (): void {
+    $category = $this->inTenant(fn () => Category::factory()->create(['icon' => CategoryIcon::Pencil]));
+    $url = "/api/dashboard/categories/{$category->id}";
+
+    $this->tenantJson('PUT', $url, ['name' => 'جديد', 'parent_id' => null])->assertOk()->assertJsonPath('data.icon', 'pencil');
+    $this->tenantJson('PUT', $url, ['name' => 'جديد', 'parent_id' => null, 'icon' => null])->assertOk()->assertJsonPath('data.icon', null);
+
+    $this->assertDatabaseHas('categories', ['id' => $category->id, 'icon' => null]);
 });

@@ -12,7 +12,9 @@ import { cart, cartItem, customer, facet, omit, page, storeProduct, tenantSettin
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { renderWithQuery, router, searchParams } from "../render";
 
-const tree = [{ id: 1, name: "المرحلة الإعدادية", slug: "prep", kind: "books", image_url: null, children: [] }];
+const tree = [
+  { id: 1, name: "المرحلة الإعدادية", slug: "prep", kind: "books", icon: null, image_url: null, children: [] },
+];
 
 beforeEach(() => {
   router.push.mockReset();
@@ -161,7 +163,15 @@ describe("PriceListView", () => {
       "GET /api/store/categories": json(200, {
         data: [
           ...tree,
-          { id: 2, name: "أدوات دراسية", slug: "supplies", kind: "stationery", image_url: null, children: [] },
+          {
+            id: 2,
+            name: "أدوات دراسية",
+            slug: "supplies",
+            kind: "stationery",
+            icon: null,
+            image_url: null,
+            children: [],
+          },
         ],
       }),
       "GET /api/store/filters": json(200, { data: [] }),

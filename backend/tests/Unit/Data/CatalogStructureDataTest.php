@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Http\Requests\StoreCategoryRequest;
@@ -33,11 +34,13 @@ function validatedRequest(string $class, string $method, array $payload, array $
 test('category data from a create request trims the name and carries the image', function (): void {
     $image = UploadedFile::fake()->image('a.png');
 
-    $data = CategoryData::fromRequest(validatedRequest(StoreCategoryRequest::class, 'POST', ['name' => '  أقلام ', 'parent_id' => '7', 'sort_order' => '2'], ['image' => $image]));
+    $data = CategoryData::fromRequest(validatedRequest(StoreCategoryRequest::class, 'POST', ['name' => '  أقلام ', 'parent_id' => '7', 'sort_order' => '2', 'icon' => 'pencil'], ['image' => $image]));
 
     expect($data->name)->toBe('أقلام')
         ->and($data->parentId)->toBe(7)
         ->and($data->sortOrder)->toBe(2)
+        ->and($data->icon)->toBe(CategoryIcon::Pencil)
+        ->and($data->iconGiven)->toBeTrue()
         ->and($data->image)->toBeInstanceOf(UploadedFile::class);
 });
 
@@ -46,6 +49,8 @@ test('category data leaves unsent optional fields null', function (): void {
 
     expect($data->parentId)->toBeNull()
         ->and($data->sortOrder)->toBeNull()
+        ->and($data->icon)->toBeNull()
+        ->and($data->iconGiven)->toBeFalse()
         ->and($data->image)->toBeNull();
 });
 
@@ -95,4 +100,11 @@ test('D69 FieldDefinitionData tells a kind sent as null apart from a kind not se
 
     expect($data->kind)->toBeNull()
         ->and($data->kindGiven)->toBeTrue();
+});
+
+test('D73 CategoryData tells an icon sent as null apart from an icon not sent', function (): void {
+    $data = CategoryData::fromRequest(validatedRequest(UpdateCategoryRequest::class, 'PUT', ['name' => 'x', 'parent_id' => null, 'icon' => null]));
+
+    expect($data->icon)->toBeNull()
+        ->and($data->iconGiven)->toBeTrue();
 });

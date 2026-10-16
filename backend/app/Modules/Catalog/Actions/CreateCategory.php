@@ -36,6 +36,7 @@ final readonly class CreateCategory
                 'parent_id' => $data->parentId,
                 'name' => $data->name,
                 'kind' => $data->kind ?? CategoryKind::General,
+                'icon' => $data->icon,
                 'sort_order' => $data->sortOrder ?? 0,
             ]);
 
@@ -43,7 +44,7 @@ final readonly class CreateCategory
                 $category->update(['image_path' => $this->store($data->image)]);
             }
 
-            $this->audit->log('category.created', $category, null, $category->only(['name', 'parent_id', 'kind', 'sort_order', 'image_path']));
+            $this->audit->log('category.created', $category, null, $category->only(['name', 'parent_id', 'kind', 'icon', 'sort_order', 'image_path']));
 
             return $category->refresh();
         });

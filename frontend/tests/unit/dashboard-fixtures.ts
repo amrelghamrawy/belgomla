@@ -96,6 +96,7 @@ export function category(overrides: Partial<DashboardCategory> = {}): DashboardC
     name: "المرحلة الابتدائية",
     slug: "primary",
     kind: "books",
+    icon: null,
     image_url: null,
     parent_id: null,
     sort_order: 0,

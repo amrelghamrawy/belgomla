@@ -1,30 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { CategoryGlyph } from "@/components/shared/CategoryGlyph";
 import type { Category } from "@/lib/api/types";
-import { COVER_INKS } from "@/lib/store/cover";
-
-/** A row of book spines in the cover inks, varied by category, for a tile without an image. */
-function Spines({ seed }: { seed: number }) {
-  return (
-    <span aria-hidden className="flex h-14 items-end gap-[3px]">
-      {Array.from({ length: 5 }, (_, index) => (
-        <span
-          key={index}
-          className="block w-2.5 rounded-t-[2px]"
-          style={{
-            backgroundColor: COVER_INKS[(seed + index * 3) % COVER_INKS.length],
-            height: `${36 + ((seed + index * 7) % 5) * 5}px`,
-          }}
-        />
-      ))}
-    </span>
-  );
-}
+import { iconFor } from "@/lib/store/category-icon";
 
 /**
- * Category tiles linking to `/c/{slug}` (D67): the name in the display face, the image or a row of spines, and the
- * subcategories as chips. The whole tile is the category link; the chips sit above it as their own links.
+ * Category tiles linking to `/c/{slug}` (D67): the name in the display face, the image or the category's icon (D73),
+ * and the subcategories as chips. The whole tile is the category link; the chips sit above it as their own links.
  */
 export function CategoryGrid({ categories }: { categories: readonly Category[] }) {
   return (
@@ -50,7 +33,9 @@ export function CategoryGrid({ categories }: { categories: readonly Category[] }
                 className="size-14 rounded-lg object-cover"
               />
             ) : (
-              <Spines seed={category.id} />
+              <span className="bg-brand-soft text-primary grid size-14 shrink-0 place-items-center rounded-xl">
+                <CategoryGlyph icon={iconFor(category)} className="size-7" />
+              </span>
             )}
           </div>
           {category.children.length > 0 && (

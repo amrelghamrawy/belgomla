@@ -1,5 +1,5 @@
 import type { ApiErrorCode } from "@/lib/api/errors";
-import type { CategoryKind } from "@/lib/api/types";
+import type { CategoryIcon, CategoryKind } from "@/lib/api/types";
 import { dashboard } from "@/lib/copy/ar-dashboard";
 
 // Every Arabic string the UI shows (rules/03 §5). No i18n framework in V1: Arabic only.
@@ -181,6 +181,39 @@ export const ar = {
       CategoryKind,
       string
     >,
+    /** What each category icon shows (D73), read out by the dashboard picker. */
+    icons: {
+      "book-open": "كتب",
+      library: "مكتبة",
+      "graduation-cap": "مدرسة",
+      "notebook-pen": "كراسات",
+      pencil: "أقلام رصاص",
+      pen: "أقلام",
+      highlighter: "هايلايتر",
+      eraser: "أساتيك",
+      ruler: "مساطر",
+      scissors: "مقصات",
+      palette: "ألوان",
+      brush: "فرش رسم",
+      calculator: "آلات حاسبة",
+      backpack: "شنط",
+      folder: "حافظات",
+      paperclip: "مستلزمات مكتبية",
+      "file-text": "ورق",
+      printer: "طباعة",
+      "flask-conical": "علوم",
+      globe: "جغرافيا",
+      languages: "لغات",
+      sigma: "رياضيات",
+      puzzle: "بازل",
+      "gamepad-2": "ألعاب",
+      shapes: "ألعاب تعليمية",
+      baby: "أطفال",
+      gift: "هدايا",
+      shirt: "ملابس",
+      laptop: "إلكترونيات",
+      package: "عام",
+    } satisfies Record<CategoryIcon, string>,
     kindAll: "كل الأقسام",
     breadcrumbs: "مسار التصفح",
     filters: "تصفية",

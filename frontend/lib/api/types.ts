@@ -16,6 +16,7 @@ export type DashboardMe = Schemas["DashboardMe"];
 // Storefront (tasks/9)
 export type PaginationMeta = Schemas["PaginationMeta"];
 export type CategoryKind = Schemas["CategoryKind"];
+export type CategoryIcon = Schemas["CategoryIcon"];
 export type CategoryRef = Schemas["CategoryRef"];
 export type Category = Schemas["Category"];
 export type Facet = Schemas["Facet"];

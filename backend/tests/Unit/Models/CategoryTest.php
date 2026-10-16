@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
@@ -18,15 +19,16 @@ test('to array', function (): void {
     $category = $this->inTenant(fn () => Category::factory()->create()->fresh());
 
     expect(array_keys($category->toArray()))->toBe([
-        'id', 'tenant_id', 'parent_id', 'name', 'slug', 'path', 'sort_order', 'image_path', 'status', 'created_at', 'updated_at', 'kind',
+        'id', 'tenant_id', 'parent_id', 'name', 'slug', 'path', 'sort_order', 'image_path', 'status', 'created_at', 'updated_at', 'kind', 'icon',
     ]);
 });
 
 test('casts', function (): void {
-    $category = $this->inTenant(fn () => Category::factory()->archived()->books()->create(['sort_order' => '3'])->fresh());
+    $category = $this->inTenant(fn () => Category::factory()->archived()->books()->create(['sort_order' => '3', 'icon' => 'backpack'])->fresh());
 
     expect($category->status)->toBe(ArchiveStatus::Archived)
         ->and($category->kind)->toBe(CategoryKind::Books)
+        ->and($category->icon)->toBe(CategoryIcon::Backpack)
         ->and($category->sort_order)->toBe(3);
 });
 

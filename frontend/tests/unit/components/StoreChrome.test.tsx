@@ -1,13 +1,14 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CategoryGlyph } from "@/components/shared/CategoryGlyph";
 import { CategoryGrid } from "@/components/store/CategoryGrid";
 import { OrderSheet } from "@/components/store/OrderSheet";
 import { StoreBottomNav } from "@/components/store/StoreBottomNav";
 import { StoreFooter } from "@/components/store/StoreFooter";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHome } from "@/components/store/StoreHome";
-import type { Category } from "@/lib/api/types";
+import type { Category, CategoryIcon } from "@/lib/api/types";
 
 import { cart, cartItem, customer, page, storeProduct, tenantSettings } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
@@ -19,10 +20,13 @@ const tree: Category[] = [
     name: "المرحلة الإعدادية",
     slug: "prep",
     kind: "books",
+    icon: null,
     image_url: null,
-    children: [{ id: 2, name: "أولى إعدادي", slug: "prep-1", kind: "books", image_url: null, children: [] }],
+    children: [
+      { id: 2, name: "أولى إعدادي", slug: "prep-1", kind: "books", icon: null, image_url: null, children: [] },
+    ],
   },
-  { id: 3, name: "المرحلة الثانوية", slug: "secondary", kind: "books", image_url: null, children: [] },
+  { id: 3, name: "المرحلة الثانوية", slug: "secondary", kind: "books", icon: null, image_url: null, children: [] },
 ];
 const storeWithMinimum = tenantSettings({
   whatsapp: "+201001234567",
@@ -257,6 +261,36 @@ describe("CategoryGrid (D67)", () => {
 
     expect(screen.getByRole("link", { name: "المرحلة الإعدادية" })).toHaveAttribute("href", "/c/prep");
     expect(screen.getByRole("link", { name: "أولى إعدادي" })).toHaveAttribute("href", "/c/prep-1");
+  });
+
+  it("D73 shows the icon the merchant picked, otherwise one guessed from the name", () => {
+    const { container } = renderWithQuery(
+      <CategoryGrid
+        categories={[
+          { ...tree[0]!, icon: "backpack" },
+          { id: 5, name: "أدوات دراسية", slug: "tools", kind: "stationery", icon: null, image_url: null, children: [] },
+        ]}
+      />,
+    );
+
+    expect([...container.querySelectorAll("[data-icon]")].map((icon) => icon.getAttribute("data-icon"))).toEqual([
+      "backpack",
+      "pencil",
+    ]);
+  });
+
+  it("D73 draws the generic icon for a category with no icon key or an icon this build does not know", () => {
+    const { container } = renderWithQuery(
+      <>
+        <CategoryGlyph icon={"rocket" as CategoryIcon} />
+        <CategoryGrid
+          categories={[{ ...tree[1]!, kind: "general", name: "متنوعات", icon: undefined as unknown as null }]}
+        />
+      </>,
+    );
+
+    expect(container.querySelectorAll("svg")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-icon]")[1]).toHaveAttribute("data-icon", "package");
   });
 });
 

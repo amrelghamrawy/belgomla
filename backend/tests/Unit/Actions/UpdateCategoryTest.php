@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\UpdateCategory;
 use App\Modules\Catalog\Data\CategoryData;
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\CategoryCycle;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
@@ -121,3 +122,15 @@ test('D68 UpdateCategory audits the kind', function (): void {
     expect($log->old_values)->toEqual(['kind' => 'books'])
         ->and($log->new_values)->toEqual(['kind' => 'general']);
 });
+
+test('D73 UpdateCategory sets, keeps and clears the icon', function (?CategoryIcon $icon, bool $given, ?CategoryIcon $expected): void {
+    $category = Category::factory()->create(['icon' => CategoryIcon::Pencil]);
+
+    app(UpdateCategory::class)->handle($category, new CategoryData($category->name, null, icon: $icon, iconGiven: $given));
+
+    expect($category->refresh()->icon)->toBe($expected);
+})->with([
+    'changed' => [CategoryIcon::Backpack, true, CategoryIcon::Backpack],
+    'not sent' => [null, false, CategoryIcon::Pencil],
+    'sent as null' => [null, true, null],
+]);

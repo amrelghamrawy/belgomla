@@ -906,6 +906,10 @@ paths:
                   oneOf:
                     - $ref: '#/components/schemas/CategoryKind'
                     - type: 'null'
+                icon:
+                  oneOf:
+                    - $ref: '#/components/schemas/CategoryIcon'
+                    - type: 'null'
                 sort_order: { type: integer, minimum: 0, maximum: 100000 }
           multipart/form-data:
             schema:
@@ -915,6 +919,7 @@ paths:
                 name: { type: string, maxLength: 100 }
                 parent_id: { type: integer }
                 kind: { $ref: '#/components/schemas/CategoryKind' }
+                icon: { $ref: '#/components/schemas/CategoryIcon' }
                 sort_order: { type: integer }
                 image: { type: string, format: binary }
       responses:
@@ -952,7 +957,7 @@ paths:
     put:
       operationId: dashboardUpdateCategory
       tags: [dashboard-catalog]
-      summary: Renames, re-kinds and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only
+      summary: Renames, re-kinds, re-icons and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only; `icon` left out keeps it, null removes it
       requestBody:
         required: true
         content:
@@ -966,6 +971,10 @@ paths:
                 kind:
                   oneOf:
                     - $ref: '#/components/schemas/CategoryKind'
+                    - type: 'null'
+                icon:
+                  oneOf:
+                    - $ref: '#/components/schemas/CategoryIcon'
                     - type: 'null'
                 sort_order: { type: integer, minimum: 0, maximum: 100000 }
       responses:
@@ -2782,6 +2791,11 @@ components:
       description: 'The section of a root category, inherited by its subtree and products (D68). Decides what cover_price means: the printed cover price for books, the retail price otherwise'
       enum: [books, stationery, toys, general]
 
+    CategoryIcon:
+      type: string
+      description: The icon of a category tile on the storefront, chosen by the merchant (D73); a lucide icon name
+      enum: [book-open, library, graduation-cap, notebook-pen, pencil, pen, highlighter, eraser, ruler, scissors, palette, brush, calculator, backpack, folder, paperclip, file-text, printer, flask-conical, globe, languages, sigma, puzzle, gamepad-2, shapes, baby, gift, shirt, laptop, package]
+
     CategoryRef:
       type: object
       required: [id, name, kind]
@@ -2792,12 +2806,17 @@ components:
 
     Category:
       type: object
-      required: [id, name, slug, kind, image_url, children]
+      required: [id, name, slug, kind, icon, image_url, children]
       properties:
         id: { type: integer }
         name: { type: string }
         slug: { type: string }
         kind: { $ref: '#/components/schemas/CategoryKind' }
+        icon:
+          description: Null when the merchant chose none; the storefront then picks one from the name
+          oneOf:
+            - $ref: '#/components/schemas/CategoryIcon'
+            - type: 'null'
         image_url: { type: [string, 'null'] }
         children:
           type: array
@@ -3243,7 +3262,6 @@ components:
       allOf:
         - $ref: '#/components/schemas/TenantSettings'
         - type: object
-          required: [stale_pending_hours]
           properties:
             stale_pending_hours: { type: integer, description: 'Hours before a pending order is stale (D10)' }
 
@@ -3299,7 +3317,7 @@ components:
 
     DashboardCategory:
       type: object
-      required: [id, name, slug, kind, image_url, parent_id, sort_order, status, children]
+      required: [id, name, slug, kind, icon, image_url, parent_id, sort_order, status, children]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -3309,6 +3327,11 @@ components:
         parent_id: { type: [integer, 'null'] }
         sort_order: { type: integer }
         status: { $ref: '#/components/schemas/ArchiveStatus' }
+        icon:
+          description: Null when the merchant chose none; the storefront then picks one from the name
+          oneOf:
+            - $ref: '#/components/schemas/CategoryIcon'
+            - type: 'null'
         children:
           type: array
           items: { $ref: '#/components/schemas/DashboardCategory' }

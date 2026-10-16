@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Observers\CategoryObserver;
 use App\Modules\Catalog\Observers\FacetCacheObserver;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\Storage;
  * @property CategoryKind $kind
  * @property int $sort_order
  * @property string|null $image_path
+ * @property CategoryIcon|null $icon
  * @property ArchiveStatus $status
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -96,6 +98,7 @@ final class Category extends Model
         return [
             'status' => ArchiveStatus::class,
             'kind' => CategoryKind::class,
+            'icon' => CategoryIcon::class,
             'sort_order' => 'integer',
         ];
     }

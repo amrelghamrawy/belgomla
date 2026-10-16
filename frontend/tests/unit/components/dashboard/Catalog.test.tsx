@@ -443,13 +443,67 @@ describe("CategoriesPage", () => {
       name: "ألعاب",
       parent_id: null,
       kind: "toys",
+      icon: null,
     });
 
     await user.click(screen.getByRole("button", { name: "إضافة قسم" }));
     await user.selectOptions(screen.getByLabelText("القسم الأب"), "1");
 
     expect(screen.queryByLabelText("نوع القسم")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "أيقونة القسم" })).not.toBeInTheDocument();
     expect(screen.getByText("يرث نوع القسم الرئيسي: كتب خارجية")).toBeInTheDocument();
+  });
+
+  it("D73 a root category gets the icon picked for its store tile", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/categories": json(200, { data: tree }),
+      "POST /api/dashboard/categories": json(201, { data: category({ id: 9, icon: "backpack" }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CategoriesPage />);
+
+    await user.click(await screen.findByRole("button", { name: "إضافة قسم" }));
+    await user.type(screen.getByLabelText("اسم القسم"), "شنط مدرسية");
+
+    const picker = screen.getByRole("radiogroup", { name: "أيقونة القسم" });
+    expect(within(picker).getByRole("radio", { name: "تلقائي" })).toHaveAttribute("aria-checked", "true");
+    // "automatic" previews the icon the store will guess from the name.
+    expect(within(picker).getByRole("radio", { name: "تلقائي" }).querySelector("[data-icon]")).toHaveAttribute(
+      "data-icon",
+      "backpack",
+    );
+
+    await user.click(within(picker).getByRole("radio", { name: "حافظات" }));
+    expect(within(picker).getByRole("radio", { name: "حافظات" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/categories")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/dashboard/categories")[0]?.body).toMatchObject({ icon: "folder" });
+  });
+
+  it("D73 editing a root shows its icon and can set it back to automatic", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/categories": json(200, { data: [category({ id: 2, name: "ألعاب", icon: "puzzle" })] }),
+      "PUT /api/dashboard/categories/2": json(200, { data: category({ id: 2, name: "ألعاب" }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CategoriesPage />);
+
+    const row = await screen.findByTestId("category-2");
+    expect(row.querySelector("[data-icon]")).toHaveAttribute("data-icon", "puzzle");
+
+    await user.click(within(row).getByRole("button", { name: "تعديل" }));
+    expect(screen.getByRole("radio", { name: "بازل" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("radio", { name: "تلقائي" }));
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/categories/2")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/categories/2")[0]?.body).toEqual({
+      name: "ألعاب",
+      parent_id: null,
+      kind: "books",
+      icon: null,
+    });
   });
 
   it("moves a category and surfaces the backend's category_cycle message", async () => {

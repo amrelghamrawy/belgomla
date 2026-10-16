@@ -635,7 +635,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Renames, re-kinds and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only */
+        /** Renames, re-kinds, re-icons and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only; `icon` left out keeps it, null removes it */
         put: operations["dashboardUpdateCategory"];
         post?: never;
         delete?: never;
@@ -1689,6 +1689,11 @@ export interface components {
          * @enum {string}
          */
         CategoryKind: "books" | "stationery" | "toys" | "general";
+        /**
+         * @description The icon of a category tile on the storefront, chosen by the merchant (D73); a lucide icon name
+         * @enum {string}
+         */
+        CategoryIcon: "book-open" | "library" | "graduation-cap" | "notebook-pen" | "pencil" | "pen" | "highlighter" | "eraser" | "ruler" | "scissors" | "palette" | "brush" | "calculator" | "backpack" | "folder" | "paperclip" | "file-text" | "printer" | "flask-conical" | "globe" | "languages" | "sigma" | "puzzle" | "gamepad-2" | "shapes" | "baby" | "gift" | "shirt" | "laptop" | "package";
         CategoryRef: {
             id: number;
             name: string;
@@ -1699,6 +1704,8 @@ export interface components {
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"];
+            /** @description Null when the merchant chose none; the storefront then picks one from the name */
+            icon: components["schemas"]["CategoryIcon"] | null;
             image_url: string | null;
             children: components["schemas"]["Category"][];
         };
@@ -1971,7 +1978,7 @@ export interface components {
         };
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description Hours before a pending order is stale (D10) */
-            stale_pending_hours: number;
+            stale_pending_hours?: number;
         };
         /** @description D70. A store that never linked a number is disconnected; enabled false hides the section. */
         StoreWhatsApp: {
@@ -2024,6 +2031,8 @@ export interface components {
             parent_id: number | null;
             sort_order: number;
             status: components["schemas"]["ArchiveStatus"];
+            /** @description Null when the merchant chose none; the storefront then picks one from the name */
+            icon: components["schemas"]["CategoryIcon"] | null;
             children: components["schemas"]["DashboardCategory"][];
         };
         Unit: {
@@ -3834,12 +3843,14 @@ export interface operations {
                     name: string;
                     parent_id?: number | null;
                     kind?: components["schemas"]["CategoryKind"] | null;
+                    icon?: components["schemas"]["CategoryIcon"] | null;
                     sort_order?: number;
                 };
                 "multipart/form-data": {
                     name: string;
                     parent_id?: number;
                     kind?: components["schemas"]["CategoryKind"];
+                    icon?: components["schemas"]["CategoryIcon"];
                     sort_order?: number;
                     /** Format: binary */
                     image?: string;
@@ -3891,6 +3902,7 @@ export interface operations {
                     name: string;
                     parent_id: number | null;
                     kind?: components["schemas"]["CategoryKind"] | null;
+                    icon?: components["schemas"]["CategoryIcon"] | null;
                     sort_order?: number;
                 };
             };

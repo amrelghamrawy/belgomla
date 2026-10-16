@@ -1893,6 +1893,16 @@
                                             }
                                         ]
                                     },
+                                    "icon": {
+                                        "oneOf": [
+                                            {
+                                                "$ref": "#/components/schemas/CategoryIcon"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ]
+                                    },
                                     "sort_order": {
                                         "type": "integer",
                                         "minimum": 0,
@@ -1917,6 +1927,9 @@
                                     },
                                     "kind": {
                                         "$ref": "#/components/schemas/CategoryKind"
+                                    },
+                                    "icon": {
+                                        "$ref": "#/components/schemas/CategoryIcon"
                                     },
                                     "sort_order": {
                                         "type": "integer"
@@ -2009,7 +2022,7 @@
                 "tags": [
                     "dashboard-catalog"
                 ],
-                "summary": "Renames, re-kinds and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only",
+                "summary": "Renames, re-kinds, re-icons and/or moves a category with its subtree; parent_id null makes it a root; `kind` is accepted for roots only; `icon` left out keeps it, null removes it",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2035,6 +2048,16 @@
                                         "oneOf": [
                                             {
                                                 "$ref": "#/components/schemas/CategoryKind"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ]
+                                    },
+                                    "icon": {
+                                        "oneOf": [
+                                            {
+                                                "$ref": "#/components/schemas/CategoryIcon"
                                             },
                                             {
                                                 "type": "null"
@@ -6132,6 +6155,42 @@
                     "general"
                 ]
             },
+            "CategoryIcon": {
+                "type": "string",
+                "description": "The icon of a category tile on the storefront, chosen by the merchant (D73); a lucide icon name",
+                "enum": [
+                    "book-open",
+                    "library",
+                    "graduation-cap",
+                    "notebook-pen",
+                    "pencil",
+                    "pen",
+                    "highlighter",
+                    "eraser",
+                    "ruler",
+                    "scissors",
+                    "palette",
+                    "brush",
+                    "calculator",
+                    "backpack",
+                    "folder",
+                    "paperclip",
+                    "file-text",
+                    "printer",
+                    "flask-conical",
+                    "globe",
+                    "languages",
+                    "sigma",
+                    "puzzle",
+                    "gamepad-2",
+                    "shapes",
+                    "baby",
+                    "gift",
+                    "shirt",
+                    "laptop",
+                    "package"
+                ]
+            },
             "CategoryRef": {
                 "type": "object",
                 "required": [
@@ -6158,6 +6217,7 @@
                     "name",
                     "slug",
                     "kind",
+                    "icon",
                     "image_url",
                     "children"
                 ],
@@ -6173,6 +6233,17 @@
                     },
                     "kind": {
                         "$ref": "#/components/schemas/CategoryKind"
+                    },
+                    "icon": {
+                        "description": "Null when the merchant chose none; the storefront then picks one from the name",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CategoryIcon"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     },
                     "image_url": {
                         "type": [
@@ -7359,9 +7430,6 @@
                     },
                     {
                         "type": "object",
-                        "required": [
-                            "stale_pending_hours"
-                        ],
                         "properties": {
                             "stale_pending_hours": {
                                 "type": "integer",
@@ -7549,6 +7617,7 @@
                     "name",
                     "slug",
                     "kind",
+                    "icon",
                     "image_url",
                     "parent_id",
                     "sort_order",
@@ -7585,6 +7654,17 @@
                     },
                     "status": {
                         "$ref": "#/components/schemas/ArchiveStatus"
+                    },
+                    "icon": {
+                        "description": "Null when the merchant chose none; the storefront then picks one from the name",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CategoryIcon"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     },
                     "children": {
                         "type": "array",

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\CreateCategory;
 use App\Modules\Catalog\Data\CategoryData;
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Category;
@@ -25,7 +26,7 @@ test('CreateCategory creates a root category with sort order 0 and a system audi
         ->and($category->path)->toBe("/{$category->id}/")
         ->and($log->action)->toBe('category.created')
         ->and($log->actor_type->value)->toBe('system')
-        ->and($log->new_values)->toEqual(['name' => 'أقلام', 'parent_id' => null, 'kind' => 'general', 'sort_order' => 0, 'image_path' => null]);
+        ->and($log->new_values)->toEqual(['name' => 'أقلام', 'parent_id' => null, 'kind' => 'general', 'icon' => null, 'sort_order' => 0, 'image_path' => null]);
 });
 
 test('D68 CreateCategory gives a root the requested kind and a child the kind of its parent', function (): void {
@@ -48,4 +49,11 @@ test('CreateCategory rejects an unknown parent and writes nothing', function ():
 
     expect(Category::query()->count())->toBe(0)
         ->and(AuditLog::query()->count())->toBe(0);
+});
+
+test('D73 CreateCategory stores the chosen icon', function (): void {
+    $category = app(CreateCategory::class)->handle(new CategoryData('أقلام', null, icon: CategoryIcon::Pencil, iconGiven: true));
+
+    expect($category->icon)->toBe(CategoryIcon::Pencil)
+        ->and(AuditLog::query()->sole()->new_values['icon'] ?? null)->toBe('pencil');
 });

@@ -30,7 +30,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { queryKeys } from "@/lib/api/keys";
-import type { CategoryKind, DashboardCategory } from "@/lib/api/types";
+import { CategoryGlyph } from "@/components/shared/CategoryGlyph";
+import type { CategoryIcon, CategoryKind, DashboardCategory } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import {
   useCategoryStatus,
@@ -47,6 +48,7 @@ import {
   subtreeIds,
 } from "@/lib/dashboard/category-tree";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
+import { CATEGORY_ICONS, iconFor } from "@/lib/store/category-icon";
 import { cn } from "@/lib/utils";
 
 import { FilterPanel } from "../common/FilterPanel";
@@ -184,6 +186,7 @@ function CategoryRow({
         >
           <GripVerticalIcon className="size-4" />
         </button>
+        {depth === 0 && <CategoryGlyph icon={iconFor(node)} className="text-primary size-4 shrink-0" />}
         <span className={cn("min-w-0 flex-1 truncate", archived && "text-muted-foreground line-through")}>
           {node.name}
         </span>
@@ -217,6 +220,8 @@ function CategoryDialog({
     current?.parent_id ?? (editing.mode === "create" ? editing.parentId : null),
   );
   const [kind, setKind] = useState<CategoryKind>(current?.kind ?? "general");
+  // Null = "automatic": the store picks one from the name (D73). Only roots show an icon, so only roots pick one.
+  const [icon, setIcon] = useState<CategoryIcon | null>(current?.icon ?? null);
   const [error, setError] = useState<string | null>(null);
   // A category cannot move under itself or its own subtree (the backend answers 422 category_cycle).
   const blocked = current === null ? new Set<number>() : subtreeIds(current);
@@ -233,7 +238,7 @@ function CategoryDialog({
     }
 
     save.mutate(
-      { id: current?.id, name: name.trim(), parent_id: parentId, ...(parentId === null ? { kind } : {}) },
+      { id: current?.id, name: name.trim(), parent_id: parentId, ...(parentId === null ? { kind, icon } : {}) },
       {
         onSuccess: () => {
           toast.success(ar.dashboard.saved);
@@ -291,6 +296,13 @@ function CategoryDialog({
               <p className="text-muted-foreground text-xs">{copy.kindInherited(ar.catalog.kinds[inherited])}</p>
             )
           )}
+          {parentId === null && (
+            <IconPicker
+              value={icon}
+              auto={iconFor({ name, kind, icon: null, children: current?.children })}
+              onChange={setIcon}
+            />
+          )}
           {error !== null && <FieldError role="alert">{error}</FieldError>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -303,5 +315,48 @@ function CategoryDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The icon on the category's store tile (D73): "automatic" (the icon the name suggests, shown) or one of the set. */
+function IconPicker({
+  value,
+  auto,
+  onChange,
+}: {
+  value: CategoryIcon | null;
+  auto: CategoryIcon;
+  onChange: (icon: CategoryIcon | null) => void;
+}) {
+  const option = (icon: CategoryIcon | null, label: string, drawn: CategoryIcon) => (
+    <button
+      key={icon ?? "auto"}
+      type="button"
+      role="radio"
+      aria-checked={value === icon}
+      aria-label={label}
+      onClick={() => onChange(icon)}
+      className={cn(
+        "hover:bg-muted grid size-11 place-items-center rounded-md border",
+        value === icon && "border-primary bg-brand-soft text-primary ring-primary ring-1",
+      )}
+    >
+      <CategoryGlyph icon={drawn} className="size-5" />
+    </button>
+  );
+
+  return (
+    <Field>
+      <FieldLabel id="category-icon">{copy.icon}</FieldLabel>
+      <div
+        role="radiogroup"
+        aria-labelledby="category-icon"
+        className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto"
+      >
+        {option(null, copy.iconAuto, auto)}
+        {CATEGORY_ICONS.map((icon) => option(icon, ar.catalog.icons[icon], icon))}
+      </div>
+      <p className="text-muted-foreground text-xs">{copy.iconHint}</p>
+    </Field>
   );
 }

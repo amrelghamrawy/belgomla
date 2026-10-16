@@ -15,6 +15,7 @@ const tree: Category[] = [
     name: "المرحلة الإعدادية",
     slug: "prep",
     kind: "books",
+    icon: null,
     image_url: null,
     children: [
       {
@@ -22,8 +23,11 @@ const tree: Category[] = [
         name: "أولى إعدادي",
         slug: "first-prep",
         kind: "books",
+        icon: null,
         image_url: null,
-        children: [{ id: 3, name: "الترم الأول", slug: "first-term", kind: "books", image_url: null, children: [] }],
+        children: [
+          { id: 3, name: "الترم الأول", slug: "first-term", kind: "books", icon: null, image_url: null, children: [] },
+        ],
       },
     ],
   },

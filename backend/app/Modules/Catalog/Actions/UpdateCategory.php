@@ -13,7 +13,7 @@ use App\Modules\Catalog\Services\CategoryPath;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Renames, re-kinds and/or moves a category. A move rewrites the materialized path of the whole subtree
+ * Renames, re-kinds, re-icons and/or moves a category. A move rewrites the materialized path of the whole subtree
  * in one statement; moving under itself or a descendant throws CategoryCycle (BR-P06). The kind follows
  * the same rule (D68): under a parent it is the parent's, as a root it is the one sent (or kept), and a
  * change is written to the whole subtree. Owns its transaction. The slug is kept on rename so shared
@@ -43,6 +43,7 @@ final readonly class UpdateCategory
 
             $category->name = $data->name;
             $category->sort_order = $data->sortOrder ?? $category->sort_order;
+            $category->icon = $data->iconGiven ? $data->icon : $category->icon;
             $category->save();
             $category->refresh();
 
@@ -83,6 +84,7 @@ final readonly class UpdateCategory
             'name' => $category->name,
             'parent_id' => $category->parent_id,
             'kind' => $category->kind->value,
+            'icon' => $category->icon?->value,
             'sort_order' => $category->sort_order,
             'path' => $category->path,
         ];

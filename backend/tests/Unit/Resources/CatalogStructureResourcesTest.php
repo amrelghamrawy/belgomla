@@ -22,19 +22,21 @@ test('the category resource has the store key set and hides dashboard fields on 
 
     $data = rendered(new CategoryResource($category), storeRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'image_url', 'children'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'icon', 'image_url', 'children'])
         ->and($data['kind'])->toBe('general')
+        ->and($data['icon'])->toBeNull()
         ->and($data['image_url'])->toEndWith('/storage/tenants/1/categories/a.png')
         ->and($data['children'])->toBe([]);
 });
 
 test('the category resource adds parent, order and status on the dashboard', function (): void {
-    $category = Category::factory()->archived()->books()->create(['sort_order' => 4])->refresh();
+    $category = Category::factory()->archived()->books()->create(['sort_order' => 4, 'icon' => 'book-open'])->refresh();
 
     $data = rendered(new CategoryResource($category), dashboardRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'image_url', 'parent_id', 'sort_order', 'status', 'children'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'icon', 'image_url', 'parent_id', 'sort_order', 'status', 'children'])
         ->and($data['kind'])->toBe('books')
+        ->and($data['icon'])->toBe('book-open')
         ->and($data['status'])->toBe('archived')
         ->and($data['sort_order'])->toBe(4);
 });

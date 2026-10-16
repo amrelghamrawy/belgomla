@@ -105,7 +105,7 @@ Suspended tenant → `503 store_unavailable`.
 
 ### `GET /api/store/categories`
 
-Full active tree: `[{ id, name, slug, image_url, children: [...] }]`.
+Full active tree: `[{ id, name, slug, kind, icon, image_url, children: [...] }]`. `icon` is null unless the merchant picked one (D73).
 
 ### `GET /api/store/filters`
 
@@ -330,7 +330,6 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | Method | Path                           | Notes                                       |
 | ------ | ------------------------------ | ------------------------------------------- |
 | GET    | `/api/dashboard/settings`      |                                             |
-| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited    |
 | POST   | `/api/dashboard/settings/logo` | multipart; also `/favicon`                  |
 | GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
@@ -348,8 +347,8 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | Method | Path                                     | Notes                                                |
 | ------ | ---------------------------------------- | ---------------------------------------------------- |
 | GET    | `/api/dashboard/categories`              | tree incl. archived (`?status=`)                     |
-| POST   | `/api/dashboard/categories`              | `name, parent_id?, kind?, image?, sort_order?`; `kind` (D68) for roots only, default `general`; sent with a `parent_id` → `422` on `kind` |
-| PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `kind?` (roots only; absent = keep), `sort_order?`; move = change `parent_id` (the subtree takes the new root's kind); cycle → `422 category_cycle` |
+| POST   | `/api/dashboard/categories`              | `name, parent_id?, kind?, icon?, image?, sort_order?`; `kind` (D68) for roots only, default `general`; sent with a `parent_id` → `422` on `kind`; `icon` (D73) one of `CategoryIcon` or null |
+| PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `kind?` (roots only; absent = keep), `icon?` (absent = keep, null = none, D73), `sort_order?`; move = change `parent_id` (the subtree takes the new root's kind); cycle → `422 category_cycle` |
 
 Category shapes (store and dashboard) carry `kind`; product shapes carry `category: { id, name, kind }` (`CategoryRef`).
 | POST   | `/api/dashboard/categories/{id}/archive` | allowed with products (BR-P06); products stay linked |

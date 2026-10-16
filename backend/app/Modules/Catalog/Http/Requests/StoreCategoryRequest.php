@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Http\Requests;
 
+use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -21,6 +22,7 @@ final class StoreCategoryRequest extends FormRequest
             'name' => ['required', 'string', 'max:100'],
             'parent_id' => ['nullable', 'integer'],
             'kind' => ['sometimes', 'nullable', 'prohibited_unless:parent_id,null', Rule::enum(CategoryKind::class)],
+            'icon' => ['sometimes', 'nullable', Rule::enum(CategoryIcon::class)],
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:100000'],
             'image' => ['sometimes', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
         ];
@@ -47,6 +49,12 @@ final class StoreCategoryRequest extends FormRequest
     public function kind(): ?CategoryKind
     {
         return $this->filled('kind') ? $this->enum('kind', CategoryKind::class) : null;
+    }
+
+    /** Null = no icon (D73); whether it was sent at all is `has('icon')`. */
+    public function icon(): ?CategoryIcon
+    {
+        return $this->filled('icon') ? $this->enum('icon', CategoryIcon::class) : null;
     }
 
     public function sortOrder(): ?int
