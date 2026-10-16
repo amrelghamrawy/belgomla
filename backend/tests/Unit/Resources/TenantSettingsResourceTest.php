@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Http\Resources\TenantSettingsResource;
 use App\Modules\Tenancy\Http\Resources\TenantUserResource;
+use App\Support\InvitationMessage;
 use Illuminate\Http\Request;
 
 test('the settings resource has the documented key set and hides operational fields on the store', function (): void {
@@ -18,6 +19,8 @@ test('the settings resource has the documented key set and hides operational fie
     ])
         ->and($store)->not->toHaveKeys(['logo_path', 'favicon_path', 'tenant_id'])
         ->and($dashboard)->toHaveKey('stale_pending_hours', 24)
+        ->and($dashboard)->toHaveKey('invitation_message', null)
+        ->and($dashboard)->toHaveKey('invitation_message_default', InvitationMessage::DEFAULT)
         ->and($store['mov'])->toBe(['enabled' => false, 'amount' => null]);
 });
 

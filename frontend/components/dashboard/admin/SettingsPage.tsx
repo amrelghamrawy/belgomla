@@ -2,8 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
-import { type CSSProperties, useRef, useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { type CSSProperties, type ReactNode, useRef, useState } from "react";
+import { Controller, type UseFormRegisterReturn, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -20,6 +20,15 @@ import type { DashboardSettings } from "@/lib/api/types";
 import { readableOn } from "@/lib/auth/branding";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { hoursBody, hoursRows, useDashboardSettings, useSaveSettings, useUploadBranding } from "@/lib/dashboard/admin";
+import {
+  INVITATION_MAX_LENGTH,
+  INVITATION_PLACEHOLDERS,
+  INVITATION_TTL_DAYS,
+  insertAt,
+  invitationBody,
+  renderInvitation,
+  unknownPlaceholders,
+} from "@/lib/dashboard/invitation-message";
 import { toPiasters } from "@/lib/dashboard/price-math";
 import { applyServerErrors } from "@/lib/forms/server-errors";
 
@@ -48,8 +57,19 @@ const schema = z
       .string()
       .regex(/^\d{1,3}$/, ar.dashboard.productForm.invalidInteger)
       .refine((value) => Number(value) >= 1 && Number(value) <= 720, ar.dashboard.productForm.invalidInteger),
+    invitation_message: z.string().max(INVITATION_MAX_LENGTH, copy.invitation.tooLong(INVITATION_MAX_LENGTH)),
   })
   .superRefine((values, context) => {
+    const unknown = unknownPlaceholders(values.invitation_message);
+
+    if (unknown.length > 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["invitation_message"],
+        message: copy.invitation.unknown(unknown.join("، ")),
+      });
+    }
+
     if (values.mov_enabled && (toPiasters(values.mov_amount) === null || toPiasters(values.mov_amount) === 0n)) {
       context.addIssue({ code: "custom", path: ["mov_amount"], message: copy.movRequired });
     }
@@ -67,6 +87,7 @@ const SERVER_FIELDS = [
   "description",
   "mov_amount",
   "stale_pending_hours",
+  "invitation_message",
 ] as const;
 
 function defaults(settings: DashboardSettings): Values {
@@ -84,6 +105,7 @@ function defaults(settings: DashboardSettings): Values {
     require_login_for_prices: settings.require_login_for_prices,
     require_customer_approval: settings.require_customer_approval,
     stale_pending_hours: String(settings.stale_pending_hours),
+    invitation_message: settings.invitation_message ?? settings.invitation_message_default,
   };
 }
 
@@ -113,9 +135,9 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
   const [error, setError] = useState<string | null>(null);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults(settings) });
   const errors = form.formState.errors;
-  const [primary, secondary, movEnabled, hours] = useWatch({
+  const [primary, secondary, movEnabled, hours, invitation] = useWatch({
     control: form.control,
-    name: ["primary_color", "secondary_color", "mov_enabled", "hours"],
+    name: ["primary_color", "secondary_color", "mov_enabled", "hours", "invitation_message"],
   });
 
   const submit = form.handleSubmit((values) => {
@@ -136,6 +158,7 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         require_login_for_prices: values.require_login_for_prices,
         require_customer_approval: values.require_customer_approval,
         stale_pending_hours: Number(values.stale_pending_hours),
+        invitation_message: invitationBody(values.invitation_message, settings.invitation_message_default),
       },
       {
         onSuccess: () => toast.success(copy.saved),
@@ -337,12 +360,101 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
           />
         </CardContent>
       </Card>
+      <InvitationCard
+        storeName={settings.name}
+        fallback={settings.invitation_message_default}
+        registration={form.register("invitation_message")}
+        value={invitation}
+        error={errors.invitation_message?.message}
+        onChange={(text) => form.setValue("invitation_message", text, { shouldDirty: true, shouldValidate: true })}
+      />
       <div className="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t p-3 backdrop-blur md:hidden">
         <Button type="submit" className="h-11 w-full" disabled={save.isPending}>
           {save.isPending ? ar.saving : ar.save}
         </Button>
       </div>
     </form>
+  );
+}
+
+type InvitationCardProps = {
+  storeName: string;
+  fallback: string;
+  registration: UseFormRegisterReturn<"invitation_message">;
+  value: string;
+  error: string | undefined;
+  onChange: (text: string) => void;
+};
+
+/** BR-CU08: the merchant's invitation wording, with placeholder buttons and a live preview; the link is the backend's. */
+function InvitationCard({ storeName, fallback, registration, value, error, onChange }: InvitationCardProps) {
+  const text = copy.invitation;
+  const box = useRef<HTMLTextAreaElement | null>(null);
+  const { ref, ...field } = registration;
+
+  const insert = (token: string) => {
+    const area = box.current;
+    const next = insertAt(value, token, area?.selectionStart ?? value.length, area?.selectionEnd ?? value.length);
+    onChange(next.text);
+    requestAnimationFrame(() => {
+      area?.focus();
+      area?.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  const chip = (key: keyof typeof INVITATION_PLACEHOLDERS): ReactNode => (
+    <Button key={key} type="button" variant="outline" size="sm" onClick={() => insert(INVITATION_PLACEHOLDERS[key])}>
+      {text.placeholders[key]}
+    </Button>
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{text.title}</CardTitle>
+        <p className="text-muted-foreground text-xs">{text.hint}</p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <Field data-invalid={error !== undefined}>
+          <FieldLabel htmlFor="settings-invitation">{text.label}</FieldLabel>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground text-xs">{text.insert}</span>
+            {chip("customer")}
+            {chip("store")}
+            {chip("days")}
+          </div>
+          <Textarea
+            id="settings-invitation"
+            rows={4}
+            maxLength={INVITATION_MAX_LENGTH}
+            aria-invalid={error !== undefined}
+            {...field}
+            ref={(element) => {
+              ref(element);
+              box.current = element;
+            }}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <Button type="button" variant="link" size="sm" className="px-0" onClick={() => onChange(fallback)}>
+              {text.restore}
+            </Button>
+            <span className="text-muted-foreground text-xs tabular-nums" dir="ltr">
+              {text.count(value.length, INVITATION_MAX_LENGTH)}
+            </span>
+          </div>
+          <FieldError>{error}</FieldError>
+        </Field>
+        <div className="bg-muted rounded-md p-3" data-testid="invitation-preview">
+          <p className="text-muted-foreground mb-1 text-xs">{text.preview}</p>
+          <p className="text-sm whitespace-pre-line">
+            {renderInvitation(value, { customer: text.sampleCustomer, store: storeName, days: INVITATION_TTL_DAYS })}
+          </p>
+          <p className="text-primary text-sm" dir="ltr">
+            {text.link}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

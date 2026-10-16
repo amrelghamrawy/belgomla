@@ -29,6 +29,14 @@ final readonly class CurrentTenantSettingsQuery
         return TenantSetting::query()->whereKey($this->context->id())->value('require_customer_approval') === true;
     }
 
+    /** BR-CU08: the merchant's own invitation text, null for the default. Used by Customers. */
+    public function invitationMessage(): ?string
+    {
+        $message = TenantSetting::query()->whereKey($this->context->id())->value('invitation_message');
+
+        return is_string($message) ? $message : null;
+    }
+
     /**
      * BR-MOV01: the minimum order value. Enabled without an amount counts as disabled.
      *

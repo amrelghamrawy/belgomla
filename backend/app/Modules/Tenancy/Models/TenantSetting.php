@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $require_login_for_prices
  * @property bool $require_customer_approval
  * @property int $stale_pending_hours
+ * @property string|null $invitation_message
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Tenant $tenant

@@ -151,3 +151,11 @@ test('D2 BR-MOV01 the settings query reads the approval flag and the mov', funct
     'mov off keeps no amount' => [false, false, '1000.00', ['enabled' => false, 'amount' => null]],
     'mov on without amount' => [false, true, null, ['enabled' => false, 'amount' => null]],
 ]);
+
+test('BR-CU08 the settings query reads the store invitation text, null by default', function (): void {
+    expect(app(CurrentTenantSettingsQuery::class)->invitationMessage())->toBeNull();
+
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['invitation_message' => 'أهلًا {اسم_العميل}']);
+
+    expect(app(CurrentTenantSettingsQuery::class)->invitationMessage())->toBe('أهلًا {اسم_العميل}');
+});

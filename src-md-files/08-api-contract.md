@@ -330,6 +330,7 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | Method | Path                           | Notes                                       |
 | ------ | ------------------------------ | ------------------------------------------- |
 | GET    | `/api/dashboard/settings`      |                                             |
+| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default` |
 | POST   | `/api/dashboard/settings/logo` | multipart; also `/favicon`                  |
 | GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |

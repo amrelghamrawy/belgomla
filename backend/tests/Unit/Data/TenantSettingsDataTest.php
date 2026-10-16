@@ -29,6 +29,12 @@ test('only sent fields are carried, nullable fields can be cleared, money is a 2
         ]);
 });
 
+test('BR-CU08 an empty invitation message is carried as null, the default', function (): void {
+    $data = TenantSettingsData::fromRequest(settingsRequest(['invitation_message' => '']));
+
+    expect($data->settingColumns())->toBe(['invitation_message' => null]);
+});
+
 test('working hours are normalised to typed rows', function (): void {
     $data = TenantSettingsData::fromRequest(settingsRequest([
         'working_hours' => [['day' => '6', 'from' => '09:00', 'to' => '21:00']],

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Requests;
 
+use App\Modules\Tenancy\Rules\InvitationTemplate;
+use App\Support\InvitationMessage;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class UpdateSettingsRequest extends FormRequest
@@ -12,11 +15,11 @@ final class UpdateSettingsRequest extends FormRequest
     private const array FIELDS = [
         'name', 'primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description',
         'working_hours', 'mov_enabled', 'mov_amount', 'require_login_for_prices', 'require_customer_approval',
-        'stale_pending_hours',
+        'stale_pending_hours', 'invitation_message',
     ];
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<string|ValidationRule>>
      */
     public function rules(): array
     {
@@ -37,6 +40,7 @@ final class UpdateSettingsRequest extends FormRequest
             'require_login_for_prices' => ['sometimes', 'boolean'],
             'require_customer_approval' => ['sometimes', 'boolean'],
             'stale_pending_hours' => ['sometimes', 'integer', 'between:1,720'],
+            'invitation_message' => ['sometimes', 'nullable', 'string', 'max:'.InvitationMessage::MAX_LENGTH, new InvitationTemplate],
         ];
     }
 

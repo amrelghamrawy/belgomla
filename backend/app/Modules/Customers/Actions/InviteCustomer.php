@@ -13,14 +13,16 @@ use App\Modules\Customers\Services\InvitationTokens;
 use App\Modules\Messaging\Data\MessagePayload;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\Messenger;
+use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Modules\Tenancy\TenantContext;
+use App\Support\InvitationMessage;
 use Illuminate\Support\Facades\DB;
 
 /**
  * BR-CU08: sends (or re-sends) the invitation link of a merchant-created customer over WhatsApp, which falls
  * back to SMS on its own (BR-CU07). Each send rotates the token, so only the newest link works, and restarts
- * the 7 days. Only an `invited` customer can be invited (`409`). Audited as `customer.invited`. Owns its
- * transaction; the message is queued after commit.
+ * the 7 days. The text is the store's own (InvitationMessage, null = default). Only an `invited` customer can be
+ * invited (`409`). Audited as `customer.invited`. Owns its transaction; the message is queued after commit.
  */
 final readonly class InviteCustomer
 {
@@ -28,6 +30,7 @@ final readonly class InviteCustomer
         private InvitationTokens $tokens,
         private Messenger $messenger,
         private TenantContext $context,
+        private CurrentTenantSettingsQuery $settings,
         private AuditLogger $audit,
     ) {}
 
@@ -59,10 +62,12 @@ final readonly class InviteCustomer
 
     private function text(Customer $customer, string $token): string
     {
-        $days = config()->integer('customers.invitation.ttl_days');
-
-        return "أهلًا {$customer->name}، دعاك {$this->context->get()->name} للطلب من متجره.\n"
-            ."اضغط الرابط لتحديد كلمة المرور وتفعيل حسابك (صالح {$days} أيام):\n"
-            .$this->tokens->link($token);
+        return InvitationMessage::render(
+            $this->settings->invitationMessage(),
+            $customer->name,
+            $this->context->get()->name,
+            config()->integer('customers.invitation.ttl_days'),
+            $this->tokens->link($token),
+        );
     }
 }

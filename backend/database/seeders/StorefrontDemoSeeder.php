@@ -273,6 +273,7 @@ final class StorefrontDemoSeeder extends Seeder
             requireLoginForPrices: null,
             requireCustomerApproval: null,
             stalePendingHours: null,
+            invitationMessage: null,
             sent: ['primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description', 'working_hours', 'mov_enabled', 'mov_amount'],
         );
     }

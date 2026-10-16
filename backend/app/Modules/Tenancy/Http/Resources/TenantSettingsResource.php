@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Resources;
 
 use App\Modules\Tenancy\Models\TenantSetting;
+use App\Support\InvitationMessage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,6 +22,7 @@ final class TenantSettingsResource extends JsonResource
     public function toArray(Request $request): array
     {
         $tenant = $this->resource->tenant;
+        $dashboard = $request->is('api/dashboard/*');
 
         return [
             'name' => $tenant->name,
@@ -37,7 +39,9 @@ final class TenantSettingsResource extends JsonResource
             'require_login_for_prices' => $this->resource->require_login_for_prices,
             'require_customer_approval' => $this->resource->require_customer_approval,
             'mov' => ['enabled' => $this->resource->mov_enabled, 'amount' => $this->resource->mov_amount],
-            'stale_pending_hours' => $this->when($request->is('api/dashboard/*'), $this->resource->stale_pending_hours),
+            'stale_pending_hours' => $this->when($dashboard, $this->resource->stale_pending_hours),
+            'invitation_message' => $this->when($dashboard, $this->resource->invitation_message),
+            'invitation_message_default' => $this->when($dashboard, InvitationMessage::DEFAULT),
         ];
     }
 }

@@ -1978,7 +1978,10 @@ export interface components {
         };
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description Hours before a pending order is stale (D10) */
-            stale_pending_hours?: number;
+            stale_pending_hours: number;
+            /** @description BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line */
+            invitation_message: string | null;
+            invitation_message_default: string;
         };
         /** @description D70. A store that never linked a number is disconnected; enabled false hides the section. */
         StoreWhatsApp: {
@@ -2013,6 +2016,8 @@ export interface components {
             require_login_for_prices?: boolean;
             require_customer_approval?: boolean;
             stale_pending_hours?: number;
+            /** @description Only the placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; null or empty = the default */
+            invitation_message?: string | null;
         };
         IdName: {
             id: number;

@@ -29,6 +29,7 @@ final readonly class TenantSettingsData
         public ?bool $requireLoginForPrices,
         public ?bool $requireCustomerApproval,
         public ?int $stalePendingHours,
+        public ?string $invitationMessage,
         /** Fields the request explicitly sent, so nullable ones can be cleared. */
         public array $sent,
     ) {}
@@ -49,6 +50,7 @@ final readonly class TenantSettingsData
             requireLoginForPrices: $request->nullableBoolean('require_login_for_prices'),
             requireCustomerApproval: $request->nullableBoolean('require_customer_approval'),
             stalePendingHours: $request->stalePendingHours(),
+            invitationMessage: $request->nullableString('invitation_message'),
             sent: $request->sentKeys(),
         );
     }
@@ -73,6 +75,7 @@ final readonly class TenantSettingsData
             'require_login_for_prices' => $this->requireLoginForPrices,
             'require_customer_approval' => $this->requireCustomerApproval,
             'stale_pending_hours' => $this->stalePendingHours,
+            'invitation_message' => $this->invitationMessage,
         ];
 
         return array_intersect_key($map, array_flip($this->sent));

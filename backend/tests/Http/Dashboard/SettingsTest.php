@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Support\InvitationMessage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -73,11 +74,49 @@ test('settings validation', function (array $body, string $field): void {
     'working hours day out of range' => [['working_hours' => [['day' => 7, 'from' => '09:00', 'to' => '10:00']]], 'working_hours.0.day'],
     'working hours bad time' => [['working_hours' => [['day' => 1, 'from' => '9am', 'to' => '10:00']]], 'working_hours.0.from'],
     'stale hours too large' => [['stale_pending_hours' => 10000], 'stale_pending_hours'],
+    'invitation text too long' => [['invitation_message' => str_repeat('ا', 501)], 'invitation_message'],
+    'invitation text unknown placeholder' => [['invitation_message' => 'أهلًا {name}'], 'invitation_message'],
+    'invitation text not a string' => [['invitation_message' => ['x']], 'invitation_message'],
 ]);
 
 test('the Arabic message for a missing minimum order amount is explicit', function (): void {
     $this->tenantJson('PUT', '/api/dashboard/settings', ['mov_enabled' => true, 'mov_amount' => null])
         ->assertJsonPath('error.details.mov_amount.0', 'يجب تحديد الحد الأدنى لقيمة الطلب عند تفعيله');
+});
+
+test('BR-CU08 an owner sets the invitation text and the change is audited', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['invitation_message' => 'أهلًا {اسم_العميل}، اتفضل سجّل في {اسم_المتجر}'])
+        ->assertOk()
+        ->assertJsonPath('data.invitation_message', 'أهلًا {اسم_العميل}، اتفضل سجّل في {اسم_المتجر}')
+        ->assertJsonPath('data.invitation_message_default', InvitationMessage::DEFAULT);
+
+    $log = $this->asTenant($this->tenant, fn () => AuditLog::query()->sole());
+
+    expect($log->action)->toBe('settings.updated')
+        ->and($log->old_values)->toBe(['invitation_message' => null])
+        ->and($log->new_values)->toBe(['invitation_message' => 'أهلًا {اسم_العميل}، اتفضل سجّل في {اسم_المتجر}']);
+});
+
+test('BR-CU08 sending the invitation text as null goes back to the default', function (): void {
+    $this->tenant->settings->update(['invitation_message' => 'نص قديم']);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['invitation_message' => null])
+        ->assertOk()
+        ->assertJsonPath('data.invitation_message', null);
+});
+
+test('the invitation text is not shown on the storefront', function (): void {
+    $this->tenant->settings->update(['invitation_message' => 'نص خاص']);
+
+    $this->tenantJson('GET', '/api/store/tenant')
+        ->assertOk()
+        ->assertJsonMissingPath('data.invitation_message')
+        ->assertJsonMissingPath('data.invitation_message_default');
+});
+
+test('the Arabic message for an unknown invitation placeholder lists the allowed ones', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['invitation_message' => 'أهلًا {الاسم}'])
+        ->assertJsonPath('error.details.invitation_message.0', 'متغير غير معروف: {الاسم}. المتغيرات المتاحة: {اسم_العميل}، {اسم_المتجر}، {عدد_الأيام}.');
 });
 
 test('BR-T03 settings are isolated per tenant', function (): void {

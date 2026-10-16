@@ -71,6 +71,7 @@ erDiagram
 | require_login_for_prices       | boolean       | default false (D1)    |
 | require_customer_approval      | boolean       | default false (D2)    |
 | stale_pending_hours            | int           | default 24 (BR-INV07) |
+| invitation_message             | text          | nullable; null = default text (BR-CU08, D72) |
 
 ### `tenant_users`
 

@@ -33,6 +33,15 @@ test('BR-CU08 the first invitation stores the token hash for 7 days and sends th
         ->and(AuditLog::query()->sole()->only(['action', 'new_values']))->toBe(['action' => 'customer.invited', 'new_values' => ['sent_count' => 1]]);
 });
 
+test('BR-CU08 the store own invitation text is sent with its placeholders filled and the link last', function (): void {
+    $this->tenant->settings->update(['invitation_message' => 'يا {اسم_العميل}، {اسم_المتجر} فتح لك حساب لمدة {عدد_الأيام} أيام']);
+
+    app(InviteCustomer::class)->handle($this->customer);
+
+    expect(lastMessageText())->toBe('يا مكتبة الأمل، مكتبة النور فتح لك حساب لمدة 7 أيام
+https://alnoor.gomal.test/account/invite/'.lastInvitationToken());
+});
+
 test('BR-CU08 a re-send rotates the token and counts', function (): void {
     $first = app(InviteCustomer::class)->handle($this->customer)->token_hash;
 

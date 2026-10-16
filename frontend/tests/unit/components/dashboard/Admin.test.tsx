@@ -14,10 +14,15 @@ import { page, tenantSettings } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderWithQuery, router, searchParams } from "../../render";
 
+const DEFAULT_INVITATION =
+  "أهلًا {اسم_العميل}، دعاك {اسم_المتجر} للطلب من متجره.\nاضغط الرابط لتحديد كلمة المرور وتفعيل حسابك (صالح {عدد_الأيام} أيام):";
+
 function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings {
   return {
     ...tenantSettings({ working_hours: [{ day: 0, from: "09:00", to: "21:00" }] }),
     stale_pending_hours: 24,
+    invitation_message: null,
+    invitation_message_default: DEFAULT_INVITATION,
     ...overrides,
   };
 }
@@ -94,6 +99,7 @@ describe("SettingsForm", () => {
       mov_amount: "500",
       require_customer_approval: true,
       stale_pending_hours: 24,
+      invitation_message: null,
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["store", "tenant"] });
   });
@@ -108,6 +114,77 @@ describe("SettingsForm", () => {
 
     expect(await screen.findByText("أدخل قيمة الحد الأدنى")).toBeInTheDocument();
     expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
+  });
+});
+
+describe("invitation message", () => {
+  it("starts from the default text and previews it with the store name", () => {
+    stubApi({});
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    expect(screen.getByLabelText("نص الرسالة")).toHaveValue(DEFAULT_INVITATION);
+    expect(screen.getByTestId("invitation-preview")).toHaveTextContent(
+      "أهلًا أحمد محمود، دعاك مكتبة النور للطلب من متجره.",
+    );
+    expect(screen.getByTestId("invitation-preview")).toHaveTextContent("(صالح 7 أيام)");
+  });
+
+  it("inserts a placeholder at the caret and saves the store's own text", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+    const box = screen.getByLabelText("نص الرسالة");
+
+    await user.clear(box);
+    await user.type(box, "يا ");
+    await user.click(screen.getByRole("button", { name: "اسم العميل" }));
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+      invitation_message: "يا {اسم_العميل}",
+    });
+    expect(screen.getByTestId("invitation-preview")).toHaveTextContent("يا أحمد محمود");
+  });
+
+  it("restores the default text, which is sent as null", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings({ invitation_message: "نص خاص" })} />);
+
+    expect(screen.getByLabelText("نص الرسالة")).toHaveValue("نص خاص");
+    await user.click(screen.getByRole("button", { name: "استرجاع النص الافتراضي" }));
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(screen.getByLabelText("نص الرسالة")).toHaveValue(DEFAULT_INVITATION);
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({ invitation_message: null });
+  });
+
+  it("blocks an unknown placeholder before saving", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    fireEvent.change(screen.getByLabelText("نص الرسالة"), { target: { value: "أهلًا {الاسم}" } });
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("متغير غير معروف: {الاسم}. استخدم الأزرار لإضافة المتغيرات.")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
+  });
+
+  it("shows the backend's error under the box", async () => {
+    stubApi({
+      "PUT /api/dashboard/settings": envelopeError(422, "validation_failed", "بيانات غير صحيحة", {
+        invitation_message: ["نص مرفوض"],
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("نص مرفوض")).toBeInTheDocument();
   });
 });
 

@@ -672,6 +672,7 @@ Then the merchant can **invite** the customer:
 - An invitation message with a one-time link is sent via the same channel order as BR-CU07 (WhatsApp, then SMS).
 - The link opens the storefront, lets the customer set a password, and marks the phone as verified (the link itself proves phone ownership).
 - Invitation link is valid for 7 days and can be re-sent.
+- The merchant may word the message themselves in dashboard settings (D72), with the placeholders `{اسم_العميل}`, `{اسم_المتجر}`, `{عدد_الأيام}`; the link is always appended on its own last line.
 - Customer status while invited and not yet activated: `Invited`.
 - A merchant-created customer who never activates can still be used by the merchant for reference, but cannot log in or order.
 
