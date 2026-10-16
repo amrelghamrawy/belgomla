@@ -20,18 +20,20 @@ import type { ListQuery } from "./list-query";
 
 export const CUSTOMER_LIST_KEYS = ["q", "status"] as const;
 
-export function useCustomers(query: ListQuery) {
+export function useCustomers(query: ListQuery, enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardCustomersList(query),
     queryFn: () => apiFetchPage<DashboardCustomer>(withQuery("/api/dashboard/customers", query)),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
-export function useCustomer(id: number) {
+export function useCustomer(id: number, enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardCustomer(id),
     queryFn: () => apiFetch<DashboardCustomer>(`/api/dashboard/customers/${id}`),
+    enabled,
   });
 }
 

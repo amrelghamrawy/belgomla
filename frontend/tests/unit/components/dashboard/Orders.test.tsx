@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionsPage } from "@/components/dashboard/collections/CollectionsPage";
 import { OrderDetail } from "@/components/dashboard/orders/OrderDetailPage";
 import { OrdersPage } from "@/components/dashboard/orders/OrdersPage";
-import type { Collection, DashboardOrderDetail } from "@/lib/api/types";
+import type { Collection, DashboardCustomer, DashboardOrderDetail } from "@/lib/api/types";
 
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
@@ -298,7 +298,68 @@ describe("OrdersPage", () => {
 
     expect(router.replace).toHaveBeenCalledWith("/?status=out_for_delivery", { scroll: false });
   });
+
+  it("filters by a customer searched by name or phone, resetting the page", async () => {
+    searchParams.value = new URLSearchParams("page=3");
+    const fetchMock = stubApi({
+      "GET /api/dashboard/orders": json(200, page([])),
+      "GET /api/dashboard/customers": json(200, page([pickerCustomer()])),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrdersPage />);
+
+    await user.click(screen.getByRole("combobox", { name: "العميل" }));
+    await user.type(screen.getByPlaceholderText("ابحث بالاسم أو رقم الهاتف"), "الأمل");
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "GET /api/dashboard/customers").at(-1)?.url.searchParams.get("q")).toBe("الأمل"),
+    );
+    await user.click(await screen.findByRole("option", { name: /مكتبة الأمل/ }));
+
+    expect(router.replace).toHaveBeenCalledWith("/?customer_id=7", { scroll: false });
+  });
+
+  it("names the filtered customer from the URL and clears the filter", async () => {
+    searchParams.value = new URLSearchParams("customer_id=7&status=pending");
+    const fetchMock = stubApi({
+      "GET /api/dashboard/orders": json(200, page([])),
+      "GET /api/dashboard/customers/7": json(200, { data: pickerCustomer() }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrdersPage />);
+
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "العميل" })).toHaveTextContent("مكتبة الأمل"));
+    expect(callsTo(fetchMock, "GET /api/dashboard/orders")[0]?.url.searchParams.get("customer_id")).toBe("7");
+    await user.click(screen.getByRole("button", { name: "إلغاء تصفية العميل" }));
+
+    expect(router.replace).toHaveBeenCalledWith("/?status=pending", { scroll: false });
+  });
+
+  it("does not load customers until the picker opens", async () => {
+    const fetchMock = stubApi({ "GET /api/dashboard/orders": json(200, page([])) });
+    renderWithQuery(<OrdersPage />);
+
+    expect(await screen.findByText("لا توجد طلبات")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET /api/dashboard/customers")).toHaveLength(0);
+    expect(screen.getByRole("combobox", { name: "العميل" })).toHaveTextContent("كل العملاء");
+  });
 });
+
+function pickerCustomer(): DashboardCustomer {
+  return {
+    id: 7,
+    name: "مكتبة الأمل",
+    phone: "+201012345678",
+    status: "active",
+    status_label: "نشط",
+    phone_verified_at: "2026-10-01T08:00:00Z",
+    created_at: "2026-10-01T08:00:00Z",
+    outstanding_amount: "0.00",
+    created_by: null,
+    approved_by: null,
+    blocked_at: null,
+    blocked_reason: null,
+  };
+}
 
 describe("CollectionsPage", () => {
   it("lists collections with their order and marks voided ones with the reason on the row", async () => {

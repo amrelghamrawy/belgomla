@@ -18,6 +18,7 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
 
+import { CustomerPicker } from "../common/CustomerPicker";
 import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -70,18 +71,21 @@ export function OrdersPage() {
             : undefined
         }
         leading={
-          <form onSubmit={search} role="search" className="flex gap-2">
-            <Input
-              aria-label={ar.dashboard.list.search}
-              placeholder={copy.number}
-              value={q}
-              onChange={(event) => setQ(event.target.value)}
-              className="w-40"
-            />
-            <Button type="submit" variant="outline">
-              {ar.dashboard.list.search}
-            </Button>
-          </form>
+          <>
+            <form onSubmit={search} role="search" className="flex gap-2">
+              <Input
+                aria-label={ar.dashboard.list.search}
+                placeholder={copy.number}
+                value={q}
+                onChange={(event) => setQ(event.target.value)}
+                className="w-40"
+              />
+              <Button type="submit" variant="outline">
+                {ar.dashboard.list.search}
+              </Button>
+            </form>
+            <CustomerPicker value={query.customer_id} onChange={(id) => setQuery({ customer_id: id })} />
+          </>
         }
       >
         <NativeSelect
@@ -124,14 +128,6 @@ export function OrdersPage() {
           <Label htmlFor="orders-stale">{copy.staleOnly}</Label>
         </div>
       </FilterPanel>
-      {query.customer_id !== undefined && (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          {copy.customerFilter(query.customer_id)}
-          <Button variant="link" size="sm" onClick={() => setQuery({ customer_id: null })}>
-            {copy.clearCustomer}
-          </Button>
-        </p>
-      )}
       {orders.isError && <ErrorBlock error={orders.error} onRetry={() => void orders.refetch()} />}
       {orders.isPending && <LoadingBlock />}
       {orders.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}

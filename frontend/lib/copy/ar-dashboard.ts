@@ -375,6 +375,16 @@ export const dashboard = {
     },
   },
 
+  customerPicker: {
+    label: "العميل",
+    all: "كل العملاء",
+    search: "ابحث بالاسم أو رقم الهاتف",
+    loading: "جارٍ البحث…",
+    noMatch: "لا يوجد عميل مطابق",
+    clear: "إلغاء تصفية العميل",
+    customerNumber: (id: string) => `العميل رقم ${id}`,
+  },
+
   orders: {
     title: "الطلبات",
     all: "الكل",
@@ -389,8 +399,6 @@ export const dashboard = {
     stale: "متأخر",
     staleOnly: "المتأخرة فقط",
     staleHint: "قيد الانتظار لفترة أطول من المحدد في الإعدادات (D10)",
-    customerFilter: (id: string) => `طلبات العميل رقم ${id}`,
-    clearCustomer: "إلغاء تصفية العميل",
     sort: "الترتيب",
     sorts: {
       "-placed_at": "الأحدث",
