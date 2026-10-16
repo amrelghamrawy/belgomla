@@ -33,11 +33,35 @@ export function activeOnly(nodes: readonly DashboardCategory[]): DashboardCatego
     .map((node) => ({ ...node, children: activeOnly(node.children) }));
 }
 
-/** Depth-first rows for a parent picker: each node with its depth, siblings in sort order. */
-export function flatten(nodes: readonly DashboardCategory[], depth = 0): { node: DashboardCategory; depth: number }[] {
+export type CategoryRow = { node: DashboardCategory; depth: number; /** Ancestor names, root first. */ path: string[] };
+
+/** Depth-first rows for a parent picker: each node with its depth and ancestors, siblings in sort order. */
+export function flatten(nodes: readonly DashboardCategory[], depth = 0, path: string[] = []): CategoryRow[] {
   return [...nodes]
     .sort((a, b) => a.sort_order - b.sort_order)
-    .flatMap((node) => [{ node, depth }, ...flatten(node.children, depth + 1)]);
+    .flatMap((node) => [{ node, depth, path }, ...flatten(node.children, depth + 1, [...path, node.name])]);
+}
+
+/** Folds the spellings people mix up when typing Arabic (hamza forms, ta marbuta, alef maqsura, diacritics). */
+export function searchKey(text: string): string {
+  return text
+    .replace(/[ً-ْـ]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .toLowerCase()
+    .trim();
+}
+
+/** Rows whose name or any ancestor's name contains the query, so "ابتدائي" finds the grades under it too. */
+export function searchCategories(rows: readonly CategoryRow[], query: string): CategoryRow[] {
+  const needle = searchKey(query);
+
+  if (needle === "") {
+    return [...rows];
+  }
+
+  return rows.filter((row) => [...row.path, row.node.name].some((name) => searchKey(name).includes(needle)));
 }
 
 /** The node's id and every id under it: none of them can become its parent (that would be a cycle). */

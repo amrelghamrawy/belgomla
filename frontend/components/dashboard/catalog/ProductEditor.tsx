@@ -23,7 +23,7 @@ import {
   useSetProductStatus,
   useUnits,
 } from "@/lib/dashboard/catalog";
-import { activeOnly, flatten, kindOfCategory } from "@/lib/dashboard/category-tree";
+import { activeOnly, kindOfCategory } from "@/lib/dashboard/category-tree";
 import { customFieldProblems, visibleDefinitions } from "@/lib/dashboard/custom-fields";
 import { priceFromPercent, tierProblems } from "@/lib/dashboard/price-math";
 import {
@@ -35,6 +35,7 @@ import {
 } from "@/lib/dashboard/product-form";
 import { useRecomputePricing } from "@/lib/dashboard/pricing";
 
+import { CategoryPicker } from "../common/CategoryPicker";
 import { LabelText } from "../common/LabelText";
 import { NativeSelect } from "../common/NativeSelect";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -117,7 +118,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
     (unit) =>
       unit.status === "active" || unit.id === product?.sku?.selling_unit?.id || unit.id === product?.sku?.base_unit?.id,
   );
-  const categoryOptions = flatten(activeOnly(categories));
+  const activeCategories = activeOnly(categories);
 
   const onInvalid = () => setTab("basics");
 
@@ -288,18 +289,22 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
               <FieldLabel htmlFor="product-category_id">
                 <LabelText text={copy.category} need="required" />
               </FieldLabel>
-              <NativeSelect
-                id="product-category_id"
-                aria-invalid={errors.category_id !== undefined}
-                {...form.register("category_id")}
-              >
-                <option value="">{copy.chooseCategory}</option>
-                {categoryOptions.map(({ node, depth }) => (
-                  <option key={node.id} value={node.id}>
-                    {`${"— ".repeat(depth)}${node.name}`}
-                  </option>
-                ))}
-              </NativeSelect>
+              <Controller
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <CategoryPicker
+                    id="product-category_id"
+                    ref={field.ref}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    categories={activeCategories}
+                    allCategories={categories}
+                    invalid={errors.category_id !== undefined}
+                  />
+                )}
+              />
               <FieldError errors={[errors.category_id]} />
             </Field>
             <Field className="md:col-span-2">

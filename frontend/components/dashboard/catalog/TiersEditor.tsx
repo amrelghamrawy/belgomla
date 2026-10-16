@@ -44,6 +44,7 @@ export function TiersEditor({ tiers, onChange, cover, referenceLabel, problems }
             <div className="flex flex-wrap items-center gap-2">
               <Input
                 aria-label={`${copy.tierMin} ${index + 1}`}
+                placeholder={copy.tierMinPlaceholder}
                 inputMode="numeric"
                 dir="ltr"
                 className="w-24 text-start"
@@ -61,6 +62,7 @@ export function TiersEditor({ tiers, onChange, cover, referenceLabel, problems }
               </NativeSelect>
               <Input
                 aria-label={`${copy.tierValue} ${index + 1}`}
+                placeholder={tier.mode === "percent" ? copy.tierPercentPlaceholder : copy.tierPricePlaceholder}
                 inputMode="decimal"
                 dir="ltr"
                 className="w-28 text-start"

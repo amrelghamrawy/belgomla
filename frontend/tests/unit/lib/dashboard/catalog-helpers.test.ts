@@ -7,6 +7,8 @@ import {
   flatten,
   kindOfCategory,
   reorderSiblings,
+  searchCategories,
+  searchKey,
   subtreeIds,
 } from "@/lib/dashboard/category-tree";
 import { customFieldProblems, customFieldsBody, visibleDefinitions } from "@/lib/dashboard/custom-fields";
@@ -32,6 +34,25 @@ describe("category tree", () => {
       [3, 1],
       [5, 2],
     ]);
+  });
+
+  it("gives every row the names of its ancestors, root first", () => {
+    expect(flatten(activeOnly(tree)).map(({ path }) => path)).toEqual([
+      [],
+      ["المرحلة الابتدائية"],
+      ["المرحلة الابتدائية", "رابعة"],
+    ]);
+  });
+
+  it("searches categories by their own or an ancestor's name, ignoring hamza, ta marbuta and diacritics", () => {
+    const rows = flatten(activeOnly(tree));
+    const ids = (query: string) => searchCategories(rows, query).map(({ node }) => node.id);
+
+    expect(ids("")).toEqual([1, 3, 5]);
+    expect(ids("رابعه")).toEqual([3, 5]);
+    expect(ids("الابتدائيَة")).toEqual([1, 3, 5]);
+    expect(ids("إعدادي")).toEqual([]);
+    expect(searchKey("  أولى إعداديّة ")).toBe("اولي اعداديه");
   });
 
   it("knows a node's subtree, which cannot become its parent", () => {

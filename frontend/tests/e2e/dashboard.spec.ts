@@ -47,7 +47,9 @@ test("a merchant builds a category, unit, custom field and product, sees it on t
   // The product with its custom field, price and opening stock.
   await page.goto("/dashboard/products/new");
   await page.getByLabel("اسم المنتج *", { exact: true }).fill(product);
-  await page.getByLabel("القسم *", { exact: true }).selectOption({ label: category });
+  await page.getByLabel("القسم *", { exact: true }).click();
+  await page.getByPlaceholder("ابحث باسم القسم").fill(category);
+  await page.getByRole("option", { name: category }).click();
   await page.getByLabel("كود الصنف (SKU)").fill(`E2E-${run}`);
   await page.getByLabel("وحدة البيع *", { exact: true }).selectOption({ label: unit });
   await page.getByLabel("الوحدة الأساسية *", { exact: true }).selectOption({ label: unit });

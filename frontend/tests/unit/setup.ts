@@ -15,6 +15,11 @@ if (typeof window !== "undefined") {
   };
 }
 
+// cmdk scrolls the highlighted option into view; jsdom does not implement scrollIntoView.
+if (typeof Element !== "undefined") {
+  Element.prototype.scrollIntoView ??= () => {};
+}
+
 // input-otp probes for password-manager badges with elementFromPoint, which jsdom does not implement.
 if (typeof document !== "undefined" && typeof document.elementFromPoint !== "function") {
   document.elementFromPoint = () => null;

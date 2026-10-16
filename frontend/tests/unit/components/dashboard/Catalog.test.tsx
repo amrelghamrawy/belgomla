@@ -17,6 +17,12 @@ import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderWithQuery, router, searchParams } from "../../render";
 
+/** Opens the product's category combobox and picks a category by name. */
+async function pickCategory(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByLabelText("القسم *"));
+  await user.click(await screen.findByRole("option", { name }));
+}
+
 beforeEach(() => {
   vi.spyOn(toast, "success").mockImplementation(() => "t");
   vi.spyOn(toast, "error").mockImplementation(() => "t");
@@ -212,6 +218,23 @@ describe("ProductForm", () => {
     expect(callsTo(fetchMock, "PUT /api/dashboard/products/3")).toHaveLength(0);
   });
 
+  it("shows placeholders on a tier's quantity and value, the value one following the price mode", async () => {
+    stubApi({});
+    const user = userEvent.setup();
+    renderForm(dashboardProduct({ sku: { ...dashboardProduct().sku!, tiers: [] } }));
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    await user.click(screen.getByRole("button", { name: "إضافة شريحة" }));
+    const tier = within(screen.getByTestId("tier-0"));
+    const value = tier.getByLabelText("السعر أو النسبة 1");
+
+    expect(tier.getByLabelText("من كمية 1")).toHaveAttribute("placeholder", "من كمية");
+    await user.selectOptions(tier.getByLabelText("طريقة إدخال السعر"), "price");
+    expect(value).toHaveAttribute("placeholder", "السعر");
+    await user.selectOptions(tier.getByLabelText("طريقة إدخال السعر"), "percent");
+    expect(value).toHaveAttribute("placeholder", "النسبة %");
+  });
+
   it("saves the product as entered: the base price as a percentage and the custom field as an option id", async () => {
     const saved = dashboardProduct({ updated_at: "2026-10-02T08:00:00Z" });
     const fetchMock = stubApi({ "PUT /api/dashboard/products/3": json(200, { data: saved }) });
@@ -300,12 +323,12 @@ describe("ProductForm", () => {
       />,
     );
 
-    await user.selectOptions(screen.getByLabelText("القسم *"), "1");
+    await pickCategory(user, "المرحلة الابتدائية");
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
     expect(screen.getByLabelText("سعر الغلاف (اختياري)")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "البيانات" }));
-    await user.selectOptions(screen.getByLabelText("القسم *"), "2");
+    await pickCategory(user, "ألعاب");
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
     expect(screen.getByLabelText("سعر القطاعي (اختياري)")).toBeInTheDocument();
 
@@ -314,13 +337,47 @@ describe("ProductForm", () => {
     expect(screen.queryByLabelText("الصف *")).not.toBeInTheDocument();
   });
 
+  it("searches the category picker, showing each match with its parent path", async () => {
+    const user = userEvent.setup();
+    const tree = [
+      category({
+        children: [category({ id: 3, name: "رابعة ابتدائي", parent_id: 1 })],
+      }),
+      category({ id: 2, name: "ألعاب", kind: "toys", sort_order: 1 }),
+      category({ id: 4, name: "قديم", sort_order: 2, status: "archived" }),
+    ];
+    renderWithQuery(<ProductForm product={null} definitions={[]} units={units} categories={tree} />);
+
+    await user.click(screen.getByLabelText("القسم *"));
+    expect(
+      within(screen.getByRole("listbox"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["المرحلة الابتدائية", "رابعة ابتدائي", "ألعاب"]);
+
+    await user.type(screen.getByPlaceholderText("ابحث باسم القسم"), "رابعه");
+    expect(
+      within(screen.getByRole("listbox"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["رابعة ابتدائيالمرحلة الابتدائية"]);
+
+    await user.clear(screen.getByPlaceholderText("ابحث باسم القسم"));
+    await user.type(screen.getByPlaceholderText("ابحث باسم القسم"), "زzz");
+    expect(screen.getByText("لا يوجد قسم بهذا الاسم")).toBeInTheDocument();
+
+    await user.clear(screen.getByPlaceholderText("ابحث باسم القسم"));
+    await user.click(screen.getByRole("option", { name: "رابعة ابتدائي" }));
+    expect(screen.getByLabelText("القسم *")).toHaveTextContent("المرحلة الابتدائية ‹رابعة ابتدائي");
+  });
+
   it("creates a product with status and opening stock, then opens it", async () => {
     const fetchMock = stubApi({ "POST /api/dashboard/products": json(201, { data: dashboardProduct({ id: 9 }) }) });
     const user = userEvent.setup();
     renderWithQuery(<ProductForm product={null} definitions={[]} units={units} categories={categories} />);
 
     await user.type(screen.getByLabelText("اسم المنتج *"), "كتاب جديد");
-    await user.selectOptions(screen.getByLabelText("القسم *"), "1");
+    await pickCategory(user, "المرحلة الابتدائية");
     await user.type(screen.getByLabelText("كود الصنف (SKU) *"), "NEW-1");
     await user.selectOptions(screen.getByLabelText("وحدة البيع *"), "2");
     await user.selectOptions(screen.getByLabelText("الوحدة الأساسية *"), "1");
