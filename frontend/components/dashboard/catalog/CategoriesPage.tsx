@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { queryKeys } from "@/lib/api/keys";
 import type { CategoryKind, DashboardCategory } from "@/lib/api/types";
@@ -49,7 +50,6 @@ import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { cn } from "@/lib/utils";
 
 import { FilterPanel } from "../common/FilterPanel";
-import { NativeSelect } from "../common/NativeSelect";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 
 const copy = ar.dashboard.categories;

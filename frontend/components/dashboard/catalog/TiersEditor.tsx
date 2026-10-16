@@ -5,12 +5,12 @@ import { PlusIcon, TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { ar } from "@/lib/copy/ar";
 import { type TierDraft, tierPrice } from "@/lib/dashboard/price-math";
 import { formatMoney } from "@/lib/format/money";
 
 import { LabelText } from "../common/LabelText";
-import { NativeSelect } from "../common/NativeSelect";
 
 const copy = ar.dashboard.productForm;
 

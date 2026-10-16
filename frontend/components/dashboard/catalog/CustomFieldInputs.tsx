@@ -2,12 +2,12 @@
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { CategoryKind, FieldDefinition } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { type CustomFieldDrafts, visibleDefinitions } from "@/lib/dashboard/custom-fields";
 
 import { LabelText } from "../common/LabelText";
-import { NativeSelect } from "../common/NativeSelect";
 
 const copy = ar.dashboard.productForm;
 

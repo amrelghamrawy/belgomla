@@ -20,6 +20,21 @@ if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView ??= () => {};
 }
 
+// The dashboard sidebar asks matchMedia whether it is on a phone; jsdom has none, so tests see the desktop frame.
+if (typeof window !== "undefined") {
+  window.matchMedia ??= (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) satisfies MediaQueryList;
+}
+
 // input-otp probes for password-manager badges with elementFromPoint, which jsdom does not implement.
 if (typeof document !== "undefined" && typeof document.elementFromPoint !== "function") {
   document.elementFromPoint = () => null;

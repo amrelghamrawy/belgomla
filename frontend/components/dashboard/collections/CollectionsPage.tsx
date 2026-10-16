@@ -133,9 +133,14 @@ function CollectionRow({ collection }: { collection: Collection }) {
       <TableCell>{collection.method_label}</TableCell>
       <TableCell>
         {collection.is_voided ? (
-          <Badge variant="secondary" title={collection.void_reason ?? undefined}>
-            {copy.voidedBadge}
-          </Badge>
+          <div className="flex flex-col items-start gap-1">
+            <Badge variant="secondary">{copy.voidedBadge}</Badge>
+            {collection.void_reason !== null && (
+              <span className="text-muted-foreground max-w-48 text-xs" data-testid="void-reason">
+                {collection.void_reason}
+              </span>
+            )}
+          </div>
         ) : (
           <ReasonDialog
             trigger={(open) => (

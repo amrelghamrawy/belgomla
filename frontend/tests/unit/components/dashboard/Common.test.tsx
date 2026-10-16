@@ -5,10 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 import { FilterPanel } from "@/components/dashboard/common/FilterPanel";
 import { Pager } from "@/components/dashboard/common/Pager";
 import { ReasonDialog } from "@/components/dashboard/common/ReasonDialog";
+import { StaleBadge } from "@/components/dashboard/orders/OrderBadges";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/errors";
+import { ar } from "@/lib/copy/ar";
 
 import { page } from "../../fixtures";
+import { renderWithQuery } from "../../render";
 
 function renderDialog(onSubmit: (reason: string) => Promise<unknown>) {
   render(
@@ -132,5 +135,16 @@ describe("FilterPanel", () => {
     await user.click(screen.getByRole("button", { name: "مسح التصفية" }));
 
     expect(onClear).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Hint", () => {
+  it("explains the stale badge when it gets keyboard focus", async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<StaleBadge />);
+
+    await user.tab();
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(ar.dashboard.orders.staleHint);
   });
 });

@@ -9,7 +9,8 @@ export const dashboard = {
 
   nav: {
     label: "القائمة الرئيسية",
-    open: "فتح القائمة",
+    toggle: "إظهار القائمة أو إخفاؤها",
+    toggleHint: "إظهار القائمة أو إخفاؤها (Ctrl+B)",
     overview: "الرئيسية",
     orders: "الطلبات",
     collections: "التحصيلات",

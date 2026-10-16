@@ -80,6 +80,38 @@ describe("DashboardShell", () => {
   });
 });
 
+describe("DashboardShell sidebar", () => {
+  const sidebar = () => document.querySelector('[data-slot="sidebar"]');
+
+  beforeEach(() => {
+    document.cookie = "sidebar_state=; max-age=0; path=/";
+  });
+
+  it("collapses the sidebar to icons from the toggle and remembers it in a cookie", async () => {
+    stubDashboard();
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    const toggle = await screen.findByRole("button", { name: "إظهار القائمة أو إخفاؤها" });
+    expect(sidebar()).toHaveAttribute("data-state", "expanded");
+    await user.click(toggle);
+
+    expect(sidebar()).toHaveAttribute("data-state", "collapsed");
+    expect(sidebar()).toHaveAttribute("data-collapsible", "icon");
+    expect(document.cookie).toContain("sidebar_state=false");
+  });
+
+  it("opens collapsed when the last visit left it collapsed", async () => {
+    document.cookie = "sidebar_state=false; path=/";
+    stubDashboard();
+
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await screen.findByTestId("tenant-name");
+    expect(sidebar()).toHaveAttribute("data-state", "collapsed");
+  });
+});
+
 describe("isActive", () => {
   it("matches the overview only on /dashboard and other items on their sub-pages", () => {
     expect(isActive("/dashboard", "/dashboard")).toBe(true);

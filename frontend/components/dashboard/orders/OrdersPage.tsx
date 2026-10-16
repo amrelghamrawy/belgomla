@@ -6,6 +6,7 @@ import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
@@ -18,7 +19,6 @@ import { formatMoney } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
 
 import { FilterPanel } from "../common/FilterPanel";
-import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { CollectionStatusBadge, OrderStatusBadge, StaleBadge } from "./OrderBadges";

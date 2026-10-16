@@ -5,11 +5,10 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { DashboardProduct, ProductRelation } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { useAddProductRelation, useProductSearch, useRemoveProductRelation } from "@/lib/dashboard/catalog";
-
-import { NativeSelect } from "../common/NativeSelect";
 
 const copy = ar.dashboard.productForm;
 

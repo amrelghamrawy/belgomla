@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { BulkAdjustResult, InventoryRow } from "@/lib/api/types";
@@ -19,7 +20,6 @@ import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 
 import { FilterPanel } from "../common/FilterPanel";
-import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { AdjustStockSheet } from "./AdjustStockSheet";

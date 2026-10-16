@@ -19,8 +19,16 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { ar } from "@/lib/copy/ar";
-import { cn } from "@/lib/utils";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -62,35 +70,47 @@ export function isActive(href: string, path: string): boolean {
   return href === "/dashboard" ? path === href : path === href || path.startsWith(`${href}/`);
 }
 
-/** The dashboard's sections, shared by the desktop sidebar and the phone drawer. */
-export function DashboardNav({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * The dashboard's sections inside the sidebar: labelled groups on a wide screen, icons with tooltips when the
+ * sidebar is collapsed, and on phones a drawer that closes once an item is picked.
+ */
+export function DashboardNav() {
   const path = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   return (
-    <nav aria-label={copy.label} className="flex flex-col gap-4 p-3">
+    <nav aria-label={copy.label}>
       {NAV_SECTIONS.map((section) => (
-        <div key={section.title} className="flex flex-col gap-1">
-          <p className="text-muted-foreground px-3 text-xs font-medium">{section.title}</p>
-          {section.items.map((item) => {
-            const active = isActive(item.href, path);
+        <SidebarGroup key={section.title}>
+          <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {section.items.map((item) => {
+                const active = isActive(item.href, path);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors",
-                  active ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                )}
-              >
-                <item.icon className="size-4 shrink-0" aria-hidden />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      tooltip={item.label}
+                      className="data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary/90 data-active:hover:text-sidebar-primary-foreground h-10"
+                    >
+                      <Link
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                      >
+                        <item.icon aria-hidden />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       ))}
     </nav>
   );

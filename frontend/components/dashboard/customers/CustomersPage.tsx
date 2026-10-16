@@ -23,6 +23,7 @@ import {
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CustomerStatus } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
@@ -36,7 +37,6 @@ import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 
 import { FilterPanel } from "../common/FilterPanel";
-import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { CustomerStatusBadge, inviteMessage } from "./CustomerStatusBadge";

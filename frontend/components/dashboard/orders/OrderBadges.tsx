@@ -3,6 +3,8 @@ import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { cn } from "@/lib/utils";
 
+import { Hint } from "../common/Hint";
+
 const ORDER_TONES: Record<OrderStatus, string> = {
   pending: "bg-amber-100 text-amber-900",
   confirmed: "bg-sky-100 text-sky-900",
@@ -37,8 +39,10 @@ export function CollectionStatusBadge({ status }: { status: CollectionStatus }) 
 
 export function StaleBadge() {
   return (
-    <Badge variant="outline" className="border-amber-500 text-amber-900" title={ar.dashboard.orders.staleHint}>
-      {ar.dashboard.orders.stale}
-    </Badge>
+    <Hint text={ar.dashboard.orders.staleHint}>
+      <Badge variant="outline" className="border-amber-500 text-amber-900" tabIndex={0}>
+        {ar.dashboard.orders.stale}
+      </Badge>
+    </Hint>
   );
 }

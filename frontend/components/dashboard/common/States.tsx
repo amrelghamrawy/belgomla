@@ -1,9 +1,11 @@
 "use client";
 
+import { InboxIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ar, messageFor } from "@/lib/copy/ar";
 
@@ -34,11 +36,17 @@ export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () =>
   );
 }
 
+/** Nothing to show: an icon and the reason. */
 export function EmptyBlock({ children }: { children?: ReactNode }) {
   return (
-    <p className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">
-      {children ?? ar.dashboard.list.empty}
-    </p>
+    <Empty className="border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <InboxIcon />
+        </EmptyMedia>
+        <EmptyDescription>{children ?? ar.dashboard.list.empty}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 

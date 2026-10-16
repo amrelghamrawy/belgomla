@@ -72,7 +72,7 @@ export function CategoryPicker({
           aria-expanded={open}
           aria-controls={listId}
           aria-invalid={invalid}
-          className="border-input bg-background focus-visible:ring-ring/50 aria-invalid:border-destructive flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border px-3 text-sm outline-none focus-visible:ring-3"
+          className="border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border bg-transparent px-2.5 text-sm transition-colors outline-none focus-visible:ring-3 aria-invalid:ring-3"
         >
           {selected === undefined ? (
             <span className="text-muted-foreground flex-1 truncate text-start">{copy.chooseCategory}</span>

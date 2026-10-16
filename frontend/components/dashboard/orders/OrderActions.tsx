@@ -9,6 +9,7 @@ import { canCancel, canCollect, nextSteps } from "@/lib/dashboard/order-status";
 import { balanceOf, useCancelOrder, useTransitionOrder } from "@/lib/dashboard/orders";
 import { formatMoney } from "@/lib/format/money";
 
+import { Hint } from "../common/Hint";
 import { ReasonDialog } from "../common/ReasonDialog";
 import { RecordCollectionDialog } from "./RecordCollectionDialog";
 
@@ -57,14 +58,11 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
         </Button>
       ))}
       {steps.includes("delivered") && owed && (
-        <Button
-          variant="secondary"
-          disabled={transition.isPending}
-          title={copy.deliverAndCollectHint(formatMoney(balance))}
-          onClick={() => move("delivered", true)}
-        >
-          {copy.deliverAndCollect}
-        </Button>
+        <Hint text={copy.deliverAndCollectHint(formatMoney(balance))}>
+          <Button variant="secondary" disabled={transition.isPending} onClick={() => move("delivered", true)}>
+            {copy.deliverAndCollect}
+          </Button>
+        </Hint>
       )}
       {collectable && <RecordCollectionDialog order={order} />}
       {canCancel(order.status) && (

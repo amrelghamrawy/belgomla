@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CategoryKind, FieldDefinition, FieldOption } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
@@ -28,7 +29,6 @@ import {
 } from "@/lib/dashboard/catalog";
 import { applyServerErrors } from "@/lib/forms/server-errors";
 
-import { NativeSelect } from "../common/NativeSelect";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 
 const copy = ar.dashboard.fields;
@@ -50,20 +50,18 @@ const schema = z.object({
   filter_order: z.string().regex(/^\d{1,6}$/, ar.dashboard.productForm.invalidInteger),
   sort_order: z.string().regex(/^\d{1,6}$/, ar.dashboard.productForm.invalidInteger),
   // One row per option; blank rows are dropped on submit, the rest must be distinct (options.* distinct).
-  options: z
-    .array(z.object({ label: z.string().trim().max(100) }))
-    .superRefine((rows, context) => {
-      const seen = new Set<string>();
-      rows.forEach((row, index) => {
-        if (row.label === "") {
-          return;
-        }
-        if (seen.has(row.label)) {
-          context.addIssue({ code: "custom", path: [index, "label"], message: copy.duplicateOption });
-        }
-        seen.add(row.label);
-      });
-    }),
+  options: z.array(z.object({ label: z.string().trim().max(100) })).superRefine((rows, context) => {
+    const seen = new Set<string>();
+    rows.forEach((row, index) => {
+      if (row.label === "") {
+        return;
+      }
+      if (seen.has(row.label)) {
+        context.addIssue({ code: "custom", path: [index, "label"], message: copy.duplicateOption });
+      }
+      seen.add(row.label);
+    });
+  }),
 });
 
 type FieldForm = z.infer<typeof schema>;

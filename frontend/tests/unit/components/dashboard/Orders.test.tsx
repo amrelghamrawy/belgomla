@@ -301,7 +301,7 @@ describe("OrdersPage", () => {
 });
 
 describe("CollectionsPage", () => {
-  it("lists collections with their order and marks voided ones", async () => {
+  it("lists collections with their order and marks voided ones with the reason on the row", async () => {
     stubApi({
       "GET /api/dashboard/collections": json(
         200,
@@ -314,5 +314,6 @@ describe("CollectionsPage", () => {
     const row = await screen.findByTestId("collection-31");
     expect(within(row).getByRole("link", { name: "#1001" })).toHaveAttribute("href", "/dashboard/orders/1001");
     expect(within(screen.getByTestId("collection-32")).getByText("ملغي")).toBeInTheDocument();
+    expect(within(screen.getByTestId("collection-32")).getByTestId("void-reason")).toHaveTextContent("خطأ");
   });
 });

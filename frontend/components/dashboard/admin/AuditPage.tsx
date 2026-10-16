@@ -182,29 +182,33 @@ export function AuditDiff({ entry }: { entry: AuditLog }) {
   }
 
   return (
-    <table className="w-full text-xs" data-testid="audit-diff">
-      <thead>
-        <tr className="text-muted-foreground">
-          <th className="p-1 text-start font-medium">{copy.field}</th>
-          <th className="p-1 text-start font-medium">{copy.before}</th>
-          <th className="p-1 text-start font-medium">{copy.after}</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table className="text-xs" data-testid="audit-diff">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="h-8">{copy.field}</TableHead>
+          <TableHead className="h-8">{copy.before}</TableHead>
+          <TableHead className="h-8">{copy.after}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={row.field} className={cn(row.changed && "bg-amber-50")} data-changed={row.changed}>
-            <td className="p-1 font-medium">
+          <TableRow
+            key={row.field}
+            className={cn(row.changed && "bg-amber-50 hover:bg-amber-100/70")}
+            data-changed={row.changed}
+          >
+            <TableCell className="font-medium">
               <bdi>{row.field}</bdi>
-            </td>
-            <td className="text-muted-foreground p-1 break-all">
+            </TableCell>
+            <TableCell className="text-muted-foreground break-all whitespace-normal">
               <bdi>{row.before ?? ar.dashboard.none}</bdi>
-            </td>
-            <td className="p-1 break-all">
+            </TableCell>
+            <TableCell className="break-all whitespace-normal">
               <bdi>{row.after ?? ar.dashboard.none}</bdi>
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

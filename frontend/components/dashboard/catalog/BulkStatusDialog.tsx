@@ -13,11 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FieldError, FieldLabel } from "@/components/ui/field";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { ProductFilter, ProductStatus } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { useBulkProductStatus } from "@/lib/dashboard/catalog";
-
-import { NativeSelect } from "../common/NativeSelect";
 
 const copy = ar.dashboard.products;
 

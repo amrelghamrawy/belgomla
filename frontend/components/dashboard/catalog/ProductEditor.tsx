@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api/errors";
@@ -37,7 +38,6 @@ import { useRecomputePricing } from "@/lib/dashboard/pricing";
 
 import { CategoryPicker } from "../common/CategoryPicker";
 import { LabelText } from "../common/LabelText";
-import { NativeSelect } from "../common/NativeSelect";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { CustomFieldInputs } from "./CustomFieldInputs";
 import { ProductImages } from "./ProductImages";

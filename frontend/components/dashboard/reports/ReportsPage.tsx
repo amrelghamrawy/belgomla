@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SalesGrouping } from "@/lib/api/types";
@@ -18,7 +19,6 @@ import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 
 import { FilterPanel } from "../common/FilterPanel";
-import { NativeSelect } from "../common/NativeSelect";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { SalesChart } from "./SalesChart";

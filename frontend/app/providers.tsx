@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiError, isApiError, StoreUnavailableError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/keys";
 import { ar } from "@/lib/copy/ar";
@@ -74,7 +75,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <DirectionProvider dir="rtl">
-        {children}
+        <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
         <Toaster position="top-center" dir="rtl" />
       </DirectionProvider>
     </QueryClientProvider>
