@@ -14,7 +14,7 @@ const cairo = Cairo({
 
 export default function StoreLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className={`${cairo.variable} store-theme bg-background text-foreground flex flex-1 flex-col`}>
+    <div className={`${cairo.variable} store-theme store-wallpaper bg-background text-foreground flex flex-1 flex-col`}>
       <StoreHeader />
       {children}
       <StoreFooter />

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Storefront wallpaper tile (D67): used as a CSS mask, so only the shape matters; the colour comes from the store's theme. -->
+  <!-- open book -->
+  <g transform="translate(18 22)">
+    <path d="M0 6c8-4 18-4 26 0v28c-8-4-18-4-26 0z"/>
+    <path d="M26 6c8-4 18-4 26 0v28c-8-4-18-4-26 0"/>
+    <path d="M5 12h15M5 18h15M5 24h11M31 12h15M31 18h15M31 24h11"/>
+  </g>
+  <!-- stack of books -->
+  <g transform="translate(150 14)">
+    <rect x="0" y="26" width="52" height="10" rx="2"/>
+    <rect x="5" y="15" width="44" height="11" rx="2"/>
+    <rect x="2" y="5" width="40" height="10" rx="2" transform="rotate(-4 22 10)"/>
+    <path d="M10 26v10M40 15v11"/>
+  </g>
+  <!-- pencil -->
+  <g transform="rotate(-35 95 120) translate(70 116)">
+    <path d="M0 0h42l8 4-8 4H0z"/>
+    <path d="M42 0v8M6 0v8"/>
+  </g>
+  <!-- ruler -->
+  <g transform="rotate(20 190 110) translate(160 102)">
+    <rect x="0" y="0" width="60" height="14" rx="2"/>
+    <path d="M8 0v5M16 0v7M24 0v5M32 0v7M40 0v5M48 0v7"/>
+  </g>
+  <!-- reading glasses -->
+  <g transform="translate(20 150)">
+    <circle cx="10" cy="10" r="9"/>
+    <circle cx="36" cy="10" r="9"/>
+    <path d="M19 9c2-2 6-2 8 0M1 8l-6-4M45 8l6-4"/>
+  </g>
+  <!-- bookmark -->
+  <path d="M120 176h16v26l-8-6-8 6z"/>
+  <!-- single closed book -->
+  <g transform="rotate(12 200 190) translate(182 168)">
+    <rect x="0" y="0" width="30" height="40" rx="3"/>
+    <path d="M5 0v40M11 10h13M11 16h9"/>
+  </g>
+  <!-- small dots for texture -->
+  <g fill="#000" stroke="none">
+    <circle cx="110" cy="40" r="1.6"/>
+    <circle cx="70" cy="210" r="1.6"/>
+    <circle cx="225" cy="70" r="1.6"/>
+    <circle cx="140" cy="235" r="1.2"/>
+    <circle cx="10" cy="100" r="1.2"/>
+  </g>
+</svg>

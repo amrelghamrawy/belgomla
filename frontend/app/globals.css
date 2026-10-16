@@ -122,6 +122,26 @@
   --brand-soft: color-mix(in oklch, var(--primary) 8%, var(--card));
 }
 
+/*
+ * The storefront's library wallpaper (D67): a line-drawn tile of books, pencils and glasses, used as a mask so it
+ * takes the store's primary colour. Fixed behind the page; cards and bands paint over it, so it shows in the gaps.
+ */
+@utility store-wallpaper {
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: color-mix(in oklch, var(--primary) 9%, transparent);
+    mask-image: url("/patterns/library.svg");
+    mask-size: 240px 240px;
+    mask-repeat: repeat;
+  }
+}
+
 /* The hero band's ruled-ledger paper (دفتر الطلبيات): faint lines in the band's text colour, a highlight margin rule. */
 @utility ledger {
   background-image:
