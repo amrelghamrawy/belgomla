@@ -6,6 +6,7 @@ import type {
   FieldDefinition,
   MerchantNotification,
   OverviewReport,
+  StoreWhatsApp,
   TenantUser,
   Unit,
 } from "@/lib/api/types";
@@ -63,6 +64,21 @@ export function shellRoutes(notifications: MerchantNotification[] = [], unread =
     "GET /api/dashboard/me": json(200, { data: dashboardMe() }),
     "GET /api/store/tenant": json(200, { data: tenantSettings() }),
     "GET /api/dashboard/notifications": json(200, { ...page(notifications), unread_count: unread }),
+    "GET /api/dashboard/settings/whatsapp": json(200, { data: storeWhatsApp() }),
+  };
+}
+
+/** D70: the store number as GET /api/dashboard/settings/whatsapp returns it; never linked by default. */
+export function storeWhatsApp(overrides: Partial<StoreWhatsApp> = {}): StoreWhatsApp {
+  return {
+    enabled: true,
+    status: "disconnected",
+    status_label: "غير مربوط",
+    phone: null,
+    connected_at: null,
+    disconnect_reason: null,
+    qr: null,
+    ...overrides,
   };
 }
 

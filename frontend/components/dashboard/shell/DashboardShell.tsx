@@ -23,6 +23,7 @@ import { useTenant } from "@/lib/auth/tenant";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { cn } from "@/lib/utils";
 
+import { StoreWhatsAppBanner } from "../admin/StoreWhatsAppCard";
 import { DashboardNav } from "./DashboardNav";
 import { NotificationsBell } from "./NotificationsBell";
 import { UserMenu } from "./UserMenu";
@@ -85,6 +86,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <NotificationsBell />
           <UserMenu user={me.user} />
         </header>
+        <StoreWhatsAppBanner />
         <main className="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
       </div>
     </SidebarProvider>

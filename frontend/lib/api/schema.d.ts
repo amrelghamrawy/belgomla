@@ -537,6 +537,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/settings/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The store WhatsApp number (D70); while pairing, also the live QR. Poll every few seconds while pairing. */
+        get: operations["dashboardStoreWhatsApp"];
+        put?: never;
+        /** Starts linking the store number by QR (audited). 404 when the feature is disabled, 409 whatsapp_already_connected, 503 wa_gateway_unavailable or wa_gateway_capacity. */
+        post: operations["dashboardStartWhatsAppPairing"];
+        /** Unlinks the store number (audited); logged_out_on_phone is false when the phone may still list the device. */
+        delete: operations["dashboardUnlinkWhatsApp"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/users": {
         parameters: {
             query?: never;
@@ -1577,7 +1596,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "reserved_subdomain" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed";
+        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "reserved_subdomain" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1953,6 +1972,23 @@ export interface components {
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description Hours before a pending order is stale (D10) */
             stale_pending_hours: number;
+        };
+        /** @description D70. A store that never linked a number is disconnected; enabled false hides the section. */
+        StoreWhatsApp: {
+            enabled: boolean;
+            /** @enum {string} */
+            status: "pairing" | "connected" | "disconnected" | "logged_out" | "error";
+            status_label: string;
+            /** @description E.164 */
+            phone: string | null;
+            /** Format: date-time */
+            connected_at: string | null;
+            /** @description unlinked, qr_expired, phone_in_use, or a gateway reason such as logged_out */
+            disconnect_reason: string | null;
+            /** @description PNG data URL, only while pairing */
+            qr: string | null;
+            /** @description Only in the unlink response */
+            logged_out_on_phone?: boolean;
         };
         /** @description Every key is optional; only the sent keys change */
         SettingsRequest: {
@@ -2477,6 +2513,17 @@ export interface components {
             content: {
                 "application/json": {
                     data: components["schemas"]["DashboardSettings"];
+                };
+            };
+        };
+        /** @description The store WhatsApp number */
+        StoreWhatsApp: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["StoreWhatsApp"];
                 };
             };
         };
@@ -3618,6 +3665,52 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardStoreWhatsApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["StoreWhatsApp"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardStartWhatsAppPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["StoreWhatsApp"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            503: components["responses"]["Error"];
+        };
+    };
+    dashboardUnlinkWhatsApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["StoreWhatsApp"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     dashboardUsers: {

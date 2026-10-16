@@ -24,6 +24,7 @@ import { toPiasters } from "@/lib/dashboard/price-math";
 import { applyServerErrors } from "@/lib/forms/server-errors";
 
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { StoreWhatsAppCard } from "./StoreWhatsAppCard";
 
 const copy = ar.dashboard.settings;
 const COLOR = /^#[0-9A-Fa-f]{6}$/;
@@ -97,7 +98,13 @@ export function SettingsPage() {
     return <LoadingBlock rows={8} />;
   }
 
-  return <SettingsForm settings={settings.data} />;
+  return (
+    // The bottom padding keeps the last card clear of the form's fixed save bar on phones.
+    <div className="flex max-w-3xl flex-col gap-4 pb-20 md:pb-0">
+      <SettingsForm settings={settings.data} />
+      <StoreWhatsAppCard />
+    </div>
+  );
 }
 
 /** Branding, contact, working hours, MOV and the visibility/approval switches, saved in one PUT. */
@@ -186,7 +193,7 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
   } as CSSProperties;
 
   return (
-    <form onSubmit={submit} noValidate className="flex max-w-3xl flex-col gap-4 pb-20 md:pb-0">
+    <form onSubmit={submit} noValidate className="flex max-w-3xl flex-col gap-4">
       <PageHeader
         title={copy.title}
         actions={

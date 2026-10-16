@@ -50,6 +50,7 @@ export type OrderHistoryEntry = Schemas["OrderHistoryEntry"];
 
 // Dashboard (tasks/10)
 export type DashboardSettings = Schemas["DashboardSettings"];
+export type StoreWhatsApp = Schemas["StoreWhatsApp"];
 export type SettingsRequest = Schemas["SettingsRequest"];
 export type WorkingHours = Schemas["WorkingHours"];
 export type IdName = Schemas["IdName"];

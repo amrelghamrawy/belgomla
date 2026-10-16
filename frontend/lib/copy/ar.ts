@@ -68,6 +68,9 @@ const errors: Record<ApiErrorCode, string> = {
   use_invitation: "لديك دعوة من المتجر، أكمل التسجيل من رابط الدعوة",
   user_disabled: "تم إيقاف حسابك، تواصل مع مالك المتجر",
   validation_failed: "راجع البيانات المدخلة",
+  wa_gateway_capacity: "لا يمكن ربط أرقام جديدة الآن، تواصل مع الدعم",
+  wa_gateway_unavailable: "خدمة ربط واتساب غير متاحة الآن، حاول بعد قليل",
+  whatsapp_already_connected: "رقم واتساب مربوط بالفعل، افصله أولًا لربط رقم آخر",
 };
 
 export const ar = {

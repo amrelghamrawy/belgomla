@@ -21,6 +21,7 @@ export const queryKeys = {
 
   // Dashboard (tasks/10)
   dashboardSettings: ["dashboard", "settings"] as const,
+  dashboardStoreWhatsApp: ["dashboard", "store-whatsapp"] as const,
   dashboardUsers: ["dashboard", "users"] as const,
   dashboardAudit: (params: ListParams) => ["dashboard", "audit", params] as const,
   dashboardNotifications: ["dashboard", "notifications"] as const,
