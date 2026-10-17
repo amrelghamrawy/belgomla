@@ -29,6 +29,20 @@ describe("ProductCard", () => {
     expect(screen.getByText("هامش ربحك 25%")).toBeInTheDocument();
   });
 
+  it("shows the margin as a badge on the cover and keeps the SKU code off the card", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct()} />);
+
+    expect(screen.getAllByText("هامش ربحك 25%")).toHaveLength(1);
+    expect(screen.queryByText("BK-001")).not.toBeInTheDocument();
+  });
+
+  it("shows no margin badge while prices are hidden", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct({ sku: hiddenPriceSku(), prices_hidden: true })} />);
+
+    expect(screen.queryByText(/هامش ربحك/)).not.toBeInTheDocument();
+  });
   it("D68 calls the reference price the retail price outside the books section", () => {
     stubApi(guest);
     renderWithQuery(<ProductCard product={storeProduct({ category: { id: 9, name: "ألعاب", kind: "toys" } })} />);

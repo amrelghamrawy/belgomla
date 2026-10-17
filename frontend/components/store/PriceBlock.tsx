@@ -14,6 +14,8 @@ type PriceBlockProps = {
   size?: "sm" | "lg";
   /** Where the login link returns to when prices are hidden (D1). */
   loginNext?: string;
+  /** Cards show the margin as a badge on the cover instead. */
+  showMargin?: boolean;
 };
 
 /**
@@ -21,7 +23,7 @@ type PriceBlockProps = {
  * as "هامش ربحك" per D67), the reference price struck through and, on cards, the first quantity tier. When the
  * store hides prices from guests the same box shows a login link, so the layout does not shift either way.
  */
-export function PriceBlock({ sku, pricesHidden, kind, size = "sm", loginNext }: PriceBlockProps) {
+export function PriceBlock({ sku, pricesHidden, kind, size = "sm", loginNext, showMargin = true }: PriceBlockProps) {
   const large = size === "lg";
 
   if (pricesHidden || sku?.base_price === undefined) {
@@ -48,7 +50,7 @@ export function PriceBlock({ sku, pricesHidden, kind, size = "sm", loginNext }: 
         </span>
         {sku.unit !== null && <span className="text-muted-foreground text-xs">/ {sku.unit}</span>}
       </div>
-      {sku.discount_percent && (
+      {showMargin && sku.discount_percent && (
         <span className="bg-highlight-soft text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold">
           <TrendingUpIcon className="size-3.5" aria-hidden />
           {ar.product.margin(formatPercent(sku.discount_percent))}

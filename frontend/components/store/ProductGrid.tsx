@@ -11,9 +11,9 @@ import { ProductCard } from "./ProductCard";
 
 const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 
-/** A horizontal, snap-scrolling row: two cards on a phone, five on a wide screen (D67). */
+/** A horizontal, snap-scrolling row: two cards on a phone, three on a tablet, four on a wide screen (D67). */
 const RAIL =
-  "grid snap-x snap-mandatory auto-cols-[46%] grid-flow-col gap-3 overflow-x-auto pb-2 sm:auto-cols-[calc((100%-2.25rem)/4)] lg:auto-cols-[calc((100%-3rem)/5)] [&>li]:snap-start";
+  "grid snap-x snap-mandatory auto-cols-[46%] grid-flow-col gap-3 overflow-x-auto pb-2 sm:auto-cols-[calc((100%-1.5rem)/3)] lg:auto-cols-[calc((100%-2.25rem)/4)] [&>li]:snap-start";
 
 /** The first images load eagerly: on a phone they are the largest paint. A rail turns by itself. */
 export function ProductGrid({ products, rail = false }: { products: readonly StoreProduct[]; rail?: boolean }) {

@@ -80,7 +80,7 @@ export function StoreHome() {
               {featured.data ? (
                 <ProductGrid products={featured.data.data} rail />
               ) : (
-                <ProductGridSkeleton count={5} rail />
+                <ProductGridSkeleton count={4} rail />
               )}
             </section>
 
@@ -191,7 +191,7 @@ function CategoryRow({ category }: { category: Category }) {
   return (
     <section className="flex flex-col gap-4" aria-labelledby={id}>
       <SectionHeading id={id} title={category.name} href={`/c/${encodeURIComponent(category.slug)}`} />
-      {products.data ? <ProductGrid products={products.data.data} rail /> : <ProductGridSkeleton count={5} rail />}
+      {products.data ? <ProductGrid products={products.data.data} rail /> : <ProductGridSkeleton count={4} rail />}
     </section>
   );
 }
