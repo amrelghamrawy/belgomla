@@ -63,7 +63,8 @@ add-apt-repository -y ppa:ondrej/php
 apt-get update -q
 apt-get install -yq "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-pgsql" "php${PHP_VERSION}-gd" \
     "php${PHP_VERSION}-intl" "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-mbstring" "php${PHP_VERSION}-xml" \
-    "php${PHP_VERSION}-zip" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-opcache"
+    "php${PHP_VERSION}-zip" "php${PHP_VERSION}-curl"
+# OPcache is part of PHP itself since 8.5, so there is no php8.5-opcache package.
 # Redis is reached through predis (composer.json), so no php-redis extension.
 cat > "/etc/php/${PHP_VERSION}/fpm/conf.d/99-belgomla.ini" <<'EOF'
 ; deploy.sh reloads php-fpm, so compiled files never need a timestamp check.
