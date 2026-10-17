@@ -33,6 +33,11 @@ arch('tenancy and audit do not depend on the business modules')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit'])
     ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports']);
 
+// tenant:demo is the one way into the demo seeders from app code (they write through the business modules' actions).
+arch('only tenant:demo runs the demo seeders')
+    ->expect('Database\Seeders')
+    ->toOnlyBeUsedIn(['Database\Seeders', App\Modules\Tenancy\Console\TenantDemoCommand::class]);
+
 /*
 | Catalog ⇄ Pricing (tasks/2-pricing.md). Pricing never looks up Catalog rows by itself: it receives
 | the Product/Sku the controller got from route binding, or reads them through Catalog's queries.

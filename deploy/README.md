@@ -66,6 +66,7 @@ systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belg
    - Pass both options: without them the command prompts.
    - The owner changes the password at the first login (dashboard → settings → users).
    - Run `deploy.sh` once more to see every check green.
+   - **Demo store** (for showing the product, not for a merchant): `sudo -u belgomla php artisan tenant:demo demo --owner-email=<email> --owner-password='<password>'` creates `demo.<domain>` with what `db:seed` gives the local `alnoor` store: the demo catalog (books, supplies, toys) and two months of bookshops, orders and collections. Nothing is sent to the demo customers' phones. Use `SMOKE_TENANT=demo` in `ops.env` if this is the only store.
 8. **Hypersender** (tasks/4 live check):
    - Pair the WhatsApp instance to the platform number (D48).
    - Install the SMS app on the platform Android phone (D49).

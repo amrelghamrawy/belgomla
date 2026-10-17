@@ -38,7 +38,7 @@ Stock Laravel folders (`app/Http`, `app/Models`, `app/Console`) are **never** us
 
 Cross-module rule: module A may call module B only through B's `Actions`, `Queries`, `Services` or `Enums`. Never B's models, requests, or resources. Arch tests enforce this per module as modules are added.
 
-Seeders (`database/seeders`) are dev tooling like factories, not a module: they may read any module's models (to find what to act on, or to type what an action returned) but write only through the modules' actions, like a merchant or customer would. A write no action covers (a demo customer accepting an invitation without an OTP) is a `forceFill` with a comment saying which action it stands for. The model-boundary arch tests list `Database\Seeders` next to `Database\Factories`.
+Seeders (`database/seeders`) are dev tooling like factories, not a module: they may read any module's models (to find what to act on, or to type what an action returned) but write only through the modules' actions, like a merchant or customer would. A write no action covers (a demo customer accepting an invitation without an OTP) is a `forceFill` with a comment saying which action it stands for. The model-boundary arch tests list `Database\Seeders` next to `Database\Factories`. The demo seeders take the store's `subdomain` (default `alnoor`); `tenant:demo` (`Tenancy\Console\TenantDemoCommand`) is the only app code that runs them, so a demo store can be created on any machine, production included; an arch test keeps it that way.
 
 ---
 

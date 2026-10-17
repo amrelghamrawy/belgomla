@@ -9,6 +9,7 @@ use App\Modules\Platform\Console\MonitorCommand;
 use App\Modules\Platform\Console\OpenApiCommand;
 use App\Modules\Tenancy\Console\TenantActivateCommand;
 use App\Modules\Tenancy\Console\TenantCreateCommand;
+use App\Modules\Tenancy\Console\TenantDemoCommand;
 use App\Modules\Tenancy\Console\TenantListCommand;
 use App\Modules\Tenancy\Console\TenantSuspendCommand;
 use App\Modules\Tenancy\Http\Middleware\EnsureSessionTenant;
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         TenantCreateCommand::class,
+        TenantDemoCommand::class,
         TenantSuspendCommand::class,
         TenantActivateCommand::class,
         TenantListCommand::class,

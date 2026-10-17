@@ -42,7 +42,7 @@ use Random\Randomizer;
 use RuntimeException;
 
 /**
- * Demo activity for the `alnoor` store, on top of StorefrontDemoSeeder's catalog: 14 bookshops across Egypt as
+ * Demo activity for the `alnoor` store (or the one `tenant:demo` creates), on top of StorefrontDemoSeeder's catalog: 14 bookshops across Egypt as
  * customers and about two months of wholesale orders placed, confirmed, delivered, cancelled and collected
  * through the module actions, with the clock moved to each step's time. The result feeds every dashboard
  * screen: delivered sales in the last 30 days, orders in every status, stale pending orders (D10), unpaid and
@@ -105,8 +105,9 @@ final class DemoActivitySeeder extends Seeder
         RecordCollection $collect,
         AdjustStock $adjust,
         MarkNotificationsRead $markRead,
+        string $subdomain = 'alnoor',
     ): void {
-        $tenant = Tenant::query()->where('subdomain', 'alnoor')->firstOrFail();
+        $tenant = Tenant::query()->where('subdomain', $subdomain)->firstOrFail();
         $this->random = new Randomizer(new Mt19937(2026));
         $frozen = CarbonImmutable::getTestNow();
         $now = CarbonImmutable::now('Africa/Cairo');

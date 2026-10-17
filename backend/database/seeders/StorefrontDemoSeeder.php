@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * Local development and Playwright catalog for the `alnoor` tenant (tasks/9): store contacts, a minimum order
+ * Local development and Playwright catalog for the `alnoor` tenant (tasks/9), or the store `tenant:demo` creates: store contacts, a minimum order
  * value of 500 and the three sections of D68. Books (كتب خارجية): a stage/grade tree, 34 books with
  * grade/subject/publisher facets, cover and wholesale prices, a few tiers and carton MOQs, stock on every
  * book, one coming-soon book and one final-revision edition linked to its main book. School supplies
@@ -72,8 +72,9 @@ final class StorefrontDemoSeeder extends Seeder
         CreateCategory $categories,
         CreateProduct $products,
         AddProductRelation $relations,
+        string $subdomain = 'alnoor',
     ): void {
-        $tenant = Tenant::query()->where('subdomain', 'alnoor')->firstOrFail();
+        $tenant = Tenant::query()->where('subdomain', $subdomain)->firstOrFail();
 
         $context->runAs($tenant, fn () => DB::transaction(function () use ($tenant, $tree, $existingUnits, $fields, $settings, $templates, $fieldDefinitions, $fieldOptions, $units, $categories, $products, $relations): void {
             // The demo tree's books root marks a seeded catalog; a dev database may hold other test data.

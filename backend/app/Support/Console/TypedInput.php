@@ -36,4 +36,15 @@ trait TypedInput
 
         return $value;
     }
+
+    protected function askString(string $question, bool $secret = false): string
+    {
+        $answer = $secret ? $this->secret($question) : $this->ask($question);
+
+        if (! is_string($answer) || $answer === '') {
+            throw new InvalidArgumentException("{$question} is required.");
+        }
+
+        return $answer;
+    }
 }
