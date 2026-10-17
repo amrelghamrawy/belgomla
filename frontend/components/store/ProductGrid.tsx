@@ -1,4 +1,9 @@
+"use client";
+
+import { useRef } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import type { StoreProduct } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -10,10 +15,13 @@ const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-
 const RAIL =
   "grid snap-x snap-mandatory auto-cols-[46%] grid-flow-col gap-3 overflow-x-auto pb-2 sm:auto-cols-[calc((100%-2.25rem)/4)] lg:auto-cols-[calc((100%-3rem)/5)] [&>li]:snap-start";
 
-/** The first images load eagerly: on a phone they are the largest paint. */
+/** The first images load eagerly: on a phone they are the largest paint. A rail turns by itself. */
 export function ProductGrid({ products, rail = false }: { products: readonly StoreProduct[]; rail?: boolean }) {
+  const list = useRef<HTMLUListElement>(null);
+  useAutoScroll(list, rail);
+
   return (
-    <ul className={rail ? RAIL : GRID}>
+    <ul ref={list} className={rail ? RAIL : GRID}>
       {products.map((product, index) => (
         <li key={product.id} className="min-w-0">
           <ProductCard product={product} priority={index < 2} />
