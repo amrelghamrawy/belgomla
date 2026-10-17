@@ -14,13 +14,7 @@ backend/.env.production
 backend/.phpunit.cache/
 backend/.phpunit.result.cache
 backend/storage/*.key
-backend/storage/app/public/
-backend/storage/app/private/
-backend/storage/framework/cache/data/
-backend/storage/framework/sessions/
-backend/storage/framework/testing/
-backend/storage/framework/views/
-backend/storage/logs/
+# storage/ subfolders: their own .gitignore files keep the contents out and the folders in git
 backend/bootstrap/cache/*.php
 backend/public/build/
 backend/public/hot
