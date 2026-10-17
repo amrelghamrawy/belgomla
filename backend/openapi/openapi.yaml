@@ -3327,15 +3327,15 @@ components:
         name: { type: string }
         slug: { type: string }
         kind: { $ref: '#/components/schemas/CategoryKind' }
-        image_url: { type: [string, 'null'] }
-        parent_id: { type: [integer, 'null'] }
-        sort_order: { type: integer }
-        status: { $ref: '#/components/schemas/ArchiveStatus' }
         icon:
           description: Null when the merchant chose none; the storefront then picks one from the name
           oneOf:
             - $ref: '#/components/schemas/CategoryIcon'
             - type: 'null'
+        image_url: { type: [string, 'null'] }
+        parent_id: { type: [integer, 'null'] }
+        sort_order: { type: integer }
+        status: { $ref: '#/components/schemas/ArchiveStatus' }
         children:
           type: array
           items: { $ref: '#/components/schemas/DashboardCategory' }

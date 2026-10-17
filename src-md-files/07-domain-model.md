@@ -103,8 +103,8 @@ erDiagram
 | sort_order | int          |                                                         |
 | image_path | varchar      | nullable                                                |
 | kind       | varchar(20)  | `books`, `stationery`, `toys`, `general` (default); set on roots, copied to the subtree like `path` (D68) |
-| status     | enum         | `active`, `archived` (BR-P06)                           |
 | icon       | varchar(40)  | nullable; `CategoryIcon` value for the storefront tile, null = guessed from the name (D73) |
+| status     | enum         | `active`, `archived` (BR-P06)                           |
 
 ### `units`
 

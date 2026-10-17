@@ -7660,6 +7660,17 @@
                     "kind": {
                         "$ref": "#/components/schemas/CategoryKind"
                     },
+                    "icon": {
+                        "description": "Null when the merchant chose none; the storefront then picks one from the name",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CategoryIcon"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
                     "image_url": {
                         "type": [
                             "string",
@@ -7677,17 +7688,6 @@
                     },
                     "status": {
                         "$ref": "#/components/schemas/ArchiveStatus"
-                    },
-                    "icon": {
-                        "description": "Null when the merchant chose none; the storefront then picks one from the name",
-                        "oneOf": [
-                            {
-                                "$ref": "#/components/schemas/CategoryIcon"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ]
                     },
                     "children": {
                         "type": "array",

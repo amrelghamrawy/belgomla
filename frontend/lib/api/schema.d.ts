@@ -2032,12 +2032,12 @@ export interface components {
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"];
+            /** @description Null when the merchant chose none; the storefront then picks one from the name */
+            icon: components["schemas"]["CategoryIcon"] | null;
             image_url: string | null;
             parent_id: number | null;
             sort_order: number;
             status: components["schemas"]["ArchiveStatus"];
-            /** @description Null when the merchant chose none; the storefront then picks one from the name */
-            icon: components["schemas"]["CategoryIcon"] | null;
             children: components["schemas"]["DashboardCategory"][];
         };
         Unit: {
