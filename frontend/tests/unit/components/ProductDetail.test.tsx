@@ -55,8 +55,11 @@ describe("ProductDetail", () => {
     renderWithQuery(<ProductDetail />);
 
     expect(await screen.findByRole("spinbutton", { name: "الكمية" })).toHaveValue(2);
-    expect(screen.getByText("أقل كمية 2 كرتونة · المتاح 20 كرتونة")).toBeInTheDocument();
+    expect(screen.getByText("أقل كمية 2 كرتونة")).toBeInTheDocument();
+    expect(screen.queryByText(/المتاح/)).not.toBeInTheDocument();
+    expect(screen.getByText("الإجمالي 40 نسخة")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "زيادة الكمية" }));
+    expect(screen.getByText("الإجمالي 60 نسخة")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "أضف إلى السلة" }));
 
     await waitFor(() => expect(success).toHaveBeenCalled());

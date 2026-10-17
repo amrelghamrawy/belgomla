@@ -64,8 +64,13 @@ export function AddToCartBar({ product }: { product: StoreProduct }) {
     <div className="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
       <div className="mx-auto flex max-w-6xl flex-col gap-2">
         {orderable && (
-          <p className="text-muted-foreground text-xs">
-            {ar.product.minQuantity(bounds.min, unit)} · {ar.product.maxAvailable(bounds.max, unit)}
+          <p className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
+            <span>{ar.product.minQuantity(bounds.min, unit)}</span>
+            {sku.conversion_factor > 1 && (
+              <span className="text-foreground font-semibold tabular-nums">
+                {ar.product.totalPieces(quantity * sku.conversion_factor)}
+              </span>
+            )}
           </p>
         )}
         <div className="flex items-center gap-3">

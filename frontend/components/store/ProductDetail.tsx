@@ -1,6 +1,8 @@
 "use client";
 
+import { HashIcon, LayersIcon, PackageIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { StatusPage } from "@/components/shared/StatusPage";
 import { Badge } from "@/components/ui/badge";
@@ -48,32 +50,39 @@ export function ProductDetail() {
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 pt-4 pb-40 md:pb-8">
-      <div className="grid gap-6 md:grid-cols-2">
-        <ProductGallery
-          images={product.gallery}
-          name={product.name}
-          fallback={<GeneratedCover product={product} className="rounded-sm" />}
-        />
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            {product.category && <p className="text-muted-foreground text-sm">{product.category.name}</p>}
-            <h1 className="font-display text-2xl leading-9 font-bold">{product.name}</h1>
-            {product.sku?.coming_soon && <Badge className="w-fit">{ar.catalog.comingSoon}</Badge>}
-          </div>
-          <PriceBlock
-            sku={product.sku}
-            pricesHidden={product.prices_hidden === true}
-            kind={product.category?.kind ?? null}
-            size="lg"
-            loginNext={`/p/${encodeURIComponent(slug)}`}
+      <div className="grid items-start gap-6 md:grid-cols-2 lg:gap-10">
+        <div className="md:sticky md:top-20">
+          <ProductGallery
+            images={product.gallery}
+            name={product.name}
+            fallback={<GeneratedCover product={product} className="rounded-sm" />}
           />
-          {product.sku && <OrderingFacts sku={product.sku} />}
-          {product.sku?.tiers && product.sku.tiers.length > 0 && <TiersTable sku={product.sku} />}
-          <AddToCartBar product={product} />
-          <CustomFields product={product} />
-          {product.description && (
-            <p className="text-muted-foreground leading-7 whitespace-pre-line">{product.description}</p>
-          )}
+        </div>
+        <div className="flex min-w-0 flex-col gap-4">
+          <section className="bg-card shadow-card flex flex-col gap-5 rounded-2xl border p-4 sm:p-6">
+            <div className="flex flex-col items-start gap-2">
+              {product.category && (
+                <span className="bg-brand-soft text-primary rounded-full px-3 py-1 text-xs font-semibold">
+                  {product.category.name}
+                </span>
+              )}
+              <h1 className="font-display text-2xl leading-snug font-bold md:text-3xl">{product.name}</h1>
+              {product.sku?.coming_soon && <Badge>{ar.catalog.comingSoon}</Badge>}
+            </div>
+            <div className="bg-brand-soft rounded-xl p-4">
+              <PriceBlock
+                sku={product.sku}
+                pricesHidden={product.prices_hidden === true}
+                kind={product.category?.kind ?? null}
+                size="lg"
+                loginNext={`/p/${encodeURIComponent(slug)}`}
+              />
+            </div>
+            {product.sku && <OrderingFacts sku={product.sku} />}
+            {product.sku?.tiers && product.sku.tiers.length > 0 && <TiersTable sku={product.sku} />}
+            <AddToCartBar product={product} />
+          </section>
+          <AboutProduct product={product} />
         </div>
       </div>
       {product.related.length > 0 && (
@@ -95,27 +104,39 @@ export function ProductDetail() {
   );
 }
 
+/** Unit, minimum order and code as three tiles, the facts a retailer checks before choosing a quantity. */
 function OrderingFacts({ sku }: { sku: StoreSku }) {
   const unit = sku.unit ?? "";
 
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border p-3 text-sm">
-      <dt className="text-muted-foreground">{ar.product.code}</dt>
-      <dd>
-        <bdi>{sku.code}</bdi>
-      </dd>
-      <dt className="text-muted-foreground">{ar.product.unit}</dt>
-      <dd>
+    <dl className="grid grid-cols-3 gap-2 text-sm">
+      <Fact icon={<PackageIcon />} label={ar.product.unit}>
         {unit}
         {sku.conversion_factor > 1 && (
-          <span className="text-muted-foreground"> ({ar.product.conversion(unit, sku.conversion_factor)})</span>
+          <span className="text-muted-foreground block text-xs font-normal">
+            ({ar.product.conversion(unit, sku.conversion_factor)})
+          </span>
         )}
-      </dd>
-      <dt className="text-muted-foreground">{ar.product.moq}</dt>
-      <dd>
+      </Fact>
+      <Fact icon={<LayersIcon />} label={ar.product.moq}>
         {sku.moq} {unit}
-      </dd>
+      </Fact>
+      <Fact icon={<HashIcon />} label={ar.product.code}>
+        <bdi className="tabular-nums">{sku.code}</bdi>
+      </Fact>
     </dl>
+  );
+}
+
+function Fact({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 rounded-xl border p-2.5 sm:p-3">
+      <dt className="text-muted-foreground flex items-start gap-1.5 text-xs leading-4 [&_svg]:size-3.5 [&_svg]:shrink-0">
+        {icon}
+        <span>{label}</span>
+      </dt>
+      <dd className="font-semibold wrap-break-word">{children}</dd>
+    </div>
   );
 }
 
@@ -147,24 +168,33 @@ function TiersTable({ sku }: { sku: StoreSku }) {
   );
 }
 
-function CustomFields({ product }: { product: StoreProductDetail }) {
-  if (product.custom_fields.length === 0) {
+/** The product's own fields as label/value rows, then the description. */
+function AboutProduct({ product }: { product: StoreProductDetail }) {
+  if (product.custom_fields.length === 0 && !product.description) {
     return null;
   }
 
   return (
-    <section aria-labelledby="product-details" className="flex flex-col gap-2">
-      <h2 id="product-details" className="font-bold">
+    <section
+      aria-labelledby="product-details"
+      className="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-4 sm:p-6"
+    >
+      <h2 id="product-details" className="font-display text-lg font-bold">
         {ar.product.details}
       </h2>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        {product.custom_fields.map((field) => (
-          <div key={field.key} className="contents">
-            <dt className="text-muted-foreground">{field.label}</dt>
-            <dd>{field.value}</dd>
-          </div>
-        ))}
-      </dl>
+      {product.custom_fields.length > 0 && (
+        <dl className="divide-y text-sm">
+          {product.custom_fields.map((field) => (
+            <div key={field.key} className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted-foreground shrink-0">{field.label}</dt>
+              <dd className="text-end font-medium">{field.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {product.description && (
+        <p className="text-muted-foreground border-t pt-3 leading-8 whitespace-pre-line">{product.description}</p>
+      )}
     </section>
   );
 }
