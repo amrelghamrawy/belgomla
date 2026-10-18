@@ -27,7 +27,7 @@ test('D24 the statement lists the customer\'s orders with totals, collected and 
         ->assertJsonPath('customer', ['id' => $this->customer->id, 'name' => $this->customer->name, 'phone' => $this->customer->phone])
         ->assertJsonPath('summary', ['orders_count' => 2, 'total' => '800.00', 'collected' => '300.00', 'outstanding' => '300.00'])
         ->assertExactJsonStructure([
-            'data' => ['*' => ['number', 'status', 'status_label', 'placed_at', 'delivered_at', 'order_total', 'collected_amount', 'balance', 'collection_status']],
+            'data' => ['*' => ['number', 'status', 'status_label', 'placed_at', 'delivered_at', 'order_total', 'returned_total', 'net_total', 'collected_amount', 'balance', 'collection_status']],
             'links', 'meta', 'customer' => ['id', 'name', 'phone'], 'summary' => ['orders_count', 'total', 'collected', 'outstanding'],
         ]);
 });

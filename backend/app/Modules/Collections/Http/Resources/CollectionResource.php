@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * A collection record (08-api-contract.md §10, BR-C02). `order` carries the balance after this change, so the
+ * A collection record (08-api-contract.md §10, BR-C02): a payment, or a refund paid back after a return (BR-R04). `order` carries the balance after this change, so the
  * dashboard refreshes the order's collected amount and status from a record/void answer; `customer` appears when
  * the order's customer is loaded (the collections list), not on the order detail.
  *
@@ -31,6 +31,7 @@ final class CollectionResource extends JsonResource
                 'id' => $order->id,
                 'number' => $order->number,
                 'order_total' => $order->order_total,
+                'net_total' => $order->netTotal(),
                 'collected_amount' => $order->collected_amount,
                 'collection_status' => $order->collection_status->value,
             ],
@@ -38,6 +39,9 @@ final class CollectionResource extends JsonResource
                 'id' => $order->customer->id,
                 'name' => $order->customer->name,
             ]),
+            'kind' => $collection->kind->value,
+            'kind_label' => $collection->kind->label(),
+            'order_return_id' => $collection->order_return_id,
             'amount' => $collection->amount,
             'method' => $collection->method->value,
             'method_label' => $collection->method->label(),

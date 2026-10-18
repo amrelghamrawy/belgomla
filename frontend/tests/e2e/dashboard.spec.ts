@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { loginAsOwner, placeShopperOrder, uniqueSuffix } from "./helpers";
+import { api, loginAsOwner, placeShopperOrder, uniqueSuffix } from "./helpers";
 
 // The merchant dashboard against the real stack (tasks/10). Needs the seeded backend (php artisan
 // migrate:fresh --seed). Every run creates its own names, phones and orders, so runs do not collide, and the
@@ -115,12 +115,53 @@ test("BR-INV08 a reserved quantity blocks the adjustment, then the order is conf
   await expect(page.getByRole("link", { name: `#${order.number}` })).toBeVisible();
 });
 
+test("BR-R01 BR-R03 a delivered order takes a return of 2: the stock comes back and the balance drops", async ({
+  page,
+  browser,
+}) => {
+  const order = await placeShopperOrder(browser, "الأضواء رياضيات ثانية إعدادي");
+  await loginAsOwner(page);
+  const stock = async () =>
+    (
+      await api<{ data: { on_hand: number; conversion_factor: number } }>(
+        page,
+        "GET",
+        `/api/dashboard/inventory/${order.sku.id}`,
+      )
+    ).body.data;
+
+  await page.goto(`/dashboard/orders/${order.number}`);
+  await page.getByRole("button", { name: "تأكيد الطلب" }).click();
+  await expect(page.getByTestId("order-status")).toHaveText("مؤكد");
+  await page.getByRole("button", { name: "تم التسليم", exact: true }).click();
+  await expect(page.getByTestId("order-status")).toHaveText("تم التوصيل");
+  const balanceBefore = await page.getByTestId("order-balance").textContent();
+  const before = await stock();
+
+  await page.getByRole("button", { name: "تسجيل مرتجع" }).click();
+  const dialog = page.getByRole("dialog");
+  const plus = dialog.getByRole("button", { name: /^الكمية المرتجعة \+/ });
+  await plus.click();
+  await plus.click();
+  await dialog.getByLabel("سبب المرتجع").fill("مرتجع نهاية الموسم");
+  await dialog.getByRole("button", { name: "تسجيل مرتجع" }).click();
+
+  await expect(page.getByTestId("order-returns")).toContainText("مرتجع #1");
+  await expect(page.getByTestId("order-returned")).toBeVisible();
+  await expect(page.getByTestId("order-balance")).not.toHaveText(balanceBefore ?? "");
+  expect((await stock()).on_hand).toBe(before.on_hand + 2 * before.conversion_factor);
+
+  await page.goto("/dashboard/returns");
+  await expect(page.getByRole("link", { name: new RegExp(`#${order.number}`) })).toBeVisible();
+});
+
 test("no dashboard screen scrolls sideways, on a phone or a desktop (rules/03 §3)", async ({ page }) => {
   await loginAsOwner(page);
   const screens = [
     "/dashboard",
     "/dashboard/orders",
     "/dashboard/collections",
+    "/dashboard/returns",
     "/dashboard/customers",
     "/dashboard/reports",
     "/dashboard/products",

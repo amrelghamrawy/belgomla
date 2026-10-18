@@ -8,19 +8,23 @@ use App\Modules\Customers\Contracts\RecentOrders;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Orders\Contracts\CollectsPayments;
 use App\Modules\Orders\Contracts\OrderCollections;
+use App\Modules\Orders\Contracts\RefundsPayments;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Policies\OrderPolicy;
+use App\Modules\Orders\Policies\OrderReturnPolicy;
 use App\Modules\Orders\Services\CustomerRecentOrders;
 use App\Modules\Orders\Services\NullCollectsPayments;
 use App\Modules\Orders\Services\NullOrderCollections;
+use App\Modules\Orders\Services\NullRefundsPayments;
 use App\Modules\Orders\Services\OrdersHoldingSku;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Orders wiring: the order policy for the storefront, and the read contracts earlier modules declared for
+ * Orders wiring: the order policy for the storefront and the return policy (BR-R06), and the read contracts earlier modules declared for
  * orders — the orders holding a reservation (Inventory, BR-INV08) and a customer's recent orders (Customers).
- * Orders' own contracts default to their null implementations (no collections recorded or listed);
+ * Orders' own contracts default to their null implementations (no collections recorded, listed or refunded);
  * CollectionsServiceProvider, registered after this one, rebinds them.
  */
 final class OrdersServiceProvider extends ServiceProvider
@@ -31,10 +35,12 @@ final class OrdersServiceProvider extends ServiceProvider
         RecentOrders::class => CustomerRecentOrders::class,
         CollectsPayments::class => NullCollectsPayments::class,
         OrderCollections::class => NullOrderCollections::class,
+        RefundsPayments::class => NullRefundsPayments::class,
     ];
 
     public function boot(): void
     {
         Gate::policy(Order::class, OrderPolicy::class);
+        Gate::policy(OrderReturn::class, OrderReturnPolicy::class);
     }
 }

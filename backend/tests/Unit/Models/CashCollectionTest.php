@@ -13,7 +13,7 @@ test('to array', function (): void {
     $collection = $this->inTenant(fn (): ?CashCollection => CashCollection::factory()->create()->fresh());
 
     expect(array_keys($collection?->toArray() ?? []))->toBe([
-        'id', 'tenant_id', 'order_id', 'amount', 'method', 'collected_at', 'recorded_by', 'note', 'voided_at', 'void_reason', 'voided_by', 'created_at', 'updated_at',
+        'id', 'tenant_id', 'order_id', 'amount', 'method', 'collected_at', 'recorded_by', 'note', 'voided_at', 'void_reason', 'voided_by', 'created_at', 'updated_at', 'kind', 'order_return_id',
     ]);
 });
 

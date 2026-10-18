@@ -30,8 +30,11 @@ test('BR-C02 a collection renders its order balance, customer, money as a string
 
     expect(rendered(new CollectionResource($this->collection->setRelation('order', $this->order)), dashboardRequest('/api/dashboard/collections')))->toBe([
         'id' => $this->collection->id,
-        'order' => ['id' => $this->order->id, 'number' => $this->order->number, 'order_total' => '500.00', 'collected_amount' => '200.00', 'collection_status' => 'partially_collected'],
+        'order' => ['id' => $this->order->id, 'number' => $this->order->number, 'order_total' => '500.00', 'net_total' => '500.00', 'collected_amount' => '200.00', 'collection_status' => 'partially_collected'],
         'customer' => ['id' => $this->customer->id, 'name' => $this->customer->name],
+        'kind' => 'payment',
+        'kind_label' => 'تحصيل',
+        'order_return_id' => null,
         'amount' => '200.00',
         'method' => 'cash',
         'method_label' => 'نقدي',
@@ -69,6 +72,8 @@ test('D24 a statement order renders its balance', function (): void {
         'placed_at' => now()->toIso8601String(),
         'delivered_at' => now()->toIso8601String(),
         'order_total' => '500.00',
+        'returned_total' => '0.00',
+        'net_total' => '500.00',
         'collected_amount' => '200.00',
         'balance' => '300.00',
         'collection_status' => 'partially_collected',
@@ -85,20 +90,20 @@ test('D24 the statement head names the customer and carries the summary', functi
 });
 
 test('D5 the overview renders its five figures', function (): void {
-    $overview = ['orders_by_status' => ['pending' => 1], 'today' => ['orders' => 1, 'total' => '10.00'], 'stale_pending' => 0, 'outstanding_total' => '0.00', 'low_stock_count' => 2];
+    $overview = ['orders_by_status' => ['pending' => 1], 'today' => ['orders' => 1, 'total' => '10.00', 'returns' => '0.00'], 'stale_pending' => 0, 'outstanding_total' => '0.00', 'low_stock_count' => 2];
 
     expect(rendered(new OverviewResource($overview), dashboardRequest()))->toBe($overview);
 });
 
 test('D5 the sales report renders its range, grouping, buckets and totals', function (): void {
-    $sales = ['buckets' => [['period_start' => '2026-10-10', 'orders' => 1, 'total' => '10.00']], 'orders' => 1, 'total' => '10.00'];
+    $sales = ['buckets' => [['period_start' => '2026-10-10', 'orders' => 1, 'gross' => '10.00', 'returns' => '4.00', 'net' => '6.00']], 'orders' => 1, 'gross' => '10.00', 'returns' => '4.00', 'net' => '6.00'];
 
     expect(rendered(new SalesReportResource($sales, new SalesReportData('2026-10-10', '2026-10-10', SalesGrouping::Week, 'Africa/Cairo')), dashboardRequest()))->toBe([
         'from' => '2026-10-10',
         'to' => '2026-10-10',
         'group' => 'week',
-        'buckets' => [['period_start' => '2026-10-10', 'orders' => 1, 'total' => '10.00']],
-        'totals' => ['orders' => 1, 'total' => '10.00'],
+        'buckets' => [['period_start' => '2026-10-10', 'orders' => 1, 'gross' => '10.00', 'returns' => '4.00', 'net' => '6.00']],
+        'totals' => ['orders' => 1, 'gross' => '10.00', 'returns' => '4.00', 'net' => '6.00'],
     ]);
 });
 

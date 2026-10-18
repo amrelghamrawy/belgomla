@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Collections\Models;
 
+use App\Modules\Collections\Enums\CollectionKind;
 use App\Modules\Collections\Enums\CollectionMethod;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -14,13 +15,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * BR-C02: one cash collection of an order (table `collections`; named apart from Laravel's Collection). Voided with
+ * BR-C02: one cash collection of an order (table `collections`; named apart from Laravel's Collection): a `payment`
+ * from the customer or a `refund` paid back after a return (BR-R04, tied to it by `order_return_id`). Voided with
  * a reason, never deleted. `recorded_by` / `voided_by` are tenant user ids (null = system); Tenancy models stay
  * inside Tenancy, so there is no relation to them.
  *
  * @property int $id
  * @property int $tenant_id
  * @property int $order_id
+ * @property CollectionKind $kind
+ * @property int|null $order_return_id
  * @property string $amount
  * @property CollectionMethod $method
  * @property CarbonImmutable $collected_at
@@ -43,7 +47,7 @@ final class CashCollection extends Model
     protected $table = 'collections';
 
     /** @var array<string, string> */
-    protected $attributes = ['method' => 'cash'];
+    protected $attributes = ['method' => 'cash', 'kind' => 'payment'];
 
     protected static function newFactory(): CashCollectionFactory
     {
@@ -64,6 +68,8 @@ final class CashCollection extends Model
     protected function casts(): array
     {
         return [
+            'kind' => CollectionKind::class,
+            'order_return_id' => 'integer',
             'amount' => 'decimal:2',
             'method' => CollectionMethod::class,
             'collected_at' => 'datetime',

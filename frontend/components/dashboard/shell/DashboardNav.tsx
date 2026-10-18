@@ -12,6 +12,7 @@ import {
   SettingsIcon,
   ShoppingBagIcon,
   SlidersHorizontalIcon,
+  Undo2Icon,
   UsersIcon,
   UserCogIcon,
   WalletIcon,
@@ -40,6 +41,7 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: copy.overview, icon: LayoutDashboardIcon },
       { href: "/dashboard/orders", label: copy.orders, icon: ShoppingBagIcon },
+      { href: "/dashboard/returns", label: copy.returns, icon: Undo2Icon },
       { href: "/dashboard/collections", label: copy.collections, icon: WalletIcon },
       { href: "/dashboard/customers", label: copy.customers, icon: UsersIcon },
       { href: "/dashboard/reports", label: copy.reports, icon: BarChart3Icon },

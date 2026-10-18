@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionsPage } from "@/components/dashboard/collections/CollectionsPage";
 import { OrderDetail } from "@/components/dashboard/orders/OrderDetailPage";
 import { OrdersPage } from "@/components/dashboard/orders/OrdersPage";
-import type { Collection, DashboardCustomer, DashboardOrderDetail } from "@/lib/api/types";
+import type { Collection, DashboardCustomer, DashboardOrderDetail, OrderReturn } from "@/lib/api/types";
 
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
@@ -19,10 +19,14 @@ function collection(overrides: Partial<Collection> = {}): Collection {
       id: 1,
       number: 1001,
       order_total: "450.00",
+      net_total: "450.00",
       collected_amount: "100.00",
       collection_status: "partially_collected",
     },
     customer: { id: 7, name: "مكتبة الأمل" },
+    kind: "payment",
+    kind_label: "تحصيل",
+    order_return_id: null,
     amount: "100.00",
     method: "cash",
     method_label: "نقدي",
@@ -38,6 +42,37 @@ function collection(overrides: Partial<Collection> = {}): Collection {
   };
 }
 
+function orderReturn(overrides: Partial<OrderReturn> = {}): OrderReturn {
+  return {
+    id: 41,
+    number: 1,
+    total: "180.00",
+    refund_amount: "90.00",
+    reason: "مرتجع نهاية الموسم",
+    returned_at: "2026-10-04T08:00:00Z",
+    recorded_by: 1,
+    is_voided: false,
+    voided_at: null,
+    void_reason: null,
+    voided_by: null,
+    items: [
+      {
+        id: 51,
+        order_item_id: 61,
+        product_name: "الأضواء علوم",
+        sku_code: "ADW-SCI-1",
+        unit: "كرتونة",
+        quantity: 2,
+        quantity_base: 40,
+        unit_price: "90.00",
+        line_total: "180.00",
+      },
+    ],
+    created_at: "2026-10-04T08:00:00Z",
+    ...overrides,
+  };
+}
+
 function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDetail {
   return {
     id: 1,
@@ -47,6 +82,8 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
     placed_at: "2026-10-02T08:00:00Z",
     items_total: "450.00",
     order_total: "450.00",
+    returned_total: "0.00",
+    net_total: "450.00",
     collection_status: "unpaid",
     collected_amount: "0.00",
     delivery: {
@@ -96,6 +133,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
       },
     ],
     collections: [],
+    returns: [],
     ...overrides,
   };
 }
@@ -120,25 +158,91 @@ describe("OrderDetail actions", () => {
     ).toEqual(["خرج للتوصيل", "تم التسليم", "تسليم وتحصيل كامل", "تسجيل تحصيل", "إلغاء الطلب"]);
   });
 
-  it("offers nothing but collecting on a delivered order with money left, and says a settled one is final", () => {
+  it("BR-R01 offers collecting and a return on a delivered order, only the return once settled, nothing once cancelled", () => {
     stubApi({});
+    const actions = () =>
+      within(screen.getByTestId("order-actions"))
+        .getAllByRole("button")
+        .map((button) => button.textContent);
     const { rerender } = renderWithQuery(
       <OrderDetail order={order({ status: "delivered", collection_status: "unpaid" })} />,
     );
 
-    expect(
-      within(screen.getByTestId("order-actions"))
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["تسجيل تحصيل"]);
+    expect(actions()).toEqual(["تسجيل تحصيل", "تسجيل مرتجع"]);
 
     rerender(
       <OrderDetail
         order={order({ status: "delivered", collected_amount: "450.00", collection_status: "collected" })}
       />,
     );
+    expect(actions()).toEqual(["تسجيل مرتجع"]);
 
+    rerender(
+      <OrderDetail order={order({ status: "cancelled", cancel_reason: "نفاد", cancelled_by: "tenant_user" })} />,
+    );
     expect(screen.getByText("هذا الطلب في حالته النهائية.")).toBeInTheDocument();
+  });
+
+  it("BR-R05 shows the returned and net totals and the balance on the net total", () => {
+    stubApi({});
+    renderWithQuery(
+      <OrderDetail
+        order={order({ status: "delivered", returned_total: "90.00", net_total: "360.00", collected_amount: "100.00" })}
+      />,
+    );
+
+    expect(screen.getByTestId("order-returned")).toHaveTextContent("90.00 ج.م");
+    expect(screen.getByTestId("order-balance")).toHaveTextContent("260.00 ج.م");
+  });
+
+  it("BR-R06 lists the returns, voided struck out, and voids a live one with a reason", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/returns/41/void": json(200, { data: orderReturn({ is_voided: true }) }),
+      "GET /api/dashboard/orders/1001": json(200, { data: order() }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(
+      <OrderDetail
+        order={order({
+          status: "delivered",
+          returns: [
+            orderReturn(),
+            orderReturn({
+              id: 42,
+              number: 2,
+              refund_amount: "0.00",
+              is_voided: true,
+              voided_at: "2026-10-05T08:00:00Z",
+              void_reason: "مكرر",
+            }),
+          ],
+        })}
+      />,
+    );
+
+    const list = screen.getByTestId("order-returns");
+    expect(within(list).getByText("سبب الإلغاء: مكرر")).toBeInTheDocument();
+    expect(within(list).getByText("رُد للعميل 90.00 ج.م")).toBeInTheDocument();
+    await user.click(within(list).getByRole("button", { name: "إلغاء المرتجع" }));
+    await user.type(screen.getByLabelText("السبب"), "سجلناه بالخطأ");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "إلغاء المرتجع" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم إلغاء المرتجع"));
+    const call = callsTo(fetchMock, "POST /api/dashboard/returns/41/void")[0];
+    expect(call?.body).toEqual({ reason: "سجلناه بالخطأ" });
+    expect(call?.headers["Idempotency-Key"]).toMatch(/^void-return-/);
+  });
+
+  it("BR-R04 shows a refund collection with a minus sign and a refund badge", () => {
+    stubApi({});
+    renderWithQuery(
+      <OrderDetail
+        order={order({ collections: [collection({ kind: "refund", kind_label: "رد", order_return_id: 41 })] })}
+      />,
+    );
+
+    const line = within(screen.getByTestId("order-collections")).getByText(/−100.00 ج.م/);
+    expect(line).toHaveTextContent("رد");
   });
 
   it("D55 moves the order forward with an Idempotency-Key and shows the new status", async () => {

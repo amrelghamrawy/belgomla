@@ -496,10 +496,11 @@ Every change to On Hand is recorded as an inventory movement with type:
 - `opening` (initial stock)
 - `adjustment` (manual merchant change, with reason)
 - `sale` (delivery deduction, linked to the order)
+- `return` (V2, BR-R03/R06: goods a customer brought back, positive and linked to the order; negative when the return is voided)
 
 Reservation changes are not movements; they are derived from order status.
 
-**Returns (المرتجع) are not in V1. They are planned for V2** (decided 2026-10-09). Because the school-book trade relies on end-of-season returns, the domain model reserves the `return` movement type and an `order_returns` entity now, so V2 returns ship without migrating existing data.
+Returns (المرتجع) were left out of V1 and shipped as the first V2 increment (D20, §H2).
 
 ### BR-INV08 — Adjustments Cannot Go Below Reserved
 
@@ -552,7 +553,7 @@ Order totals and item prices are snapshots and must remain stable even if catalo
 
 ### BR-O06 — Orders Are Immutable After Creation
 
-Order items (SKUs, quantities, prices) cannot be edited after creation in V1. The merchant cancels and the customer re-orders. Partial fulfilment is V2.
+Order items (SKUs, quantities, prices) cannot be edited after creation in V1. The merchant cancels and the customer re-orders. Partial fulfilment is V2. Goods brought back after delivery are returns (§H2), which leave the items as they were.
 
 ### BR-O07 — Merchant Delivery
 
@@ -561,6 +562,8 @@ The merchant is responsible for delivery in V1.
 ### BR-O08 — Order Total
 
 `order_total = Σ line_total`. No fees, discounts or taxes in V1.
+
+V2 (Task 01): `net_total = order_total − returned_total`, where `returned_total` is the sum of the order's live returns (BR-R04). Everything the customer owes is computed on the net total.
 
 ### BR-O09 — Order Number
 
@@ -571,6 +574,39 @@ Each tenant has its own sequential order number starting at 1 (e.g. `#1024`). Or
 The order stores a snapshot of the chosen delivery address and the customer phone at creation time.
 
 The customer cannot change it afterwards. The merchant may edit the address snapshot while the order is before `Out for Delivery` (audited). Pending confirmation, see `06-open-decisions.md` (D9).
+
+---
+
+## H2. Returns (المرتجع) — V2 Task 01 (D20)
+
+### BR-R01 — Only Delivered Orders Take Returns
+
+A return records goods the customer brings back **after delivery**. Before delivery the merchant cancels the order instead (BR-O02). There is no return window (D75): any delivered order can take returns. Returns are recorded by the merchant from the dashboard; customers cannot request them from the storefront.
+
+### BR-R02 — Never More Than Delivered
+
+Per order line, the returnable quantity is the delivered quantity minus what live returns already brought back (selling units). A return line above it is rejected (`422 return_exceeds_delivered`, each offending line listed). A line appears once per return. Two returns recorded at the same time queue on the order row lock, so the last unit is never returned twice.
+
+### BR-R03 — Returned Goods Go Back Into Stock
+
+`On Hand += quantity × conversion_factor`, written as a positive `return` movement linked to the order (BR-INV06). Reserved is unchanged.
+
+### BR-R04 — Return Price and Refund
+
+A returned line is priced at the order line's snapshot `unit_price` (D74), never re-priced by tier. The order's `returned_total` rises by the return's total and its **net total** (`order_total − returned_total`, BR-O08) drops. If the order was already collected beyond the new net total, the difference goes back to the customer in cash: the merchant must confirm it (`refund: true`, otherwise `422 refund_required` with the amount and nothing is saved), and it is recorded as a `refund` collection tied to the return. Keeping it as customer credit instead is Task 02.
+
+### BR-R05 — Returns in Totals and Reports
+
+- What a customer owes, the statement, the outstanding report and the overview are net of returns (D59).
+- Sales report: gross = delivered orders by `delivered_at`; returns = live returns by `returned_at`; net = gross − returns, on Cairo days (D60).
+- Each order numbers its returns 1, 2, …; the status history gets a note «مرتجع #n» (no status change, no merchant notification).
+- The customer sees the live returns of their order on "my orders", without the merchant's reason.
+
+### BR-R06 — Voiding a Return
+
+A wrong return is voided with a reason, never deleted. Voiding takes the goods off the stock again (a negative `return` movement) and lowers `returned_total`. A return whose cash refund is still live is voided only after the refund (`409 return_has_refund`, like D7). Goods sold or reserved since cannot leave the stock again: `422 insufficient_stock` (D76); the merchant adjusts stock first. A second void is `409 already_voided`.
+
+Between voiding a refund and voiding its return, the order is collected beyond its net total; its status is `collected` and it owes nothing.
 
 ---
 
@@ -592,19 +628,20 @@ The merchant records each cash collection as a collection record:
 
 A collection record can be voided (not deleted) with a reason.
 
-Method in V1 is always `cash`.
+Method in V1 is always `cash`. A record is a `payment` (money received) or, from V2 Task 01, a `refund` (cash paid back after a return, BR-R04); both keep a positive amount.
 
 ### BR-C03 — Collection Status Is Derived
 
-`collected_amount = Σ non-voided collection amounts`
+`collected_amount = Σ live payments − Σ live refunds` (refunds: BR-R04)
 
-| Condition                          | Status              |
-| ---------------------------------- | ------------------- |
-| collected_amount = 0               | Unpaid              |
-| 0 < collected_amount < order_total | Partially Collected |
-| collected_amount ≥ order_total     | Collected           |
+| Condition                        | Status              |
+| -------------------------------- | ------------------- |
+| net_total = 0                    | Collected           |
+| collected_amount = 0             | Unpaid              |
+| 0 < collected_amount < net_total | Partially Collected |
+| collected_amount ≥ net_total     | Collected           |
 
-Collecting more than the order total is rejected.
+`net_total = order_total − returned_total` (BR-O08). Collecting more than the net total is rejected. Voiding a payment that would leave more refunded than collected is rejected (`409 void_refund_first`).
 
 ### BR-C04 — Collection Is Independent of Order Status
 

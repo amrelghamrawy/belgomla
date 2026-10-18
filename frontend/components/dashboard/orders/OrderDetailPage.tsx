@@ -10,10 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Collection, DashboardOrderDetail } from "@/lib/api/types";
+import type { Collection, DashboardOrderDetail, OrderReturn } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { allowsAddressEdit } from "@/lib/dashboard/order-status";
 import { balanceOf, useOrder, useVoidCollection } from "@/lib/dashboard/orders";
+import { useVoidReturn } from "@/lib/dashboard/returns";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
@@ -42,7 +43,7 @@ export function OrderDetailPage() {
   return <OrderDetail order={order.data} />;
 }
 
-/** One order: actions, items, totals and collections, customer and delivery, and the status timeline. */
+/** One order: actions, items, totals, returns and collections, customer and delivery, and the status timeline. */
 export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
   const [editingAddress, setEditingAddress] = useState(false);
   const address = order.delivery.address;
@@ -111,6 +112,14 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                 <dd>{formatMoney(order.items_total)}</dd>
                 <dt className="text-muted-foreground">{copy.orderTotal}</dt>
                 <dd className="font-bold">{formatMoney(order.order_total)}</dd>
+                {order.returned_total !== "0.00" && (
+                  <>
+                    <dt className="text-muted-foreground">{copy.returnedTotal}</dt>
+                    <dd data-testid="order-returned">−{formatMoney(order.returned_total)}</dd>
+                    <dt className="text-muted-foreground">{copy.netTotal}</dt>
+                    <dd className="font-bold">{formatMoney(order.net_total)}</dd>
+                  </>
+                )}
                 <dt className="text-muted-foreground">{copy.collected}</dt>
                 <dd>{formatMoney(order.collected_amount)}</dd>
                 <dt className="text-muted-foreground">{copy.balance}</dt>
@@ -120,6 +129,7 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
               </dl>
             </CardContent>
           </Card>
+          <ReturnsCard returns={order.returns} />
           <CollectionsCard collections={order.collections} />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
@@ -189,6 +199,70 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
   );
 }
 
+/** BR-R06: every return of the order, voided ones struck through, each live one voidable with a reason. */
+function ReturnsCard({ returns }: { returns: OrderReturn[] }) {
+  const labels = ar.dashboard.returns;
+  const voidReturn = useVoidReturn();
+
+  if (returns.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{labels.sectionTitle}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col divide-y" data-testid="order-returns">
+          {returns.map((orderReturn) => (
+            <li key={orderReturn.id} className="flex flex-wrap items-start justify-between gap-2 py-2 text-sm">
+              <span className="flex min-w-0 flex-col">
+                <span className={orderReturn.is_voided ? "text-muted-foreground line-through" : "font-medium"}>
+                  {labels.returnNumber(orderReturn.number)} · {formatMoney(orderReturn.total)}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {formatDateTime(orderReturn.returned_at)} · {orderReturn.reason}
+                </span>
+                {orderReturn.items.map((item) => (
+                  <span key={item.id} className="text-xs">
+                    {item.product_name} × {ar.orders.quantityOf(item.quantity, item.unit)}
+                  </span>
+                ))}
+                {orderReturn.refund_amount !== "0.00" && (
+                  <span className="text-xs">{labels.refunded(formatMoney(orderReturn.refund_amount))}</span>
+                )}
+                {orderReturn.void_reason !== null && (
+                  <span className="text-xs">{labels.voidReason(orderReturn.void_reason)}</span>
+                )}
+              </span>
+              {orderReturn.is_voided ? (
+                <Badge variant="secondary">{labels.voidedBadge}</Badge>
+              ) : (
+                <ReasonDialog
+                  trigger={(open) => (
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                      {labels.void}
+                    </Button>
+                  )}
+                  title={labels.voidTitle}
+                  description={labels.voidBody}
+                  confirmLabel={labels.void}
+                  destructive
+                  onSubmit={async (reason) => {
+                    await voidReturn.mutateAsync({ id: orderReturn.id, reason });
+                    toast.success(labels.voided);
+                  }}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CollectionsCard({ collections }: { collections: Collection[] }) {
   const labels = ar.dashboard.collections;
 
@@ -220,7 +294,13 @@ export function CollectionLine({ collection }: { collection: Collection }) {
     <li className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
       <span className="flex flex-col">
         <span className={collection.is_voided ? "text-muted-foreground line-through" : "font-medium"}>
+          {collection.kind === "refund" ? "−" : ""}
           {formatMoney(collection.amount)} · {collection.method_label}
+          {collection.kind === "refund" && (
+            <Badge variant="outline" className="ms-2">
+              {labels.refundBadge}
+            </Badge>
+          )}
         </span>
         <span className="text-muted-foreground text-xs">{formatDateTime(collection.collected_at)}</span>
         {collection.note !== null && <span className="text-xs">{collection.note}</span>}

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   apiFetch,
   apiFetchPage,
+  apiFetchWith,
   refreshCsrfCookie,
   setUnauthenticatedHandler,
   surfaceOf,
@@ -289,5 +290,21 @@ describe("withQuery", () => {
 
   it("repeats a key for an array", () => {
     expect(withQuery("/x", { id: ["1", "2"] })).toBe("/x?id=1&id=2");
+  });
+});
+
+describe("apiFetchWith", () => {
+  it("keeps the keys next to data when the body is not a page", async () => {
+    stubFetch(json(200, { data: [{ id: 1 }], returnable: [{ order_item_id: 7 }] }));
+
+    await expect(
+      apiFetchWith<{ id: number }[], { returnable: { order_item_id: number }[] }>("/api/dashboard/orders/1/returns"),
+    ).resolves.toEqual({ data: [{ id: 1 }], returnable: [{ order_item_id: 7 }] });
+  });
+
+  it("treats a body without data as server_error", async () => {
+    stubFetch(json(200, { returnable: [] }));
+
+    await expect(apiFetchWith("/api/dashboard/orders/1/returns")).rejects.toMatchObject({ code: "server_error" });
   });
 });

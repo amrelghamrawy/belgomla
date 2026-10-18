@@ -6,62 +6,55 @@ namespace App\Modules\Reports\Queries;
 
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Reports\Data\SalesReportData;
 use App\Modules\Reports\Enums\SalesGrouping;
 use App\Support\BusinessCalendar;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
- * GET /api/dashboard/reports/sales (D5 a): delivered orders counted and summed per bucket of `delivered_at`, in
- * business days (D60). Weeks start on Saturday (D58): Postgres truncates to ISO Monday weeks, so the day is shifted
- * by two before truncating and back after. Every bucket of the range is listed, empty ones as zero.
+ * GET /api/dashboard/reports/sales (D5 a, BR-R05): per bucket, delivered orders counted and summed by `delivered_at`
+ * (gross), live returns summed by `returned_at` (returns), and net = gross − returns, in business days (D60). Weeks
+ * start on Saturday (D58): Postgres truncates to ISO Monday weeks, so the day is shifted by two before truncating and
+ * back after. Every bucket of the range is listed, empty ones as zero.
  */
 final readonly class SalesQuery
 {
     /**
-     * @return array{buckets: list<array{period_start: string, orders: int, total: string}>, orders: int, total: string}
+     * @return array{buckets: list<array{period_start: string, orders: int, gross: string, returns: string, net: string}>, orders: int, gross: string, returns: string, net: string}
      */
     public function get(SalesReportData $report): array
     {
-        $sales = $this->sums($report);
+        $sales = $this->sales($report);
+        $returns = $this->returns($report);
         $buckets = [];
         $orders = 0;
-        $total = '0.00';
+        $gross = '0.00';
+        $returned = '0.00';
 
         foreach ($this->periods($report) as $period) {
             [$count, $sum] = $sales[$period] ?? [0, '0.00'];
-            $buckets[] = ['period_start' => $period, 'orders' => $count, 'total' => $sum];
+            $back = $returns[$period] ?? '0.00';
+            $buckets[] = ['period_start' => $period, 'orders' => $count, 'gross' => $sum, 'returns' => $back, 'net' => Money::subtract($sum, $back)];
             $orders += $count;
-            $total = Money::add($total, $sum);
+            $gross = Money::add($gross, $sum);
+            $returned = Money::add($returned, $back);
         }
 
-        return ['buckets' => $buckets, 'orders' => $orders, 'total' => $total];
+        return ['buckets' => $buckets, 'orders' => $orders, 'gross' => $gross, 'returns' => $returned, 'net' => Money::subtract($gross, $returned)];
     }
 
     /**
      * @return array<string, array{0: int, 1: string}> period start (Y-m-d) => [orders, total]
      */
-    private function sums(SalesReportData $report): array
+    private function sales(SalesReportData $report): array
     {
-        $local = "(orders.delivered_at AT TIME ZONE 'UTC') AT TIME ZONE ?";
-        $bucket = match ($report->group) {
-            SalesGrouping::Day => "date_trunc('day', {$local})",
-            SalesGrouping::Week => "date_trunc('week', {$local} + interval '2 days') - interval '2 days'",
-            SalesGrouping::Month => "date_trunc('month', {$local})",
-        };
-
-        $rows = Order::query()
-            ->toBase()
-            ->where('status', OrderStatus::Delivered->value)
-            ->whereBetween('delivered_at', [
-                BusinessCalendar::dayStart($report->from, $report->timezone),
-                BusinessCalendar::dayEnd($report->to, $report->timezone),
-            ])
-            ->selectRaw("to_char({$bucket}, 'YYYY-MM-DD') as period", [$report->timezone])
+        $rows = $this->bucketed(Order::query()->where('status', OrderStatus::Delivered->value), 'orders.delivered_at', $report)
             ->selectRaw('count(*) as orders')
             ->selectRaw('sum(order_total) as total')
-            ->groupBy('period')
             ->get();
 
         $sums = [];
@@ -72,6 +65,50 @@ final readonly class SalesQuery
         }
 
         return $sums;
+    }
+
+    /**
+     * @return array<string, string> period start (Y-m-d) => returned total
+     */
+    private function returns(SalesReportData $report): array
+    {
+        $rows = $this->bucketed(OrderReturn::query()->whereNull('voided_at'), 'order_returns.returned_at', $report)
+            ->selectRaw('sum(total) as total')
+            ->get();
+
+        $sums = [];
+
+        foreach ($rows as $row) {
+            /** @var object{period: string, total: string} $row */
+            $sums[$row->period] = Money::add('0.00', $row->total);
+        }
+
+        return $sums;
+    }
+
+    /**
+     * Rows of the range grouped by the bucket of the given timestamp column, as `period`.
+     *
+     * @template TModel of Order|OrderReturn
+     *
+     * @param  Builder<TModel>  $query
+     */
+    private function bucketed(Builder $query, string $column, SalesReportData $report): QueryBuilder
+    {
+        $local = "({$column} AT TIME ZONE 'UTC') AT TIME ZONE ?";
+        $bucket = match ($report->group) {
+            SalesGrouping::Day => "date_trunc('day', {$local})",
+            SalesGrouping::Week => "date_trunc('week', {$local} + interval '2 days') - interval '2 days'",
+            SalesGrouping::Month => "date_trunc('month', {$local})",
+        };
+
+        return $query->toBase()
+            ->whereBetween($column, [
+                BusinessCalendar::dayStart($report->from, $report->timezone),
+                BusinessCalendar::dayEnd($report->to, $report->timezone),
+            ])
+            ->selectRaw("to_char({$bucket}, 'YYYY-MM-DD') as period", [$report->timezone])
+            ->groupBy('period');
     }
 
     /**

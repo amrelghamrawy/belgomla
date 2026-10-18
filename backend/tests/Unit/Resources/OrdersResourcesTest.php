@@ -9,10 +9,13 @@ use App\Modules\Orders\Http\Resources\DashboardOrderResource;
 use App\Modules\Orders\Http\Resources\NotificationResource;
 use App\Modules\Orders\Http\Resources\OrderItemResource;
 use App\Modules\Orders\Http\Resources\OrderResource;
+use App\Modules\Orders\Http\Resources\OrderReturnResource;
 use App\Modules\Orders\Http\Resources\PlacedOrderResource;
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderReturn;
+use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Tenancy\TenantContext;
 
@@ -31,6 +34,8 @@ beforeEach(function (): void {
         'placed_at' => now()->toIso8601String(),
         'items_total' => '170.00',
         'order_total' => '170.00',
+        'returned_total' => '0.00',
+        'net_total' => '170.00',
         'collection_status' => 'unpaid',
         'collected_amount' => '0.00',
         'delivery' => ['name' => 'مكتبة الأمل', 'phone' => '+201012345678', 'address' => $order->delivery_address],
@@ -114,6 +119,67 @@ test('BR-INV07 a pending order placed before the threshold is stale, others are 
 
     expect(rendered(new DashboardOrderResource($order, now()->subHours(24)), dashboardRequest())['is_stale'])->toBeTrue()
         ->and(rendered(new DashboardOrderResource($confirmed, now()->subHours(24)), dashboardRequest())['is_stale'])->toBeFalse();
+});
+
+test('BR-R05 the store order detail shows live returns without the merchant\'s reason', function (): void {
+    $order = Order::query()->findOrFail($this->order->id);
+    $return = OrderReturn::factory()->for($order)->create(['total' => '85.00', 'returned_at' => now()]);
+    $item = OrderReturnItem::factory()->for($return)->create(['order_item_id' => $order->items()->sole()->id, 'quantity' => 1]);
+    $order->load(['items', 'history', 'returns.items.orderItem']);
+
+    expect(rendered(new OrderResource($order), storeRequest('/api/store/orders/1024'))['returns'])->toBe([[
+        'number' => 1,
+        'total' => '85.00',
+        'refund_amount' => '0.00',
+        'returned_at' => now()->toIso8601String(),
+        'items' => [['product_name' => $item->orderItem->product_name, 'sku_code' => $item->orderItem->sku_code, 'unit' => $item->orderItem->unit_name, 'quantity' => 1, 'unit_price' => '85.00', 'line_total' => '85.00']],
+    ]]);
+});
+
+test('BR-R06 a return renders its order balance, customer, lines and void details', function (): void {
+    $order = Order::query()->with('customer')->findOrFail($this->order->id);
+    $owner = $this->makeOwner();
+    $return = OrderReturn::factory()->for($order)->voided('مكرر')->create(['total' => '85.00', 'refund_amount' => '5.00', 'recorded_by' => $owner->id, 'voided_by' => $owner->id, 'returned_at' => now()]);
+    $item = OrderReturnItem::factory()->for($return)->create(['order_item_id' => $order->items()->sole()->id, 'quantity' => 1]);
+    $return = OrderReturn::query()->with('items.orderItem')->findOrFail($return->id)->setRelation('order', $order);
+
+    expect(rendered(new OrderReturnResource($return), dashboardRequest('/api/dashboard/returns')))->toBe([
+        'id' => $return->id,
+        'number' => 1,
+        'order' => ['id' => $order->id, 'number' => 1024, 'order_total' => '170.00', 'returned_total' => '0.00', 'net_total' => '170.00', 'collected_amount' => '0.00', 'collection_status' => 'unpaid'],
+        'customer' => ['id' => $this->customer->id, 'name' => 'مكتبة الأمل'],
+        'total' => '85.00',
+        'refund_amount' => '5.00',
+        'reason' => 'مرتجع نهاية الموسم',
+        'returned_at' => now()->toIso8601String(),
+        'recorded_by' => $owner->id,
+        'is_voided' => true,
+        'voided_at' => now()->toIso8601String(),
+        'void_reason' => 'مكرر',
+        'voided_by' => $owner->id,
+        'items' => [[
+            'id' => $item->id, 'order_item_id' => $item->order_item_id, 'product_name' => $item->orderItem->product_name, 'sku_code' => $item->orderItem->sku_code,
+            'unit' => $item->orderItem->unit_name, 'quantity' => 1, 'quantity_base' => 1, 'unit_price' => '85.00', 'line_total' => '85.00',
+        ]],
+        'created_at' => now()->toIso8601String(),
+    ]);
+});
+
+test('a return leaves out its order and customer when the order is not loaded', function (): void {
+    $return = OrderReturn::factory()->create();
+
+    expect(array_keys(rendered(new OrderReturnResource($return), dashboardRequest())))->not->toContain('order')->not->toContain('customer')->not->toContain('items');
+});
+
+test('BR-R06 the dashboard order detail lists every return without the order', function (): void {
+    OrderReturn::factory()->for($this->order)->voided()->create();
+    $order = Order::query()->with(['items', 'history', 'customer', 'returns.items.orderItem'])->findOrFail($this->order->id);
+
+    $data = rendered(new DashboardOrderResource($order, now()->subDay()), dashboardRequest('/api/dashboard/orders/1024'));
+
+    expect($data['returns'])->toHaveCount(1)
+        ->and($data['returns'][0]['is_voided'])->toBeTrue()
+        ->and($data['returns'][0])->not->toHaveKey('order');
 });
 
 test('BR-N02 the notification resource', function (): void {

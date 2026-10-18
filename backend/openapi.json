@@ -4523,6 +4523,292 @@
                 }
             }
         },
+        "/api/dashboard/orders/{order}/returns": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/OrderNumber"
+                }
+            ],
+            "get": {
+                "operationId": "dashboardOrderReturns",
+                "tags": [
+                    "dashboard-orders"
+                ],
+                "summary": "The order's returns oldest first, voided included, plus what each line can still take back (BR-R02)",
+                "responses": {
+                    "200": {
+                        "description": "The returns and the returnable quantities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "returnable"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/OrderReturn"
+                                            }
+                                        },
+                                        "returnable": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ReturnableLine"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "dashboardRecordReturn",
+                "tags": [
+                    "dashboard-orders"
+                ],
+                "summary": "Records goods brought back after delivery (BR-R01..R04); priced at the line's snapshot price (D74)",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/IdempotencyKey"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "reason",
+                                    "items"
+                                ],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 300
+                                    },
+                                    "returned_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "refund": {
+                                        "type": "boolean",
+                                        "description": "Confirms paying back in cash what was collected beyond the new net total"
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "maxItems": 200,
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "order_item_id",
+                                                "quantity"
+                                            ],
+                                            "properties": {
+                                                "order_item_id": {
+                                                    "type": "integer"
+                                                },
+                                                "quantity": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "$ref": "#/components/responses/OrderReturn"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "return_not_allowed (the order is not delivered)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "return_exceeds_delivered (items: order_item_id, requested, returnable), refund_required (details.refund_amount) or validation_failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/dashboard/returns": {
+            "get": {
+                "operationId": "dashboardReturns",
+                "tags": [
+                    "dashboard-orders"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/From"
+                    },
+                    {
+                        "$ref": "#/components/parameters/To"
+                    },
+                    {
+                        "name": "customer_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Order number (#1024 too) or customer name",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of returns, newest first, voided included",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/OrderReturn"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/returns/{orderReturn}/void": {
+            "parameters": [
+                {
+                    "name": "orderReturn",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    }
+                },
+                {
+                    "$ref": "#/components/parameters/IdempotencyKey"
+                }
+            ],
+            "post": {
+                "operationId": "dashboardVoidReturn",
+                "tags": [
+                    "dashboard-orders"
+                ],
+                "summary": "Voids a return (BR-R06); its live refund must be voided first; sold-again stock refuses (D76)",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Reason"
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/OrderReturn"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "already_voided or return_has_refund",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "insufficient_stock (D76) or validation_failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/dashboard/notifications": {
             "get": {
                 "operationId": "dashboardNotifications",
@@ -5710,6 +5996,24 @@
                     }
                 }
             },
+            "OrderReturn": {
+                "description": "The return",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/components/schemas/OrderReturn"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "Collection": {
                 "description": "The collection",
                 "content": {
@@ -5788,7 +6092,11 @@
                     "phone_taken",
                     "prices_hidden",
                     "rate_limited",
+                    "refund_required",
                     "reserved_subdomain",
+                    "return_exceeds_delivered",
+                    "return_has_refund",
+                    "return_not_allowed",
                     "server_error",
                     "stateful_request_required",
                     "store_unavailable",
@@ -5798,6 +6106,7 @@
                     "use_invitation",
                     "user_disabled",
                     "validation_failed",
+                    "void_refund_first",
                     "wa_gateway_capacity",
                     "wa_gateway_unavailable",
                     "whatsapp_already_connected"
@@ -7180,6 +7489,8 @@
                     "placed_at",
                     "items_total",
                     "order_total",
+                    "returned_total",
+                    "net_total",
                     "collection_status",
                     "collected_amount",
                     "delivery",
@@ -7206,6 +7517,14 @@
                     },
                     "order_total": {
                         "$ref": "#/components/schemas/Money"
+                    },
+                    "returned_total": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "Σ live returns (BR-R05)"
+                    },
+                    "net_total": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "order_total − returned_total (BR-O08)"
                     },
                     "collection_status": {
                         "type": "string",
@@ -7298,7 +7617,8 @@
                         "type": "object",
                         "required": [
                             "items",
-                            "history"
+                            "history",
+                            "returns"
                         ],
                         "properties": {
                             "items": {
@@ -7311,6 +7631,12 @@
                                 "type": "array",
                                 "items": {
                                     "$ref": "#/components/schemas/OrderHistoryEntry"
+                                }
+                            },
+                            "returns": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/StoreOrderReturn"
                                 }
                             }
                         }
@@ -9018,7 +9344,8 @@
                         "required": [
                             "items",
                             "history",
-                            "collections"
+                            "collections",
+                            "returns"
                         ],
                         "properties": {
                             "items": {
@@ -9038,10 +9365,276 @@
                                 "items": {
                                     "$ref": "#/components/schemas/Collection"
                                 }
+                            },
+                            "returns": {
+                                "type": "array",
+                                "description": "Every return, voided included, without `order` (BR-R06)",
+                                "items": {
+                                    "$ref": "#/components/schemas/OrderReturn"
+                                }
                             }
                         }
                     }
                 ]
+            },
+            "OrderReturnLine": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "order_item_id",
+                    "product_name",
+                    "sku_code",
+                    "unit",
+                    "quantity",
+                    "quantity_base",
+                    "unit_price",
+                    "line_total"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "order_item_id": {
+                        "type": "integer"
+                    },
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "quantity_base": {
+                        "type": "integer"
+                    },
+                    "unit_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "line_total": {
+                        "$ref": "#/components/schemas/Money"
+                    }
+                }
+            },
+            "OrderReturn": {
+                "type": "object",
+                "description": "A return (BR-R01..R06). `order` (the balance after the change) is on the list and the writes, not inside the order detail; `customer` on the list only.",
+                "required": [
+                    "id",
+                    "number",
+                    "total",
+                    "refund_amount",
+                    "reason",
+                    "returned_at",
+                    "recorded_by",
+                    "is_voided",
+                    "voided_at",
+                    "void_reason",
+                    "voided_by",
+                    "items",
+                    "created_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "number": {
+                        "type": "integer"
+                    },
+                    "order": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "number",
+                            "order_total",
+                            "returned_total",
+                            "net_total",
+                            "collected_amount",
+                            "collection_status"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "number": {
+                                "type": "integer"
+                            },
+                            "order_total": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "returned_total": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "net_total": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "collected_amount": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "collection_status": {
+                                "$ref": "#/components/schemas/CollectionStatus"
+                            }
+                        }
+                    },
+                    "customer": {
+                        "$ref": "#/components/schemas/IdName"
+                    },
+                    "total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "refund_amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "returned_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "recorded_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "is_voided": {
+                        "type": "boolean"
+                    },
+                    "voided_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "voided_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrderReturnLine"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "ReturnableLine": {
+                "type": "object",
+                "required": [
+                    "order_item_id",
+                    "product_name",
+                    "sku_code",
+                    "unit",
+                    "unit_price",
+                    "ordered",
+                    "returned",
+                    "returnable"
+                ],
+                "properties": {
+                    "order_item_id": {
+                        "type": "integer"
+                    },
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "unit_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "ordered": {
+                        "type": "integer"
+                    },
+                    "returned": {
+                        "type": "integer",
+                        "description": "Brought back by live returns"
+                    },
+                    "returnable": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "StoreOrderReturn": {
+                "type": "object",
+                "description": "A live return as the customer sees it (BR-R05), without the merchant's reason",
+                "required": [
+                    "number",
+                    "total",
+                    "refund_amount",
+                    "returned_at",
+                    "items"
+                ],
+                "properties": {
+                    "number": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "refund_amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "returned_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "product_name",
+                                "sku_code",
+                                "unit",
+                                "quantity",
+                                "unit_price",
+                                "line_total"
+                            ],
+                            "properties": {
+                                "product_name": {
+                                    "type": "string"
+                                },
+                                "sku_code": {
+                                    "type": "string"
+                                },
+                                "unit": {
+                                    "type": "string"
+                                },
+                                "quantity": {
+                                    "type": "integer"
+                                },
+                                "unit_price": {
+                                    "$ref": "#/components/schemas/Money"
+                                },
+                                "line_total": {
+                                    "$ref": "#/components/schemas/Money"
+                                }
+                            }
+                        }
+                    }
+                }
             },
             "MerchantNotification": {
                 "type": "object",
@@ -9111,6 +9704,9 @@
                 "required": [
                     "id",
                     "order",
+                    "kind",
+                    "kind_label",
+                    "order_return_id",
                     "amount",
                     "method",
                     "method_label",
@@ -9133,6 +9729,7 @@
                             "id",
                             "number",
                             "order_total",
+                            "net_total",
                             "collected_amount",
                             "collection_status"
                         ],
@@ -9146,6 +9743,9 @@
                             "order_total": {
                                 "$ref": "#/components/schemas/Money"
                             },
+                            "net_total": {
+                                "$ref": "#/components/schemas/Money"
+                            },
                             "collected_amount": {
                                 "$ref": "#/components/schemas/Money"
                             },
@@ -9156,6 +9756,24 @@
                     },
                     "customer": {
                         "$ref": "#/components/schemas/IdName"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "payment",
+                            "refund"
+                        ],
+                        "description": "A refund pays back part of a return (BR-R04) and lowers the collected amount"
+                    },
+                    "kind_label": {
+                        "type": "string"
+                    },
+                    "order_return_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "The return a refund belongs to"
                     },
                     "amount": {
                         "$ref": "#/components/schemas/Money"
@@ -9222,6 +9840,8 @@
                     "placed_at",
                     "delivered_at",
                     "order_total",
+                    "returned_total",
+                    "net_total",
                     "collected_amount",
                     "balance",
                     "collection_status"
@@ -9248,6 +9868,12 @@
                         "format": "date-time"
                     },
                     "order_total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "returned_total": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "net_total": {
                         "$ref": "#/components/schemas/Money"
                     },
                     "collected_amount": {
@@ -9329,13 +9955,18 @@
                         "type": "object",
                         "required": [
                             "orders",
-                            "total"
+                            "total",
+                            "returns"
                         ],
                         "properties": {
                             "orders": {
                                 "type": "integer"
                             },
                             "total": {
+                                "$ref": "#/components/schemas/Money",
+                                "description": "Placed today, not cancelled, minus today's live returns (BR-R05)"
+                            },
+                            "returns": {
                                 "$ref": "#/components/schemas/Money"
                             }
                         }
@@ -9387,7 +10018,9 @@
                             "required": [
                                 "period_start",
                                 "orders",
-                                "total"
+                                "gross",
+                                "returns",
+                                "net"
                             ],
                             "properties": {
                                 "period_start": {
@@ -9397,7 +10030,15 @@
                                 "orders": {
                                     "type": "integer"
                                 },
-                                "total": {
+                                "gross": {
+                                    "$ref": "#/components/schemas/Money",
+                                    "description": "Delivered orders by delivered_at"
+                                },
+                                "returns": {
+                                    "$ref": "#/components/schemas/Money",
+                                    "description": "Live returns by returned_at (BR-R05)"
+                                },
+                                "net": {
                                     "$ref": "#/components/schemas/Money"
                                 }
                             }
@@ -9407,13 +10048,21 @@
                         "type": "object",
                         "required": [
                             "orders",
-                            "total"
+                            "gross",
+                            "returns",
+                            "net"
                         ],
                         "properties": {
                             "orders": {
                                 "type": "integer"
                             },
-                            "total": {
+                            "gross": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "returns": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "net": {
                                 "$ref": "#/components/schemas/Money"
                             }
                         }

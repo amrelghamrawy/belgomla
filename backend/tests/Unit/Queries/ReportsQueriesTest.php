@@ -6,6 +6,7 @@ use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Reports\Data\SalesReportData;
 use App\Modules\Reports\Enums\SalesGrouping;
 use App\Modules\Reports\Queries\LowStockReportQuery;
@@ -43,12 +44,14 @@ test('D5 the sales report sums delivered orders per business day, empty days as 
 
     expect(($this->sales)('2026-10-08', '2026-10-10', SalesGrouping::Day))->toBe([
         'buckets' => [
-            ['period_start' => '2026-10-08', 'orders' => 2, 'total' => '200.25'],
-            ['period_start' => '2026-10-09', 'orders' => 0, 'total' => '0.00'],
-            ['period_start' => '2026-10-10', 'orders' => 1, 'total' => '100.00'],
+            ['period_start' => '2026-10-08', 'orders' => 2, 'gross' => '200.25', 'returns' => '0.00', 'net' => '200.25'],
+            ['period_start' => '2026-10-09', 'orders' => 0, 'gross' => '0.00', 'returns' => '0.00', 'net' => '0.00'],
+            ['period_start' => '2026-10-10', 'orders' => 1, 'gross' => '100.00', 'returns' => '0.00', 'net' => '100.00'],
         ],
         'orders' => 3,
-        'total' => '300.25',
+        'gross' => '300.25',
+        'returns' => '0.00',
+        'net' => '300.25',
     ]);
 });
 
@@ -72,8 +75,8 @@ test('D58 sales weeks start on saturday: friday night and saturday morning fall 
     ($this->delivered)('2026-10-09 21:30:00');
 
     expect(($this->sales)('2026-10-03', '2026-10-16', SalesGrouping::Week)['buckets'])->toBe([
-        ['period_start' => '2026-10-03', 'orders' => 1, 'total' => '100.00'],
-        ['period_start' => '2026-10-10', 'orders' => 1, 'total' => '100.00'],
+        ['period_start' => '2026-10-03', 'orders' => 1, 'gross' => '100.00', 'returns' => '0.00', 'net' => '100.00'],
+        ['period_start' => '2026-10-10', 'orders' => 1, 'gross' => '100.00', 'returns' => '0.00', 'net' => '100.00'],
     ]);
 });
 
@@ -86,9 +89,33 @@ test('D5 the sales report groups by month', function (): void {
     ($this->delivered)('2026-10-02 10:00:00', '60.00');
 
     expect(($this->sales)('2026-09-15', '2026-10-10', SalesGrouping::Month)['buckets'])->toBe([
-        ['period_start' => '2026-09-01', 'orders' => 1, 'total' => '40.00'],
-        ['period_start' => '2026-10-01', 'orders' => 1, 'total' => '60.00'],
+        ['period_start' => '2026-09-01', 'orders' => 1, 'gross' => '40.00', 'returns' => '0.00', 'net' => '40.00'],
+        ['period_start' => '2026-10-01', 'orders' => 1, 'gross' => '60.00', 'returns' => '0.00', 'net' => '60.00'],
     ]);
+});
+
+test('BR-R05 D60 live returns lower the net sales of the cairo day they came back, not of the delivery day', function (): void {
+    $order = ($this->delivered)('2026-10-08 10:00:00', '300.00');
+    OrderReturn::factory()->for($order)->create(['total' => '120.00', 'returned_at' => CarbonImmutable::parse('2026-10-09 21:30:00', 'UTC')]);
+    OrderReturn::factory()->for($order)->voided()->create(['number' => 2, 'total' => '50.00', 'returned_at' => CarbonImmutable::parse('2026-10-10 09:00:00', 'UTC')]);
+
+    expect(($this->sales)('2026-10-08', '2026-10-10', SalesGrouping::Day))->toBe([
+        'buckets' => [
+            ['period_start' => '2026-10-08', 'orders' => 1, 'gross' => '300.00', 'returns' => '0.00', 'net' => '300.00'],
+            ['period_start' => '2026-10-09', 'orders' => 0, 'gross' => '0.00', 'returns' => '0.00', 'net' => '0.00'],
+            ['period_start' => '2026-10-10', 'orders' => 0, 'gross' => '0.00', 'returns' => '120.00', 'net' => '-120.00'],
+        ],
+        'orders' => 1,
+        'gross' => '300.00',
+        'returns' => '120.00',
+        'net' => '180.00',
+    ]);
+});
+
+test('BR-T03 the sales report never counts another tenant\'s returns', function (): void {
+    $this->inTenant(fn (): OrderReturn => OrderReturn::factory()->create(['returned_at' => now()]), $this->otherTenant());
+
+    expect(($this->sales)('2026-10-10', '2026-10-10', SalesGrouping::Day)['returns'])->toBe('0.00');
 });
 
 test('BR-T03 the sales report never counts another tenant', function (): void {
@@ -111,7 +138,16 @@ test('D60 today\'s orders are those placed since cairo midnight, the total witho
     Order::factory()->cancelled()->create(['items_total' => '50.00', 'order_total' => '50.00', 'placed_at' => now()]);
     Order::factory()->create(['items_total' => '70.00', 'order_total' => '70.00', 'placed_at' => CarbonImmutable::parse('2026-10-09 20:59:59', 'UTC')]);
 
-    expect(app(OverviewQuery::class)->get('Africa/Cairo')['today'])->toBe(['orders' => 2, 'total' => '100.00']);
+    expect(app(OverviewQuery::class)->get('Africa/Cairo')['today'])->toBe(['orders' => 2, 'total' => '100.00', 'returns' => '0.00']);
+});
+
+test('BR-R05 D60 today\'s total is net of the live returns recorded since cairo midnight, which are also given apart', function (): void {
+    $order = Order::factory()->delivered()->create(['items_total' => '300.00', 'order_total' => '300.00', 'placed_at' => now()]);
+    OrderReturn::factory()->for($order)->create(['total' => '80.00', 'returned_at' => CarbonImmutable::parse('2026-10-09 21:00:00', 'UTC')]);
+    OrderReturn::factory()->for($order)->create(['number' => 2, 'total' => '15.00', 'returned_at' => CarbonImmutable::parse('2026-10-09 20:59:59', 'UTC')]);
+    OrderReturn::factory()->for($order)->voided()->create(['number' => 3, 'total' => '40.00', 'returned_at' => now()]);
+
+    expect(app(OverviewQuery::class)->get('Africa/Cairo')['today'])->toBe(['orders' => 1, 'total' => '220.00', 'returns' => '80.00']);
 });
 
 test('BR-INV07 the overview counts pending orders past the stale threshold', function (): void {

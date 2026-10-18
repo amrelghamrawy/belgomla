@@ -167,9 +167,9 @@ export function useCollections(query: ListQuery) {
   });
 }
 
-/** What is left to collect on an order (display only), never below zero. */
-export function balanceOf(order: { order_total: string; collected_amount: string }): string {
-  const total = toPiasters(order.order_total) ?? 0n;
+/** What is left to collect on an order: its net total (BR-O08) minus what was collected, never below zero (display only). */
+export function balanceOf(order: { net_total: string; collected_amount: string }): string {
+  const total = toPiasters(order.net_total) ?? 0n;
   const collected = toPiasters(order.collected_amount) ?? 0n;
 
   return fromPiasters(total > collected ? total - collected : 0n);

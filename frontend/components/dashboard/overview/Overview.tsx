@@ -119,7 +119,7 @@ function SalesTrend() {
         {sales.data && (
           <>
             <p className="flex flex-wrap items-baseline gap-x-3" data-testid="sales-trend-total">
-              <span className="text-2xl font-bold">{formatMoney(sales.data.totals.total)}</span>
+              <span className="text-2xl font-bold">{formatMoney(sales.data.totals.net)}</span>
               <span className="text-muted-foreground text-sm">{copy.salesTrendOrders(sales.data.totals.orders)}</span>
             </p>
             {sales.data.totals.orders === 0 ? (

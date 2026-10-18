@@ -53,6 +53,51 @@ describe("OrderDetailView", () => {
     expect(screen.getByText("12 شارع عباس العقاد، مدينة نصر، القاهرة")).toBeInTheDocument();
   });
 
+  it("BR-R05 shows the returns of a delivered order and the net total", async () => {
+    stubOrder(
+      order({
+        status: "delivered",
+        status_label: "تم التوصيل",
+        returned_total: "180.00",
+        net_total: "360.00",
+        returns: [
+          {
+            number: 1,
+            total: "180.00",
+            refund_amount: "50.00",
+            returned_at: "2026-10-12T08:00:00Z",
+            items: [
+              {
+                product_name: "الأضواء علوم",
+                sku_code: "BK-001",
+                unit: "كرتونة",
+                quantity: 2,
+                unit_price: "90.00",
+                line_total: "180.00",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    renderWithQuery(<OrderDetailView />);
+
+    const returns = await screen.findByRole("region", { name: "المرتجعات" });
+    expect(within(returns).getByText(/مرتجع #1/)).toBeInTheDocument();
+    expect(within(returns).getByText("الأضواء علوم · 2 كرتونة × 90.00 ج.م")).toBeInTheDocument();
+    expect(within(returns).getByText("تم رد 50.00 ج.م لك")).toBeInTheDocument();
+    expect(screen.getByTestId("order-net-total")).toHaveTextContent("360.00 ج.م");
+  });
+
+  it("an order without returns shows no returns block", async () => {
+    stubOrder();
+    renderWithQuery(<OrderDetailView />);
+
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(screen.queryByRole("region", { name: "المرتجعات" })).not.toBeInTheDocument();
+  });
+
   it("BR-O02 a confirmed order cannot be cancelled by the customer", async () => {
     stubOrder(order({ status: "confirmed", status_label: "مؤكد" }));
     renderWithQuery(<OrderDetailView />);

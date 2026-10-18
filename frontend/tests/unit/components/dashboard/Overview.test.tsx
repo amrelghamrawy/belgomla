@@ -13,7 +13,7 @@ const emptySales = {
   to: "2026-10-10",
   group: "day",
   buckets: [],
-  totals: { orders: 0, total: "0.00" },
+  totals: { orders: 0, gross: "0.00", returns: "0.00", net: "0.00" },
 };
 
 describe("Overview", () => {
@@ -25,8 +25,8 @@ describe("Overview", () => {
       "GET /api/dashboard/reports/sales": json(200, {
         data: {
           ...emptySales,
-          buckets: [{ period_start: "2026-10-01", orders: 3, total: "1500.00" }],
-          totals: { orders: 3, total: "1500.00" },
+          buckets: [{ period_start: "2026-10-01", orders: 3, gross: "1500.00", returns: "0.00", net: "1500.00" }],
+          totals: { orders: 3, gross: "1500.00", returns: "0.00", net: "1500.00" },
         },
       }),
       "GET /api/dashboard/reports/outstanding": json(

@@ -6,6 +6,9 @@ use App\Modules\Orders\Data\CancelData;
 use App\Modules\Orders\Data\CheckoutData;
 use App\Modules\Orders\Data\DeliveryAddressData;
 use App\Modules\Orders\Data\OrderFiltersData;
+use App\Modules\Orders\Data\ReturnData;
+use App\Modules\Orders\Data\ReturnFiltersData;
+use App\Modules\Orders\Data\ReturnLineData;
 use App\Modules\Orders\Data\TransitionData;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
@@ -14,7 +17,9 @@ use App\Modules\Orders\Http\Requests\CheckoutRequest;
 use App\Modules\Orders\Http\Requests\ListDashboardOrdersRequest;
 use App\Modules\Orders\Http\Requests\ListNotificationsRequest;
 use App\Modules\Orders\Http\Requests\ListOrdersRequest;
+use App\Modules\Orders\Http\Requests\ListReturnsRequest;
 use App\Modules\Orders\Http\Requests\MarkNotificationsReadRequest;
+use App\Modules\Orders\Http\Requests\RecordReturnRequest;
 use App\Modules\Orders\Http\Requests\TransitionOrderRequest;
 use App\Modules\Orders\Http\Requests\UpdateDeliveryAddressRequest;
 use Carbon\CarbonImmutable;
@@ -55,6 +60,38 @@ test('BR-C04 collect_full_amount only counts when delivering', function (): void
     $request = validatedOrdersRequest(TransitionOrderRequest::class, ['to' => 'confirmed', 'collect_full_amount' => true]);
 
     expect(TransitionData::fromRequest($request))->toEqual(new TransitionData(OrderStatus::Confirmed, null, false));
+});
+
+test('BR-R01 return data: trimmed reason, integer lines, the refund flag and an optional utc return time', function (): void {
+    $data = ReturnData::fromRequest(validatedOrdersRequest(RecordReturnRequest::class, [
+        'reason' => '  نهاية الموسم ', 'returned_at' => '2026-10-09T12:00:00+03:00', 'refund' => '1',
+        'items' => [['order_item_id' => '7', 'quantity' => '2'], ['order_item_id' => 9, 'quantity' => 1]],
+    ]));
+
+    expect($data->reason)->toBe('نهاية الموسم')
+        ->and($data->lines)->toEqual([new ReturnLineData(7, 2), new ReturnLineData(9, 1)])
+        ->and($data->refund)->toBeTrue()
+        ->and($data->returnedAt?->toIso8601String())->toBe('2026-10-09T09:00:00+00:00');
+});
+
+test('BR-R04 return data without refund or time: no refund confirmed, now is decided by the action', function (): void {
+    $data = ReturnData::fromRequest(validatedOrdersRequest(RecordReturnRequest::class, ['reason' => 'تالف', 'items' => [['order_item_id' => 7, 'quantity' => 1]]]));
+
+    expect($data->refund)->toBeFalse()
+        ->and($data->returnedAt)->toBeNull();
+});
+
+test('D60 the returns list filters by business days of returned_at, customer and search', function (): void {
+    $filters = ReturnFiltersData::fromRequest(validatedOrdersRequest(ListReturnsRequest::class, ['from' => '2026-10-01', 'to' => '2026-10-02', 'customer_id' => '5', 'q' => ' #12 '], 'GET'));
+
+    expect($filters->from?->toIso8601String())->toBe('2026-09-30T21:00:00+00:00')
+        ->and($filters->to?->toIso8601String())->toBe('2026-10-02T20:59:59+00:00')
+        ->and($filters->customerId)->toBe(5)
+        ->and($filters->search)->toBe('#12');
+});
+
+test('the returns list without filters lists everything', function (): void {
+    expect(ReturnFiltersData::fromRequest(validatedOrdersRequest(ListReturnsRequest::class, ['q' => '  '], 'GET')))->toEqual(new ReturnFiltersData());
 });
 
 test('BR-O02 cancel data trims the reason', function (): void {

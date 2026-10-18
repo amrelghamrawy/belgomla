@@ -98,3 +98,9 @@ export type SalesReport = Schemas["SalesReport"];
 export type OutstandingCustomer = Schemas["OutstandingCustomer"];
 export type LowStockSku = Schemas["LowStockSku"];
 export type AuditLog = Schemas["AuditLog"];
+
+// V2 Task 01 — returns
+export type OrderReturn = Schemas["OrderReturn"];
+export type OrderReturnLine = Schemas["OrderReturnLine"];
+export type ReturnableLine = Schemas["ReturnableLine"];
+export type StoreOrderReturn = Schemas["StoreOrderReturn"];

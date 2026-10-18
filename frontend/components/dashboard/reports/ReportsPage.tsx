@@ -105,11 +105,17 @@ export function SalesSection({ query, setQuery }: SectionProps) {
       {report.isPending && <LoadingBlock rows={4} />}
       {report.data && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+          <div className="grid grid-cols-2 gap-3 sm:max-w-xl sm:grid-cols-3">
             <div className="rounded-md border p-3">
               <p className="text-muted-foreground text-xs">{copy.totalSales}</p>
               <p className="text-xl font-semibold" data-testid="sales-total">
-                {formatMoney(report.data.totals.total)}
+                {formatMoney(report.data.totals.net)}
+              </p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-muted-foreground text-xs">{copy.totalReturns}</p>
+              <p className="text-xl font-semibold" data-testid="returns-total">
+                {formatMoney(report.data.totals.returns)}
               </p>
             </div>
             <div className="rounded-md border p-3">
@@ -123,7 +129,8 @@ export function SalesSection({ query, setQuery }: SectionProps) {
               <p className="text-muted-foreground text-xs">{copy.salesHint}</p>
             </CardHeader>
             <CardContent>
-              {report.data.buckets.length === 0 || report.data.totals.orders === 0 ? (
+              {report.data.buckets.length === 0 ||
+              (report.data.totals.orders === 0 && report.data.totals.returns === "0.00") ? (
                 <EmptyBlock>{copy.noSales}</EmptyBlock>
               ) : table ? (
                 <div className="overflow-x-auto">
@@ -132,7 +139,9 @@ export function SalesSection({ query, setQuery }: SectionProps) {
                       <TableRow>
                         <TableHead>{copy.period}</TableHead>
                         <TableHead>{copy.orders}</TableHead>
-                        <TableHead>{copy.sales}</TableHead>
+                        <TableHead>{copy.gross}</TableHead>
+                        <TableHead>{copy.returns}</TableHead>
+                        <TableHead>{copy.net}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -140,7 +149,9 @@ export function SalesSection({ query, setQuery }: SectionProps) {
                         <TableRow key={bucket.period_start}>
                           <TableCell>{formatDate(bucket.period_start)}</TableCell>
                           <TableCell>{bucket.orders}</TableCell>
-                          <TableCell>{formatMoney(bucket.total)}</TableCell>
+                          <TableCell>{formatMoney(bucket.gross)}</TableCell>
+                          <TableCell>{formatMoney(bucket.returns)}</TableCell>
+                          <TableCell>{formatMoney(bucket.net)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

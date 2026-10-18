@@ -246,10 +246,10 @@ The `reserved ≤ on_hand` check is deliberate: an adjustment that would drop On
 | id            | bigint PK    |                                                                                               |
 | tenant_id     | FK           |                                                                                               |
 | sku_id        | FK           |                                                                                               |
-| type          | enum         | `opening`, `adjustment`, `sale`, `return` (**`return` reserved for V2, never written in V1**) |
-| quantity      | int          | signed, base units (`sale` is negative)                                                       |
+| type          | enum         | `opening`, `adjustment`, `sale`, `return` (V2: a customer return, BR-R03/R06)                 |
+| quantity      | int          | signed, base units (`sale` and a voided `return` are negative)                                |
 | on_hand_after | int          | snapshot for traceability                                                                     |
-| order_id      | FK           | nullable; set for `sale`                                                                      |
+| order_id      | FK           | nullable; set for `sale` and `return`                                                         |
 | reason        | varchar(200) | required for `adjustment`                                                                     |
 | actor_type    | enum         | `tenant_user`, `system`                                                                       |
 | actor_id      | bigint       | nullable                                                                                      |
@@ -344,6 +344,7 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | status                                              | enum          | `pending`, `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled` |
 | items_total                                         | numeric(12,2) | Σ line_total                                                                      |
 | order_total                                         | numeric(12,2) | = items_total in V1 (BR-O08)                                                      |
+| returned_total                                      | numeric(12,2) | V2: Σ live returns, default 0, **check 0 ≤ returned_total ≤ order_total** (BR-R04) |
 | collected_amount                                    | numeric(12,2) | denormalized Σ non-voided collections, default 0                                  |
 | collection_status                                   | enum          | `unpaid`, `partially_collected`, `collected` (derived, BR-C03)                    |
 | delivery_name                                       | varchar(150)  | snapshot (BR-O10)                                                                 |
@@ -386,9 +387,26 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 
 `id, tenant_id, order_id, from_status, to_status, actor_type (customer|tenant_user|system), actor_id, note, created_at`.
 
-### `order_returns` — **reserved for V2** (D20)
+### `order_returns` (V2 Task 01, BR-R01..R06)
 
-Not created in V1. Name and the `return` movement type are reserved so V2 adds it without touching existing rows.
+| Column        | Type            | Notes                                                    |
+| ------------- | --------------- | -------------------------------------------------------- |
+| id            | bigint PK       |                                                          |
+| tenant_id     | FK              |                                                          |
+| order_id      | FK              | a delivered order                                        |
+| number        | int             | per order 1, 2, …; **unique (order_id, number)**         |
+| total         | numeric(12,2)   | Σ line_total, **check > 0**                              |
+| refund_amount | numeric(12,2)   | cash paid back (BR-R04), default 0, check ≥ 0            |
+| reason        | varchar(300)    | required                                                 |
+| returned_at   | timestamptz     | defaults to now, never in the future                     |
+| recorded_by   | FK tenant_users | nullable (system)                                        |
+| voided_at, void_reason, voided_by | | set together (BR-R06), never deleted                  |
+
+No status: a return is live or voided. Model `Orders\Models\OrderReturn`.
+
+### `order_return_items`
+
+`id, tenant_id, order_return_id FK, order_item_id FK, quantity int (check ≥ 1), quantity_base int, unit_price numeric(12,2) (the line's snapshot, D74), line_total numeric(12,2)`. `quantity_base = quantity × order_items.conversion_factor` is kept by `RecordReturn`, since the factor lives on the order line. Model `OrderReturnItem`.
 
 ---
 
@@ -401,6 +419,8 @@ Not created in V1. Name and the `return` movement type are reserved so V2 adds i
 | id           | bigint PK       |                   |
 | tenant_id    | FK              |                   |
 | order_id     | FK              |                   |
+| kind         | enum            | `payment` (default), `refund` (V2, BR-R04) |
+| order_return_id | FK order_returns | set exactly for a refund (the return it pays back) |
 | amount       | numeric(12,2)   | **check > 0**     |
 | method       | enum            | `cash` only in V1 |
 | collected_at | timestamptz     |                   |
@@ -410,7 +430,7 @@ Not created in V1. Name and the `return` movement type are reserved so V2 adds i
 | void_reason  | varchar(300)    | nullable          |
 | voided_by    | FK tenant_users | nullable          |
 
-Invariant (app, inside a transaction with the order row locked): `Σ non-voided amount ≤ order_total`. After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method = 'cash'`, `voided_at` and `void_reason` set together.
+Invariant (app, inside a transaction with the order row locked): `Σ live payments − Σ live refunds ≤ net total` (order_total − returned_total), except transiently between voiding a return's refund and voiding the return (BR-R06). After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method = 'cash'`, `kind in (payment, refund)`, `order_return_id` set iff `kind = refund`, `voided_at` and `void_reason` set together.
 
 ---
 
@@ -607,7 +627,6 @@ Each module exposes services; cross-module calls go through those services, neve
 
 | V2 feature             | Hook already present                                   |
 | ---------------------- | ------------------------------------------------------ |
-| Returns                | `return` movement type, `order_returns` name reserved  |
 | Variants               | products 1:N skus                                      |
 | Multiple selling units | `selling_unit_id` on SKU → becomes a `sku_units` table |
 | Credit terms           | `collected_amount` / `collection_status` on orders     |

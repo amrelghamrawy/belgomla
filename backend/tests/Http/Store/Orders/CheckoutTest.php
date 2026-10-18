@@ -31,6 +31,8 @@ test('BR-PR06 checkout answers 201 with the order detail', function (): void {
             'placed_at' => now()->toIso8601String(),
             'items_total' => '1020.00',
             'order_total' => '1020.00',
+            'returned_total' => '0.00',
+            'net_total' => '1020.00',
             'collection_status' => 'unpaid',
             'collected_amount' => '0.00',
             'delivery' => [
@@ -47,6 +49,7 @@ test('BR-PR06 checkout answers 201 with the order detail', function (): void {
                 'tier_min_quantity' => 10, 'line_total' => '1020.00',
             ]],
             'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
+            'returns' => [],
         ]]]);
 
     $this->assertDatabaseHas('sku_inventory', ['sku_id' => $this->sku->id, 'on_hand' => 400, 'reserved' => 240]);

@@ -14,7 +14,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * GET /api/dashboard/customers/{id}/statement (08-api-contract.md §10, D24): the customer's orders with their totals,
  * what was collected and the balance left, newest first; cancelled orders carry no money (BR-O03) and are left out.
- * The summary's `outstanding` counts delivered orders only (D59), like the customer list.
+ * Totals are net of returns (BR-R05); the summary's `outstanding` counts delivered orders only (D59), like the
+ * customer list.
  */
 final readonly class CustomerStatementQuery
 {
@@ -34,9 +35,9 @@ final readonly class CustomerStatementQuery
         /** @var object{orders_count: int|string, total: string, collected: string, outstanding: string} $row */
         $row = $this->of($customer)->toBase()
             ->selectRaw('count(*) as orders_count')
-            ->selectRaw('coalesce(sum(order_total), 0) as total')
+            ->selectRaw('coalesce(sum(order_total - returned_total), 0) as total')
             ->selectRaw('coalesce(sum(collected_amount), 0) as collected')
-            ->selectRaw('coalesce(sum(order_total - collected_amount) filter (where status = ?), 0) as outstanding', [OrderStatus::Delivered->value])
+            ->selectRaw('coalesce(sum(order_total - returned_total - collected_amount) filter (where status = ?), 0) as outstanding', [OrderStatus::Delivered->value])
             ->first();
 
         return [

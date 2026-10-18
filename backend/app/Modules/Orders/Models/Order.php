@@ -9,6 +9,7 @@ use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Collection;
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A customer's order (07-domain-model.md §7). Its lines and delivery details are snapshots (BR-PR07, BR-O10),
- * its items never change after checkout (BR-O06). Routes address it by its per-tenant `number` (BR-O09).
+ * its items never change after checkout (BR-O06); goods brought back are returns (BR-R01), which lower the net total. Routes address it by its per-tenant `number` (BR-O09).
  *
  * @property int $id
  * @property int $tenant_id
@@ -28,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property OrderStatus $status
  * @property string $items_total
  * @property string $order_total
+ * @property string $returned_total Σ live returns (BR-R05)
  * @property string $collected_amount
  * @property CollectionStatus $collection_status
  * @property string $delivery_name
@@ -45,6 +47,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Customer $customer
  * @property-read Collection<int, OrderItem> $items
  * @property-read Collection<int, OrderStatusHistory> $history
+ * @property-read Collection<int, OrderReturn> $returns
  */
 final class Order extends Model
 {
@@ -54,6 +57,7 @@ final class Order extends Model
     use HasFactory;
 
     protected $attributes = [
+        'returned_total' => '0.00',
         'collected_amount' => '0.00',
         'collection_status' => 'unpaid',
     ];
@@ -95,6 +99,22 @@ final class Order extends Model
     }
 
     /**
+     * Oldest first, voided ones included (BR-R06).
+     *
+     * @return HasMany<OrderReturn, $this>
+     */
+    public function returns(): HasMany
+    {
+        return $this->hasMany(OrderReturn::class)->orderBy('number');
+    }
+
+    /** BR-O08: what the customer owes for the order once returns are taken off, as "150.00". */
+    public function netTotal(): string
+    {
+        return Money::subtract($this->order_total, $this->returned_total);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -104,6 +124,7 @@ final class Order extends Model
             'status' => OrderStatus::class,
             'items_total' => 'decimal:2',
             'order_total' => 'decimal:2',
+            'returned_total' => 'decimal:2',
             'collected_amount' => 'decimal:2',
             'collection_status' => CollectionStatus::class,
             'delivery_address' => 'array',

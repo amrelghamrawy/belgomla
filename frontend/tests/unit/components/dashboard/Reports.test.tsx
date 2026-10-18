@@ -14,26 +14,28 @@ const sales = {
   to: "2026-10-03",
   group: "day",
   buckets: [
-    { period_start: "2026-10-01", orders: 2, total: "900.00" },
-    { period_start: "2026-10-02", orders: 0, total: "0.00" },
-    { period_start: "2026-10-03", orders: 1, total: "350.50" },
+    { period_start: "2026-10-01", orders: 2, gross: "900.00", returns: "0.00", net: "900.00" },
+    { period_start: "2026-10-02", orders: 0, gross: "0.00", returns: "100.00", net: "-100.00" },
+    { period_start: "2026-10-03", orders: 1, gross: "350.50", returns: "0.00", net: "350.50" },
   ],
-  totals: { orders: 3, total: "1250.50" },
+  totals: { orders: 3, gross: "1250.50", returns: "100.00", net: "1150.50" },
 };
 
 describe("SalesSection", () => {
-  it("D5 shows the totals and the same buckets as a table", async () => {
+  it("D5 BR-R05 shows the net and returns totals and the same buckets as a table", async () => {
     stubApi({ "GET /api/dashboard/reports/sales": json(200, { data: sales }) });
     const user = userEvent.setup();
     renderWithQuery(<SalesSection query={{}} setQuery={vi.fn()} />);
 
-    expect(await screen.findByTestId("sales-total")).toHaveTextContent("1,250.50 ج.م");
+    expect(await screen.findByTestId("sales-total")).toHaveTextContent("1,150.50 ج.م");
+    expect(screen.getByTestId("returns-total")).toHaveTextContent("100.00 ج.م");
     expect(screen.getByRole("figure", { name: /رسم بياني للمبيعات/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "عرض كجدول" }));
 
     const rows = screen.getAllByRole("row").slice(1);
     expect(rows).toHaveLength(3);
-    expect(within(rows[2]!).getByText("350.50 ج.م")).toBeInTheDocument();
+    expect(within(rows[2]!).getAllByText("350.50 ج.م")).toHaveLength(2);
+    expect(within(rows[1]!).getByText("100.00 ج.م")).toBeInTheDocument();
   });
 
   it("sends the range and grouping and changes the grouping through the URL", async () => {
@@ -60,7 +62,7 @@ describe("SalesSection", () => {
   it("says when the period has no sales", async () => {
     stubApi({
       "GET /api/dashboard/reports/sales": json(200, {
-        data: { ...sales, buckets: [], totals: { orders: 0, total: "0.00" } },
+        data: { ...sales, buckets: [], totals: { orders: 0, gross: "0.00", returns: "0.00", net: "0.00" } },
       }),
     });
 

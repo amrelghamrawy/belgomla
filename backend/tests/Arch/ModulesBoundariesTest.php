@@ -383,6 +383,28 @@ arch('collections fill the order collections contract of orders')
     ->expect(App\Modules\Collections\Services\OrderCollectionRecords::class)
     ->toImplement(App\Modules\Orders\Contracts\OrderCollections::class);
 
+/*
+| Returns (V2 Task 01, BR-R01..R06) live in Orders. Reports read them for net sales; Collections pays a return's
+| refund through Orders' RefundsPayments contract (ReturnRefunds) and never touches the return rows or actions.
+*/
+
+arch('return models are used only by orders and, for reading, reports')
+    ->expect([App\Modules\Orders\Models\OrderReturn::class, App\Modules\Orders\Models\OrderReturnItem::class])
+    ->toOnlyBeUsedIn(['App\Modules\Orders', 'App\Modules\Reports\Queries', App\Providers\OrdersServiceProvider::class, 'Database\Factories']);
+
+arch('collections reach returns only through the refunds contract')
+    ->expect('App\Modules\Collections')
+    ->not->toUse([
+        App\Modules\Orders\Models\OrderReturn::class,
+        App\Modules\Orders\Models\OrderReturnItem::class,
+        App\Modules\Orders\Actions\RecordReturn::class,
+        App\Modules\Orders\Actions\VoidReturn::class,
+    ]);
+
+arch('collections fill the refunds payments contract of orders')
+    ->expect(App\Modules\Collections\Services\ReturnRefunds::class)
+    ->toImplement(App\Modules\Orders\Contracts\RefundsPayments::class);
+
 arch('collections fill the outstanding balances contract of customers')
     ->expect(App\Modules\Collections\Queries\OutstandingByCustomerQuery::class)
     ->toImplement(App\Modules\Customers\Contracts\OutstandingBalances::class);

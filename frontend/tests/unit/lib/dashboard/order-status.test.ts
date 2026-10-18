@@ -41,8 +41,9 @@ describe("nextSteps and the other guards", () => {
     expect(ALL.filter(canCollect)).toEqual(["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]);
   });
 
-  it("works out the balance in piasters and never below zero", () => {
-    expect(balanceOf({ order_total: "450.10", collected_amount: "100.05" })).toBe("350.05");
-    expect(balanceOf({ order_total: "100.00", collected_amount: "100.00" })).toBe("0.00");
+  it("BR-O08 works out the balance on the net total in piasters and never below zero", () => {
+    expect(balanceOf({ net_total: "450.10", collected_amount: "100.05" })).toBe("350.05");
+    expect(balanceOf({ net_total: "100.00", collected_amount: "100.00" })).toBe("0.00");
+    expect(balanceOf({ net_total: "60.00", collected_amount: "100.00" })).toBe("0.00");
   });
 });

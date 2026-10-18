@@ -23,7 +23,7 @@ test('a customer lists their orders, newest first, without lines', function (): 
         ->assertJsonPath('data.1.number', $first->number)
         ->assertJsonPath('meta.total', 2)
         ->assertJsonMissingPath('data.0.items')
-        ->assertExactJsonStructure(['data' => ['*' => ['number', 'status', 'status_label', 'placed_at', 'items_total', 'order_total', 'collection_status', 'collected_amount', 'delivery', 'customer_note', 'cancel_reason', 'cancelled_by']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['number', 'status', 'status_label', 'placed_at', 'items_total', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount', 'delivery', 'customer_note', 'cancel_reason', 'cancelled_by']], 'links', 'meta']);
 });
 
 test('the list filters by status', function (): void {
@@ -96,4 +96,28 @@ test('the history follows the merchant\'s changes', function (): void {
     $this->tenantJson('GET', "/api/store/orders/{$order->number}")
         ->assertJsonPath('data.status', 'confirmed')
         ->assertJsonPath('data.history.1', ['from' => 'pending', 'to' => 'confirmed', 'at' => $order->refresh()->history->last()?->created_at->toIso8601String(), 'by' => 'tenant_user']);
+});
+
+test('BR-R05 the customer sees the live returns of their order, without the merchant\'s reason or voided ones', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+    $owner = $this->makeOwner();
+    $this->inTenant(function () use ($order, $owner): void {
+        app(App\Modules\Orders\Actions\TransitionOrder::class)->handle($order, new App\Modules\Orders\Data\TransitionData(OrderStatus::Delivered), $owner->id);
+        $line = App\Modules\Orders\Models\OrderItem::query()->where('order_id', $order->id)->sole();
+        $record = fn (int $quantity): App\Modules\Orders\Models\OrderReturn => app(App\Modules\Orders\Actions\RecordReturn::class)
+            ->handle($order, new App\Modules\Orders\Data\ReturnData('ملاحظة داخلية', [new App\Modules\Orders\Data\ReturnLineData($line->id, $quantity)]), $owner->id);
+        $record(2);
+        app(App\Modules\Orders\Actions\VoidReturn::class)->handle($record(1), 'خطأ', $owner->id);
+    });
+
+    $this->tenantJson('GET', "/api/store/orders/{$order->number}")
+        ->assertOk()
+        ->assertJsonPath('data.returned_total', '180.00')
+        ->assertJsonPath('data.net_total', '360.00')
+        ->assertJsonCount(1, 'data.returns')
+        ->assertJsonPath('data.returns.0.number', 1)
+        ->assertJsonPath('data.returns.0.total', '180.00')
+        ->assertJsonPath('data.returns.0.items.0.quantity', 2)
+        ->assertJsonMissingPath('data.returns.0.reason')
+        ->assertJsonCount(2, 'data.history');
 });

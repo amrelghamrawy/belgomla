@@ -1,6 +1,13 @@
 # V2 Task 01 — Returns (المرتجع)
 
-Status: **planned**. Requires V2 Task 00. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-19). Started while Task 00 still waits for the VM and accounts (its repo side is done); the product owner asked for V2 01–05 in one go. Read `CLAUDE.md`, `rules/*.md`, then this file.
+
+### Delivered
+
+- Docs: D74–D76 (D76 refuses with `422 insufficient_stock`, the ledger's existing code, not 409), §H2 BR-R01..R06, BR-INV06/O06/O08/C02/C03 and D59 updated, 07 `order_returns`/`order_return_items`/`orders.returned_total`/`collections.kind`+`order_return_id`, 08 §9 Returns.
+- Deviations from the plan, each recorded in the docs: the net total is `Order::netTotal()` (a model accessor; `App\Support` may not depend on Orders), a refund row points at its return (`collections.order_return_id`) so VoidReturn can ask `RefundsPayments::hasLiveRefund()`, collected may exceed the net total between voiding a refund and voiding its return (status `collected`, owes nothing), voiding a payment that would leave more refunded than collected is `409 void_refund_first`, the store order hides history entries without a status change (the return notes), and the sales report replaces `total` with `gross`/`returns`/`net`.
+- Tests: backend +164 (3118, all green); frontend +17 unit (641) and the e2e "delivered order takes a return of 2" on mobile and desktop.
+- Smoke against `php artisan serve`: deliver + collect in full → return without refund (422 refund_required) → with refund (restocked, net = collected) → void return (409 return_has_refund) → void refund → void return; stock, totals and outstanding back at each step.
 
 ## Goal
 

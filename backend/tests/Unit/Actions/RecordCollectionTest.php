@@ -76,6 +76,17 @@ test('BR-C03 collecting more than the remaining balance is rejected with what is
         ->and($this->order->refresh()->collected_amount)->toBe('200.00');
 });
 
+test('BR-C03 BR-R05 the remaining balance is the net total once returns came back', function (): void {
+    $this->order->forceFill(['returned_total' => '140.00'])->save();
+
+    expect(fn () => ($this->record)('360.01'))->toThrow(function (ExceedsBalance $e): void {
+        expect($e->details)->toBe(['remaining' => '360.00']);
+    });
+
+    ($this->record)('360.00');
+    expect($this->order->refresh()->collection_status)->toBe(CollectionStatus::Collected);
+});
+
 test('BR-C03 nothing more can be collected on a collected order', function (): void {
     ($this->record)('500.00');
 

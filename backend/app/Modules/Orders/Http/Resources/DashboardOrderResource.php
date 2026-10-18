@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Http\Resources;
 
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -16,7 +17,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * An order on the dashboard (08-api-contract.md §9): the customer's shape plus the order id, the customer, the
  * status timestamps, `is_stale` (pending past `stale_pending_hours`, BR-INV07), history with the actor id and
- * note, and `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()).
+ * note, `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()) and every
+ * return of the order, voided ones included, in the returns list shape without `order` (BR-R06).
  *
  * @property-read Order $resource
  */
@@ -67,6 +69,7 @@ final class DashboardOrderResource extends JsonResource
                 'note' => $entry->note,
             ])->values()->all()),
             'collections' => $this->when($detail, $this->collections),
+            'returns' => $this->whenLoaded('returns', fn (): array => $order->returns->map(fn (OrderReturn $return): array => new OrderReturnResource($return)->resolve($request))->values()->all()),
         ];
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Enums;
 
 /**
- * BR-INV06: what changed On Hand. `return` is reserved for V2 returns (D20) and never written in V1.
+ * BR-INV06: what changed On Hand. `return` is a customer return (BR-R03, positive) or its void (BR-R06, negative).
  */
 enum MovementType: string
 {

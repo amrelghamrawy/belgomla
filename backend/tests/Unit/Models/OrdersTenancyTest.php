@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderReturn;
+use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Orders\Models\TenantOrderCounter;
 use App\Modules\Tenancy\TenantContext;
@@ -20,6 +22,8 @@ dataset('orders models', [
     'status history' => [OrderStatusHistory::class],
     'order counter' => [TenantOrderCounter::class],
     'notification' => [MerchantNotification::class],
+    'return' => [OrderReturn::class],
+    'return line' => [OrderReturnItem::class],
 ]);
 
 test('a model created in tenant context gets that tenant id', function (string $model): void {

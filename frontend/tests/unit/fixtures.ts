@@ -162,6 +162,8 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
     placed_at: "2026-10-10T08:00:00Z",
     items_total: "540.00",
     order_total: "540.00",
+    returned_total: "0.00",
+    net_total: "540.00",
     collection_status: "unpaid",
     collected_amount: "0.00",
     delivery: {
@@ -195,6 +197,7 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
       },
     ],
     history: [{ from: null, to: "pending", at: "2026-10-10T08:00:00Z", by: "customer" }],
+    returns: [],
     ...overrides,
   };
 }

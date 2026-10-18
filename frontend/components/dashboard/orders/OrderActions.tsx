@@ -12,13 +12,15 @@ import { formatMoney } from "@/lib/format/money";
 import { Hint } from "../common/Hint";
 import { ReasonDialog } from "../common/ReasonDialog";
 import { RecordCollectionDialog } from "./RecordCollectionDialog";
+import { ReturnDialog } from "./ReturnDialog";
 
 const copy = ar.dashboard.orders;
 
 /**
  * Only the actions the order's status allows (BR-O01/O02, mirrored in order-status.ts): one button per forward
- * step, the "deliver and collect in full" shortcut while money is left (BR-C04), record a collection, and
- * cancel with a reason (the backend refuses with has_collections while collections exist, BR-O03).
+ * step, the "deliver and collect in full" shortcut while money is left (BR-C04), record a collection, record a
+ * return on a delivered order (BR-R01), and cancel with a reason (the backend refuses with has_collections while
+ * collections exist, BR-O03).
  */
 export function OrderActions({ order }: { order: DashboardOrderDetail }) {
   const transition = useTransitionOrder(order.number);
@@ -27,6 +29,7 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
   const balance = balanceOf(order);
   const owed = balance !== "0.00";
   const collectable = canCollect(order.status) && owed;
+  const returnable = order.status === "delivered";
 
   const move = (to: (typeof steps)[number], collect = false) =>
     transition.mutate(
@@ -40,8 +43,8 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
       },
     );
 
-  // A delivered order with money left still takes collections (BR-C04); anything else final has no actions.
-  if (steps.length === 0 && !canCancel(order.status) && !collectable) {
+  // A delivered order still takes collections (BR-C04) and returns (BR-R01); a cancelled one has no actions.
+  if (steps.length === 0 && !canCancel(order.status) && !collectable && !returnable) {
     return <p className="text-muted-foreground text-sm">{copy.terminal}</p>;
   }
 
@@ -65,6 +68,7 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
         </Hint>
       )}
       {collectable && <RecordCollectionDialog order={order} />}
+      {returnable && <ReturnDialog orderNumber={order.number} />}
       {canCancel(order.status) && (
         <ReasonDialog
           trigger={(open) => (

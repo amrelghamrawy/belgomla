@@ -10,6 +10,7 @@ use App\Modules\Collections\Queries\CustomerStatementQuery;
 use App\Modules\Collections\Queries\OutstandingByCustomerQuery;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 
@@ -29,6 +30,16 @@ test('BR-C03 the collected amount of an order sums its collections that are not 
     CashCollection::factory()->create(['amount' => '999.00']);
 
     expect(app(CollectedAmountQuery::class)->forOrder($order->id))->toBe('200.00');
+});
+
+test('BR-R04 refunds are taken off the collected amount, a voided refund no longer', function (): void {
+    $order = ($this->order)('500.00');
+    $return = OrderReturn::factory()->for($order)->create();
+    CashCollection::factory()->for($order)->create(['amount' => '500.00']);
+    CashCollection::factory()->for($order)->refund($return->id)->create(['amount' => '120.00']);
+    CashCollection::factory()->for($order)->refund($return->id)->voided()->create(['amount' => '80.00']);
+
+    expect(app(CollectedAmountQuery::class)->forOrder($order->id))->toBe('380.00');
 });
 
 test('BR-C03 an order without collections has collected nothing', function (): void {
@@ -74,6 +85,15 @@ test('D59 customers owe the balance of their delivered orders only', function ()
     ($this->order)('50.00', customerId: $other->id);
 
     expect(app(OutstandingByCustomerQuery::class)->forCustomers([$this->customer->id, $other->id]))->toEqual([$this->customer->id => '600.00', $other->id => '50.00']);
+});
+
+test('D59 BR-R05 what customers owe is net of returns', function (): void {
+    $order = ($this->order)('500.00', '200.00');
+    $order->forceFill(['returned_total' => '120.00'])->save();
+
+    expect(app(OutstandingByCustomerQuery::class)->forCustomers([$this->customer->id]))->toEqual([$this->customer->id => '180.00'])
+        ->and(app(OutstandingByCustomerQuery::class)->total())->toBe('180.00')
+        ->and(app(OutstandingByCustomerQuery::class)->builder()->sole()->total)->toBe('380.00');
 });
 
 test('D59 customers who owe nothing are missing from the balances', function (): void {
@@ -122,6 +142,14 @@ test('D59 the statement summary counts every open or delivered order but owes on
 
     expect(app(CustomerStatementQuery::class)->summary($this->customer))->toBe([
         'orders_count' => 2, 'total' => '1400.00', 'collected' => '300.00', 'outstanding' => '300.00',
+    ]);
+});
+
+test('D59 BR-R05 the statement summary is net of returns', function (): void {
+    ($this->order)('500.00', '200.00')->forceFill(['returned_total' => '100.00'])->save();
+
+    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toBe([
+        'orders_count' => 1, 'total' => '400.00', 'collected' => '200.00', 'outstanding' => '200.00',
     ]);
 });
 

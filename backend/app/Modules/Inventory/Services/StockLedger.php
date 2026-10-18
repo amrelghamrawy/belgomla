@@ -23,7 +23,7 @@ use RuntimeException;
  *
  * Locking: every change works on a row locked with `SELECT … FOR UPDATE`, ordered by `sku_id` so two
  * transactions locking several SKUs always queue in the same order and cannot deadlock (domain §12).
- * `reserve`, `release` and `deduct` join the caller's transaction (checkout, order transitions) and
+ * `reserve`, `release`, `deduct`, `restock` and `unrestock` join the caller's transaction (checkout, order transitions, returns) and
  * refuse to run outside one; `openingStock` and `adjust` open their own (nesting into the caller's).
  * A SKU without a stock row gets an empty one the first time it is locked.
  *
@@ -149,6 +149,40 @@ final readonly class StockLedger
         $row->save();
 
         return $this->record($sku, MovementType::Sale, -$quantityBase, $row->on_hand, $actorId, orderId: $orderId);
+    }
+
+    /** BR-R03: goods a customer brought back go back on the shelf, as a positive `return` movement linked to the order. */
+    public function restock(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null): InventoryMovement
+    {
+        $this->assertInTransaction('restock');
+        $this->assertPositive($quantityBase);
+
+        $row = $this->row($sku);
+        $row->on_hand += $quantityBase;
+        $row->save();
+
+        return $this->record($sku, MovementType::Return, $quantityBase, $row->on_hand, $actorId, orderId: $orderId);
+    }
+
+    /**
+     * BR-R06: a voided return takes its goods off the shelf again, as a negative `return` movement. Units sold or
+     * reserved since are not taken back: less than the quantity Available is `insufficient_stock` (D76).
+     */
+    public function unrestock(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null): InventoryMovement
+    {
+        $this->assertInTransaction('unrestock');
+        $this->assertPositive($quantityBase);
+
+        $row = $this->row($sku);
+
+        if ($row->available < $quantityBase) {
+            throw InsufficientStock::for($sku->id, $row->available);
+        }
+
+        $row->on_hand -= $quantityBase;
+        $row->save();
+
+        return $this->record($sku, MovementType::Return, -$quantityBase, $row->on_hand, $actorId, orderId: $orderId);
     }
 
     /**

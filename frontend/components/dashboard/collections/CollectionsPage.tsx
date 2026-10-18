@@ -128,9 +128,17 @@ function CollectionRow({ collection }: { collection: Collection }) {
       <TableCell
         className={collection.is_voided ? "text-muted-foreground whitespace-nowrap line-through" : "whitespace-nowrap"}
       >
+        {collection.kind === "refund" ? "−" : ""}
         {formatMoney(collection.amount)}
       </TableCell>
-      <TableCell>{collection.method_label}</TableCell>
+      <TableCell>
+        {collection.method_label}
+        {collection.kind === "refund" && (
+          <Badge variant="outline" className="ms-2">
+            {copy.refundBadge}
+          </Badge>
+        )}
+      </TableCell>
       <TableCell>
         {collection.is_voided ? (
           <div className="flex flex-col items-start gap-1">

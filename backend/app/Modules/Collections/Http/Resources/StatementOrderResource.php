@@ -10,8 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * One order line of a customer statement (08-api-contract.md §10): its total, what was collected and the balance
- * left (`order_total − collected_amount`, whatever the status; the summary decides what counts as outstanding, D59).
+ * One order line of a customer statement (08-api-contract.md §10): its total, what came back, what was collected and
+ * the balance left (`order_total − returned_total − collected_amount`, whatever the status; the summary decides what
+ * counts as outstanding, D59).
  *
  * @property-read Order $resource
  */
@@ -31,8 +32,10 @@ final class StatementOrderResource extends JsonResource
             'placed_at' => $order->placed_at->toIso8601String(),
             'delivered_at' => $order->delivered_at?->toIso8601String(),
             'order_total' => $order->order_total,
+            'returned_total' => $order->returned_total,
+            'net_total' => $order->netTotal(),
             'collected_amount' => $order->collected_amount,
-            'balance' => Money::subtract($order->order_total, $order->collected_amount),
+            'balance' => Money::subtract($order->netTotal(), $order->collected_amount),
             'collection_status' => $order->collection_status->value,
         ];
     }

@@ -311,6 +311,8 @@ Order detail shape (shared with dashboard, dashboard adds customer + collections
 
 Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `cancelled_by`, and each item `sku_id`, `sku_name`, `conversion_factor`, `cover_price`, `discount_percent`, `tier_min_quantity`. The list leaves out `items` and `history`. `{number}` is the per-tenant order number; another customer's or another tenant's order is `404` (D57). In `checkout_failed`, `requested`/`available` are selling units; an empty cart is `422 cart_empty`; an address that is not the customer's active address is `422 validation_failed` on `address_id`; a customer who is not active gets `403` with the status as code. Cancel needs `reason` (≤ 300); `has_collections` (409) when money was collected. Orders routes need status `active` (like the cart). Audit: `order.created`, `order.cancelled`.
 
+V2 Task 01: the order also carries `returned_total` and `net_total` (BR-O08), and the detail `returns[]`, the live returns without the merchant's reason (see §9 Returns).
+
 ---
 
 ## 4. Dashboard — Auth
@@ -514,6 +516,21 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by
 
 Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer { id, name, phone }`, `confirmed_at`, `delivered_at`, `cancelled_at`, `is_stale` (pending past `stale_pending_hours`), history entries with `actor_id` and `note`, and on the detail `collections` (the collection shape of §10, newest first, voided ones included). `?from=&to=` are `Y-m-d` days of `placed_at`, both inclusive; `?q=` matches the order number (`#1024` too), customer name or phone, or recipient name; `?sort=placed_at|number|order_total` (default `-placed_at`). `delivery-address` takes `governorate, city, address_line, label?, landmark?, name?, phone?` (name/phone kept when omitted) → `409 address_locked` from `out_for_delivery` on. `collect_full_amount` is ignored for other targets (see §10 for what it records). Every write answers the dashboard order detail. Audit: `order.status_changed`, `order.cancelled`, `order.delivery_address_changed`.
 
+### Returns (V2 Task 01, BR-R01..R06)
+
+| Method | Path                                          | Body / Notes                                                                 |
+| ------ | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| GET    | `/api/dashboard/orders/{number}/returns`      | the order's returns oldest first (voided included) + `returnable[]` per line |
+| POST   | `/api/dashboard/orders/{number}/returns`      | `{ reason, returned_at?, refund?, items: [{ order_item_id, quantity }] }`    |
+| POST   | `/api/dashboard/returns/{id}/void`            | `{ reason }`                                                                 |
+| GET    | `/api/dashboard/returns`                      | `?from=&to=&customer_id=&q=`, paginated, newest `returned_at` first          |
+
+- **Return** shape: `{ id, number, order { id, number, order_total, returned_total, net_total, collected_amount, collection_status }, customer { id, name }, total, refund_amount, reason, returned_at, recorded_by, is_voided, voided_at, void_reason, voided_by, items: [{ id, order_item_id, product_name, sku_code, unit, quantity, quantity_base, unit_price, line_total }], created_at }`. `order` (the balance after the change) is on the list and the writes, not on the order's own returns list or inside the order detail; `customer` is on the list only.
+- **Record**: answers `201`. Only a delivered order (`409 return_not_allowed`, `details.status`). Each line at most its returnable quantity (`422 return_exceeds_delivered`, `items: [{ order_item_id, requested, returnable }]`). `items` 1..200, each line once, `quantity ≥ 1`; `returned_at` defaults to now and cannot be in the future; `reason` ≤ 300. Priced at the line's snapshot price (D74). When the order was collected beyond its new net total: `422 refund_required` with `details.refund_amount`, unless `refund: true`, which records the cash refund. Honors `Idempotency-Key`. Audit: `order.returned` (+ `collection.refunded`).
+- **Void**: answers the return. `409 already_voided`; `409 return_has_refund` while its refund is live; `422 insufficient_stock` when the goods are gone again (D76). Honors `Idempotency-Key`. Audit: `order.return_voided`.
+- `returnable[]`: `{ order_item_id, product_name, sku_code, unit, unit_price, ordered, returned, returnable }` (`returned` = live returns).
+- The dashboard order adds `returned_total`, `net_total` and, on the detail, `returns[]` (every return, the shape above without `order`). The store order adds `returned_total`, `net_total` and, on the detail, `returns[]` of live returns `{ number, total, refund_amount, returned_at, items: [{ product_name, sku_code, unit, quantity, unit_price, line_total }] }` (no reason).
+
 ---
 
 ## 10. Dashboard — Collections (BR-C02..C04)
@@ -527,15 +544,16 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 
 Delivered in Task 7:
 
-- **Collection** shape (list, record, void, and `collections` on the dashboard order detail): `{ id, order { id, number, order_total, collected_amount, collection_status }, customer { id, name }, amount, method: "cash", method_label, collected_at, recorded_by, note, is_voided, voided_at, void_reason, voided_by, created_at }`. `order` carries the balance after the change. `customer` is only on the list, not on the order detail. `recorded_by`/`voided_by` are tenant user ids (`null` = system).
+- **Collection** shape (list, record, void, and `collections` on the dashboard order detail): `{ id, order { id, number, order_total, net_total, collected_amount, collection_status }, customer { id, name }, kind: "payment"|"refund", kind_label, order_return_id, amount, method: "cash", method_label, collected_at, recorded_by, note, is_voided, voided_at, void_reason, voided_by, created_at }`. `order` carries the balance after the change. `customer` is only on the list, not on the order detail. `recorded_by`/`voided_by` are tenant user ids (`null` = system).
 - **List**: every collection, voided ones included, newest `collected_at` first. `from`/`to` are business days (D60) of `collected_at`, both inclusive. `order` is the order number.
-- **Record**: answers `201` with the collection. `amount` is `decimal:0,2`, `> 0`, ≤ 9 999 999 999.99. `collected_at` defaults to now and cannot be in the future. `note` is at most 300 characters. Allowed at any order status but cancelled (`409 order_cancelled`); a deposit before delivery is fine (BR-C04). More than the remaining balance is `422 exceeds_balance`. The order row is locked, so two concurrent collections cannot both fit one balance. Honors `Idempotency-Key`.
+- **Refunds** (V2 Task 01): a `refund` record is cash paid back for a return (`order_return_id`), created only by recording the return (BR-R04). It lowers `collected_amount`; voiding it raises it again. Voiding a payment that would leave more refunded than collected is `409 void_refund_first`.
+- **Record**: answers `201` with the collection. `amount` is `decimal:0,2`, `> 0`, ≤ 9 999 999 999.99. `collected_at` defaults to now and cannot be in the future. `note` is at most 300 characters. Allowed at any order status but cancelled (`409 order_cancelled`); a deposit before delivery is fine (BR-C04). More than the remaining balance (net total − collected) is `422 exceeds_balance`. The order row is locked, so two concurrent collections cannot both fit one balance. Honors `Idempotency-Key`.
 - **Void**: `reason` is at most 300 characters. Answers the collection; a second void is `409 already_voided`. Voiding everything makes the order cancellable again (BR-O03). Honors `Idempotency-Key`.
 - `orders.collected_amount` / `collection_status` are recomputed after every record or void (BR-C03).
 - **Shortcut**: `transition` to `delivered` with `collect_full_amount: true` records one collection for whatever is left, in the same transaction. Nothing is recorded when a deposit already covered the order; if the collection fails, the delivery rolls back.
-- **Statement**: `{ data: [ { number, status, status_label, placed_at, delivered_at, order_total, collected_amount, balance, collection_status } ], links, meta, customer { id, name, phone }, summary { orders_count, total, collected, outstanding } }`.
+- **Statement**: `{ data: [ { number, status, status_label, placed_at, delivered_at, order_total, returned_total, net_total, collected_amount, balance, collection_status } ], links, meta, customer { id, name, phone }, summary { orders_count, total, collected, outstanding } }`.
   - Lists the customer's non-cancelled orders, newest first.
-  - `balance` = `order_total − collected_amount`.
+  - `balance` = `order_total − returned_total − collected_amount`; the summary's `total` is net of returns too.
   - `summary.outstanding` counts delivered orders only (D59), the same figure as the customer list's `outstanding_amount`.
 - Audit actions: `collection.recorded`, `collection.voided`.
 
@@ -553,17 +571,17 @@ Delivered in Task 7:
 Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 
 - **overview**:
-  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total }, stale_pending, outstanding_total, low_stock_count }`.
-  - `today` counts orders placed since local midnight; its total leaves cancelled orders out.
+  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total, returns }, stale_pending, outstanding_total, low_stock_count }`.
+  - `today` counts orders placed since local midnight; its total leaves cancelled orders out and takes off today's live returns (`returns`, BR-R05).
   - `outstanding_total` follows D59.
 - **sales**:
-  - Shape: `{ from, to, group, buckets: [ { period_start, orders, total } ], totals { orders, total } }`.
-  - It covers delivered orders by `delivered_at`.
+  - Shape: `{ from, to, group, buckets: [ { period_start, orders, gross, returns, net } ], totals { orders, gross, returns, net } }`.
+  - `gross` covers delivered orders by `delivered_at`, `returns` live returns by `returned_at`, `net` = gross − returns (BR-R05).
   - Every bucket of the range is listed, with empty ones as zero. Weeks start on Saturday (D58) and the first bucket starts on the Saturday on or before `from`.
   - Without `from`/`to`, it covers the last 30 days up to today; `group` defaults to `day`.
 - **outstanding**:
   - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding }` rows, largest debt first.
-  - It covers delivered orders that are not fully collected (D59).
+  - It covers delivered orders that are not fully collected (D59); `total` and `outstanding` are net of returns.
 - **low-stock**:
   - Paginated `{ sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold }`, ordered by code.
   - It covers SKUs of products that are not inactive.
@@ -627,9 +645,9 @@ php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-g
 | Store public   |         6 |
 | Store auth     |        10 |
 | Store customer |        13 |
-| Dashboard      |        71 |
+| Dashboard      |        75 |
 | Webhooks       |         2 |
-| **Total**      |   **102** |
+| **Total**      |   **106** |
 
 ---
 

@@ -203,6 +203,23 @@ export async function apiFetchPage<T, M = PaginationMeta, E extends object = obj
   return { ...rest, data: body.data as T[], meta: body.meta as M } as Page<T, M> & E;
 }
 
+/**
+ * Like apiFetch for a body that carries top-level keys next to `data` but is not a page (an order's returns with
+ * `returnable`): keeps the whole envelope, typed as `E` beside `data`.
+ */
+export async function apiFetchWith<T, E extends object>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<{ data: T } & E> {
+  const body = await call(path, options);
+
+  if (!isRecord(body) || !("data" in body)) {
+    throw new ApiError(0, "server_error", ar.errors.server_error);
+  }
+
+  return body as { data: T } & E;
+}
+
 /** Sends the request with CSRF bootstrap, the single 419 retry and the 401 hook; returns the parsed body. */
 async function call(path: string, options: ApiOptions): Promise<unknown> {
   const mutating = (options.method ?? "GET") !== "GET";

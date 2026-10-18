@@ -1411,6 +1411,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/orders/{order}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        /** The order's returns oldest first, voided included, plus what each line can still take back (BR-R02) */
+        get: operations["dashboardOrderReturns"];
+        put?: never;
+        /** Records goods brought back after delivery (BR-R01..R04); priced at the line's snapshot price (D74) */
+        post: operations["dashboardRecordReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/returns/{orderReturn}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderReturn: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Voids a return (BR-R06); its live refund must be voided first; sold-again stock refuses (D76) */
+        post: operations["dashboardVoidReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/notifications": {
         parameters: {
             query?: never;
@@ -1596,7 +1655,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "reserved_subdomain" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1925,6 +1984,10 @@ export interface components {
             placed_at: string;
             items_total: components["schemas"]["Money"];
             order_total: components["schemas"]["Money"];
+            /** @description Σ live returns (BR-R05) */
+            returned_total: components["schemas"]["Money"];
+            /** @description order_total − returned_total (BR-O08) */
+            net_total: components["schemas"]["Money"];
             /** @enum {string} */
             collection_status: "unpaid" | "partially_collected" | "collected";
             collected_amount: components["schemas"]["Money"];
@@ -1947,6 +2010,7 @@ export interface components {
         OrderDetail: components["schemas"]["Order"] & {
             items: components["schemas"]["OrderItem"][];
             history: components["schemas"]["OrderHistoryEntry"][];
+            returns: components["schemas"]["StoreOrderReturn"][];
         };
         DashboardLoginRequest: {
             /** Format: email */
@@ -2347,6 +2411,75 @@ export interface components {
             items: components["schemas"]["OrderItem"][];
             history: components["schemas"]["DashboardOrderHistoryEntry"][];
             collections: components["schemas"]["Collection"][];
+            /** @description Every return, voided included, without `order` (BR-R06) */
+            returns: components["schemas"]["OrderReturn"][];
+        };
+        OrderReturnLine: {
+            id: number;
+            order_item_id: number;
+            product_name: string;
+            sku_code: string;
+            unit: string;
+            quantity: number;
+            quantity_base: number;
+            unit_price: components["schemas"]["Money"];
+            line_total: components["schemas"]["Money"];
+        };
+        /** @description A return (BR-R01..R06). `order` (the balance after the change) is on the list and the writes, not inside the order detail; `customer` on the list only. */
+        OrderReturn: {
+            id: number;
+            number: number;
+            order?: {
+                id: number;
+                number: number;
+                order_total: components["schemas"]["Money"];
+                returned_total: components["schemas"]["Money"];
+                net_total: components["schemas"]["Money"];
+                collected_amount: components["schemas"]["Money"];
+                collection_status: components["schemas"]["CollectionStatus"];
+            };
+            customer?: components["schemas"]["IdName"];
+            total: components["schemas"]["Money"];
+            refund_amount: components["schemas"]["Money"];
+            reason: string;
+            /** Format: date-time */
+            returned_at: string;
+            recorded_by: number | null;
+            is_voided: boolean;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
+            voided_by: number | null;
+            items: components["schemas"]["OrderReturnLine"][];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ReturnableLine: {
+            order_item_id: number;
+            product_name: string;
+            sku_code: string;
+            unit: string;
+            unit_price: components["schemas"]["Money"];
+            ordered: number;
+            /** @description Brought back by live returns */
+            returned: number;
+            returnable: number;
+        };
+        /** @description A live return as the customer sees it (BR-R05), without the merchant's reason */
+        StoreOrderReturn: {
+            number: number;
+            total: components["schemas"]["Money"];
+            refund_amount: components["schemas"]["Money"];
+            /** Format: date-time */
+            returned_at: string;
+            items: {
+                product_name: string;
+                sku_code: string;
+                unit: string;
+                quantity: number;
+                unit_price: components["schemas"]["Money"];
+                line_total: components["schemas"]["Money"];
+            }[];
         };
         MerchantNotification: {
             id: number;
@@ -2371,10 +2504,19 @@ export interface components {
                 id: number;
                 number: number;
                 order_total: components["schemas"]["Money"];
+                net_total: components["schemas"]["Money"];
                 collected_amount: components["schemas"]["Money"];
                 collection_status: components["schemas"]["CollectionStatus"];
             };
             customer?: components["schemas"]["IdName"];
+            /**
+             * @description A refund pays back part of a return (BR-R04) and lowers the collected amount
+             * @enum {string}
+             */
+            kind: "payment" | "refund";
+            kind_label: string;
+            /** @description The return a refund belongs to */
+            order_return_id: number | null;
             amount: components["schemas"]["Money"];
             /** @enum {string} */
             method: "cash";
@@ -2400,6 +2542,8 @@ export interface components {
             /** Format: date-time */
             delivered_at: string | null;
             order_total: components["schemas"]["Money"];
+            returned_total: components["schemas"]["Money"];
+            net_total: components["schemas"]["Money"];
             collected_amount: components["schemas"]["Money"];
             balance: components["schemas"]["Money"];
             collection_status: components["schemas"]["CollectionStatus"];
@@ -2421,7 +2565,9 @@ export interface components {
             };
             today: {
                 orders: number;
+                /** @description Placed today, not cancelled, minus today's live returns (BR-R05) */
                 total: components["schemas"]["Money"];
+                returns: components["schemas"]["Money"];
             };
             stale_pending: number;
             outstanding_total: components["schemas"]["Money"];
@@ -2439,11 +2585,17 @@ export interface components {
                 /** Format: date */
                 period_start: string;
                 orders: number;
-                total: components["schemas"]["Money"];
+                /** @description Delivered orders by delivered_at */
+                gross: components["schemas"]["Money"];
+                /** @description Live returns by returned_at (BR-R05) */
+                returns: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
             }[];
             totals: {
                 orders: number;
-                total: components["schemas"]["Money"];
+                gross: components["schemas"]["Money"];
+                returns: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
             };
         };
         OutstandingCustomer: {
@@ -2670,6 +2822,17 @@ export interface components {
             content: {
                 "application/json": {
                     data: components["schemas"]["DashboardOrderDetail"];
+                };
+            };
+        };
+        /** @description The return */
+        OrderReturn: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["OrderReturn"];
                 };
             };
         };
@@ -5217,6 +5380,161 @@ export interface operations {
                 };
             };
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardOrderReturns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The returns and the returnable quantities */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderReturn"][];
+                        returnable: components["schemas"]["ReturnableLine"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardRecordReturn: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    /** Format: date-time */
+                    returned_at?: string;
+                    /** @description Confirms paying back in cash what was collected beyond the new net total */
+                    refund?: boolean;
+                    items: {
+                        order_item_id: number;
+                        quantity: number;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["OrderReturn"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description return_not_allowed (the order is not delivered) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description return_exceeds_delivered (items: order_item_id, requested, returnable), refund_required (details.refund_amount) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardReturns: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                customer_id?: number;
+                /** @description Order number (#1024 too) or customer name */
+                q?: string;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of returns, newest first, voided included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderReturn"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardVoidReturn: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderReturn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            200: components["responses"]["OrderReturn"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description already_voided or return_has_refund */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description insufficient_stock (D76) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardNotifications: {

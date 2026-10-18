@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Collections\Enums\CollectionKind;
 use App\Modules\Collections\Enums\CollectionMethod;
 use App\Modules\Collections\Models\CashCollection;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -25,12 +26,20 @@ final class CashCollectionFactory extends Factory
     {
         return [
             'order_id' => OrderFactory::new(),
+            'kind' => CollectionKind::Payment,
+            'order_return_id' => null,
             'amount' => '100.00',
             'method' => CollectionMethod::Cash,
             'collected_at' => now(),
             'recorded_by' => null,
             'note' => null,
         ];
+    }
+
+    /** BR-R04: cash paid back for a return (which must belong to the same order). */
+    public function refund(int $orderReturnId): static
+    {
+        return $this->state(['kind' => CollectionKind::Refund, 'order_return_id' => $orderReturnId]);
     }
 
     public function voided(string $reason = 'تسجيل خاطئ'): static

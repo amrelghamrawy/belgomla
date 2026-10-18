@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Data\OrderFiltersData;
+use App\Modules\Orders\Data\ReturnFiltersData;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderReturn;
+use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Queries\CustomerOrdersQuery;
 use App\Modules\Orders\Queries\DashboardOrdersQuery;
 use App\Modules\Orders\Queries\NotificationsQuery;
 use App\Modules\Orders\Queries\OrderDetailQuery;
+use App\Modules\Orders\Queries\ReturnsQuery;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -49,6 +54,70 @@ test('the detail loads lines and history for the store, plus the customer for th
     expect($store->relationLoaded('items') && $store->relationLoaded('history'))->toBeTrue()
         ->and($store->relationLoaded('customer'))->toBeFalse()
         ->and($dashboard->relationLoaded('customer') && $dashboard->relationLoaded('items'))->toBeTrue();
+});
+
+test('BR-R05 the customer\'s order page loads live returns only, the merchant\'s every return, with their lines', function (): void {
+    $order = Order::factory()->delivered()->create();
+    $live = OrderReturn::factory()->for($order)->create();
+    OrderReturnItem::factory()->for($live)->create();
+    OrderReturn::factory()->for($order)->voided()->create(['number' => 2]);
+
+    $store = app(OrderDetailQuery::class)->forStore(Order::query()->findOrFail($order->id));
+    $dashboard = app(OrderDetailQuery::class)->forDashboard(Order::query()->findOrFail($order->id));
+
+    expect($store->returns->pluck('id')->all())->toBe([$live->id])
+        ->and($store->returns->first()?->items->first()?->relationLoaded('orderItem'))->toBeTrue()
+        ->and($dashboard->returns)->toHaveCount(2);
+});
+
+test('BR-R05 the returns list is newest returned first, voided included, with order, customer and lines', function (): void {
+    $old = OrderReturn::factory()->create(['returned_at' => now()->subDay()]);
+    $new = OrderReturn::factory()->voided()->create();
+    $this->inTenant(fn (): OrderReturn => OrderReturn::factory()->create(), $this->otherTenant());
+
+    $page = app(ReturnsQuery::class)->paginate(new ReturnFiltersData, 24);
+
+    expect($page->pluck('id')->all())->toBe([$new->id, $old->id])
+        ->and($page->first()?->relationLoaded('items'))->toBeTrue()
+        ->and($page->first()?->order->relationLoaded('customer'))->toBeTrue();
+});
+
+test('the returns list filters by returned time, customer and order number or customer name', function (): void {
+    $mine = Order::factory()->for($this->customer)->delivered()->create(['number' => 1024]);
+    $match = OrderReturn::factory()->for($mine)->create(['returned_at' => now()->subHour()]);
+    $early = OrderReturn::factory()->for($mine)->create(['number' => 2, 'returned_at' => now()->subDays(3)]);
+    $other = OrderReturn::factory()->create(['returned_at' => now()->subHour()]);
+    $filter = fn (ReturnFiltersData $filters): array => app(ReturnsQuery::class)->paginate($filters, 24)->pluck('id')->all();
+
+    expect($filter(new ReturnFiltersData(from: now()->subDay())))->toBe([$other->id, $match->id])
+        ->and($filter(new ReturnFiltersData(to: now()->subDays(2))))->toBe([$early->id])
+        ->and($filter(new ReturnFiltersData(customerId: $this->customer->id)))->toBe([$match->id, $early->id])
+        ->and($filter(new ReturnFiltersData(search: '#1024')))->toBe([$match->id, $early->id])
+        ->and($filter(new ReturnFiltersData(search: 'الأمل')))->toBe([$match->id, $early->id]);
+});
+
+test('BR-R06 an order\'s returns are listed by number, voided included, with their lines', function (): void {
+    $order = Order::factory()->delivered()->create();
+    $second = OrderReturn::factory()->for($order)->voided()->create(['number' => 2]);
+    $first = OrderReturn::factory()->for($order)->create(['number' => 1]);
+    OrderReturn::factory()->create();
+
+    $returns = app(ReturnsQuery::class)->forOrder($order);
+
+    expect($returns->pluck('id')->all())->toBe([$first->id, $second->id])
+        ->and($returns->first()?->relationLoaded('items'))->toBeTrue();
+});
+
+test('BR-R02 the returnable lines show what was ordered, what came back by live returns and what is left', function (): void {
+    $order = Order::factory()->delivered()->create();
+    $line = OrderItem::factory()->for($order)->create(['quantity' => 6, 'unit_price' => '85.00']);
+    OrderReturnItem::factory()->for(OrderReturn::factory()->for($order))->create(['order_item_id' => $line->id, 'quantity' => 2]);
+    OrderReturnItem::factory()->for(OrderReturn::factory()->for($order)->voided()->state(['number' => 2]))->create(['order_item_id' => $line->id, 'quantity' => 4]);
+
+    expect(app(ReturnsQuery::class)->returnable($order))->toBe([[
+        'order_item_id' => $line->id, 'product_name' => $line->product_name, 'sku_code' => $line->sku_code, 'unit' => $line->unit_name,
+        'unit_price' => '85.00', 'ordered' => 6, 'returned' => 2, 'returnable' => 4,
+    ]]);
 });
 
 test('the dashboard list holds every order of the tenant, newest first, with the customer', function (): void {

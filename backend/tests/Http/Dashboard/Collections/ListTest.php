@@ -23,7 +23,7 @@ test('BR-C02 the collections list shows every collection with its order and cust
         ->assertJsonPath('data.1.id', $old->id)
         ->assertJsonPath('data.0.customer', ['id' => $this->customer->id, 'name' => $this->customer->name])
         ->assertJsonPath('meta.total', 2)
-        ->assertExactJsonStructure(['data' => ['*' => ['id', 'order' => ['id', 'number', 'order_total', 'collected_amount', 'collection_status'], 'customer' => ['id', 'name'], 'amount', 'method', 'method_label', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['id', 'order' => ['id', 'number', 'order_total', 'net_total', 'collected_amount', 'collection_status'], 'customer' => ['id', 'name'], 'kind', 'kind_label', 'order_return_id', 'amount', 'method', 'method_label', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']], 'links', 'meta']);
 });
 
 test('D60 the from/to filters are cairo business days', function (): void {

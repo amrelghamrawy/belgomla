@@ -50,7 +50,7 @@ export function notification(overrides: Partial<MerchantNotification> = {}): Mer
 export function overviewReport(overrides: Partial<OverviewReport> = {}): OverviewReport {
   return {
     orders_by_status: { pending: 3, confirmed: 2, preparing: 1, out_for_delivery: 0, delivered: 9, cancelled: 1 },
-    today: { orders: 4, total: "1250.50" },
+    today: { orders: 4, total: "1250.50", returns: "0.00" },
     stale_pending: 1,
     outstanding_total: "3000.00",
     low_stock_count: 2,

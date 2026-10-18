@@ -174,6 +174,45 @@ test('BR-INV05 a deduction takes the units from on hand and reserved as a negati
         ]);
 });
 
+test('BR-R03 a restock puts returned units back on hand as a positive return movement of the order', function (): void {
+    $sku = Sku::factory()->withStock(10, 4)->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->restock($sku, 6, $order->id, null);
+
+    expect(($this->stock)($sku)->only(['on_hand', 'reserved']))->toBe(['on_hand' => 16, 'reserved' => 4])
+        ->and($movement->only(['sku_id', 'type', 'quantity', 'on_hand_after', 'order_id', 'reason', 'actor_type', 'actor_id']))->toBe([
+            'sku_id' => $sku->id, 'type' => MovementType::Return, 'quantity' => 6, 'on_hand_after' => 16, 'order_id' => $order->id,
+            'reason' => null, 'actor_type' => ActorType::System, 'actor_id' => null,
+        ]);
+});
+
+test('BR-R06 an unrestock takes voided returned units off again as a negative return movement by the merchant', function (): void {
+    $owner = $this->makeOwner();
+    $sku = Sku::factory()->withStock(10, 4)->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->unrestock($sku, 6, $order->id, $owner->id);
+
+    expect(($this->stock)($sku)->only(['on_hand', 'reserved']))->toBe(['on_hand' => 4, 'reserved' => 4])
+        ->and($movement->only(['type', 'quantity', 'on_hand_after', 'order_id', 'actor_type', 'actor_id']))->toBe([
+            'type' => MovementType::Return, 'quantity' => -6, 'on_hand_after' => 4, 'order_id' => $order->id,
+            'actor_type' => ActorType::TenantUser, 'actor_id' => $owner->id,
+        ]);
+});
+
+test('D76 an unrestock never takes more than is available, so reserved or sold units stay', function (): void {
+    $sku = Sku::factory()->withStock(10, 5)->create();
+    $order = Order::factory()->delivered()->create();
+
+    expect(fn (): InventoryMovement => ($this->ledger)()->unrestock($sku, 6, $order->id))->toThrow(function (InsufficientStock $e) use ($sku): void {
+        expect([$e->status, $e->errorCode, $e->items])->toBe([422, 'insufficient_stock', [['sku_id' => $sku->id, 'reason' => 'insufficient_stock', 'available' => 5]]]);
+    });
+
+    expect(($this->stock)($sku)->on_hand)->toBe(10)
+        ->and(InventoryMovement::query()->count())->toBe(0);
+});
+
 test('release and deduct never take back more than is reserved', function (Closure $call): void {
     $sku = Sku::factory()->withStock(10, 2)->create();
 
@@ -191,6 +230,8 @@ test('stock quantities must be positive and on hand never negative', function (C
     'reserve zero' => [fn (StockLedger $ledger, Sku $sku) => $ledger->reserve($sku, 0), 'must be positive'],
     'release zero' => [fn (StockLedger $ledger, Sku $sku) => $ledger->release($sku, 0), 'must be positive'],
     'deduct negative' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->deduct($sku, -1, 1), 'must be positive'],
+    'restock zero' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->restock($sku, 0, 1), 'must be positive'],
+    'unrestock negative' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->unrestock($sku, -2, 1), 'must be positive'],
     'negative opening stock' => [fn (StockLedger $ledger, Sku $sku) => $ledger->openingStock($sku, -1), 'cannot be negative'],
     'negative adjustment' => [fn (StockLedger $ledger, Sku $sku): ?\App\Modules\Inventory\Models\InventoryMovement => $ledger->adjust($sku, -1, 'x'), 'cannot be negative'],
 ]);
@@ -206,4 +247,6 @@ test('Tech §11 locking and reservation changes refuse to run outside a transact
     'reserve' => [fn (StockLedger $ledger, Sku $sku) => $ledger->reserve($sku, 1), 'reserve'],
     'release' => [fn (StockLedger $ledger, Sku $sku) => $ledger->release($sku, 1), 'release'],
     'deduct' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->deduct($sku, 1, 1), 'deduct'],
+    'restock' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->restock($sku, 1, 1), 'restock'],
+    'unrestock' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->unrestock($sku, 1, 1), 'unrestock'],
 ]);

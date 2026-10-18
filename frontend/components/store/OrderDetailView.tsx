@@ -33,7 +33,7 @@ import { AddressText } from "./AddressList";
 
 const REASON_MAX = 300;
 
-/** `/account/orders/[number]`: status history, items, payment status, delivery; cancel while pending (BR-O02). */
+/** `/account/orders/[number]`: status history, items, returns (BR-R05), payment status, delivery; cancel while pending (BR-O02). */
 export function OrderDetailView() {
   const number = Number(useRouteParam("number"));
   const session = useRequiredCustomer();
@@ -120,7 +120,48 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
           <span>{ar.orders.total}</span>
           <span>{formatMoney(order.order_total)}</span>
         </p>
+        {order.returned_total !== "0.00" && (
+          <>
+            <p className="text-muted-foreground flex justify-between text-sm">
+              <span>{ar.orders.returnedTotal}</span>
+              <span>−{formatMoney(order.returned_total)}</span>
+            </p>
+            <p className="flex justify-between font-bold" data-testid="order-net-total">
+              <span>{ar.orders.netTotal}</span>
+              <span>{formatMoney(order.net_total)}</span>
+            </p>
+          </>
+        )}
       </section>
+
+      {order.returns.length > 0 && (
+        <section aria-labelledby="order-returns" className="flex flex-col gap-2">
+          <h2 id="order-returns" className="font-bold">
+            {ar.orders.returns}
+          </h2>
+          <ul className="flex flex-col divide-y rounded-xl border">
+            {order.returns.map((orderReturn) => (
+              <li key={orderReturn.number} className="flex flex-col gap-1 p-3 text-sm">
+                <span className="flex justify-between font-medium">
+                  <span>
+                    {ar.orders.returnNumber(orderReturn.number)} · {formatDateTime(orderReturn.returned_at)}
+                  </span>
+                  <span>{formatMoney(orderReturn.total)}</span>
+                </span>
+                {orderReturn.items.map((item, index) => (
+                  <span key={`${item.sku_code}-${index}`} className="text-muted-foreground">
+                    {item.product_name} · {ar.orders.quantityOf(item.quantity, item.unit)} ×{" "}
+                    {formatMoney(item.unit_price)}
+                  </span>
+                ))}
+                {orderReturn.refund_amount !== "0.00" && (
+                  <span>{ar.orders.refunded(formatMoney(orderReturn.refund_amount))}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="order-payment" className="flex flex-col gap-1 text-sm">
         <h2 id="order-payment" className="font-bold">
