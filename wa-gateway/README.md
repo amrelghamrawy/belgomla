@@ -2,7 +2,7 @@
 
 Holds one WhatsApp Web session (Baileys) per linked store number, so each tenant's OTPs and invitations go from its own number (D70, `tasks/12-tenant-whatsapp.md`). Laravel is the only client and the source of truth. The gateway knows opaque session keys, never tenants.
 
-- Node 22+, no browser, no Docker. In production it runs as the systemd unit `belgomla-wa-gateway`.
+- Node 22+, no browser, no Docker. In production it runs as the systemd unit `belgomla-wa-gateway` (`deploy/systemd/`), with settings in `/etc/belgomla/wa-gateway.env` (`deploy/env/wa-gateway.env.example`) and credentials in `/var/lib/belgomla-wa-gateway/sessions`.
 - Listens on `127.0.0.1` only. Every route except `/health` needs `Authorization: Bearer $WA_GATEWAY_TOKEN`.
 - Events go to `$WA_GATEWAY_WEBHOOK_URL`, signed with `X-Gateway-Signature`: hex HMAC-SHA256 of `{X-Gateway-Timestamp}.{body}` with `$WA_GATEWAY_WEBHOOK_SECRET`.
 

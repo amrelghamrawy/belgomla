@@ -652,7 +652,7 @@ New customers can order immediately after verification. Tenant setting `require_
 
 OTP delivery order:
 
-1. Send the OTP via **WhatsApp**.
+1. Send the OTP via **WhatsApp**: from the store's own number when the tenant has linked one and it is connected, otherwise from the platform number (D70). A store-number failure other than "not on WhatsApp" is retried once from the platform number.
 2. If the WhatsApp provider reports the number is not reachable on WhatsApp (or the send fails), send the OTP via **SMS** automatically.
 3. The customer can also tap "send by SMS instead" after 60 seconds.
 
@@ -661,7 +661,7 @@ OTP rules:
 - 6 digits, valid for 10 minutes, single use.
 - Maximum 5 OTP sends per phone per hour, maximum 5 verification attempts per OTP.
 - OTP sends are logged (channel, provider message id, status) per tenant.
-- OTP is the only WhatsApp/SMS use in V1; order notifications remain V2.
+- OTP and customer invitations (BR-CU08) are the only customer-facing WhatsApp/SMS uses in V1 (BR-N01); order notifications remain V2. Operator alerts (D65) go to the platform operator, never to customers.
 
 ### BR-CU08 — Merchant-Created Customers and Invitations
 
@@ -755,6 +755,9 @@ Tenant settings include, at minimum:
 - Minimum Order Value amount.
 - `require_login_for_prices` (default off).
 - `require_customer_approval` (default off).
+- `stale_pending_hours`: when a `Pending` order is highlighted as stale (default 24, BR-INV07, D10).
+- `invitation_message`: the merchant's wording of the customer invitation (null = platform default, BR-CU08, D72).
+- Store WhatsApp number linked by QR (D70; kept in `whatsapp_connections`, not in the settings row).
 
 ---
 

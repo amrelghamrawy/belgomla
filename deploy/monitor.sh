@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Health monitor (tasks/11-release.md), every 5 minutes from belgomla-monitor.timer, as the app user.
 # Checks what PHP cannot see by itself and hands every failure to `php artisan platform:monitor`, which adds
-# its in-app checks (queue backlog, failed jobs, disk, SMS phone heartbeat) and alerts the operator (D65).
+# its in-app checks (queue backlog, failed jobs, disk, SMS phone heartbeat, wa-gateway sessions) and alerts the operator (D65).
 # An external uptime service watching https://<tenant>/up from outside covers "the whole VM is down".
 set -uo pipefail
 
@@ -31,7 +31,7 @@ done
 code="$(status_of "${SMOKE_TENANT}.${BASE_DOMAIN}" /)"
 [[ "${code}" == "200" ]] || reports+=("--report=next=storefront / answered ${code}")
 
-for unit in belgomla-queue@1 belgomla-queue@2 belgomla-next nginx redis-server postgresql; do
+for unit in belgomla-queue@1 belgomla-queue@2 belgomla-next belgomla-wa-gateway nginx redis-server postgresql; do
     systemctl is-active --quiet "${unit}" || reports+=("--report=service:${unit}=${unit} is not running")
 done
 

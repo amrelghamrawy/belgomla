@@ -77,6 +77,20 @@ final readonly class WaGatewayClient
     }
 
     /**
+     * Sessions the gateway runs and how many of them are open (`GET /health`, no token needed).
+     *
+     * @return array{sessions: int, open: int}
+     */
+    public function health(): array
+    {
+        $response = $this->ensureOk($this->call(fn (): Response => $this->http()->get('health')));
+        $sessions = $response->json('sessions');
+        $open = $response->json('open');
+
+        return ['sessions' => is_int($sessions) ? $sessions : 0, 'open' => is_int($open) ? $open : 0];
+    }
+
+    /**
      * @param  callable(): Response  $request
      */
     private function call(callable $request): Response

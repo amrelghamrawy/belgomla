@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Modules\Messaging\Jobs\SendMessage;
 use App\Modules\Messaging\Models\SmsPhoneHeartbeat;
+use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Platform\Services\HealthChecks;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
@@ -90,4 +92,38 @@ test('D49 the newest heartbeat of any phone counts', function (): void {
     SmsPhoneHeartbeat::factory()->create(['last_seen_at' => now()->subMinutes(5)]);
 
     expect(app(HealthChecks::class)->problems())->not->toHaveKey('sms_heartbeat');
+});
+
+test('D70 wa-gateway is not checked while it is disabled', function (): void {
+    config(['messaging.wa_gateway.enabled' => false]);
+
+    expect(app(HealthChecks::class)->problems())->not->toHaveKey('wa_gateway');
+});
+
+test('D70 a wa-gateway that does not answer is a problem', function (): void {
+    useWaGateway();
+    Http::fake(['*' => Http::response(['error' => 'server_error'], 500)]);
+
+    expect(app(HealthChecks::class)->problems()['wa_gateway'] ?? null)->toContain('لا تستجيب');
+});
+
+test('D70 fewer open sessions than connected store numbers is a problem', function (int $open, bool $problem): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected('+201001111111')->create());
+    $this->asTenant($this->otherTenant(), fn () => WhatsAppConnection::factory()->connected('+201002222222')->create());
+    Http::fake(['127.0.0.1:3100/health' => Http::response(['ok' => true, 'sessions' => $open, 'open' => $open])]);
+
+    expect(array_key_exists('wa_gateway', app(HealthChecks::class)->problems()))->toBe($problem);
+})->with([
+    'one of two open' => [1, true],
+    'both open' => [2, false],
+    'more open than connected (pairing)' => [3, false],
+]);
+
+test('D70 the wa-gateway problem names both counts', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+    Http::fake(['127.0.0.1:3100/health' => Http::response(['ok' => true, 'sessions' => 0, 'open' => 0])]);
+
+    expect(app(HealthChecks::class)->problems()['wa_gateway'] ?? null)->toBe('wa-gateway: 0 جلسة مفتوحة من 1 رقم متجر مربوط');
 });

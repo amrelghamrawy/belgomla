@@ -12,7 +12,8 @@ browser ──https──▶ nginx ─┬─ /up, /api/*, /sanctum/* ──fastc
                           ├─ /storage/*  ──▶ backend/storage/app/public (D61)
                           └─ everything else ──▶ next start :3000 ──SSR prefetch──▶ nginx 127.0.0.1:8081 ──▶ php-fpm
 Hypersender ──https──▶ nginx hooks.<domain> ──▶ php-fpm only
-systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belgomla-next ·
+Laravel ──bearer──▶ wa-gateway 127.0.0.1:3100 ──signed events──▶ nginx 127.0.0.1:8081 (Host hooks.<domain>) ──▶ php-fpm
+systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belgomla-next · belgomla-wa-gateway ·
          belgomla-scheduler.timer (1 min) · belgomla-monitor.timer (5 min) · belgomla-backup.timer (01:00 UTC)
 ```
 
@@ -22,6 +23,8 @@ systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belg
 | `/etc/belgomla/backend.env` | Laravel `.env` (symlinked as `backend/.env`), secrets |
 | `/etc/belgomla/frontend.env` | `BACKEND_HOST/PORT` for Next's server-side prefetch |
 | `/etc/belgomla/ops.env` | settings for the scripts in this folder |
+| `/etc/belgomla/wa-gateway.env` | wa-gateway port, token, webhook URL and secret (D70) |
+| `/var/lib/belgomla-wa-gateway/` | store-number session credentials (mode 700, not backed up: a lost one means the merchant links again) |
 | `/etc/belgomla/certbot-dns.ini` | DNS API token for the wildcard certificate |
 | `~belgomla/.pgpass`, `~belgomla/.config/rclone/` | database password, backup bucket credentials |
 | `backend/storage/logs/` | `laravel-*.log` (errors), `monitor-*.log` (alerts), `messages.log` (log driver only) |
@@ -52,6 +55,12 @@ systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belg
    - `MESSAGING_WEBHOOK_SECRET`: `openssl rand -hex 32`.
    - The `HYPERSENDER_*` values.
    - `MONITOR_ALERT_PHONE`.
+   - `WA_GATEWAY_TOKEN` and `WA_GATEWAY_WEBHOOK_SECRET`: `openssl rand -hex 32` each.
+
+   **Fill `/etc/belgomla/wa-gateway.env`** (template `env/wa-gateway.env.example`):
+   - `WA_GATEWAY_TOKEN` and `WA_GATEWAY_WEBHOOK_SECRET`: the same two values as in `backend.env`.
+   - `WA_GATEWAY_WEBHOOK_HOST`: `hooks.<your domain>`. Leave the URL on `127.0.0.1:8081`, so events never leave the VM.
+   - Node 24 from `provision.sh` runs it (the gateway needs Node 22 or newer).
 5. **Backup bucket:**
    - Run `sudo -u belgomla rclone config` and create an S3 remote named as in `BACKUP_REMOTE` (`belgomla-s3`). Use the provider's endpoint and keys, and create the bucket.
    - Check it with `sudo -u belgomla rclone lsd belgomla-s3:`.
@@ -86,16 +95,18 @@ The script runs these steps in order:
 2. `composer install --no-dev`;
 3. `migrate --force`;
 4. config, route, view and event caches;
-5. `npm ci && npm run build`;
-6. reload php-fpm, restart the queue workers and Next;
-7. the assertions:
+5. `npm ci && npm run build` in `frontend/`;
+6. `npm ci && npm run build && npm prune --omit=dev` in `wa-gateway/` (`tsc` is a dev dependency);
+7. reload php-fpm, restart the queue workers, Next and wa-gateway;
+8. the assertions:
    - `tenant:list`;
    - `/up` on hooks and the smoke tenant;
    - `/api/store/tenant`;
    - the storefront `/`;
-   - a GET on the webhook route answering 405 (Laravel, not Next).
+   - a GET on the webhook route answering 405 (Laravel, not Next);
+   - wa-gateway `GET 127.0.0.1:3100/health`.
 
-Expect a short blip while the services restart; V1 does not require zero downtime.
+Expect a short blip while the services restart; V1 does not require zero downtime. Linked store numbers reconnect within seconds of the wa-gateway restart: its `gateway.started` event makes Laravel reconcile, and OTPs sent in the gap fall back to the platform number.
 
 **Rollback:** `DEPLOY_REF=<previous commit> deploy.sh`. Migrations are not rolled back automatically. A migration that must be undone needs `php artisan migrate:rollback --step=1` before the redeploy; `DB::prohibitDestructiveCommands` blocks `migrate:fresh`/`reset` in production on purpose.
 
@@ -106,14 +117,15 @@ Change `TENANT_BASE_DOMAIN` only together with a redeploy: `route:cache` bakes t
 `belgomla-monitor.timer` runs `monitor.sh` every 5 minutes. It checks:
 - `/up` on hooks and every active tenant host (through the local nginx, TLS included);
 - the storefront page;
-- the queue, Next, nginx, Redis and PostgreSQL units;
+- the queue, Next, wa-gateway, nginx, Redis and PostgreSQL units;
 - the last backup run.
 
 It hands the failures to `php artisan platform:monitor`, which adds its own checks:
 - messaging queue backlog over 50;
 - failed jobs in the last hour;
 - free disk under 10%;
-- no SMS-phone heartbeat for 2 hours, when `MESSAGING_DRIVER=hypersender` (D49).
+- no SMS-phone heartbeat for 2 hours, when `MESSAGING_DRIVER=hypersender` (D49);
+- wa-gateway not answering `/health`, or fewer open sessions than store numbers marked connected, when `WA_GATEWAY_ENABLED=true` (D70). Right after a gateway restart this can show once until the reconcile has run.
 
 Alerts:
 - **WhatsApp to `MONITOR_ALERT_PHONE`** (with SMS fallback), sent through Messenger as `MONITOR_ALERT_TENANT` (D65).
@@ -128,6 +140,8 @@ Handy commands:
 systemctl list-timers 'belgomla-*'
 journalctl -u belgomla-monitor -n 50          # last monitor runs
 journalctl -u 'belgomla-queue@*' -f           # workers
+journalctl -u belgomla-wa-gateway -f -o cat   # store-number sessions (JSON lines: sessionKey, event, reason)
+curl -s 127.0.0.1:3100/health                 # { ok, sessions, open }
 sudo -u belgomla php artisan queue:failed     # then queue:retry <id> or queue:forget <id>
 tail -f /srv/belgomla/backend/storage/logs/laravel-$(date -u +%F).log
 ```
@@ -163,6 +177,7 @@ On a new VM: provision, fill `/etc/belgomla`, configure rclone, then the command
 | --- | --- |
 | List tenants | `sudo -u belgomla php artisan tenant:list` |
 | Suspend / reactivate a tenant | `php artisan tenant:suspend <sub>` / `tenant:activate <sub>` |
+| Rotate the wa-gateway token or secret | new value in both `backend.env` and `wa-gateway.env` → `php artisan config:cache` + reload php-fpm + restart the queue workers and `belgomla-wa-gateway` |
 | Rotate the webhook secret | new `MESSAGING_WEBHOOK_SECRET` in `backend.env` → `php artisan config:cache` + reload php-fpm → update both Hypersender instances |
 | Renew TLS | automatic (certbot timer, reloads nginx); check with `sudo certbot renew --dry-run` |
 | Production smoke tenant | `tenant:create smoke ...`, run the flows, then `tenant:suspend smoke` (go-live checklist) |

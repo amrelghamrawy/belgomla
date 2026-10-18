@@ -1,0 +1,29 @@
+# Store WhatsApp numbers (D70, tasks/12): wa-gateway on 127.0.0.1:3100, one Baileys session per linked number.
+# Session credentials live in /var/lib/belgomla-wa-gateway (StateDirectory, mode 700), outside the checkout:
+# a lost directory only means the merchants link again, so backup.sh does not copy it.
+# deploy.sh builds dist/ and restarts the unit; on start the gateway sends gateway.started and Laravel reconciles.
+[Unit]
+Description=BelGomla wa-gateway
+After=network.target nginx.service
+
+[Service]
+User=belgomla
+Group=belgomla
+WorkingDirectory=/srv/belgomla/wa-gateway
+EnvironmentFile=/etc/belgomla/wa-gateway.env
+Environment=NODE_ENV=production
+Environment=WA_GATEWAY_DATA_DIR=/var/lib/belgomla-wa-gateway/sessions
+StateDirectory=belgomla-wa-gateway
+StateDirectoryMode=0700
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+# Each session holds its signal keys and sync state in memory; 50 sessions (WA_GATEWAY_MAX_SESSIONS) fit well under this.
+MemoryMax=768M
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
