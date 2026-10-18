@@ -16,7 +16,7 @@ One task = one session (or a few). Execute strictly in order; each task assumes 
 | 9  | [Storefront UI](9-storefront-ui.md)    | frontend/ storefront          | done (Lighthouse open) | 009b240 |
 | 10 | [Dashboard UI](10-dashboard-ui.md)     | frontend/ dashboard           | done        | 33d231b |
 | 11 | [Release](11-release.md)               | infra, seed, go-live checks   | repo side done (go-live pending) | a7c3884 |
-| 12 | [Store WhatsApp number](12-tenant-whatsapp.md) | Messaging, wa-gateway/, settings UI | repo side done (live check pending) | |
+| 12 | [Store WhatsApp number](12-tenant-whatsapp.md) | Messaging, wa-gateway/, settings UI | repo side done (live check pending) | 1b252a4 |
 
 V2 board: [tasks/v2/README.md](v2/README.md).
 
