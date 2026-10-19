@@ -514,7 +514,9 @@ Dashboard behavior:
 
 ### BR-INV07 — Unconfirmed Orders Hold Stock
 
-A `Pending` order holds its reservation until the merchant confirms or cancels it. There is no automatic expiry in V1. The dashboard should highlight Pending orders older than 24 hours.
+A `Pending` order holds its reservation until the merchant confirms or cancels it. The dashboard highlights Pending orders older than `stale_pending_hours` (default 24, D10).
+
+Optional automatic expiry (V2 Task 04, D81): a store may set `pending_expiry_hours` (1–720, off by default, never below `stale_pending_hours`). A Pending order still unconfirmed that many hours after it was placed is cancelled by the system (`cancelled_by = system`, reason "انتهت مهلة تأكيد الطلب"), which releases its stock (BR-INV04). The merchant gets an `order_expired` notification and the customer the cancelled message when the store sends it (BR-N03). An order with money collected is never expired (BR-O03); it is left pending and logged. The check runs every 15 minutes, so an order may expire up to 15 minutes late. The orders list shows when each pending order will expire.
 
 ---
 
@@ -763,6 +765,7 @@ The merchant gets in-app (dashboard) notifications for:
 
 - New order.
 - Customer cancellation.
+- An unconfirmed order the system cancelled after `pending_expiry_hours`: `order_expired` (V2 Task 04).
 - The store WhatsApp number dropped (logged out on the phone): `whatsapp_dropped`, linking to settings to scan the QR again (V2 Task 03).
 
 Customers get no in-app notifications; they see the status on "my orders" and receive the WhatsApp messages of BR-N03 (D6).
@@ -821,6 +824,7 @@ Tenant settings include, at minimum:
 - `require_login_for_prices` (default off).
 - `require_customer_approval` (default off).
 - `stale_pending_hours`: when a `Pending` order is highlighted as stale (default 24, BR-INV07, D10).
+- `pending_expiry_hours`: when an unconfirmed order cancels itself (null = off, the default; 1–720, never below `stale_pending_hours`; BR-INV07, D81).
 - `invitation_message`: the merchant's wording of the customer invitation (null = platform default, BR-CU08, D72).
 - `default_payment_terms_days`, `default_credit_limit`: the credit terms a new customer starts with (null = none; BR-C05, BR-C06).
 - `order_notify_statuses`: the order statuses customers are told about by WhatsApp (default confirmed, out for delivery, delivered, cancelled; BR-N03).

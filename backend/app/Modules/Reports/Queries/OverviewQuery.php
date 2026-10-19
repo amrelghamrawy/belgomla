@@ -36,7 +36,7 @@ final readonly class OverviewQuery
         return [
             'orders_by_status' => $this->byStatus(),
             'today' => $this->today($timezone),
-            'stale_pending' => Order::query()->where('status', OrderStatus::Pending)->where('placed_at', '<', $this->orders->staleBefore())->count(),
+            'stale_pending' => Order::query()->where('status', OrderStatus::Pending)->where('placed_at', '<', $this->orders->pendingClock()->staleBefore)->count(),
             'outstanding_total' => $this->outstanding->total(),
             'overdue_total' => $this->overdue->total(),
             'overdue_customers' => $this->overdue->customersCount(),

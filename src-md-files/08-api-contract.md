@@ -336,7 +336,7 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | Method | Path                           | Notes                                       |
 | ------ | ------------------------------ | ------------------------------------------- |
 | GET    | `/api/dashboard/settings`      |                                             |
-| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default`. V2 Task 03: `order_notify_statuses` (list of `confirmed|preparing|out_for_delivery|delivered|cancelled`, each once) and `order_status_messages` (object status → text ≤ 500 with the BR-N03 placeholders, `{سبب_الإلغاء}` only in `cancelled`; null/empty/default text = default); the dashboard response adds both plus `order_status_message_defaults` |
+| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default`. V2 Task 03: `order_notify_statuses` (list of `confirmed|preparing|out_for_delivery|delivered|cancelled`, each once) and `order_status_messages` (object status → text ≤ 500 with the BR-N03 placeholders, `{سبب_الإلغاء}` only in `cancelled`; null/empty/default text = default); the dashboard response adds both plus `order_status_message_defaults`. V2 Task 04: `pending_expiry_hours` (null/empty = off, 1–720, never below `stale_pending_hours`, compared with the stored value when only one is sent; dashboard only) |
 | POST   | `/api/dashboard/settings/logo` | multipart; also `/favicon`                  |
 | GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
@@ -522,6 +522,8 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by
 
 Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer { id, name, phone }`, `confirmed_at`, `delivered_at`, `cancelled_at`, `is_stale` (pending past `stale_pending_hours`), history entries with `actor_id` and `note`, and on the detail `collections` (the collection shape of §10, newest first, voided ones included). `?from=&to=` are `Y-m-d` days of `placed_at`, both inclusive; `?q=` matches the order number (`#1024` too), customer name or phone, or recipient name; `?sort=placed_at|number|order_total` (default `-placed_at`). `delivery-address` takes `governorate, city, address_line, label?, landmark?, name?, phone?` (name/phone kept when omitted) → `409 address_locked` from `out_for_delivery` on. `collect_full_amount` is ignored for other targets (see §10 for what it records). Every write answers the dashboard order detail. Audit: `order.status_changed`, `order.cancelled`, `order.delivery_address_changed`.
 
+V2 Task 04: every dashboard order adds `expires_at` (when a pending order cancels itself; null when it is not pending or the store has no `pending_expiry_hours`), and `cancelled_by` can be `system` (D81).
+
 V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about the order, oldest first: `{ purpose, purpose_label, channel, status, sent_at }` (fallback copies included). A transition to a status in `order_notify_statuses`, and a merchant cancel, send the customer a message after commit (BR-N03).
 
 ### Returns (V2 Task 01, BR-R01..R06)
@@ -610,7 +612,7 @@ Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 | POST   | `/api/dashboard/notifications/read` | `{ ids: [] }` or `{ all: true }`                         |
 | GET    | `/api/dashboard/audit`              | `?entity_type=&entity_id=&actor_id=&from=&to=&batch_id=` |
 
-Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled|whatsapp_dropped, type_label, details: { order_number, customer_name, order_total, reason? } (whatsapp_dropped: { phone, reason }), read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`.
+Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled|whatsapp_dropped|order_expired, type_label, details: { order_number, customer_name, order_total, reason? } (whatsapp_dropped: { phone, reason }), read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`.
 
 Delivered in Task 7 (audit):
 - The list is paginated newest first, as `{ id, actor { type, id }, action, entity { type, id }, old_values, new_values, batch_id, ip, created_at }`.
@@ -647,6 +649,7 @@ php artisan tenant:activate alnoor
 php artisan tenant:list
 php artisan api:openapi          # compile backend/openapi/openapi.yaml → backend/openapi.json (Task 8)
 php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-gateway, remove stray sessions (every 5 min)
+php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their store's pending_expiry_hours (every 15 min)
 ```
 
 ---

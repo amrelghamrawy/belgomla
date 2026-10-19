@@ -2105,8 +2105,11 @@ export interface components {
             };
             customer_note: string | null;
             cancel_reason: string | null;
-            /** @enum {string|null} */
-            cancelled_by: "customer" | "tenant_user" | null;
+            /**
+             * @description system = cancelled because nobody confirmed it in time (BR-INV07, D81)
+             * @enum {string|null}
+             */
+            cancelled_by: "customer" | "tenant_user" | "system" | null;
         };
         OrderDetail: components["schemas"]["Order"] & {
             items: components["schemas"]["OrderItem"][];
@@ -2157,6 +2160,8 @@ export interface components {
             default_credit_limit: components["schemas"]["Money"] | null;
             /** @description Hours before a pending order is stale (D10) */
             stale_pending_hours: number;
+            /** @description BR-INV07 hours before an unconfirmed order cancels itself; null = off (D81) */
+            pending_expiry_hours: number | null;
             /** @description BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line */
             invitation_message: string | null;
             invitation_message_default: string;
@@ -2194,6 +2199,8 @@ export interface components {
             require_login_for_prices?: boolean;
             require_customer_approval?: boolean;
             stale_pending_hours?: number;
+            /** @description null or empty = off; never below stale_pending_hours (BR-INV07, D81) */
+            pending_expiry_hours?: number | null;
             /** @description Only the placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; null or empty = the default */
             invitation_message?: string | null;
             default_payment_terms_days?: number | null;
@@ -2521,6 +2528,11 @@ export interface components {
             cancelled_at: string | null;
             /** @description Pending for longer than stale_pending_hours (D10) */
             is_stale: boolean;
+            /**
+             * Format: date-time
+             * @description When a pending order cancels itself; null when not pending or expiry is off (D81)
+             */
+            expires_at: string | null;
         };
         DashboardOrder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"];
         DashboardOrderHistoryEntry: {
@@ -2629,7 +2641,7 @@ export interface components {
         MerchantNotification: {
             id: number;
             /** @enum {string} */
-            type: "new_order" | "customer_cancelled" | "whatsapp_dropped";
+            type: "new_order" | "customer_cancelled" | "whatsapp_dropped" | "order_expired";
             type_label: string;
             /** @description Orders: order_number, customer_name, order_total (+ reason when customer_cancelled); whatsapp_dropped: phone, reason */
             details: {

@@ -60,7 +60,7 @@ test('BR-C02 the dashboard order detail lists its collections without the custom
     $order = $this->order->load(['items', 'history', 'customer']);
     $collections = [new CollectionResource($this->collection->setRelation('order', $order->withoutRelations()))];
 
-    $detail = rendered(new DashboardOrderResource($order, now()->toImmutable(), $collections), dashboardRequest('/api/dashboard/orders/1'));
+    $detail = rendered(new DashboardOrderResource($order, new App\Modules\Orders\Data\PendingClockData(now()->toImmutable(), null), $collections), dashboardRequest('/api/dashboard/orders/1'));
 
     expect($detail['collections'])->toHaveCount(1)
         ->and(array_keys($detail['collections'][0]))->not->toContain('customer')

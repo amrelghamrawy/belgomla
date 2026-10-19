@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Orders\Data\PendingClockData;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Http\Resources\DashboardOrderResource;
 use App\Modules\Orders\Http\Resources\NotificationResource;
@@ -92,7 +93,7 @@ test('the checkout answer wraps the order detail in order', function (): void {
 test('the dashboard list entry adds the id, customer, timestamps and staleness', function (): void {
     $order = Order::query()->with('customer')->findOrFail($this->order->id);
 
-    expect(rendered(new DashboardOrderResource($order, now()->subDay()), dashboardRequest('/api/dashboard/orders')))->toBe([
+    expect(rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders')))->toBe([
         'id' => $order->id,
         ...($this->expectedBase)($order),
         'customer' => ['id' => $this->customer->id, 'name' => 'مكتبة الأمل', 'phone' => '+201012345678'],
@@ -100,13 +101,14 @@ test('the dashboard list entry adds the id, customer, timestamps and staleness',
         'delivered_at' => null,
         'cancelled_at' => null,
         'is_stale' => false,
+        'expires_at' => null,
     ]);
 });
 
 test('the dashboard detail adds lines, history with actor and note, and the collections', function (): void {
     $order = Order::query()->with(['items', 'history', 'customer'])->findOrFail($this->order->id);
 
-    $data = rendered(new DashboardOrderResource($order, now()->subDay()), dashboardRequest('/api/dashboard/orders/1024'));
+    $data = rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders/1024'));
 
     expect($data['history'])->toBe([['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => ActorType::Customer->value, 'actor_id' => $this->customer->id, 'note' => null]])
         ->and($data['items'])->toHaveCount(1)
@@ -117,8 +119,19 @@ test('BR-INV07 a pending order placed before the threshold is stale, others are 
     $order = Order::factory()->stale(25)->create();
     $confirmed = Order::factory()->confirmed()->create(['placed_at' => now()->subDays(3)]);
 
-    expect(rendered(new DashboardOrderResource($order, now()->subHours(24)), dashboardRequest())['is_stale'])->toBeTrue()
-        ->and(rendered(new DashboardOrderResource($confirmed, now()->subHours(24)), dashboardRequest())['is_stale'])->toBeFalse();
+    $clock = new PendingClockData(now()->subHours(24), null);
+
+    expect(rendered(new DashboardOrderResource($order, $clock), dashboardRequest())['is_stale'])->toBeTrue()
+        ->and(rendered(new DashboardOrderResource($confirmed, $clock), dashboardRequest())['is_stale'])->toBeFalse();
+});
+
+test('D81 a pending order expires its expiry hours after it was placed; a confirmed one never', function (): void {
+    $order = Order::factory()->stale(25)->create();
+    $confirmed = Order::factory()->confirmed()->create(['placed_at' => now()->subDays(3)]);
+    $clock = new PendingClockData(now()->subHours(24), 48);
+
+    expect(rendered(new DashboardOrderResource($order, $clock), dashboardRequest())['expires_at'])->toBe($order->placed_at->addHours(48)->toIso8601String())
+        ->and(rendered(new DashboardOrderResource($confirmed, $clock), dashboardRequest())['expires_at'])->toBeNull();
 });
 
 test('BR-R05 the store order detail shows live returns without the merchant\'s reason', function (): void {
@@ -177,7 +190,7 @@ test('BR-R06 the dashboard order detail lists every return without the order', f
     OrderReturn::factory()->for($this->order)->voided()->create();
     $order = Order::query()->with(['items', 'history', 'customer', 'returns.items.orderItem'])->findOrFail($this->order->id);
 
-    $data = rendered(new DashboardOrderResource($order, now()->subDay()), dashboardRequest('/api/dashboard/orders/1024'));
+    $data = rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders/1024'));
 
     expect($data['returns'])->toHaveCount(1)
         ->and($data['returns'][0]['is_voided'])->toBeTrue()

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Enums;
 
-/** BR-N02: what the merchant is told about in the dashboard; `whatsapp_dropped` is the store number logging out (D70). */
+/**
+ * BR-N02: what the merchant is told about in the dashboard; `whatsapp_dropped` is the store number logging out (D70),
+ * `order_expired` a pending order the system cancelled (BR-INV07, D81).
+ */
 enum NotificationType: string
 {
     case NewOrder = 'new_order';
     case CustomerCancelled = 'customer_cancelled';
     case WhatsappDropped = 'whatsapp_dropped';
+    case OrderExpired = 'order_expired';
 
     public function label(): string
     {
@@ -17,6 +21,7 @@ enum NotificationType: string
             self::NewOrder => 'طلب جديد',
             self::CustomerCancelled => 'إلغاء من العميل',
             self::WhatsappDropped => 'انقطع رقم واتساب المتجر',
+            self::OrderExpired => 'إلغاء تلقائي لطلب غير مؤكد',
         };
     }
 

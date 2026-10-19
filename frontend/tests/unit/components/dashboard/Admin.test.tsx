@@ -37,6 +37,7 @@ function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings
     order_notify_statuses: ["confirmed", "out_for_delivery", "delivered", "cancelled"],
     order_status_messages: {},
     order_status_message_defaults: ORDER_MESSAGE_DEFAULTS,
+    pending_expiry_hours: null,
     ...overrides,
   };
 }
@@ -143,6 +144,37 @@ describe("SettingsForm", () => {
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
     expect(await screen.findByText("رقم صحيح أكبر من صفر")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
+  });
+
+  it("BR-INV07 D81 turns the automatic expiry on with a number of hours, and off when emptied", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings({ pending_expiry_hours: 72 })} />);
+    const field = screen.getByLabelText("إلغاء الطلبات غير المؤكدة تلقائيًا بعد (ساعة)");
+
+    expect(field).toHaveValue("72");
+    await user.clear(field);
+    await user.type(field, "48");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({ pending_expiry_hours: 48 });
+
+    await user.clear(field);
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(2));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[1]?.body).toMatchObject({ pending_expiry_hours: null });
+  });
+
+  it("BR-INV07 refuses an expiry shorter than the stale hours", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    await user.type(screen.getByLabelText("إلغاء الطلبات غير المؤكدة تلقائيًا بعد (ساعة)"), "12");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("يجب ألا تقل عن مدة اعتبار الطلب متأخرًا (24 ساعة)")).toBeInTheDocument();
     expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
   });
 

@@ -22,7 +22,7 @@ import { CustomerPicker } from "../common/CustomerPicker";
 import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
-import { CollectionStatusBadge, OrderStatusBadge, StaleBadge } from "./OrderBadges";
+import { CollectionStatusBadge, ExpiryBadge, OrderStatusBadge, StaleBadge } from "./OrderBadges";
 
 const copy = ar.dashboard.orders;
 const STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
@@ -162,6 +162,7 @@ export function OrdersPage() {
                     <span className="flex items-center gap-1">
                       <OrderStatusBadge status={order.status} />
                       {order.is_stale && <StaleBadge />}
+                      {order.expires_at !== null && <ExpiryBadge expiresAt={order.expires_at} />}
                     </span>
                   </TableCell>
                   <TableCell>

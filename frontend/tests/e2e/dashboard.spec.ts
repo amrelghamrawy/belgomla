@@ -142,6 +142,26 @@ test("BR-N03 the merchant turns on the confirmed message, confirms an order and 
   }
 });
 
+test("BR-INV07 D81 the merchant turns on the automatic expiry and a pending order shows its countdown", async ({
+  page,
+  browser,
+}) => {
+  const order = await placeShopperOrder(browser, "الأضواء رياضيات ثانية إعدادي");
+  await loginAsOwner(page);
+
+  try {
+    await page.goto("/dashboard/settings");
+    await page.getByLabel("إلغاء الطلبات غير المؤكدة تلقائيًا بعد (ساعة)").fill("48");
+    await page.getByRole("button", { name: "حفظ" }).filter({ visible: true }).first().click();
+    await expect(page.getByText("تم حفظ الإعدادات")).toBeVisible();
+
+    await page.goto(`/dashboard/orders/${order.number}`);
+    await expect(page.getByTestId("expiry")).toContainText(/يُلغى بعد (47|48) س/);
+  } finally {
+    await api(page, "PUT", "/api/dashboard/settings", { pending_expiry_hours: null });
+  }
+});
+
 test("BR-R01 BR-R03 a delivered order takes a return of 2: the stock comes back and the balance drops", async ({
   page,
   browser,

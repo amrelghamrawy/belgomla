@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Queries;
 
 use App\Modules\Orders\Data\OrderFiltersData;
+use App\Modules\Orders\Data\PendingClockData;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
@@ -37,10 +38,12 @@ final readonly class DashboardOrdersQuery
         return $query->orderBy($column, $direction)->orderBy('id', $direction)->paginate($perPage);
     }
 
-    /** Pending orders placed before this moment are stale (BR-INV07). */
-    public function staleBefore(): CarbonImmutable
+    /** Pending orders placed before this moment are stale (BR-INV07); with expiry on they cancel themselves (D81). */
+    public function pendingClock(): PendingClockData
     {
-        return Stale::threshold($this->settings->get()->stale_pending_hours);
+        $settings = $this->settings->get();
+
+        return new PendingClockData(Stale::threshold($settings->stale_pending_hours), $settings->pending_expiry_hours);
     }
 
     /**

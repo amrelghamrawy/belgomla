@@ -24,7 +24,7 @@ import { ReasonDialog } from "../common/ReasonDialog";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { DeliveryAddressDialog } from "./DeliveryAddressDialog";
 import { OrderActions } from "./OrderActions";
-import { CollectionStatusBadge, OrderStatusBadge, StaleBadge } from "./OrderBadges";
+import { CollectionStatusBadge, ExpiryBadge, OrderStatusBadge, StaleBadge } from "./OrderBadges";
 
 const copy = ar.dashboard.orders;
 
@@ -63,6 +63,7 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
             <OrderStatusBadge status={order.status} />
             <CollectionStatusBadge status={order.collection_status} />
             {order.is_stale && <StaleBadge />}
+            {order.expires_at !== null && <ExpiryBadge expiresAt={order.expires_at} />}
             <span>{formatDateTime(order.placed_at)}</span>
           </span>
         }

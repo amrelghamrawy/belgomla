@@ -108,6 +108,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
     delivered_at: null,
     cancelled_at: null,
     is_stale: false,
+    expires_at: null,
     items: [
       {
         sku_id: 5,
@@ -441,6 +442,35 @@ describe("OrdersPage", () => {
     await user.click(screen.getByRole("button", { name: "خرج للتوصيل" }));
 
     expect(router.replace).toHaveBeenCalledWith("/?status=out_for_delivery", { scroll: false });
+  });
+
+  it("D81 shows how long a pending order has before it cancels itself", async () => {
+    const inFiveAndAHalfHours = new Date(Date.now() + 330 * 60_000 - 1_000).toISOString();
+    stubApi({
+      "GET /api/dashboard/orders": json(
+        200,
+        page([
+          {
+            ...order({ status: "pending", expires_at: inFiveAndAHalfHours }),
+            items: undefined,
+            history: undefined,
+            collections: undefined,
+          },
+          {
+            ...order({ number: 1002, status: "pending" }),
+            items: undefined,
+            history: undefined,
+            collections: undefined,
+          },
+        ]),
+      ),
+    });
+    renderWithQuery(<OrdersPage />);
+
+    expect(within(await screen.findByTestId("order-1001")).getByTestId("expiry")).toHaveTextContent(
+      "يُلغى بعد 5 س 30 د",
+    );
+    expect(within(screen.getByTestId("order-1002")).queryByTestId("expiry")).toBeNull();
   });
 
   it("filters by a customer searched by name or phone, resetting the page", async () => {

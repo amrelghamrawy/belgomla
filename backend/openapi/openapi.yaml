@@ -3473,7 +3473,8 @@ components:
         cancel_reason: { type: [string, 'null'] }
         cancelled_by:
           type: [string, 'null']
-          enum: [customer, tenant_user, null]
+          description: 'system = cancelled because nobody confirmed it in time (BR-INV07, D81)'
+          enum: [customer, tenant_user, system, null]
 
     OrderDetail:
       allOf:
@@ -3539,7 +3540,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/TenantSettings'
         - type: object
-          required: [stale_pending_hours, invitation_message, invitation_message_default, default_payment_terms_days, default_credit_limit, order_notify_statuses, order_status_messages, order_status_message_defaults]
+          required: [stale_pending_hours, invitation_message, invitation_message_default, default_payment_terms_days, default_credit_limit, order_notify_statuses, order_status_messages, order_status_message_defaults, pending_expiry_hours]
           properties:
             order_notify_statuses:
               type: array
@@ -3559,6 +3560,7 @@ components:
                 - $ref: '#/components/schemas/Money'
                 - type: 'null'
             stale_pending_hours: { type: integer, description: 'Hours before a pending order is stale (D10)' }
+            pending_expiry_hours: { type: [integer, 'null'], description: 'BR-INV07 hours before an unconfirmed order cancels itself; null = off (D81)' }
             invitation_message: { type: [string, 'null'], description: 'BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line' }
             invitation_message_default: { type: string }
 
@@ -3596,6 +3598,7 @@ components:
         require_login_for_prices: { type: boolean }
         require_customer_approval: { type: boolean }
         stale_pending_hours: { type: integer, minimum: 1, maximum: 720 }
+        pending_expiry_hours: { type: [integer, 'null'], minimum: 1, maximum: 720, description: 'null or empty = off; never below stale_pending_hours (BR-INV07, D81)' }
         invitation_message: { type: [string, 'null'], maxLength: 500, description: 'Only the placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; null or empty = the default' }
         default_payment_terms_days: { type: [integer, 'null'], minimum: 0, maximum: 365 }
         default_credit_limit: { type: [string, 'null'] }
@@ -4093,7 +4096,7 @@ components:
 
     DashboardOrderFields:
       type: object
-      required: [id, confirmed_at, delivered_at, cancelled_at, is_stale]
+      required: [id, confirmed_at, delivered_at, cancelled_at, is_stale, expires_at]
       properties:
         id: { type: integer }
         customer:
@@ -4107,6 +4110,7 @@ components:
         delivered_at: { type: [string, 'null'], format: date-time }
         cancelled_at: { type: [string, 'null'], format: date-time }
         is_stale: { type: boolean, description: 'Pending for longer than stale_pending_hours (D10)' }
+        expires_at: { type: [string, 'null'], format: date-time, description: 'When a pending order cancels itself; null when not pending or expiry is off (D81)' }
 
     DashboardOrder:
       allOf:
@@ -4253,7 +4257,7 @@ components:
         id: { type: integer }
         type:
           type: string
-          enum: [new_order, customer_cancelled, whatsapp_dropped]
+          enum: [new_order, customer_cancelled, whatsapp_dropped, order_expired]
         type_label: { type: string }
         details:
           type: object

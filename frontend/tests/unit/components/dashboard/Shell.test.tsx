@@ -163,6 +163,18 @@ describe("NotificationsBell", () => {
     expect(link).toHaveTextContent("01001234567");
   });
 
+  it("D81 an expired order links to the order", async () => {
+    stubApi(shellRoutes([notification({ id: 4, type: "order_expired", type_label: "إلغاء تلقائي لطلب غير مؤكد" })], 1));
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await user.click(await screen.findByRole("button", { name: "الإشعارات، 1 غير مقروءة" }));
+
+    const link = await screen.findByRole("link", { name: /إلغاء تلقائي لطلب غير مؤكد/ });
+    expect(link).toHaveAttribute("href", "/dashboard/orders/1001");
+    expect(link).toHaveTextContent("طلب #1001 من مكتبة الأمل");
+  });
+
   it("marks everything read and refreshes the count", async () => {
     const fetchMock = stubApi({
       ...shellRoutes(),

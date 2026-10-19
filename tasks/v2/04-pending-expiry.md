@@ -1,6 +1,13 @@
 # V2 Task 04 — Automatic expiry of unconfirmed orders
 
-Status: **planned**. Requires V2 Task 03. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-19). Read `CLAUDE.md`, `rules/*.md`, then this file.
+
+### Delivered
+
+- Docs: D81; BR-INV07 rewritten (optional expiry), BR-N02 `order_expired`, §M `pending_expiry_hours`; 07 `cancelled_by_type` + `system`, `tenant_settings.pending_expiry_hours`, `notifications.type`; 08 §5 setting, §9 `expires_at` and `cancelled_by: system`, §12 notification type, §14 CLI.
+- Deviations, recorded in the docs: the tenants come from a Tenancy query (`PendingExpiryTenantsQuery`), because Orders may not touch Tenancy models; only active stores expire orders (a suspended store's orders wait); the "≥ stale hours" check compares what was sent with what is stored, so raising the stale hours past an existing expiry is refused too; every dashboard order carries `expires_at` (from a `PendingClockData` that replaces the bare stale threshold), and the countdown is on the order page as well as the list; `CancelOrder` already told the customer for every non-customer cancel since Task 03, so the system cancel needed no change there.
+- Tests: backend 3325 (+31: expire action, command with tenant isolation and a failing order, schedule, settings bounds, resources), frontend 679 (+6), e2e "the merchant turns on the automatic expiry and a pending order shows its countdown" on mobile and desktop.
+- Smoke against `php artisan serve`: 1 hour is refused below the stale 24; with both at 1 a customer checks out (6 reserved), `placed_at` moved back 2 hours, `orders:expire-pending` → `expired 1`; the order is cancelled by `system` with the fixed reason, the reservation is back to 0, the bell shows `order_expired`, and the customer's cancelled message is logged.
 
 ## Goal
 

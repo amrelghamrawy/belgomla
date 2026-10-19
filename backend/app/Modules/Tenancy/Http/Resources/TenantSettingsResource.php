@@ -48,6 +48,7 @@ final class TenantSettingsResource extends JsonResource
             'order_notify_statuses' => $this->when($dashboard, $this->resource->order_notify_statuses),
             'order_status_messages' => $this->when($dashboard, (object) ($this->resource->order_status_messages ?? [])),
             'order_status_message_defaults' => $this->when($dashboard, OrderStatusMessage::DEFAULTS),
+            'pending_expiry_hours' => $this->when($dashboard, $this->resource->pending_expiry_hours),
         ];
     }
 }

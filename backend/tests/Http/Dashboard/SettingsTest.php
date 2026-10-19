@@ -89,7 +89,33 @@ test('settings validation', function (array $body, string $field): void {
     'message too long' => [['order_status_messages' => ['confirmed' => str_repeat('ا', 501)]], 'order_status_messages.confirmed'],
     'message unknown placeholder' => [['order_status_messages' => ['confirmed' => 'أهلًا {name}']], 'order_status_messages.confirmed'],
     'reason outside cancelled' => [['order_status_messages' => ['delivered' => '{سبب_الإلغاء}']], 'order_status_messages.delivered'],
+    'expiry zero' => [['pending_expiry_hours' => 0], 'pending_expiry_hours'],
+    'expiry over a month' => [['pending_expiry_hours' => 721], 'pending_expiry_hours'],
+    'expiry not a number' => [['pending_expiry_hours' => 'soon'], 'pending_expiry_hours'],
+    'expiry below the stale hours sent with it' => [['stale_pending_hours' => 48, 'pending_expiry_hours' => 24], 'pending_expiry_hours'],
+    'expiry below the stored stale hours' => [['pending_expiry_hours' => 23], 'pending_expiry_hours'],
 ]);
+
+test('BR-INV07 D81 an owner turns the automatic expiry on and off; it starts off', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/settings')->assertOk()->assertJsonPath('data.pending_expiry_hours', null);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['pending_expiry_hours' => 24])->assertOk()->assertJsonPath('data.pending_expiry_hours', 24);
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['pending_expiry_hours' => null])->assertOk()->assertJsonPath('data.pending_expiry_hours', null);
+});
+
+test('BR-INV07 the stale hours cannot be raised past the expiry already set', function (): void {
+    $this->tenant->settings->update(['pending_expiry_hours' => 24]);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['stale_pending_hours' => 30])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.pending_expiry_hours.0', 'يجب ألا تقل مهلة الإلغاء التلقائي عن مدة تمييز الطلب كمتأخر (30 ساعة)');
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['stale_pending_hours' => 30, 'pending_expiry_hours' => 30])->assertOk();
+});
+
+test('the automatic expiry is not shown on the storefront', function (): void {
+    $this->tenantJson('GET', '/api/store/tenant')->assertOk()->assertJsonMissingPath('data.pending_expiry_hours');
+});
 
 test('BR-N03 an owner picks the statuses customers hear about and words a status, the default text sent back is dropped', function (): void {
     $this->tenantJson('PUT', '/api/dashboard/settings', [

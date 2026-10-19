@@ -76,6 +76,7 @@ erDiagram
 | default_credit_limit           | numeric(12,2) | V2: nullable, ≥ 0, given to new customers (BR-C05) |
 | order_notify_statuses          | jsonb         | V2: list of statuses customers are told about; default `["confirmed","out_for_delivery","delivered","cancelled"]` (BR-N03) |
 | order_status_messages          | jsonb         | V2: nullable map status → merchant wording; a missing entry = platform default (BR-N03) |
+| pending_expiry_hours           | smallint      | V2: nullable = off; CHECK 1–720; unconfirmed orders cancel themselves after it (BR-INV07, D81) |
 
 ### `tenant_users`
 
@@ -359,7 +360,7 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | delivery_address                                    | jsonb         | snapshot of the chosen address                                                    |
 | customer_note                                       | text          | nullable                                                                          |
 | cancel_reason                                       | varchar(300)  | nullable                                                                          |
-| cancelled_by_type                                   | enum          | `customer`, `tenant_user`, nullable                                               |
+| cancelled_by_type                                   | enum          | `customer`, `tenant_user`, `system` (V2 expiry, D81), nullable                    |
 | placed_at, confirmed_at, delivered_at, cancelled_at | timestamptz   | nullable except placed_at                                                         |
 | due_at                                              | timestamptz   | V2: set on delivery = delivered_at + the customer's terms (BR-C06)                |
 
@@ -452,7 +453,7 @@ Invariant (app, inside a transaction with the order row locked): `Σ live paymen
 
 ### `notifications` (BR-N02)
 
-`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped), data jsonb, read_at`.
+`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped|order_expired), data jsonb, read_at`.
 
 Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57). `whatsapp_dropped` (V2 Task 03) has no order: `data` holds `phone` and `reason`.
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Requests;
 
+use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Modules\Tenancy\Rules\InvitationTemplate;
 use App\Modules\Tenancy\Rules\OrderStatusTemplate;
 use App\Support\InvitationMessage;
@@ -11,6 +12,7 @@ use App\Support\Money;
 use App\Support\OrderStatusMessage;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 final class UpdateSettingsRequest extends FormRequest
 {
@@ -19,7 +21,7 @@ final class UpdateSettingsRequest extends FormRequest
         'name', 'primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description',
         'working_hours', 'mov_enabled', 'mov_amount', 'require_login_for_prices', 'require_customer_approval',
         'stale_pending_hours', 'invitation_message', 'default_payment_terms_days', 'default_credit_limit',
-        'order_notify_statuses', 'order_status_messages',
+        'order_notify_statuses', 'order_status_messages', 'pending_expiry_hours',
     ];
 
     /**
@@ -51,7 +53,32 @@ final class UpdateSettingsRequest extends FormRequest
             'order_notify_statuses.*' => ['string', 'distinct', 'in:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
             'order_status_messages' => ['sometimes', 'array:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
             'order_status_messages.*' => ['nullable', 'string', 'max:'.OrderStatusMessage::MAX_LENGTH, new OrderStatusTemplate],
+            'pending_expiry_hours' => ['sometimes', 'nullable', 'integer', 'between:1,720'],
         ];
+    }
+
+    /**
+     * BR-INV07, D81: an order is highlighted as stale before it can expire, so the expiry (when on) is never shorter
+     * than `stale_pending_hours`, comparing what was sent with what is stored.
+     *
+     * @return list<callable(Validator): void>
+     */
+    public function after(CurrentTenantSettingsQuery $settings): array
+    {
+        return [function (Validator $validator) use ($settings): void {
+            if ($validator->errors()->hasAny(['pending_expiry_hours', 'stale_pending_hours'])
+                || (! $this->has('pending_expiry_hours') && ! $this->has('stale_pending_hours'))) {
+                return;
+            }
+
+            $stored = $settings->get();
+            $expiry = $this->has('pending_expiry_hours') ? $this->pendingExpiryHours() : $stored->pending_expiry_hours;
+            $stale = $this->stalePendingHours() ?? $stored->stale_pending_hours;
+
+            if ($expiry !== null && $expiry < $stale) {
+                $validator->errors()->add('pending_expiry_hours', "يجب ألا تقل مهلة الإلغاء التلقائي عن مدة تمييز الطلب كمتأخر ({$stale} ساعة)");
+            }
+        }];
     }
 
     /**
@@ -156,6 +183,12 @@ final class UpdateSettingsRequest extends FormRequest
         }
 
         return array_filter($messages, fn (?string $text): bool => $text !== null);
+    }
+
+    /** BR-INV07: hours before an unconfirmed order cancels itself; null = off (also when sent empty). */
+    public function pendingExpiryHours(): ?int
+    {
+        return $this->nullableInteger('pending_expiry_hours');
     }
 
     public function stalePendingHours(): ?int

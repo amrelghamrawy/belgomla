@@ -19,6 +19,6 @@ final readonly class OrderDeliveryAddressController
     {
         $order = $update->handle($order, DeliveryAddressData::fromRequest($request));
 
-        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore(), $detail->collections($order), $detail->messages($order));
+        return new DashboardOrderResource($detail->forDashboard($order), $orders->pendingClock(), $detail->collections($order), $detail->messages($order));
     }
 }

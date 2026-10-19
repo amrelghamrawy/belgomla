@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
+import { expiryLeft, useMinuteClock } from "@/lib/dashboard/order-expiry";
 import { cn } from "@/lib/utils";
 
 import { Hint } from "../common/Hint";
@@ -34,6 +35,19 @@ export function CollectionStatusBadge({ status }: { status: CollectionStatus }) 
     <Badge variant="outline" className={COLLECTION_TONES[status]} data-testid="collection-status">
       {ar.dashboard.collectionStatuses[status]}
     </Badge>
+  );
+}
+
+/** D81: how long a pending order has before it cancels itself, ticking every minute. */
+export function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
+  const left = expiryLeft(expiresAt, useMinuteClock());
+
+  return (
+    <Hint text={ar.dashboard.orders.expiryHint}>
+      <Badge variant="outline" className="border-destructive/40 text-destructive" tabIndex={0} data-testid="expiry">
+        {ar.dashboard.orders.expiresIn(left.hours, left.minutes)}
+      </Badge>
+    </Hint>
   );
 }
 

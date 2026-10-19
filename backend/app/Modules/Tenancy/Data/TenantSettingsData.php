@@ -38,6 +38,7 @@ final readonly class TenantSettingsData
         public ?array $orderNotifyStatuses = null,
         /** @var array<string, string|null>|null */
         public ?array $orderStatusMessages = null,
+        public ?int $pendingExpiryHours = null,
     ) {}
 
     public static function fromRequest(UpdateSettingsRequest $request): self
@@ -62,6 +63,7 @@ final readonly class TenantSettingsData
             defaultCreditLimit: $request->nullableMoney('default_credit_limit'),
             orderNotifyStatuses: $request->orderNotifyStatuses(),
             orderStatusMessages: $request->orderStatusMessages(),
+            pendingExpiryHours: $request->pendingExpiryHours(),
         );
     }
 
@@ -90,6 +92,7 @@ final readonly class TenantSettingsData
             'default_credit_limit' => $this->defaultCreditLimit,
             'order_notify_statuses' => $this->orderNotifyStatuses,
             'order_status_messages' => $this->orderStatusMessages === [] ? null : $this->orderStatusMessages,
+            'pending_expiry_hours' => $this->pendingExpiryHours,
         ];
 
         return array_intersect_key($map, array_flip($this->sent));

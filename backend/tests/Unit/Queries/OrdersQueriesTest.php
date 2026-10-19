@@ -169,7 +169,15 @@ test('BR-INV07 the stale threshold follows the tenant setting', function (): voi
     $stale = Order::factory()->stale(3)->create();
 
     expect(($this->dashboard)(new OrderFiltersData(stale: true)))->toBe([$stale->id])
-        ->and(app(DashboardOrdersQuery::class)->staleBefore()->equalTo(now()->subHours(2)))->toBeTrue();
+        ->and(app(DashboardOrdersQuery::class)->pendingClock()->staleBefore->equalTo(now()->subHours(2)))->toBeTrue();
+});
+
+test('D81 the pending clock carries the store\'s expiry hours, null while off', function (): void {
+    expect(app(DashboardOrdersQuery::class)->pendingClock()->expiryHours)->toBeNull();
+
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['pending_expiry_hours' => 36]);
+
+    expect(app(DashboardOrdersQuery::class)->pendingClock()->expiryHours)->toBe(36);
 });
 
 test('the dashboard list sorts by the chosen column', function (): void {

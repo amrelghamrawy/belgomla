@@ -14,6 +14,16 @@ test('failed jobs older than 30 days are pruned daily', function (): void {
         ->and($prune?->expression)->toBe('0 0 * * *');
 });
 
+test('BR-INV07 D81 unconfirmed orders are expired every fifteen minutes without overlapping runs', function (): void {
+    $events = collect(app(Schedule::class)->events());
+
+    $expire = $events->first(fn (Event $event): bool => str_contains((string) $event->command, 'orders:expire-pending'));
+
+    expect($expire)->not->toBeNull()
+        ->and($expire?->expression)->toBe('*/15 * * * *')
+        ->and($expire?->withoutOverlapping)->toBeTrue();
+});
+
 test('D70 wa-gateway is reconciled every five minutes without overlapping runs', function (): void {
     $events = collect(app(Schedule::class)->events());
 

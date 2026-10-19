@@ -7965,9 +7965,11 @@
                             "string",
                             "null"
                         ],
+                        "description": "system = cancelled because nobody confirmed it in time (BR-INV07, D81)",
                         "enum": [
                             "customer",
                             "tenant_user",
+                            "system",
                             null
                         ]
                     }
@@ -8129,7 +8131,8 @@
                             "default_credit_limit",
                             "order_notify_statuses",
                             "order_status_messages",
-                            "order_status_message_defaults"
+                            "order_status_message_defaults",
+                            "pending_expiry_hours"
                         ],
                         "properties": {
                             "order_notify_statuses": {
@@ -8180,6 +8183,13 @@
                             "stale_pending_hours": {
                                 "type": "integer",
                                 "description": "Hours before a pending order is stale (D10)"
+                            },
+                            "pending_expiry_hours": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "description": "BR-INV07 hours before an unconfirmed order cancels itself; null = off (D81)"
                             },
                             "invitation_message": {
                                 "type": [
@@ -8333,6 +8343,15 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 720
+                    },
+                    "pending_expiry_hours": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 720,
+                        "description": "null or empty = off; never below stale_pending_hours (BR-INV07, D81)"
                     },
                     "invitation_message": {
                         "type": [
@@ -9696,7 +9715,8 @@
                     "confirmed_at",
                     "delivered_at",
                     "cancelled_at",
-                    "is_stale"
+                    "is_stale",
+                    "expires_at"
                 ],
                 "properties": {
                     "id": {
@@ -9745,6 +9765,14 @@
                     "is_stale": {
                         "type": "boolean",
                         "description": "Pending for longer than stale_pending_hours (D10)"
+                    },
+                    "expires_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "When a pending order cancels itself; null when not pending or expiry is off (D81)"
                     }
                 }
             },
@@ -10205,7 +10233,8 @@
                         "enum": [
                             "new_order",
                             "customer_cancelled",
-                            "whatsapp_dropped"
+                            "whatsapp_dropped",
+                            "order_expired"
                         ]
                     },
                     "type_label": {

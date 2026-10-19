@@ -427,6 +427,9 @@ export const dashboard = {
     stale: "متأخر",
     staleOnly: "المتأخرة فقط",
     staleHint: "قيد الانتظار لفترة أطول من المحدد في الإعدادات (D10)",
+    expiresIn: (hours: number, minutes: number) =>
+      hours > 0 ? `يُلغى بعد ${hours} س ${minutes} د` : minutes > 0 ? `يُلغى بعد ${minutes} د` : "يُلغى الآن",
+    expiryHint: "يُلغى تلقائيًا إن لم يُؤكَّد، وتعود كميته للمخزون (D81)",
     sort: "الترتيب",
     sorts: {
       "-placed_at": "الأحدث",
@@ -642,6 +645,12 @@ export const dashboard = {
     requireLogin: "إخفاء الأسعار عن الزوار حتى تسجيل الدخول",
     requireApproval: "مراجعة العملاء الجدد قبل تفعيلهم",
     staleHours: "اعتبار الطلب متأخرًا بعد (ساعة)",
+    // BR-INV07, D81: unconfirmed orders cancel themselves.
+    expiryHours: "إلغاء الطلبات غير المؤكدة تلقائيًا بعد (ساعة)",
+    expiryHint:
+      "اتركه فارغًا لإيقافه. الطلب الملغي تلقائيًا تعود كميته المحجوزة للمخزون، ويُبلَّغ العميل إن كانت رسالة الإلغاء مفعلة.",
+    expiryRange: "من 1 إلى 720 ساعة",
+    expiryBelowStale: (stale: number) => `يجب ألا تقل عن مدة اعتبار الطلب متأخرًا (${stale} ساعة)`,
     defaultTerms: "مهلة السداد الافتراضية (يوم)",
     defaultLimit: "حد الائتمان الافتراضي",
     defaultCreditHint: "تُطبَّق على العملاء الجدد فقط. اتركهما فارغين: السداد عند التسليم وبدون حد.",

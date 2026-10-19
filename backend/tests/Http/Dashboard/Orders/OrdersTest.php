@@ -27,7 +27,7 @@ test('the merchant lists every order of the store, newest first, with customer a
         ->assertJsonPath('meta.total', 2)
         ->assertExactJsonStructure(['data' => ['*' => [
             'id', 'number', 'status', 'status_label', 'placed_at', 'items_total', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount',
-            'delivery', 'customer_note', 'cancel_reason', 'cancelled_by', 'customer', 'confirmed_at', 'delivered_at', 'cancelled_at', 'is_stale',
+            'delivery', 'customer_note', 'cancel_reason', 'cancelled_by', 'customer', 'confirmed_at', 'delivered_at', 'cancelled_at', 'is_stale', 'expires_at',
         ]], 'links', 'meta']);
 });
 
@@ -49,6 +49,33 @@ test('BR-INV07 the stale threshold is the tenant setting', function (): void {
     $this->inTenant(fn () => $order->forceFill(['placed_at' => now()->subHours(2)])->save());
 
     $this->tenantJson('GET', '/api/dashboard/orders?stale=1')->assertJsonCount(1, 'data')->assertJsonPath('data.0.is_stale', true);
+});
+
+test('D81 with the expiry on, a pending order says when it cancels itself; others and stores without it say null', function (): void {
+    $this->freezeSecond();
+    $pending = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $confirmed = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $this->inTenant(fn () => $confirmed->forceFill(['status' => 'confirmed'])->save());
+
+    $this->tenantJson('GET', '/api/dashboard/orders')->assertJsonPath('data.0.expires_at', null)->assertJsonPath('data.1.expires_at', null);
+
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['pending_expiry_hours' => 48]);
+
+    $this->tenantJson('GET', '/api/dashboard/orders')
+        ->assertJsonPath('data.0.number', $confirmed->number)
+        ->assertJsonPath('data.0.expires_at', null)
+        ->assertJsonPath('data.1.expires_at', $pending->placed_at->addHours(48)->toIso8601String());
+    $this->tenantJson('GET', "/api/dashboard/orders/{$pending->number}")->assertJsonPath('data.expires_at', $pending->placed_at->addHours(48)->toIso8601String());
+});
+
+test('D81 an expired order shows as cancelled by the system, with no actor', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $this->inTenant(fn () => app(App\Modules\Orders\Actions\CancelOrder::class)->handle($order, new App\Modules\Orders\Data\CancelData('انتهت مهلة تأكيد الطلب'), App\Modules\Orders\Enums\CancelledBy::System));
+
+    $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
+        ->assertJsonPath('data.cancelled_by', 'system')
+        ->assertJsonPath('data.history.1.by', 'system')
+        ->assertJsonPath('data.history.1.actor_id', null);
 });
 
 test('the list filters by status, collection status, customer, days and search', function (string $query): void {

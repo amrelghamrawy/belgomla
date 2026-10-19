@@ -17,11 +17,11 @@ final readonly class OrderController
 {
     public function index(ListDashboardOrdersRequest $request, DashboardOrdersQuery $orders): AnonymousResourceCollection
     {
-        return DashboardOrderResource::page($orders->paginate(OrderFiltersData::fromRequest($request), $request->perPage()), $orders->staleBefore());
+        return DashboardOrderResource::page($orders->paginate(OrderFiltersData::fromRequest($request), $request->perPage()), $orders->pendingClock());
     }
 
     public function show(Order $order, OrderDetailQuery $detail, DashboardOrdersQuery $orders): DashboardOrderResource
     {
-        return new DashboardOrderResource($detail->forDashboard($order), $orders->staleBefore(), $detail->collections($order), $detail->messages($order));
+        return new DashboardOrderResource($detail->forDashboard($order), $orders->pendingClock(), $detail->collections($order), $detail->messages($order));
     }
 }

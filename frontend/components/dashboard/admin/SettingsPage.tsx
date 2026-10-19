@@ -66,6 +66,13 @@ const schema = z
       .string()
       .regex(/^\d{1,3}$/, ar.dashboard.productForm.invalidInteger)
       .refine((value) => Number(value) >= 1 && Number(value) <= 720, ar.dashboard.productForm.invalidInteger),
+    pending_expiry_hours: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (/^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 720),
+        copy.expiryRange,
+      ),
     invitation_message: z.string().max(INVITATION_MAX_LENGTH, copy.invitation.tooLong(INVITATION_MAX_LENGTH)),
     default_payment_terms_days: z
       .string()
@@ -110,6 +117,18 @@ const schema = z
       }
     }
 
+    if (
+      values.pending_expiry_hours !== "" &&
+      /^\d{1,3}$/.test(values.stale_pending_hours) &&
+      Number(values.pending_expiry_hours) < Number(values.stale_pending_hours)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["pending_expiry_hours"],
+        message: copy.expiryBelowStale(Number(values.stale_pending_hours)),
+      });
+    }
+
     if (values.mov_enabled && (toPiasters(values.mov_amount) === null || toPiasters(values.mov_amount) === 0n)) {
       context.addIssue({ code: "custom", path: ["mov_amount"], message: copy.movRequired });
     }
@@ -127,6 +146,7 @@ const SERVER_FIELDS = [
   "description",
   "mov_amount",
   "stale_pending_hours",
+  "pending_expiry_hours",
   "invitation_message",
   "default_payment_terms_days",
   "default_credit_limit",
@@ -174,6 +194,7 @@ function defaults(settings: DashboardSettings): Values {
     require_login_for_prices: settings.require_login_for_prices,
     require_customer_approval: settings.require_customer_approval,
     stale_pending_hours: String(settings.stale_pending_hours),
+    pending_expiry_hours: settings.pending_expiry_hours === null ? "" : String(settings.pending_expiry_hours),
     invitation_message: settings.invitation_message ?? settings.invitation_message_default,
     default_payment_terms_days:
       settings.default_payment_terms_days === null ? "" : String(settings.default_payment_terms_days),
@@ -241,6 +262,7 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         require_login_for_prices: values.require_login_for_prices,
         require_customer_approval: values.require_customer_approval,
         stale_pending_hours: Number(values.stale_pending_hours),
+        pending_expiry_hours: values.pending_expiry_hours === "" ? null : Number(values.pending_expiry_hours),
         invitation_message: invitationBody(values.invitation_message, settings.invitation_message_default),
         default_payment_terms_days:
           values.default_payment_terms_days === "" ? null : Number(values.default_payment_terms_days),
@@ -446,6 +468,18 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
             registration={form.register("stale_pending_hours")}
             error={errors.stale_pending_hours}
           />
+          <div className="flex flex-col gap-1">
+            <TextField
+              id="settings-expiry"
+              label={copy.expiryHours}
+              dir="ltr"
+              inputMode="numeric"
+              className="max-w-24"
+              registration={form.register("pending_expiry_hours")}
+              error={errors.pending_expiry_hours}
+            />
+            <p className="text-muted-foreground text-xs">{copy.expiryHint}</p>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               id="settings-default-terms"
