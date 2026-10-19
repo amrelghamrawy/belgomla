@@ -32,6 +32,8 @@ final readonly class TenantSettingsData
         public ?string $invitationMessage,
         /** Fields the request explicitly sent, so nullable ones can be cleared. */
         public array $sent,
+        public ?int $defaultPaymentTermsDays = null,
+        public ?string $defaultCreditLimit = null,
     ) {}
 
     public static function fromRequest(UpdateSettingsRequest $request): self
@@ -52,6 +54,8 @@ final readonly class TenantSettingsData
             stalePendingHours: $request->stalePendingHours(),
             invitationMessage: $request->nullableString('invitation_message'),
             sent: $request->sentKeys(),
+            defaultPaymentTermsDays: $request->nullableInteger('default_payment_terms_days'),
+            defaultCreditLimit: $request->nullableMoney('default_credit_limit'),
         );
     }
 
@@ -76,6 +80,8 @@ final readonly class TenantSettingsData
             'require_customer_approval' => $this->requireCustomerApproval,
             'stale_pending_hours' => $this->stalePendingHours,
             'invitation_message' => $this->invitationMessage,
+            'default_payment_terms_days' => $this->defaultPaymentTermsDays,
+            'default_credit_limit' => $this->defaultCreditLimit,
         ];
 
         return array_intersect_key($map, array_flip($this->sent));

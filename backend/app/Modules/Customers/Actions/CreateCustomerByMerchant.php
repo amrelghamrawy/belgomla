@@ -9,17 +9,20 @@ use App\Modules\Customers\Data\CustomerData;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Exceptions\PhoneTaken;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use Illuminate\Support\Facades\DB;
 
 /**
  * BR-CU08: the merchant creates a customer with a name, a phone and optional addresses. The customer is
- * `invited` with no password until they use an invitation link; the merchant can refer to them meanwhile.
+ * `invited` with no password until they use an invitation link; the merchant can refer to them meanwhile. Credit
+ * terms not sent come from the store's defaults (BR-C05, BR-C06).
  * Audited as `customer.created` (BR-L). Owns its transaction.
  */
 final readonly class CreateCustomerByMerchant
 {
     public function __construct(
         private CreateAddress $createAddress,
+        private CurrentTenantSettingsQuery $settings,
         private AuditLogger $audit,
     ) {}
 
@@ -29,12 +32,16 @@ final readonly class CreateCustomerByMerchant
             throw PhoneTaken::make();
         }
 
-        return DB::transaction(function () use ($data, $actorId): Customer {
+        $defaults = $this->settings->creditDefaults();
+
+        return DB::transaction(function () use ($data, $actorId, $defaults): Customer {
             $customer = Customer::query()->create([
                 'name' => $data->name,
                 'phone' => $data->phone,
                 'status' => CustomerStatus::Invited,
                 'created_by' => $actorId,
+                'credit_limit' => in_array('credit_limit', $data->creditTermsSent, true) ? $data->creditLimit : $defaults['credit_limit'],
+                'payment_terms_days' => in_array('payment_terms_days', $data->creditTermsSent, true) ? $data->paymentTermsDays : $defaults['payment_terms_days'],
             ]);
 
             foreach ($data->addresses ?? [] as $address) {
@@ -45,6 +52,8 @@ final readonly class CreateCustomerByMerchant
                 'name' => $customer->name,
                 'phone' => $customer->phone,
                 'status' => $customer->status->value,
+                'credit_limit' => $customer->credit_limit,
+                'payment_terms_days' => $customer->payment_terms_days,
             ]);
 
             return $customer;

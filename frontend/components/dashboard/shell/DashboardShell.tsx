@@ -63,7 +63,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <Sidebar side="start" collapsible="icon" label={copy.label}>
+      <Sidebar side="start" collapsible="icon" label={copy.label} className="print:hidden">
         <SidebarHeader className="h-14 justify-center border-b">
           <DesktopBrand name={me.tenant.name} />
         </SidebarHeader>
@@ -74,7 +74,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <SidebarRail aria-hidden />
       </Sidebar>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="bg-background/95 sticky top-0 z-40 flex h-14 items-center gap-2 border-b px-2 backdrop-blur sm:px-4">
+        <header className="bg-background/95 sticky top-0 z-40 flex h-14 items-center gap-2 border-b px-2 backdrop-blur sm:px-4 print:hidden">
           <Tooltip>
             <TooltipTrigger asChild>
               <SidebarTrigger aria-label={copy.toggle} className="size-11 md:size-9" />
@@ -87,7 +87,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <UserMenu user={me.user} />
         </header>
         <StoreWhatsAppBanner />
-        <main className="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
+        <main className="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 md:p-6 print:p-0">{children}</main>
       </div>
     </SidebarProvider>
   );

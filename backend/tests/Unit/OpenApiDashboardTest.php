@@ -157,7 +157,8 @@ test('orders, collections, the statement and notifications match their schemas',
     expectDocumentedShape($detail['collections'][0], 'Collection');
     expectDocumentedShape($collection, 'Collection');
     expectDocumentedShape($collection['customer'], 'IdName');
-    expectDocumentedShape($statement->json('data.0'), 'StatementOrder');
+    expectDocumentedShape($statement->json('data.0'), 'LedgerRow');
+    expectDocumentedShape($statement->json('meta'), 'LedgerMeta');
     expectDocumentedShape($statement->json('customer'), 'CustomerRef');
     expectDocumentedShape($statement->json('summary'), 'StatementSummary');
     expectDocumentedShape($notification, 'MerchantNotification');

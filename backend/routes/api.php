@@ -26,6 +26,7 @@ Route::prefix('store')->name('store.')->middleware(['tenant', 'tenant.active:sto
     require __DIR__.'/api/store/catalog.php';
     require __DIR__.'/api/store/customers.php';
     require __DIR__.'/api/store/orders.php';
+    require __DIR__.'/api/store/collections.php';
 });
 
 Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.active:dashboard'])->group(function (): void {

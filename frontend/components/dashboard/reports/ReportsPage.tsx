@@ -168,12 +168,17 @@ export function SalesSection({ query, setQuery }: SectionProps) {
   );
 }
 
-function OutstandingSection({ page, onPage }: { page: number; onPage: (page: number) => void }) {
+/** BR-C06: the aging buckets of the outstanding report, oldest last. */
+const AGING = ["current", "0_30", "31_60", "61_90", "over_90"] as const;
+
+export function OutstandingSection({ page, onPage }: { page: number; onPage: (page: number) => void }) {
   const report = useOutstandingReport(page);
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-muted-foreground text-sm">{copy.outstandingHint}</p>
+      <p className="text-muted-foreground text-sm">
+        {copy.outstandingHint} {copy.agingHint}
+      </p>
       {report.isError && <ErrorBlock error={report.error} onRetry={() => void report.refetch()} />}
       {report.isPending && <LoadingBlock />}
       {report.data?.data.length === 0 && <EmptyBlock>{copy.noOutstanding}</EmptyBlock>}
@@ -187,6 +192,10 @@ function OutstandingSection({ page, onPage }: { page: number; onPage: (page: num
                 <TableHead>{copy.total}</TableHead>
                 <TableHead>{copy.collected}</TableHead>
                 <TableHead>{copy.outstanding}</TableHead>
+                {AGING.map((bucket) => (
+                  <TableHead key={bucket}>{copy.aging[bucket]}</TableHead>
+                ))}
+                <TableHead>{copy.overdue}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -205,6 +214,14 @@ function OutstandingSection({ page, onPage }: { page: number; onPage: (page: num
                   <TableCell className="whitespace-nowrap">{formatMoney(row.total)}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatMoney(row.collected)}</TableCell>
                   <TableCell className="font-semibold whitespace-nowrap">{formatMoney(row.outstanding)}</TableCell>
+                  {AGING.map((bucket) => (
+                    <TableCell key={bucket} className="whitespace-nowrap">
+                      {row.aging[bucket] === "0.00" ? "" : formatMoney(row.aging[bucket])}
+                    </TableCell>
+                  ))}
+                  <TableCell className="text-destructive font-semibold whitespace-nowrap" data-testid="overdue">
+                    {row.overdue === "0.00" ? "" : formatMoney(row.overdue)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

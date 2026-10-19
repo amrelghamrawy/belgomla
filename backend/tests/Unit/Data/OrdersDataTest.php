@@ -154,3 +154,11 @@ test('mark read takes the ids, or null for all', function (): void {
     expect(validatedOrdersRequest(MarkNotificationsReadRequest::class, ['ids' => ['3', 5]])->ids())->toBe([3, 5])
         ->and(validatedOrdersRequest(MarkNotificationsReadRequest::class, ['all' => true])->ids())->toBeNull();
 });
+
+test('BR-C07 return data keeps the refund as credit when asked, cash otherwise', function (): void {
+    $credit = ReturnData::fromRequest(validatedOrdersRequest(RecordReturnRequest::class, ['reason' => 'x', 'refund' => true, 'refund_to' => 'credit', 'items' => [['order_item_id' => 7, 'quantity' => 1]]]));
+    $cash = ReturnData::fromRequest(validatedOrdersRequest(RecordReturnRequest::class, ['reason' => 'x', 'items' => [['order_item_id' => 7, 'quantity' => 1]]]));
+
+    expect($credit->refundTo)->toBe(App\Modules\Orders\Enums\RefundMethod::Credit)
+        ->and($cash->refundTo)->toBe(App\Modules\Orders\Enums\RefundMethod::Cash);
+});

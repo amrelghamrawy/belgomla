@@ -27,7 +27,7 @@ test('BR-C02 the merchant records a cash collection and gets it back with the ne
         ->assertJsonPath('data.order', [
             'id' => $this->order->id, 'number' => $this->order->number, 'order_total' => '540.00', 'net_total' => '540.00', 'collected_amount' => '200.00', 'collection_status' => 'partially_collected',
         ])
-        ->assertExactJsonStructure(['data' => ['id', 'order' => ['id', 'number', 'order_total', 'net_total', 'collected_amount', 'collection_status'], 'kind', 'kind_label', 'order_return_id', 'amount', 'method', 'method_label', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']]);
+        ->assertExactJsonStructure(['data' => ['id', 'order' => ['id', 'number', 'order_total', 'net_total', 'collected_amount', 'collection_status'], 'kind', 'kind_label', 'order_return_id', 'customer_credit_id', 'amount', 'method', 'method_label', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']]);
 });
 
 test('BR-C04 a deposit can be recorded on a pending order', function (): void {

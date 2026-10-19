@@ -9,7 +9,7 @@ test('to array', function (): void {
         'tenant_id', 'logo_path', 'favicon_path', 'primary_color', 'secondary_color', 'phone', 'whatsapp',
         'address', 'description', 'working_hours', 'currency', 'mov_enabled', 'mov_amount',
         'require_login_for_prices', 'require_customer_approval', 'stale_pending_hours', 'created_at', 'updated_at',
-        'invitation_message',
+        'invitation_message', 'default_payment_terms_days', 'default_credit_limit',
     ]);
 });
 

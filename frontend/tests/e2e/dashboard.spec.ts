@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { api, loginAsOwner, placeShopperOrder, uniqueSuffix } from "./helpers";
+import { api, loginAsOwner, placeShopperOrder, shopperSession, uniqueSuffix } from "./helpers";
 
 // The merchant dashboard against the real stack (tasks/10). Needs the seeded backend (php artisan
 // migrate:fresh --seed). Every run creates its own names, phones and orders, so runs do not collide, and the
@@ -191,4 +191,59 @@ test("no dashboard screen scrolls sideways, on a phone or a desktop (rules/03 §
     .click();
   await expect(page.getByRole("heading", { level: 1, name: /^طلب #\d+$/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});
+
+test("BR-C05 a credit limit blocks the next checkout until the merchant collects", async ({ page, browser }) => {
+  const shopper = await shopperSession(browser);
+  const first = await shopper.order("الأضواء رياضيات ثانية إعدادي");
+  expect(first.checkout.status).toBe(201);
+  const number = first.checkout.body.data?.order.number ?? 0;
+  await loginAsOwner(page);
+
+  // Deliver the first order unpaid, then cap the customer at what they already owe.
+  await api(
+    page,
+    "POST",
+    `/api/dashboard/orders/${number}/transition`,
+    { to: "delivered" },
+    { "Idempotency-Key": `e2e-d-${number}` },
+  );
+  const detail = await api<{ data: { net_total: string; customer: { id: number } } }>(
+    page,
+    "GET",
+    `/api/dashboard/orders/${number}`,
+  );
+  const customerId = detail.body.data.customer.id;
+  await page.goto(`/dashboard/customers/${customerId}`);
+  await page.getByLabel("حد الائتمان").fill(detail.body.data.net_total);
+  await page.getByRole("button", { name: "حفظ البيانات" }).click();
+  await expect(page.getByText("تم حفظ بيانات العميل")).toBeVisible();
+
+  const refused = await shopper.order("الأضواء رياضيات ثانية إعدادي");
+  expect(refused.checkout.status).toBe(422);
+  expect(refused.checkout.body.error?.details?.credit).toMatchObject({
+    limit: detail.body.data.net_total,
+    exposure: detail.body.data.net_total,
+  });
+
+  // The statement shows the debt; collecting it frees the limit.
+  await page.goto(`/dashboard/customers/${customerId}?tab=statement`);
+  await expect(page.getByTestId("ledger")).toContainText(`طلب #${number}`);
+  await page.goto(`/dashboard/orders/${number}`);
+  await page.getByRole("button", { name: "تسجيل تحصيل" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "تسجيل تحصيل" }).click();
+  await expect(page.getByTestId("order-balance")).toHaveText("0.00 ج.م");
+
+  const placed = await api(
+    shopper.page,
+    "POST",
+    "/api/store/checkout",
+    {
+      address_id: (await api<{ data: { id: number }[] }>(shopper.page, "GET", "/api/store/addresses")).body.data[0]?.id,
+      customer_note: null,
+    },
+    { "Idempotency-Key": `e2e-retry-${Date.now()}` },
+  );
+  expect(placed.status).toBe(201);
+  await shopper.close();
 });

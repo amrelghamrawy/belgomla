@@ -40,7 +40,17 @@ describe("checkoutFailure", () => {
         },
       ],
       mov: null,
+      credit: null,
     });
+  });
+
+  it("BR-C05 D78 explains the credit limit with the limit, the balance and the order", () => {
+    expect(
+      checkoutFailure(failed([], { credit: { limit: "1500.00", exposure: "500.00", order_total: "1020.00" } }), lines)
+        ?.credit,
+    ).toBe(
+      "الطلب يتجاوز حد الائتمان: الحد 1,500.00 ج.م، والمستحق عليك حاليًا 500.00 ج.م، وقيمة هذا الطلب 1,020.00 ج.م. تواصل مع المتجر لترتيب السداد.",
+    );
   });
 
   it("BR-P04 explains a product that is no longer active", () => {

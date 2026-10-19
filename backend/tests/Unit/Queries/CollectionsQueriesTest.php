@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use App\Modules\Collections\Data\CollectionFiltersData;
 use App\Modules\Collections\Models\CashCollection;
+use App\Modules\Collections\Models\CustomerCredit;
 use App\Modules\Collections\Queries\CollectedAmountQuery;
 use App\Modules\Collections\Queries\CollectionsQuery;
+use App\Modules\Collections\Queries\CustomerCreditsQuery;
 use App\Modules\Collections\Queries\CustomerStatementQuery;
 use App\Modules\Collections\Queries\OutstandingByCustomerQuery;
+use App\Modules\Collections\Queries\OverdueQuery;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderReturn;
@@ -125,22 +128,12 @@ test('D59 nothing outstanding totals zero', function (): void {
     expect(app(OutstandingByCustomerQuery::class)->total())->toBe('0.00');
 });
 
-test('D24 the statement lists the customer\'s orders newest first, cancelled ones left out', function (): void {
-    $old = ($this->order)('100.00');
-    $old->forceFill(['placed_at' => now()->subDay()])->save();
-    $new = ($this->order)('200.00', state: 'pending');
-    ($this->order)('300.00', state: 'cancelled');
-    ($this->order)('400.00', customerId: $this->makeCustomer(['phone' => '+201000000777'])->id);
-
-    expect(app(CustomerStatementQuery::class)->orders($this->customer, 24)->pluck('id')->all())->toBe([$new->id, $old->id]);
-});
-
 test('D59 the statement summary counts every open or delivered order but owes only on delivered ones', function (): void {
     ($this->order)('500.00', '200.00');
     ($this->order)('900.00', '100.00', 'confirmed');
     ($this->order)('300.00', state: 'cancelled');
 
-    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toBe([
+    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toMatchArray([
         'orders_count' => 2, 'total' => '1400.00', 'collected' => '300.00', 'outstanding' => '300.00',
     ]);
 });
@@ -148,11 +141,55 @@ test('D59 the statement summary counts every open or delivered order but owes on
 test('D59 BR-R05 the statement summary is net of returns', function (): void {
     ($this->order)('500.00', '200.00')->forceFill(['returned_total' => '100.00'])->save();
 
-    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toBe([
+    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toMatchArray([
         'orders_count' => 1, 'total' => '400.00', 'collected' => '200.00', 'outstanding' => '200.00',
     ]);
 });
 
 test('a customer without orders has an empty statement summary', function (): void {
-    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toBe(['orders_count' => 0, 'total' => '0.00', 'collected' => '0.00', 'outstanding' => '0.00']);
+    expect(app(CustomerStatementQuery::class)->summary($this->customer))->toBe([
+        'orders_count' => 0, 'total' => '0.00', 'collected' => '0.00', 'outstanding' => '0.00',
+        'credit_limit' => null, 'payment_terms_days' => null, 'available_credit' => null, 'credit_balance' => '0.00', 'overdue' => '0.00',
+    ]);
+});
+
+test('BR-C05 BR-C06 BR-C07 the statement summary carries the credit picture: limit, terms, what is left under the limit, unused credit, overdue', function (): void {
+    $this->freezeSecond();
+    $this->customer->forceFill(['credit_limit' => '2000.00', 'payment_terms_days' => 30])->save();
+    (($this->order)('500.00'))->forceFill(['due_at' => now()->subDay()])->save();
+    (($this->order)('300.00'))->forceFill(['due_at' => now()->addDays(10)])->save();
+    ($this->order)('400.00', state: 'confirmed');
+    CustomerCredit::factory()->for($this->customer)->create(['amount' => '150.00', 'remaining' => '100.00']);
+
+    expect(app(CustomerStatementQuery::class)->summary($this->customer->refresh()))->toMatchArray([
+        'credit_limit' => '2000.00', 'payment_terms_days' => 30, 'available_credit' => '900.00', 'credit_balance' => '100.00', 'overdue' => '500.00',
+    ]);
+});
+
+test('BR-C06 overdue counts delivered orders past their due date with a net balance left, per customer and per store', function (): void {
+    $this->freezeSecond();
+    $other = $this->makeCustomer(['phone' => '+201000000777']);
+    ($this->order)('500.00', '100.00')->forceFill(['due_at' => now()->subSecond()])->save();
+    ($this->order)('300.00')->forceFill(['due_at' => now()])->save();
+    ($this->order)('200.00', '200.00')->forceFill(['due_at' => now()->subDay()])->save();
+    ($this->order)('250.00', customerId: $other->id)->forceFill(['due_at' => null, 'delivered_at' => now()->subDay(), 'returned_total' => '50.00'])->save();
+    ($this->order)('999.00', state: 'confirmed');
+
+    expect(app(OverdueQuery::class)->total($this->customer))->toBe('400.00')
+        ->and(app(OverdueQuery::class)->total())->toBe('600.00')
+        ->and(app(OverdueQuery::class)->customersCount())->toBe(2);
+});
+
+test('BR-C06 nothing overdue totals zero', function (): void {
+    expect(app(OverdueQuery::class)->total())->toBe('0.00')
+        ->and(app(OverdueQuery::class)->customersCount())->toBe(0);
+});
+
+test('BR-C07 a customer\'s credits are listed newest first, voided included, and found by id', function (): void {
+    $old = CustomerCredit::factory()->for($this->customer)->voided()->create();
+    $new = CustomerCredit::factory()->for($this->customer)->create();
+    CustomerCredit::factory()->create();
+
+    expect(app(CustomerCreditsQuery::class)->of($this->customer)->pluck('id')->all())->toBe([$new->id, $old->id])
+        ->and(app(CustomerCreditsQuery::class)->find($new->id)->is($new))->toBeTrue();
 });

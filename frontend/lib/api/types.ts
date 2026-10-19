@@ -89,7 +89,6 @@ export type DashboardOrderDetail = Schemas["DashboardOrderDetail"];
 export type DashboardOrderHistoryEntry = Schemas["DashboardOrderHistoryEntry"];
 export type MerchantNotification = Schemas["MerchantNotification"];
 export type Collection = Schemas["Collection"];
-export type StatementOrder = Schemas["StatementOrder"];
 export type StatementSummary = Schemas["StatementSummary"];
 export type CustomerRef = Schemas["CustomerRef"];
 export type OverviewReport = Schemas["OverviewReport"];
@@ -104,3 +103,9 @@ export type OrderReturn = Schemas["OrderReturn"];
 export type OrderReturnLine = Schemas["OrderReturnLine"];
 export type ReturnableLine = Schemas["ReturnableLine"];
 export type StoreOrderReturn = Schemas["StoreOrderReturn"];
+
+// V2 Task 02 — credit and statement
+export type LedgerRow = Schemas["LedgerRow"];
+export type LedgerMeta = Schemas["LedgerMeta"];
+export type StoreStatementSummary = Schemas["StoreStatementSummary"];
+export type CustomerCredit = Schemas["CustomerCredit"];

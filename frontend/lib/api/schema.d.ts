@@ -436,6 +436,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/account/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in customer's own ledger (BR-C08), the same rows as the merchant's */
+        get: operations["storeAccountStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/_test/last-otp": {
         parameters: {
             query?: never;
@@ -1301,9 +1318,74 @@ export interface paths {
             };
             cookie?: never;
         };
+        /** The customer's ledger (BR-C08) in Cairo days (D60), oldest first, with running balance */
         get: operations["dashboardCustomerStatement"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /** Every credit of the customer (BR-C07), voided included, newest first */
+        get: operations["dashboardCustomerCredits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/apply-credit": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pays part of the order from a credit of the same customer (BR-C07), as a credit collection */
+        post: operations["dashboardApplyCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/credits/{customerCredit}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerCredit: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Voids a credit nothing was applied from, with the refund that created it (BR-C07) */
+        post: operations["dashboardVoidCredit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1655,7 +1737,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2041,6 +2123,10 @@ export interface components {
             tenant: components["schemas"]["Tenant"];
         };
         DashboardSettings: components["schemas"]["TenantSettings"] & {
+            /** @description BR-C06 terms a new customer starts with */
+            default_payment_terms_days: number | null;
+            /** @description BR-C05 limit a new customer starts with */
+            default_credit_limit: components["schemas"]["Money"] | null;
             /** @description Hours before a pending order is stale (D10) */
             stale_pending_hours: number;
             /** @description BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line */
@@ -2082,6 +2168,8 @@ export interface components {
             stale_pending_hours?: number;
             /** @description Only the placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; null or empty = the default */
             invitation_message?: string | null;
+            default_payment_terms_days?: number | null;
+            default_credit_limit?: string | null;
         };
         IdName: {
             id: number;
@@ -2362,6 +2450,10 @@ export interface components {
         };
         DashboardCustomer: components["schemas"]["Customer"] & {
             outstanding_amount: components["schemas"]["Money"];
+            /** @description BR-C05; null = no limit */
+            credit_limit: components["schemas"]["Money"] | null;
+            /** @description BR-C06; null = due on delivery */
+            payment_terms_days: number | null;
             created_by: number | null;
             approved_by: number | null;
             /** Format: date-time */
@@ -2441,6 +2533,11 @@ export interface components {
             customer?: components["schemas"]["IdName"];
             total: components["schemas"]["Money"];
             refund_amount: components["schemas"]["Money"];
+            /**
+             * @description How refund_amount went back (BR-C07)
+             * @enum {string|null}
+             */
+            refund_method: "cash" | "credit" | null;
             reason: string;
             /** Format: date-time */
             returned_at: string;
@@ -2470,6 +2567,8 @@ export interface components {
             number: number;
             total: components["schemas"]["Money"];
             refund_amount: components["schemas"]["Money"];
+            /** @enum {string|null} */
+            refund_method: "cash" | "credit" | null;
             /** Format: date-time */
             returned_at: string;
             items: {
@@ -2517,9 +2616,11 @@ export interface components {
             kind_label: string;
             /** @description The return a refund belongs to */
             order_return_id: number | null;
+            /** @description BR-C07: the credit a credit collection draws from (payment) or creates (refund) */
+            customer_credit_id: number | null;
             amount: components["schemas"]["Money"];
             /** @enum {string} */
-            method: "cash";
+            method: "cash" | "credit";
             method_label: string;
             /** Format: date-time */
             collected_at: string;
@@ -2533,26 +2634,60 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
-        StatementOrder: {
-            number: number;
-            status: components["schemas"]["OrderStatus"];
-            status_label: string;
+        /** @description One statement row (BR-C08). Positive balance = the customer owes the store. */
+        LedgerRow: {
             /** Format: date-time */
-            placed_at: string;
-            /** Format: date-time */
-            delivered_at: string | null;
-            order_total: components["schemas"]["Money"];
-            returned_total: components["schemas"]["Money"];
-            net_total: components["schemas"]["Money"];
-            collected_amount: components["schemas"]["Money"];
+            date: string;
+            /** @enum {string} */
+            type: "order" | "return" | "payment" | "credit_applied" | "refund" | "refund_to_credit" | "credit_created";
+            type_label: string;
+            order_number: number | null;
+            return_number: number | null;
+            debit: components["schemas"]["Money"];
+            credit: components["schemas"]["Money"];
             balance: components["schemas"]["Money"];
-            collection_status: components["schemas"]["CollectionStatus"];
+        };
+        LedgerMeta: components["schemas"]["PaginationMeta"] & {
+            /** @description Everything before `from` */
+            opening_balance: components["schemas"]["Money"];
+            /** @description Everything up to `to` */
+            closing_balance: components["schemas"]["Money"];
+        };
+        StoreStatementSummary: {
+            outstanding: components["schemas"]["Money"];
+            credit_limit: components["schemas"]["Money"] | null;
+            available_credit: components["schemas"]["Money"] | null;
+            /** @description Unused customer credit (BR-C07) */
+            credit_balance: components["schemas"]["Money"];
+            overdue: components["schemas"]["Money"];
+        };
+        CustomerCredit: {
+            id: number;
+            customer_id: number;
+            source_return_id: number | null;
+            amount: components["schemas"]["Money"];
+            remaining: components["schemas"]["Money"];
+            note: string | null;
+            created_by: number | null;
+            /** Format: date-time */
+            created_at: string;
+            is_voided: boolean;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
+            voided_by: number | null;
         };
         StatementSummary: {
             orders_count: number;
             total: components["schemas"]["Money"];
             collected: components["schemas"]["Money"];
             outstanding: components["schemas"]["Money"];
+            credit_limit: components["schemas"]["Money"] | null;
+            payment_terms_days: number | null;
+            /** @description credit_limit − exposure (D77); null without a limit */
+            available_credit: components["schemas"]["Money"] | null;
+            credit_balance: components["schemas"]["Money"];
+            overdue: components["schemas"]["Money"];
         };
         OverviewReport: {
             orders_by_status: {
@@ -2571,6 +2706,9 @@ export interface components {
             };
             stale_pending: number;
             outstanding_total: components["schemas"]["Money"];
+            /** @description BR-C06 */
+            overdue_total: components["schemas"]["Money"];
+            overdue_customers: number;
             low_stock_count: number;
         };
         /** @enum {string} */
@@ -2604,6 +2742,15 @@ export interface components {
             total: components["schemas"]["Money"];
             collected: components["schemas"]["Money"];
             outstanding: components["schemas"]["Money"];
+            /** @description The outstanding by days past due (BR-C06): not due yet, 1–30, 31–60, 61–90, over 90 */
+            aging: {
+                current: components["schemas"]["Money"];
+                "0_30": components["schemas"]["Money"];
+                "31_60": components["schemas"]["Money"];
+                "61_90": components["schemas"]["Money"];
+                over_90: components["schemas"]["Money"];
+            };
+            overdue: components["schemas"]["Money"];
         };
         LowStockSku: {
             sku_id: number;
@@ -3576,7 +3723,7 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             409: components["responses"]["Error"];
-            /** @description checkout_failed with `items` (CheckoutProblem) and, for the minimum order value, `details.mov`; cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key. */
+            /** @description checkout_failed with `items` (CheckoutProblem), `details.mov` for the minimum order value and `details.credit { limit, exposure, order_total }` past the credit limit (BR-C05, D78); cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -3680,6 +3827,38 @@ export interface operations {
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeAccountStatement: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of ledger rows with the opening and closing balance and the summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LedgerRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["LedgerMeta"];
+                        summary: components["schemas"]["StoreStatementSummary"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };
@@ -5025,6 +5204,10 @@ export interface operations {
                     name: string;
                     phone: string;
                     addresses?: components["schemas"]["AddressRequest"][];
+                    /** @description BR-C05; not sent = the store default */
+                    credit_limit?: string | null;
+                    /** @description BR-C06; not sent = the store default */
+                    payment_terms_days?: number | null;
                 };
             };
         };
@@ -5074,6 +5257,10 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /** @description BR-C05; not sent = unchanged, null = no limit */
+                    credit_limit?: string | null;
+                    /** @description BR-C06; not sent = unchanged, null = due on delivery */
+                    payment_terms_days?: number | null;
                     addresses?: (components["schemas"]["AddressRequest"] & {
                         id?: number;
                     })[];
@@ -5183,6 +5370,8 @@ export interface operations {
     dashboardCustomerStatement: {
         parameters: {
             query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -5194,16 +5383,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description A page of the customer's non-cancelled orders with balances, plus the summary */
+            /** @description A page of ledger rows, the opening and closing balance, the customer and the summary */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["StatementOrder"][];
+                        data: components["schemas"]["LedgerRow"][];
                         links: components["schemas"]["PaginationLinks"];
-                        meta: components["schemas"]["PaginationMeta"];
+                        meta: components["schemas"]["LedgerMeta"];
                         customer: components["schemas"]["CustomerRef"];
                         summary: components["schemas"]["StatementSummary"];
                     };
@@ -5212,6 +5401,125 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomerCredits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The credits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerCredit"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardApplyCredit: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    credit_id: number;
+                    amount: components["schemas"]["Money"];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["Collection"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description The order */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description credit_voided or order_cancelled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description exceeds_credit (details.remaining), exceeds_balance or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardVoidCredit: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerCredit: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            /** @description The voided credit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerCredit"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description credit_voided or credit_applied (details.applied) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             422: components["responses"]["Error"];
         };
     };
@@ -5430,8 +5738,13 @@ export interface operations {
                     reason: string;
                     /** Format: date-time */
                     returned_at?: string;
-                    /** @description Confirms paying back in cash what was collected beyond the new net total */
+                    /** @description Confirms paying back what was collected beyond the new net total */
                     refund?: boolean;
+                    /**
+                     * @description cash (default) or kept as customer credit (BR-C07)
+                     * @enum {string}
+                     */
+                    refund_to?: "cash" | "credit";
                     items: {
                         order_item_id: number;
                         quantity: number;

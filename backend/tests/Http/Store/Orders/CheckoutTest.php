@@ -175,3 +175,25 @@ test('BR-N02 the merchant finds the new order in the notifications', function ()
 
     expect(MerchantNotification::withoutTenantScope()->where('tenant_id', $this->tenant->id)->sole()->data['order_number'])->toBe(1);
 });
+
+test('BR-C05 D78 an order past the credit limit answers 422 with the limit, the balance and the order total, and orders nothing', function (): void {
+    $this->inTenant(fn () => $this->customer->forceFill(['credit_limit' => '1500.00'])->save());
+    $this->inTenant(fn (): Order => Order::factory()->delivered()->for($this->customer)->create(['items_total' => '500.00', 'order_total' => '500.00']));
+
+    ($this->checkout)()
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'checkout_failed')
+        ->assertJsonPath('error.details.credit', ['limit' => '1500.00', 'exposure' => '500.00', 'order_total' => '1020.00'])
+        ->assertJsonPath('error.items', []);
+
+    $this->assertDatabaseCount('orders', 1);
+    $this->assertDatabaseCount('cart_items', 1);
+});
+
+test('BR-C05 once the balance is collected the same order fits under the limit', function (): void {
+    $this->inTenant(fn () => $this->customer->forceFill(['credit_limit' => '1500.00'])->save());
+    $order = $this->inTenant(fn (): Order => Order::factory()->delivered()->for($this->customer)->create(['items_total' => '500.00', 'order_total' => '500.00']));
+    $this->inTenant(fn () => app(App\Modules\Collections\Actions\RecordCollection::class)->handle($order, new App\Modules\Collections\Data\CollectionData('500.00')));
+
+    ($this->checkout)()->assertCreated();
+});

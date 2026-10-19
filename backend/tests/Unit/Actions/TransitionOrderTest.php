@@ -171,3 +171,24 @@ test('BR-O01 the guard reads the status under lock, not the stale model it was g
 
     expect(InventoryMovement::query()->count())->toBe(1);
 });
+
+test('BR-C06 a delivered order falls due its customer\'s payment terms later', function (): void {
+    $this->freezeSecond();
+    App\Modules\Customers\Models\Customer::query()->whereKey($this->order->customer_id)->update(['payment_terms_days' => 30]);
+
+    $order = ($this->move)(OrderStatus::Delivered);
+
+    expect($order->refresh()->due_at?->equalTo(now()->addDays(30)))->toBeTrue();
+});
+
+test('BR-C06 without payment terms a delivered order is due on delivery', function (): void {
+    $this->freezeSecond();
+
+    $order = ($this->move)(OrderStatus::Delivered);
+
+    expect($order->refresh()->due_at?->equalTo($order->delivered_at))->toBeTrue();
+});
+
+test('BR-C06 the due date is set on delivery only', function (): void {
+    expect(($this->move)(OrderStatus::Confirmed)->refresh()->due_at)->toBeNull();
+});

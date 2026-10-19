@@ -44,6 +44,7 @@ final class OrderReturnResource extends JsonResource
             ]),
             'total' => $return->total,
             'refund_amount' => $return->refund_amount,
+            'refund_method' => $return->refund_method?->value,
             'reason' => $return->reason,
             'returned_at' => $return->returned_at->toIso8601String(),
             'recorded_by' => $return->recorded_by,

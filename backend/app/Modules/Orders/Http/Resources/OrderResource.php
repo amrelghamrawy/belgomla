@@ -58,6 +58,7 @@ final class OrderResource extends JsonResource
                 'number' => $return->number,
                 'total' => $return->total,
                 'refund_amount' => $return->refund_amount,
+                'refund_method' => $return->refund_method?->value,
                 'returned_at' => $return->returned_at->toIso8601String(),
                 'items' => $return->items->map(fn (OrderReturnItem $item): array => [
                     'product_name' => $item->orderItem->product_name,

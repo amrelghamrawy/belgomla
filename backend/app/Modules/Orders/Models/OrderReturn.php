@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Models;
 
+use App\Modules\Orders\Enums\RefundMethod;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\OrderReturnFactory;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $number
  * @property string $total
  * @property string $refund_amount
+ * @property RefundMethod|null $refund_method cash or credit (BR-C07), null when nothing went back
  * @property string $reason
  * @property CarbonImmutable $returned_at
  * @property int|null $recorded_by
@@ -76,6 +78,7 @@ final class OrderReturn extends Model
             'number' => 'integer',
             'total' => 'decimal:2',
             'refund_amount' => 'decimal:2',
+            'refund_method' => RefundMethod::class,
             'returned_at' => 'datetime',
             'recorded_by' => 'integer',
             'voided_at' => 'datetime',

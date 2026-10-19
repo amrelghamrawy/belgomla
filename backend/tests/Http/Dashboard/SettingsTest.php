@@ -77,7 +77,23 @@ test('settings validation', function (array $body, string $field): void {
     'invitation text too long' => [['invitation_message' => str_repeat('ا', 501)], 'invitation_message'],
     'invitation text unknown placeholder' => [['invitation_message' => 'أهلًا {name}'], 'invitation_message'],
     'invitation text not a string' => [['invitation_message' => ['x']], 'invitation_message'],
+    'default terms negative' => [['default_payment_terms_days' => -1], 'default_payment_terms_days'],
+    'default terms over a year' => [['default_payment_terms_days' => 366], 'default_payment_terms_days'],
+    'default limit negative' => [['default_credit_limit' => '-1'], 'default_credit_limit'],
+    'default limit three decimals' => [['default_credit_limit' => '1.001'], 'default_credit_limit'],
 ]);
+
+test('BR-C05 BR-C06 an owner sets the credit terms new customers start with, and clears them with null', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['default_payment_terms_days' => 30, 'default_credit_limit' => '2500'])
+        ->assertOk()
+        ->assertJsonPath('data.default_payment_terms_days', 30)
+        ->assertJsonPath('data.default_credit_limit', '2500.00');
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['default_payment_terms_days' => null, 'default_credit_limit' => null])
+        ->assertOk()
+        ->assertJsonPath('data.default_payment_terms_days', null)
+        ->assertJsonPath('data.default_credit_limit', null);
+});
 
 test('the Arabic message for a missing minimum order amount is explicit', function (): void {
     $this->tenantJson('PUT', '/api/dashboard/settings', ['mov_enabled' => true, 'mov_amount' => null])

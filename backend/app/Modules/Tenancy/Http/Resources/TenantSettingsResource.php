@@ -42,6 +42,8 @@ final class TenantSettingsResource extends JsonResource
             'stale_pending_hours' => $this->when($dashboard, $this->resource->stale_pending_hours),
             'invitation_message' => $this->when($dashboard, $this->resource->invitation_message),
             'invitation_message_default' => $this->when($dashboard, InvitationMessage::DEFAULT),
+            'default_payment_terms_days' => $this->when($dashboard, $this->resource->default_payment_terms_days),
+            'default_credit_limit' => $this->when($dashboard, $this->resource->default_credit_limit),
         ];
     }
 }

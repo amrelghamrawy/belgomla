@@ -10,7 +10,7 @@ export type CheckoutProblem = {
   message: string;
 };
 
-export type CheckoutFailure = { problems: CheckoutProblem[]; mov: string | null };
+export type CheckoutFailure = { problems: CheckoutProblem[]; mov: string | null; credit: string | null };
 
 function isLineProblem(item: Record<string, unknown>): item is LineProblem & Record<string, unknown> {
   return typeof item.sku_id === "number" && typeof item.reason === "string";
@@ -53,5 +53,20 @@ export function checkoutFailure(error: unknown, lines: readonly CartItem[]): Che
       ? ar.checkout.movShort(formatMoney(String(mov.required)), formatMoney(String(mov.current)))
       : null;
 
-  return { problems, mov: movText };
+  // BR-C05, D78: the limit, what the customer already owes or has on order, and this order.
+  const credit = error.details?.credit;
+  const creditText =
+    typeof credit === "object" &&
+    credit !== null &&
+    "limit" in credit &&
+    "exposure" in credit &&
+    "order_total" in credit
+      ? ar.checkout.creditShort(
+          formatMoney(String(credit.limit)),
+          formatMoney(String(credit.exposure)),
+          formatMoney(String(credit.order_total)),
+        )
+      : null;
+
+  return { problems, mov: movText, credit: creditText };
 }

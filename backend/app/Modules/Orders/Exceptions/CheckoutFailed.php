@@ -9,22 +9,26 @@ use App\Modules\Orders\Data\CheckoutProblem;
 use App\Support\ApiException;
 
 /**
- * BR-PR06: checkout refused as a whole, `422 checkout_failed` with every offending SKU in `items` and, when the
- * minimum order value is not reached, `details.mov` (08-api-contract.md §3). Nothing was written.
+ * BR-PR06: checkout refused as a whole, `422 checkout_failed` with every offending SKU in `items`, `details.mov` when
+ * the minimum order value is not reached, and `details.credit` when the order passes the credit limit (BR-C05, D78)
+ * (08-api-contract.md §3). Nothing was written.
  */
 final class CheckoutFailed extends ApiException
 {
     /**
      * @param  list<CheckoutProblem>  $problems
      * @param  array{required: string, current: string}|null  $mov  BR-MOV02
+     * @param  array{limit: string, exposure: string, order_total: string}|null  $credit  BR-C05
      */
-    public static function with(array $problems, ?array $mov = null): self
+    public static function with(array $problems, ?array $mov = null, ?array $credit = null): self
     {
+        $details = array_filter(['mov' => $mov, 'credit' => $credit], fn (?array $detail): bool => $detail !== null);
+
         return new self(
             422,
             'checkout_failed',
             'تعذر إتمام الطلب، راجع العناصر التالية',
-            $mov === null ? null : ['mov' => $mov],
+            $details === [] ? null : $details,
             array_map(fn (CheckoutProblem $problem): array => $problem->toArray(), $problems),
         );
     }

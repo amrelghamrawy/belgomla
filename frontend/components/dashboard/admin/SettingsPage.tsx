@@ -58,6 +58,17 @@ const schema = z
       .regex(/^\d{1,3}$/, ar.dashboard.productForm.invalidInteger)
       .refine((value) => Number(value) >= 1 && Number(value) <= 720, ar.dashboard.productForm.invalidInteger),
     invitation_message: z.string().max(INVITATION_MAX_LENGTH, copy.invitation.tooLong(INVITATION_MAX_LENGTH)),
+    default_payment_terms_days: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (/^\d{1,3}$/.test(value) && Number(value) <= 365),
+        ar.dashboard.productForm.invalidInteger,
+      ),
+    default_credit_limit: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || toPiasters(value) !== null, ar.dashboard.productForm.invalidMoney),
   })
   .superRefine((values, context) => {
     const unknown = unknownPlaceholders(values.invitation_message);
@@ -88,6 +99,8 @@ const SERVER_FIELDS = [
   "mov_amount",
   "stale_pending_hours",
   "invitation_message",
+  "default_payment_terms_days",
+  "default_credit_limit",
 ] as const;
 
 function defaults(settings: DashboardSettings): Values {
@@ -106,6 +119,9 @@ function defaults(settings: DashboardSettings): Values {
     require_customer_approval: settings.require_customer_approval,
     stale_pending_hours: String(settings.stale_pending_hours),
     invitation_message: settings.invitation_message ?? settings.invitation_message_default,
+    default_payment_terms_days:
+      settings.default_payment_terms_days === null ? "" : String(settings.default_payment_terms_days),
+    default_credit_limit: settings.default_credit_limit ?? "",
   };
 }
 
@@ -159,6 +175,9 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         require_customer_approval: values.require_customer_approval,
         stale_pending_hours: Number(values.stale_pending_hours),
         invitation_message: invitationBody(values.invitation_message, settings.invitation_message_default),
+        default_payment_terms_days:
+          values.default_payment_terms_days === "" ? null : Number(values.default_payment_terms_days),
+        default_credit_limit: empty(values.default_credit_limit),
       },
       {
         onSuccess: () => toast.success(copy.saved),
@@ -358,6 +377,27 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
             registration={form.register("stale_pending_hours")}
             error={errors.stale_pending_hours}
           />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField
+              id="settings-default-terms"
+              label={copy.defaultTerms}
+              dir="ltr"
+              inputMode="numeric"
+              className="max-w-24"
+              registration={form.register("default_payment_terms_days")}
+              error={errors.default_payment_terms_days}
+            />
+            <TextField
+              id="settings-default-limit"
+              label={copy.defaultLimit}
+              dir="ltr"
+              inputMode="decimal"
+              className="max-w-40"
+              registration={form.register("default_credit_limit")}
+              error={errors.default_credit_limit}
+            />
+          </div>
+          <p className="text-muted-foreground text-xs">{copy.defaultCreditHint}</p>
         </CardContent>
       </Card>
       <InvitationCard

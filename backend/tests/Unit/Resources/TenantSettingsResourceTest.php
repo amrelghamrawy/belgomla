@@ -21,6 +21,9 @@ test('the settings resource has the documented key set and hides operational fie
         ->and($dashboard)->toHaveKey('stale_pending_hours', 24)
         ->and($dashboard)->toHaveKey('invitation_message', null)
         ->and($dashboard)->toHaveKey('invitation_message_default', InvitationMessage::DEFAULT)
+        ->and($dashboard)->toHaveKey('default_payment_terms_days', null)
+        ->and($dashboard)->toHaveKey('default_credit_limit', null)
+        ->and($store)->not->toHaveKeys(['default_payment_terms_days', 'default_credit_limit'])
         ->and($store['mov'])->toBe(['enabled' => false, 'amount' => null]);
 });
 

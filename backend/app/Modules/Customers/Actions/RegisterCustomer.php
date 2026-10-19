@@ -11,6 +11,7 @@ use App\Modules\Customers\Exceptions\PhoneTaken;
 use App\Modules\Customers\Exceptions\RegistrationRejected;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Messaging\Enums\Channel;
+use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class RegisterCustomer
 {
-    public function __construct(private SendOtp $sendOtp) {}
+    public function __construct(
+        private SendOtp $sendOtp,
+        private CurrentTenantSettingsQuery $settings,
+    ) {}
 
     public function handle(RegistrationData $data): Channel
     {
@@ -36,7 +40,8 @@ final readonly class RegisterCustomer
         }
 
         return DB::transaction(function () use ($existing, $data): Channel {
-            $customer = $existing ?? new Customer(['phone' => $data->phone, 'status' => CustomerStatus::PendingVerification]);
+            // BR-C05, BR-C06: a new customer starts with the store's credit terms.
+            $customer = $existing ?? new Customer(['phone' => $data->phone, 'status' => CustomerStatus::PendingVerification, ...$this->settings->creditDefaults()]);
             $customer->fill(['name' => $data->name, 'password' => $data->password])->save();
 
             return $this->sendOtp->handle($data->phone, OtpPurpose::Register);

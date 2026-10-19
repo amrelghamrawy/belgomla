@@ -18,7 +18,7 @@ test('to array', function (): void {
 
     expect(array_keys($return?->toArray() ?? []))->toBe([
         'id', 'tenant_id', 'order_id', 'number', 'total', 'refund_amount', 'reason', 'returned_at', 'recorded_by',
-        'voided_at', 'void_reason', 'voided_by', 'created_at', 'updated_at',
+        'voided_at', 'void_reason', 'voided_by', 'created_at', 'updated_at', 'refund_method',
     ]);
 });
 

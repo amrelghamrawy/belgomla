@@ -1,6 +1,13 @@
 # V2 Task 02 — Credit terms (آجل) and customer account statement (كشف حساب)
 
-Status: **planned**. Requires V2 Tasks 00, 01. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-19). Read `CLAUDE.md`, `rules/*.md`, then this file.
+
+### Delivered
+
+- Docs: D77, D78; D24 resolved; BR-C05..C08 in §I; settings list in §M; 07 customers/tenant_settings/orders.due_at/order_returns.refund_method/collections.method+customer_credit_id/customer_credits; 08 §8, §10 statement + credits, §3 checkout `details.credit`, §11 aging and overview.
+- Deviations, recorded in the docs: the aging adds a `current` bucket (not due yet) next to 0–30/31–60/61–90/over 90; credits only come from returns (no manual credit endpoint), so voiding a credit voids the `credit` refund that created it; the return's `refund_method` column says how a refund went back; the old per-order statement shape (`StatementOrder`) is replaced by the ledger; checkout locks the customer row so two checkouts cannot both fit under the limit; the store statement needs a session only (a blocked customer still sees what they owe).
+- Tests: backend 3235 (+117), frontend 659 (+18), e2e "credit limit blocks the next checkout until the merchant collects" on mobile and desktop.
+- Smoke against `php artisan serve`: return kept as credit → credit applied to the next order → the ledger shows refund_to_credit / credit_created / credit_applied and closes at the outstanding figure → voiding the applied credit is 409.
 
 ## Goal
 

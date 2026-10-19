@@ -19,14 +19,29 @@ import { BarList } from "./BarList";
 const copy = ar.dashboard.overview;
 const STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
 
-function Stat({ label, value, href, tone }: { label: string; value: ReactNode; href: string; tone?: "warning" }) {
+function Stat({
+  label,
+  value,
+  href,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: ReactNode;
+  href: string;
+  tone?: "warning";
+  hint?: string;
+}) {
   return (
     <Link href={href} className="block">
       <Card className={cn("hover:border-primary h-full transition-colors", tone === "warning" && "border-amber-500")}>
         <CardHeader className="pb-1">
           <CardTitle className="text-muted-foreground text-sm font-normal">{label}</CardTitle>
         </CardHeader>
-        <CardContent className="text-2xl font-bold">{value}</CardContent>
+        <CardContent className="text-2xl font-bold">
+          {value}
+          {hint !== undefined && <p className="text-muted-foreground text-xs font-normal">{hint}</p>}
+        </CardContent>
       </Card>
     </Link>
   );
@@ -46,7 +61,7 @@ export function Overview() {
       {report.isPending && <LoadingBlock rows={3} />}
       {report.data && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
             <Stat label={copy.todayOrders} value={report.data.today.orders} href="/dashboard/orders" />
             <Stat label={copy.todaySales} value={formatMoney(report.data.today.total)} href="/dashboard/reports" />
             <Stat
@@ -59,6 +74,13 @@ export function Overview() {
               label={copy.outstanding}
               value={formatMoney(report.data.outstanding_total)}
               href="/dashboard/reports?tab=outstanding"
+            />
+            <Stat
+              label={copy.overdue}
+              value={formatMoney(report.data.overdue_total)}
+              hint={copy.overdueCustomers(report.data.overdue_customers)}
+              href="/dashboard/reports?tab=outstanding"
+              tone={report.data.overdue_customers > 0 ? "warning" : undefined}
             />
             <Stat
               label={copy.lowStock}

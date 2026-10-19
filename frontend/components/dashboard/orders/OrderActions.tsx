@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/format/money";
 
 import { Hint } from "../common/Hint";
 import { ReasonDialog } from "../common/ReasonDialog";
+import { ApplyCreditDialog } from "./ApplyCreditDialog";
 import { RecordCollectionDialog } from "./RecordCollectionDialog";
 import { ReturnDialog } from "./ReturnDialog";
 
@@ -68,6 +69,7 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
         </Hint>
       )}
       {collectable && <RecordCollectionDialog order={order} />}
+      {collectable && <ApplyCreditDialog order={order} />}
       {returnable && <ReturnDialog orderNumber={order.number} />}
       {canCancel(order.status) && (
         <ReasonDialog

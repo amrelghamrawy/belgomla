@@ -1141,7 +1141,7 @@
                         "$ref": "#/components/responses/Error"
                     },
                     "422": {
-                        "description": "checkout_failed with `items` (CheckoutProblem) and, for the minimum order value, `details.mov`; cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key.\n",
+                        "description": "checkout_failed with `items` (CheckoutProblem), `details.mov` for the minimum order value and `details.credit { limit, exposure, order_total }` past the credit limit (BR-C05, D78); cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key.\n",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1322,6 +1322,70 @@
                         "$ref": "#/components/responses/Error"
                     },
                     "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/store/account/statement": {
+            "get": {
+                "operationId": "storeAccountStatement",
+                "tags": [
+                    "store-orders"
+                ],
+                "summary": "The signed-in customer's own ledger (BR-C08), the same rows as the merchant's",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/From"
+                    },
+                    {
+                        "$ref": "#/components/parameters/To"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of ledger rows with the opening and closing balance and the summary",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta",
+                                        "summary"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/LedgerRow"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/LedgerMeta"
+                                        },
+                                        "summary": {
+                                            "$ref": "#/components/schemas/StoreStatementSummary"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
                         "$ref": "#/components/responses/Error"
                     },
                     "422": {
@@ -3811,6 +3875,22 @@
                                         "items": {
                                             "$ref": "#/components/schemas/AddressRequest"
                                         }
+                                    },
+                                    "credit_limit": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "description": "BR-C05; not sent = the store default"
+                                    },
+                                    "payment_terms_days": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 0,
+                                        "maximum": 365,
+                                        "description": "BR-C06; not sent = the store default"
                                     }
                                 }
                             }
@@ -3888,6 +3968,22 @@
                                     "name": {
                                         "type": "string",
                                         "maxLength": 150
+                                    },
+                                    "credit_limit": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "description": "BR-C05; not sent = unchanged, null = no limit"
+                                    },
+                                    "payment_terms_days": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 0,
+                                        "maximum": 365,
+                                        "description": "BR-C06; not sent = unchanged, null = due on delivery"
                                     },
                                     "addresses": {
                                         "type": "array",
@@ -4094,7 +4190,14 @@
                 "tags": [
                     "dashboard-collections"
                 ],
+                "summary": "The customer's ledger (BR-C08) in Cairo days (D60), oldest first, with running balance",
                 "parameters": [
+                    {
+                        "$ref": "#/components/parameters/From"
+                    },
+                    {
+                        "$ref": "#/components/parameters/To"
+                    },
                     {
                         "$ref": "#/components/parameters/Page"
                     },
@@ -4104,7 +4207,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "A page of the customer's non-cancelled orders with balances, plus the summary",
+                        "description": "A page of ledger rows, the opening and closing balance, the customer and the summary",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4120,14 +4223,14 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/StatementOrder"
+                                                "$ref": "#/components/schemas/LedgerRow"
                                             }
                                         },
                                         "links": {
                                             "$ref": "#/components/schemas/PaginationLinks"
                                         },
                                         "meta": {
-                                            "$ref": "#/components/schemas/PaginationMeta"
+                                            "$ref": "#/components/schemas/LedgerMeta"
                                         },
                                         "customer": {
                                             "$ref": "#/components/schemas/CustomerRef"
@@ -4148,6 +4251,199 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customers/{customer}/credits": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/CustomerId"
+                }
+            ],
+            "get": {
+                "operationId": "dashboardCustomerCredits",
+                "tags": [
+                    "dashboard-collections"
+                ],
+                "summary": "Every credit of the customer (BR-C07), voided included, newest first",
+                "responses": {
+                    "200": {
+                        "description": "The credits",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CustomerCredit"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/orders/{order}/apply-credit": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/OrderNumber"
+                },
+                {
+                    "$ref": "#/components/parameters/IdempotencyKey"
+                }
+            ],
+            "post": {
+                "operationId": "dashboardApplyCredit",
+                "tags": [
+                    "dashboard-collections"
+                ],
+                "summary": "Pays part of the order from a credit of the same customer (BR-C07), as a credit collection",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "credit_id",
+                                    "amount"
+                                ],
+                                "properties": {
+                                    "credit_id": {
+                                        "type": "integer"
+                                    },
+                                    "amount": {
+                                        "$ref": "#/components/schemas/Money"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "$ref": "#/components/responses/Collection"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "description": "The order",
+                        "or": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "credit_voided or order_cancelled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "exceeds_credit (details.remaining), exceeds_balance or validation_failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/dashboard/credits/{customerCredit}/void": {
+            "parameters": [
+                {
+                    "name": "customerCredit",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    }
+                },
+                {
+                    "$ref": "#/components/parameters/IdempotencyKey"
+                }
+            ],
+            "post": {
+                "operationId": "dashboardVoidCredit",
+                "tags": [
+                    "dashboard-collections"
+                ],
+                "summary": "Voids a credit nothing was applied from, with the refund that created it (BR-C07)",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/Reason"
+                },
+                "responses": {
+                    "200": {
+                        "description": "The voided credit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerCredit"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "credit_voided or credit_applied (details.applied)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
                     },
                     "422": {
                         "$ref": "#/components/responses/Error"
@@ -4607,7 +4903,15 @@
                                     },
                                     "refund": {
                                         "type": "boolean",
-                                        "description": "Confirms paying back in cash what was collected beyond the new net total"
+                                        "description": "Confirms paying back what was collected beyond the new net total"
+                                    },
+                                    "refund_to": {
+                                        "type": "string",
+                                        "enum": [
+                                            "cash",
+                                            "credit"
+                                        ],
+                                        "description": "cash (default) or kept as customer credit (BR-C07)"
                                     },
                                     "items": {
                                         "type": "array",
@@ -6054,6 +6358,8 @@
                     "category_cycle",
                     "checkout_failed",
                     "cover_price_required",
+                    "credit_applied",
+                    "credit_voided",
                     "csrf_token_mismatch",
                     "duplicate_code",
                     "duplicate_key",
@@ -6062,6 +6368,7 @@
                     "duplicate_relation",
                     "email_taken",
                     "exceeds_balance",
+                    "exceeds_credit",
                     "field_type_locked",
                     "forbidden",
                     "gallery_full",
@@ -7759,9 +8066,29 @@
                         "required": [
                             "stale_pending_hours",
                             "invitation_message",
-                            "invitation_message_default"
+                            "invitation_message_default",
+                            "default_payment_terms_days",
+                            "default_credit_limit"
                         ],
                         "properties": {
+                            "default_payment_terms_days": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "description": "BR-C06 terms a new customer starts with"
+                            },
+                            "default_credit_limit": {
+                                "description": "BR-C05 limit a new customer starts with",
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/Money"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
                             "stale_pending_hours": {
                                 "type": "integer",
                                 "description": "Hours before a pending order is stale (D10)"
@@ -7926,6 +8253,20 @@
                         ],
                         "maxLength": 500,
                         "description": "Only the placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; null or empty = the default"
+                    },
+                    "default_payment_terms_days": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 365
+                    },
+                    "default_credit_limit": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 }
             },
@@ -9136,11 +9477,31 @@
                             "created_by",
                             "approved_by",
                             "blocked_at",
-                            "blocked_reason"
+                            "blocked_reason",
+                            "credit_limit",
+                            "payment_terms_days"
                         ],
                         "properties": {
                             "outstanding_amount": {
                                 "$ref": "#/components/schemas/Money"
+                            },
+                            "credit_limit": {
+                                "description": "BR-C05; null = no limit",
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/Money"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "payment_terms_days": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "description": "BR-C06; null = due on delivery"
                             },
                             "created_by": {
                                 "type": [
@@ -9428,6 +9789,7 @@
                     "number",
                     "total",
                     "refund_amount",
+                    "refund_method",
                     "reason",
                     "returned_at",
                     "recorded_by",
@@ -9488,6 +9850,18 @@
                     },
                     "refund_amount": {
                         "$ref": "#/components/schemas/Money"
+                    },
+                    "refund_method": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "cash",
+                            "credit",
+                            null
+                        ],
+                        "description": "How refund_amount went back (BR-C07)"
                     },
                     "reason": {
                         "type": "string"
@@ -9583,6 +9957,7 @@
                     "number",
                     "total",
                     "refund_amount",
+                    "refund_method",
                     "returned_at",
                     "items"
                 ],
@@ -9595,6 +9970,17 @@
                     },
                     "refund_amount": {
                         "$ref": "#/components/schemas/Money"
+                    },
+                    "refund_method": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "cash",
+                            "credit",
+                            null
+                        ]
                     },
                     "returned_at": {
                         "type": "string",
@@ -9707,6 +10093,7 @@
                     "kind",
                     "kind_label",
                     "order_return_id",
+                    "customer_credit_id",
                     "amount",
                     "method",
                     "method_label",
@@ -9775,13 +10162,21 @@
                         ],
                         "description": "The return a refund belongs to"
                     },
+                    "customer_credit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "BR-C07: the credit a credit collection draws from (payment) or creates (refund)"
+                    },
                     "amount": {
                         "$ref": "#/components/schemas/Money"
                     },
                     "method": {
                         "type": "string",
                         "enum": [
-                            "cash"
+                            "cash",
+                            "credit"
                         ]
                     },
                     "method_label": {
@@ -9831,59 +10226,200 @@
                     }
                 }
             },
-            "StatementOrder": {
+            "LedgerRow": {
                 "type": "object",
+                "description": "One statement row (BR-C08). Positive balance = the customer owes the store.",
                 "required": [
-                    "number",
-                    "status",
-                    "status_label",
-                    "placed_at",
-                    "delivered_at",
-                    "order_total",
-                    "returned_total",
-                    "net_total",
-                    "collected_amount",
-                    "balance",
-                    "collection_status"
+                    "date",
+                    "type",
+                    "type_label",
+                    "order_number",
+                    "return_number",
+                    "debit",
+                    "credit",
+                    "balance"
                 ],
                 "properties": {
-                    "number": {
-                        "type": "integer"
-                    },
-                    "status": {
-                        "$ref": "#/components/schemas/OrderStatus"
-                    },
-                    "status_label": {
-                        "type": "string"
-                    },
-                    "placed_at": {
+                    "date": {
                         "type": "string",
                         "format": "date-time"
                     },
-                    "delivered_at": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "order",
+                            "return",
+                            "payment",
+                            "credit_applied",
+                            "refund",
+                            "refund_to_credit",
+                            "credit_created"
+                        ]
+                    },
+                    "type_label": {
+                        "type": "string"
+                    },
+                    "order_number": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "return_number": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "debit": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "credit": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "balance": {
+                        "$ref": "#/components/schemas/Money"
+                    }
+                }
+            },
+            "LedgerMeta": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/PaginationMeta"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "opening_balance",
+                            "closing_balance"
+                        ],
+                        "properties": {
+                            "opening_balance": {
+                                "$ref": "#/components/schemas/Money",
+                                "description": "Everything before `from`"
+                            },
+                            "closing_balance": {
+                                "$ref": "#/components/schemas/Money",
+                                "description": "Everything up to `to`"
+                            }
+                        }
+                    }
+                ]
+            },
+            "StoreStatementSummary": {
+                "type": "object",
+                "required": [
+                    "outstanding",
+                    "credit_limit",
+                    "available_credit",
+                    "credit_balance",
+                    "overdue"
+                ],
+                "properties": {
+                    "outstanding": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "credit_limit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "available_credit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "credit_balance": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "Unused customer credit (BR-C07)"
+                    },
+                    "overdue": {
+                        "$ref": "#/components/schemas/Money"
+                    }
+                }
+            },
+            "CustomerCredit": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "customer_id",
+                    "source_return_id",
+                    "amount",
+                    "remaining",
+                    "note",
+                    "created_by",
+                    "created_at",
+                    "is_voided",
+                    "voided_at",
+                    "void_reason",
+                    "voided_by"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "customer_id": {
+                        "type": "integer"
+                    },
+                    "source_return_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "remaining": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "is_voided": {
+                        "type": "boolean"
+                    },
+                    "voided_at": {
                         "type": [
                             "string",
                             "null"
                         ],
                         "format": "date-time"
                     },
-                    "order_total": {
-                        "$ref": "#/components/schemas/Money"
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
-                    "returned_total": {
-                        "$ref": "#/components/schemas/Money"
-                    },
-                    "net_total": {
-                        "$ref": "#/components/schemas/Money"
-                    },
-                    "collected_amount": {
-                        "$ref": "#/components/schemas/Money"
-                    },
-                    "balance": {
-                        "$ref": "#/components/schemas/Money"
-                    },
-                    "collection_status": {
-                        "$ref": "#/components/schemas/CollectionStatus"
+                    "voided_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
                     }
                 }
             },
@@ -9893,7 +10429,12 @@
                     "orders_count",
                     "total",
                     "collected",
-                    "outstanding"
+                    "outstanding",
+                    "credit_limit",
+                    "payment_terms_days",
+                    "available_credit",
+                    "credit_balance",
+                    "overdue"
                 ],
                 "properties": {
                     "orders_count": {
@@ -9907,6 +10448,39 @@
                     },
                     "outstanding": {
                         "$ref": "#/components/schemas/Money"
+                    },
+                    "credit_limit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "payment_terms_days": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "available_credit": {
+                        "description": "credit_limit − exposure (D77); null without a limit",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "credit_balance": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "overdue": {
+                        "$ref": "#/components/schemas/Money"
                     }
                 }
             },
@@ -9917,6 +10491,8 @@
                     "today",
                     "stale_pending",
                     "outstanding_total",
+                    "overdue_total",
+                    "overdue_customers",
                     "low_stock_count"
                 ],
                 "properties": {
@@ -9976,6 +10552,13 @@
                     },
                     "outstanding_total": {
                         "$ref": "#/components/schemas/Money"
+                    },
+                    "overdue_total": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "BR-C06"
+                    },
+                    "overdue_customers": {
+                        "type": "integer"
                     },
                     "low_stock_count": {
                         "type": "integer"
@@ -10076,7 +10659,9 @@
                     "orders",
                     "total",
                     "collected",
-                    "outstanding"
+                    "outstanding",
+                    "aging",
+                    "overdue"
                 ],
                 "properties": {
                     "customer": {
@@ -10092,6 +10677,37 @@
                         "$ref": "#/components/schemas/Money"
                     },
                     "outstanding": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "aging": {
+                        "type": "object",
+                        "description": "The outstanding by days past due (BR-C06): not due yet, 1–30, 31–60, 61–90, over 90",
+                        "required": [
+                            "current",
+                            "0_30",
+                            "31_60",
+                            "61_90",
+                            "over_90"
+                        ],
+                        "properties": {
+                            "current": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "0_30": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "31_60": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "61_90": {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            "over_90": {
+                                "$ref": "#/components/schemas/Money"
+                            }
+                        }
+                    },
+                    "overdue": {
                         "$ref": "#/components/schemas/Money"
                     }
                 }

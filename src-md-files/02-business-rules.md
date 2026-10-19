@@ -655,6 +655,22 @@ Collections can be recorded at any order status except `Cancelled`.
 
 The "mark Delivered" action in the dashboard offers a shortcut "and collected full amount" to create both changes in one step.
 
+### BR-C05 — Credit Limit (V2 Task 02)
+
+Each customer may have a credit limit (`customers.credit_limit`; null = no limit; new customers start with the store default `default_credit_limit`). At checkout, the customer's **exposure** (D77: what they owe on delivered orders, net of returns and collections, plus the net totals of their open orders, minus their unused customer credit) plus the new order's total may reach the limit but not pass it; otherwise checkout fails with `422 checkout_failed` and `details.credit { limit, exposure, order_total }` (D78). Two checkouts of one customer queue on the customer row, so they cannot both fit under the limit. Changing the limit is audited (`customer.credit_terms_changed`).
+
+### BR-C06 — Payment Terms, Due Date and Overdue
+
+Each customer may have payment terms in days (`payment_terms_days`, 0–365; null = due on delivery; new customers start with `default_payment_terms_days`). On delivery the order gets `due_at = delivered_at + terms` — a snapshot: changing the terms later does not move existing due dates. An order is **overdue** when it is delivered, past `due_at` (orders delivered before V2 have none and fall due on delivery) and still has a net balance. The statement summary, the outstanding report (aged by days past due: not due yet, 1–30, 31–60, 61–90, over 90) and the overview show what is overdue.
+
+### BR-C07 — Customer Credit
+
+When a return leaves an order collected beyond its net total (BR-R04), the merchant may keep the difference as **customer credit** instead of paying it back: a `refund` collection with method `credit` lowers the order's collected amount as a cash refund would, and a `customer_credits` row of the same amount is created; no cash moves. The merchant applies credit to any later order of the same customer, as a `payment` collection with method `credit` (never more than the credit's remaining nor the order's balance; two uses of one credit queue on its row). Voiding a credit payment gives the amount back to the credit. A credit is voided (together with the refund that created it) only while none of it was applied.
+
+### BR-C08 — Account Statement
+
+The customer statement is a dated ledger of everything that changed what the customer owes: delivered orders (debit), returns (credit), payments (credit; `credit_applied` when drawn from credit), cash refunds (debit), returns kept as credit (`refund_to_credit`, debit) and the credit they create (an info line). Voided rows are left out. Rows are ordered by date with a running balance (positive = the customer owes the store); a date range (Cairo days, D60) starts from the opening balance of everything before it. The merchant sees it on the customer page with print; the customer sees the same rows in `/account/statement`. With no credit left, the closing balance equals what the customer owes (D59).
+
 ---
 
 ## J. Customers
@@ -794,6 +810,7 @@ Tenant settings include, at minimum:
 - `require_customer_approval` (default off).
 - `stale_pending_hours`: when a `Pending` order is highlighted as stale (default 24, BR-INV07, D10).
 - `invitation_message`: the merchant's wording of the customer invitation (null = platform default, BR-CU08, D72).
+- `default_payment_terms_days`, `default_credit_limit`: the credit terms a new customer starts with (null = none; BR-C05, BR-C06).
 - Store WhatsApp number linked by QR (D70; kept in `whatsapp_connections`, not in the settings row).
 
 ---

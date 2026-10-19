@@ -217,7 +217,7 @@ test('BR-L a return is audited as order.returned', function (): void {
         'entity_id' => $return->id,
         'old_values' => null,
         'new_values' => [
-            'order_id' => $this->order->id, 'order_number' => $this->order->number, 'number' => 1, 'total' => '265.00', 'refund_amount' => '0.00',
+            'order_id' => $this->order->id, 'order_number' => $this->order->number, 'number' => 1, 'total' => '265.00', 'refund_amount' => '0.00', 'refund_method' => null,
             'reason' => 'مرتجع نهاية الموسم',
             'items' => [['order_item_id' => $this->lineA->id, 'quantity' => 2], ['order_item_id' => $this->lineB->id, 'quantity' => 1]],
         ],

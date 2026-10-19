@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Reports\Queries;
 
 use App\Modules\Collections\Queries\OutstandingByCustomerQuery;
+use App\Modules\Collections\Queries\OverdueQuery;
 use App\Modules\Inventory\Queries\LowStockQuery;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
@@ -16,18 +17,19 @@ use App\Support\Money;
 /**
  * GET /api/dashboard/reports/overview (D5): orders per status, today's orders (placed today in business time, D60;
  * the total leaves cancelled ones out and takes off today's live returns, BR-R05, which are also given apart), pending orders past the stale threshold (BR-INV07), what customers owe
- * (D59) and how many SKUs are low on stock (D36).
+ * (D59), what is overdue and for how many customers (BR-C06), and how many SKUs are low on stock (D36).
  */
 final readonly class OverviewQuery
 {
     public function __construct(
         private DashboardOrdersQuery $orders,
         private OutstandingByCustomerQuery $outstanding,
+        private OverdueQuery $overdue,
         private LowStockQuery $lowStock,
     ) {}
 
     /**
-     * @return array{orders_by_status: array<string, int>, today: array{orders: int, total: string, returns: string}, stale_pending: int, outstanding_total: string, low_stock_count: int}
+     * @return array{orders_by_status: array<string, int>, today: array{orders: int, total: string, returns: string}, stale_pending: int, outstanding_total: string, overdue_total: string, overdue_customers: int, low_stock_count: int}
      */
     public function get(string $timezone): array
     {
@@ -36,6 +38,8 @@ final readonly class OverviewQuery
             'today' => $this->today($timezone),
             'stale_pending' => Order::query()->where('status', OrderStatus::Pending)->where('placed_at', '<', $this->orders->staleBefore())->count(),
             'outstanding_total' => $this->outstanding->total(),
+            'overdue_total' => $this->overdue->total(),
+            'overdue_customers' => $this->overdue->customersCount(),
             'low_stock_count' => $this->lowStock->builder()->count(),
         ];
     }

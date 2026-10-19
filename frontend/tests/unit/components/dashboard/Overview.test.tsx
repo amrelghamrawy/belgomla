@@ -88,6 +88,7 @@ describe("Overview", () => {
       "/dashboard/inventory?low_stock=1",
     );
     expect(screen.getByTestId("status-delivered")).toHaveTextContent("9");
+    expect(screen.getByRole("link", { name: /متأخر السداد/ })).toHaveTextContent("0 عميل");
     expect(screen.getByTestId("status-pending")).toHaveAttribute("href", "/dashboard/orders?status=pending");
   });
 
@@ -132,6 +133,25 @@ describe("Overview", () => {
     const query = callsTo(fetchMock, "GET /api/dashboard/orders")[0]?.url.searchParams;
     expect(query?.get("stale")).toBe("1");
     expect(query?.get("sort")).toBe("placed_at");
+  });
+
+  it("BR-C06 flags what is overdue and for how many customers", async () => {
+    stubApi({
+      "GET /api/dashboard/reports/overview": json(200, {
+        data: overviewReport({ overdue_total: "750.00", overdue_customers: 2 }),
+      }),
+      "GET /api/dashboard/orders": json(200, page([])),
+      "GET /api/dashboard/reports/low-stock": json(200, page([])),
+      "GET /api/dashboard/reports/sales": json(200, { data: emptySales }),
+      "GET /api/dashboard/reports/outstanding": json(200, page([])),
+    });
+
+    renderWithQuery(<Overview />);
+
+    const tile = await screen.findByRole("link", { name: /متأخر السداد/ });
+    expect(tile).toHaveTextContent("750.00 ج.م");
+    expect(tile).toHaveTextContent("2 عميل");
+    expect(tile).toHaveAttribute("href", "/dashboard/reports?tab=outstanding");
   });
 
   it("shows the error with a retry", async () => {

@@ -13,7 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * A customer. On the storefront (`GET /me`) the customer sees their own profile and status (BR-CU05). The
  * dashboard (08-api-contract.md §8) adds `outstanding_amount` (OutstandingBalances), who created and approved
- * them, the block details, and on the detail page the addresses and `recent_orders` (RecentOrders).
+ * them, the block details, the credit terms (BR-C05/C06), and on the detail page the addresses and `recent_orders` (RecentOrders).
  *
  * @property-read Customer $resource
  */
@@ -71,6 +71,8 @@ final class CustomerResource extends JsonResource
             'approved_by' => $this->when($dashboard, $customer->approved_by),
             'blocked_at' => $this->when($dashboard, $customer->blocked_at?->toIso8601String()),
             'blocked_reason' => $this->when($dashboard, $customer->blocked_reason),
+            'credit_limit' => $this->when($dashboard, $customer->credit_limit),
+            'payment_terms_days' => $this->when($dashboard, $customer->payment_terms_days),
             'addresses' => $this->when($customer->relationLoaded('addresses'), fn (): AnonymousResourceCollection => AddressResource::collection($customer->addresses)),
             'recent_orders' => $this->when($this->recentOrders !== null, $this->recentOrders),
         ];

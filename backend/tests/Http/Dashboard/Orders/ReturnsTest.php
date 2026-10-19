@@ -252,3 +252,19 @@ test('BR-R06 the dashboard order detail carries the returns, the returned total 
 
     expectDocumentedShape($response->json('data'), 'DashboardOrderDetail');
 });
+
+test('BR-C07 an over-collected return can be kept as customer credit instead of cash', function (): void {
+    $this->inTenant(fn (): CashCollection => app(RecordCollection::class)->handle($this->order, new CollectionData('540.00'), $this->owner->id));
+
+    ($this->post)(($this->body)(2, ['refund' => true, 'refund_to' => 'credit']))
+        ->assertCreated()
+        ->assertJsonPath('data.refund_amount', '180.00')
+        ->assertJsonPath('data.refund_method', 'credit');
+
+    $this->assertDatabaseHas('customer_credits', ['customer_id' => $this->customer->id, 'amount' => '180.00', 'remaining' => '180.00']);
+    $this->assertDatabaseHas('collections', ['order_id' => $this->order->id, 'kind' => 'refund', 'method' => 'credit']);
+});
+
+test('the refund destination is validated', function (): void {
+    ($this->post)(($this->body)(1, ['refund_to' => 'bank']))->assertUnprocessable()->assertJsonStructure(['error' => ['details' => ['refund_to']]]);
+});

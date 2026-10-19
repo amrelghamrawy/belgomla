@@ -206,3 +206,37 @@ test('D36 the low-stock report lists low skus of products that are not inactive,
 test('the status values of the overview follow the order statuses', function (): void {
     expect(array_keys(app(OverviewQuery::class)->get('Africa/Cairo')['orders_by_status']))->toBe(array_map(fn (OrderStatus $status): string => $status->value, OrderStatus::cases()));
 });
+
+test('BR-C06 the outstanding report ages each debt by days past its due date, on the boundaries', function (): void {
+    $order = fn (string $total, CarbonImmutable $due): Order => tap(($this->delivered)('2026-06-01 10:00:00', $total), fn (Order $order) => $order->forceFill(['due_at' => $due])->save());
+    $order('1.00', now());
+    $order('2.00', now()->subSecond());
+    $order('4.00', now()->subDays(30));
+    $order('8.00', now()->subDays(30)->subSecond());
+    $order('16.00', now()->subDays(60));
+    $order('32.00', now()->subDays(60)->subSecond());
+    $order('64.00', now()->subDays(90));
+    $order('128.00', now()->subDays(90)->subSecond());
+
+    $row = app(OutstandingReportQuery::class)->paginate(24)->items()[0];
+
+    expect([$row->aging_current, $row->aging_0_30, $row->aging_31_60, $row->aging_61_90, $row->aging_over_90, $row->overdue])
+        ->toBe(['1.00', '6.00', '24.00', '96.00', '128.00', '254.00']);
+});
+
+test('BR-C06 an order without a due date falls due on delivery', function (): void {
+    ($this->delivered)('2026-10-01 10:00:00', '50.00');
+
+    $row = app(OutstandingReportQuery::class)->paginate(24)->items()[0];
+
+    expect([$row->aging_0_30, $row->overdue])->toBe(['50.00', '50.00']);
+});
+
+test('BR-C06 the overview shows what is overdue and for how many customers', function (): void {
+    ($this->delivered)('2026-10-09 10:00:00', '500.00', '200.00');
+    ($this->delivered)('2026-10-09 10:00:00', '100.00')->forceFill(['due_at' => now()->addDays(5)])->save();
+
+    expect(app(OverviewQuery::class)->get('Africa/Cairo'))
+        ->overdue_total->toBe('300.00')
+        ->overdue_customers->toBe(1);
+});

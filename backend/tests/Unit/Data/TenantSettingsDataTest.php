@@ -14,6 +14,13 @@ function settingsRequest(array $payload): UpdateSettingsRequest
     return $request;
 }
 
+test('BR-C05 BR-C06 the default credit terms are an integer and a 2-decimal string, null when cleared', function (): void {
+    expect(TenantSettingsData::fromRequest(settingsRequest(['default_payment_terms_days' => '45', 'default_credit_limit' => '1500.5']))->settingColumns())
+        ->toBe(['default_payment_terms_days' => 45, 'default_credit_limit' => '1500.50'])
+        ->and(TenantSettingsData::fromRequest(settingsRequest(['default_payment_terms_days' => null, 'default_credit_limit' => null]))->settingColumns())
+        ->toBe(['default_payment_terms_days' => null, 'default_credit_limit' => null]);
+});
+
 test('only sent fields are carried, nullable fields can be cleared, money is a 2-decimal string', function (): void {
     $data = TenantSettingsData::fromRequest(settingsRequest([
         'name' => 'x', 'phone' => null, 'mov_enabled' => true, 'mov_amount' => 1000, 'primary_color' => '#aabbcc',

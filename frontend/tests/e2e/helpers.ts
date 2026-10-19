@@ -73,14 +73,16 @@ export async function loginAsOwner(page: Page): Promise<void> {
 
 type StoreProduct = { name: string; sku: { id: number; code: string; base_price: string; moq: number } };
 
+type Checkout = {
+  status: number;
+  body: { data?: { order: { number: number } }; error?: { code: string; details?: Record<string, unknown> } };
+};
+
 /**
- * A shopper in their own browser context registers, verifies the phone and places an order for the first
- * product matching `search`, enough units to pass the minimum order value. Returns the order number and SKU.
+ * A shopper in their own browser context: registered with a fresh phone and verified, with one address. `order()`
+ * fills the cart with enough of the first product matching `search` to pass the minimum order value and checks out.
  */
-export async function placeShopperOrder(
-  browser: Browser,
-  search: string,
-): Promise<{ number: number; sku: StoreProduct["sku"] }> {
+export async function shopperSession(browser: Browser) {
   const context = await browser.newContext({ baseURL: test.info().project.use.baseURL, locale: "ar-EG" });
   const page = await context.newPage();
   const phone = freshPhone();
@@ -96,33 +98,51 @@ export async function placeShopperOrder(
     purpose: "register",
   });
   expect(verified.status).toBeLessThan(300);
-
-  const products = await api<{ data: StoreProduct[] }>(
-    page,
-    "GET",
-    `/api/store/products?q=${encodeURIComponent(search)}`,
-  );
-  const product = products.body.data[0];
-  expect(product).toBeDefined();
-  const sku = product!.sku;
-  const quantity = Math.max(sku.moq, Math.ceil(600 / Number(sku.base_price)));
-
-  expect((await api(page, "POST", "/api/store/cart/items", { sku_id: sku.id, quantity })).status).toBeLessThan(300);
   const address = await api<{ data: { id: number } }>(page, "POST", "/api/store/addresses", {
     label: "المكتبة",
     governorate: "القاهرة",
     city: "مدينة نصر",
     address_line: "12 شارع عباس العقاد",
   });
-  const placed = await api<{ data: { order: { number: number } } }>(
-    page,
-    "POST",
-    "/api/store/checkout",
-    { address_id: address.body.data.id, customer_note: null },
-    { "Idempotency-Key": `e2e-${Date.now()}` },
-  );
-  expect(placed.status).toBe(201);
-  await context.close();
 
-  return { number: placed.body.data.order.number, sku };
+  const order = async (search: string): Promise<{ checkout: Checkout; sku: StoreProduct["sku"] }> => {
+    const products = await api<{ data: StoreProduct[] }>(
+      page,
+      "GET",
+      `/api/store/products?q=${encodeURIComponent(search)}`,
+    );
+    const product = products.body.data[0];
+    expect(product).toBeDefined();
+    const sku = product!.sku;
+    const quantity = Math.max(sku.moq, Math.ceil(600 / Number(sku.base_price)));
+
+    expect((await api(page, "POST", "/api/store/cart/items", { sku_id: sku.id, quantity })).status).toBeLessThan(300);
+    const checkout = (await api(
+      page,
+      "POST",
+      "/api/store/checkout",
+      { address_id: address.body.data.id, customer_note: null },
+      { "Idempotency-Key": `e2e-${Date.now()}` },
+    )) as Checkout;
+
+    return { checkout, sku };
+  };
+
+  return { page, phone, order, close: () => context.close() };
+}
+
+/**
+ * A shopper in their own browser context registers, verifies the phone and places an order for the first
+ * product matching `search`, enough units to pass the minimum order value. Returns the order number and SKU.
+ */
+export async function placeShopperOrder(
+  browser: Browser,
+  search: string,
+): Promise<{ number: number; sku: StoreProduct["sku"] }> {
+  const shopper = await shopperSession(browser);
+  const { checkout, sku } = await shopper.order(search);
+  expect(checkout.status).toBe(201);
+  await shopper.close();
+
+  return { number: checkout.body.data?.order.number ?? 0, sku };
 }

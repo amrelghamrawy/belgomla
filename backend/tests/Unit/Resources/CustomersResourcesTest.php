@@ -42,7 +42,7 @@ test('the dashboard customer resource adds the outstanding amount, creator, appr
 
     expect(array_keys(rendered(CustomerResource::forDashboard($customer, '12.50'), dashboardRequest())))->toBe([
         'id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at',
-        'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason',
+        'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days',
     ])
         ->and(rendered(CustomerResource::forDashboard($customer, '12.50'), dashboardRequest())['outstanding_amount'])->toBe('12.50');
 });

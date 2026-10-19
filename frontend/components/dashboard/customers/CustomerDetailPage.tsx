@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { LedgerTable } from "@/components/shared/LedgerTable";
 import { TextField } from "@/components/shared/TextField";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardCustomer } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
@@ -26,13 +26,17 @@ import {
   useCustomer,
   useCustomerAction,
   useInviteCustomer,
+  STATEMENT_KEYS,
+  useCustomerCredits,
   useStatement,
   useUpdateCustomer,
+  useVoidCredit,
 } from "@/lib/dashboard/customers";
 import { pageOf } from "@/lib/dashboard/list-query";
+import { toPiasters } from "@/lib/dashboard/price-math";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { addressSchema, type AddressFormValues } from "@/lib/forms/address";
-import { formatDate, formatDateTime } from "@/lib/format/date";
+import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 import { useRouteParam } from "@/lib/store/route";
@@ -77,6 +81,14 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
           <span className="flex flex-wrap items-center gap-2">
             <bdi>{formatPhone(customer.phone)}</bdi>
             <CustomerStatusBadge status={customer.status} />
+            {customer.credit_limit !== null && (
+              <Badge variant="outline">
+                {copy.creditLimit}: {formatMoney(customer.credit_limit)}
+              </Badge>
+            )}
+            {customer.payment_terms_days !== null && (
+              <Badge variant="outline">{copy.termsDays(customer.payment_terms_days)}</Badge>
+            )}
             {customer.outstanding_amount !== "0.00" && (
               <Badge variant="outline">
                 {copy.outstanding}: {formatMoney(customer.outstanding_amount)}
@@ -100,7 +112,7 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
         <TabsContent value="profile" className="pt-4">
           {/* Remount with the server's list after a save, so new rows get their ids and are not created twice. */}
           <ProfileForm
-            key={`${customer.id}-${customer.name}-${(customer.addresses ?? []).map((address) => address.id).join(",")}`}
+            key={`${customer.id}-${customer.name}-${customer.credit_limit}-${customer.payment_terms_days}-${(customer.addresses ?? []).map((address) => address.id).join(",")}`}
             customer={customer}
           />
         </TabsContent>
@@ -167,6 +179,28 @@ function CustomerActions({ customer }: { customer: DashboardCustomer }) {
   );
 }
 
+/** BR-C05, BR-C06: the typed limit and terms as the request sends them (blank = none), or null when not valid. */
+export function creditTerms(
+  limit: string,
+  terms: string,
+): { credit_limit: string | null; payment_terms_days: number | null } | null {
+  const cleanLimit = limit.trim();
+  const cleanTerms = terms.trim();
+
+  if (
+    (cleanLimit !== "" && toPiasters(cleanLimit) === null) ||
+    (cleanTerms !== "" && !/^\d{1,3}$/.test(cleanTerms)) ||
+    Number(cleanTerms) > 365
+  ) {
+    return null;
+  }
+
+  return {
+    credit_limit: cleanLimit === "" ? null : cleanLimit,
+    payment_terms_days: cleanTerms === "" ? null : Number(cleanTerms),
+  };
+}
+
 function addressInput(address: NonNullable<DashboardCustomer["addresses"]>[number]): CustomerAddressInput {
   return {
     id: address.id,
@@ -185,6 +219,8 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
   const update = useUpdateCustomer(customer.id);
   const [name, setName] = useState(customer.name);
   const [addresses, setAddresses] = useState<CustomerAddressInput[]>((customer.addresses ?? []).map(addressInput));
+  const [creditLimit, setCreditLimit] = useState(customer.credit_limit ?? "");
+  const [terms, setTerms] = useState(customer.payment_terms_days === null ? "" : String(customer.payment_terms_days));
   const [editing, setEditing] = useState<number | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,9 +230,16 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
       return;
     }
 
+    const termsBody = creditTerms(creditLimit, terms);
+
+    if (termsBody === null) {
+      setError(ar.dashboard.productForm.invalidMoney);
+      return;
+    }
+
     setError(null);
     update.mutate(
-      { name: name.trim(), addresses },
+      { name: name.trim(), addresses, ...termsBody },
       { onSuccess: () => toast.success(copy.profileSaved), onError: (failure) => setError(messageFor(failure)) },
     );
   };
@@ -212,6 +255,32 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
           <Label htmlFor="profile-phone">{copy.phone}</Label>
           <Input id="profile-phone" dir="ltr" className="text-start" value={formatPhone(customer.phone)} disabled />
           <p className="text-muted-foreground text-xs">{copy.phoneFixed}</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="profile-credit-limit">{copy.creditLimit}</Label>
+          <Input
+            id="profile-credit-limit"
+            dir="ltr"
+            inputMode="decimal"
+            className="text-start"
+            value={creditLimit}
+            onChange={(event) => setCreditLimit(event.target.value)}
+          />
+          <p className="text-muted-foreground text-xs">{copy.creditLimitHint}</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="profile-terms">{copy.paymentTerms}</Label>
+          <Input
+            id="profile-terms"
+            dir="ltr"
+            inputMode="numeric"
+            className="text-start"
+            value={terms}
+            onChange={(event) => setTerms(event.target.value)}
+          />
+          <p className="text-muted-foreground text-xs">{copy.paymentTermsHint}</p>
         </div>
       </div>
       <div className="flex items-center justify-between">
@@ -419,10 +488,13 @@ function RecentOrders({ customer }: { customer: DashboardCustomer }) {
   );
 }
 
-/** The statement (08 §10): summary cards and the orders with what is left to collect. */
+/**
+ * The account statement (BR-C08): the credit picture (limit, what is left under it, unused credit, overdue), a date
+ * range in the URL, the ledger with its opening and closing balance, a print view, and the customer's credits.
+ */
 function Statement({ customerId }: { customerId: number }) {
-  const [query, setQuery] = useListQuery(["tab"]);
-  const statement = useStatement(customerId, pageOf(query));
+  const [query, setQuery] = useListQuery(STATEMENT_KEYS);
+  const statement = useStatement(customerId, { from: query.from, to: query.to, page: pageOf(query) });
   const labels = copy.statement;
 
   if (statement.isError) {
@@ -433,65 +505,121 @@ function Statement({ customerId }: { customerId: number }) {
     return <LoadingBlock rows={4} />;
   }
 
-  const { summary } = statement.data;
+  const { summary, meta } = statement.data;
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="statement-summary">
+      <dl className="grid grid-cols-2 gap-3 md:grid-cols-5" data-testid="statement-summary">
         {(
           [
-            [labels.ordersCount, String(summary.orders_count)],
-            [labels.total, formatMoney(summary.total)],
-            [labels.collected, formatMoney(summary.collected)],
             [labels.outstanding, formatMoney(summary.outstanding)],
+            [labels.creditLimit, summary.credit_limit === null ? copy.noLimit : formatMoney(summary.credit_limit)],
+            [
+              labels.availableCredit,
+              summary.available_credit === null ? copy.noLimit : formatMoney(summary.available_credit),
+            ],
+            [labels.creditBalance, formatMoney(summary.credit_balance)],
+            [labels.overdue, formatMoney(summary.overdue)],
           ] as const
         ).map(([label, value]) => (
           <div key={label} className="rounded-md border p-3">
             <dt className="text-muted-foreground text-xs">{label}</dt>
-            <dd className="text-lg font-bold">{value}</dd>
+            <dd
+              className={
+                label === labels.overdue && summary.overdue !== "0.00"
+                  ? "text-destructive text-lg font-bold"
+                  : "text-lg font-bold"
+              }
+            >
+              {value}
+            </dd>
           </div>
         ))}
       </dl>
-      {statement.data.data.length === 0 ? (
+      <div className="flex flex-wrap items-end gap-2 print:hidden">
+        <label className="flex flex-col gap-1 text-xs">
+          {labels.from}
+          <Input type="date" value={query.from ?? ""} onChange={(event) => setQuery({ from: event.target.value })} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs">
+          {labels.to}
+          <Input type="date" value={query.to ?? ""} onChange={(event) => setQuery({ to: event.target.value })} />
+        </label>
+        <Button variant="outline" onClick={() => window.print()}>
+          {labels.print}
+        </Button>
+      </div>
+      {statement.data.data.length === 0 && meta.opening_balance === "0.00" ? (
         <EmptyBlock>{labels.empty}</EmptyBlock>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{labels.order}</TableHead>
-                <TableHead>{labels.placedAt}</TableHead>
-                <TableHead>{labels.deliveredAt}</TableHead>
-                <TableHead>{labels.orderTotal}</TableHead>
-                <TableHead>{labels.collected}</TableHead>
-                <TableHead>{labels.balance}</TableHead>
-                <TableHead>{labels.collection}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {statement.data.data.map((order) => (
-                <TableRow key={order.number}>
-                  <TableCell>
-                    <Link href={`/dashboard/orders/${order.number}`} className="font-medium hover:underline">
-                      <bdi>#{order.number}</bdi>
-                    </Link>{" "}
-                    <span className="text-muted-foreground text-xs">{order.status_label}</span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{formatDate(order.placed_at)}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {order.delivered_at === null ? ar.dashboard.none : formatDate(order.delivered_at)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{formatMoney(order.order_total)}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatMoney(order.collected_amount)}</TableCell>
-                  <TableCell className="font-medium whitespace-nowrap">{formatMoney(order.balance)}</TableCell>
-                  <TableCell>{ar.dashboard.collectionStatuses[order.collection_status]}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <LedgerTable
+          rows={statement.data.data}
+          opening={meta.opening_balance}
+          closing={meta.closing_balance}
+          orderHref={(number) => `/dashboard/orders/${number}`}
+        />
       )}
-      <Pager meta={statement.data.meta} onPage={(page) => setQuery({ page })} />
+      <div className="print:hidden">
+        <Pager meta={meta} onPage={(page) => setQuery({ page })} />
+      </div>
+      <Credits customerId={customerId} />
     </div>
+  );
+}
+
+/** BR-C07: the customer's credits with what is left, each unused one voidable with a reason. */
+function Credits({ customerId }: { customerId: number }) {
+  const credits = useCustomerCredits(customerId);
+  const voidCredit = useVoidCredit();
+  const labels = copy.credits;
+
+  if (credits.data === undefined || credits.data.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="print:hidden">
+      <CardHeader>
+        <CardTitle>{labels.title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col divide-y" data-testid="customer-credits">
+          {credits.data.map((credit) => (
+            <li key={credit.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+              <span className="flex flex-col">
+                <span className={credit.is_voided ? "text-muted-foreground line-through" : "font-medium"}>
+                  {labels.remaining}: {formatMoney(credit.remaining)} · {labels.amount}: {formatMoney(credit.amount)}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {formatDateTime(credit.created_at)}
+                  {credit.source_return_id !== null && ` · ${labels.fromReturn}`}
+                </span>
+              </span>
+              {credit.is_voided ? (
+                <Badge variant="secondary">{labels.voidedBadge}</Badge>
+              ) : (
+                credit.remaining === credit.amount && (
+                  <ReasonDialog
+                    trigger={(open) => (
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                        {labels.void}
+                      </Button>
+                    )}
+                    title={labels.voidTitle}
+                    description={labels.voidBody}
+                    confirmLabel={labels.void}
+                    destructive
+                    onSubmit={async (reason) => {
+                      await voidCredit.mutateAsync({ id: credit.id, reason });
+                      toast.success(labels.voided);
+                    }}
+                  />
+                )
+              )}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

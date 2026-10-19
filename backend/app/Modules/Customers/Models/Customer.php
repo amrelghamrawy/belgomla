@@ -31,6 +31,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property CarbonImmutable|null $blocked_at
  * @property string|null $blocked_reason
  * @property CustomerStatus|null $status_before_block
+ * @property string|null $credit_limit null = no limit (BR-C05)
+ * @property int|null $payment_terms_days null = due on delivery (BR-C06)
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Collection<int, CustomerAddress> $addresses
@@ -89,6 +91,8 @@ final class Customer extends Authenticatable
             'phone_verified_at' => 'datetime',
             'blocked_at' => 'datetime',
             'status_before_block' => CustomerStatus::class,
+            'credit_limit' => 'decimal:2',
+            'payment_terms_days' => 'integer',
         ];
     }
 }

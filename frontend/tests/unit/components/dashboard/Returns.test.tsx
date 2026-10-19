@@ -42,6 +42,7 @@ function orderReturn(overrides: Partial<OrderReturn> = {}): OrderReturn {
     customer: { id: 7, name: "مكتبة الأمل" },
     total: "180.00",
     refund_amount: "0.00",
+    refund_method: null,
     reason: "مرتجع نهاية الموسم",
     returned_at: "2026-10-04T08:00:00Z",
     recorded_by: 1,
@@ -136,9 +137,9 @@ describe("ReturnDialog", () => {
 
     expect(await screen.findByText(/يجب رد 90.00 ج.م للعميل/)).toBeInTheDocument();
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل مرتجع" }));
-    expect(within(screen.getByRole("dialog")).getByText("أكد رد المبلغ نقدًا للمتابعة")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText("أكد رد المبلغ للمتابعة")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "رد المبلغ نقدًا" }));
+    await user.click(screen.getByRole("checkbox", { name: "تأكيد رد المبلغ" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل مرتجع" }));
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم تسجيل المرتجع"));
@@ -148,8 +149,35 @@ describe("ReturnDialog", () => {
       reason: "نهاية الموسم",
       items: [{ order_item_id: 61, quantity: 1 }],
       refund: true,
+      refund_to: "cash",
     });
     expect(calls[1]?.headers["Idempotency-Key"]).toMatch(/^return-1001-/);
+  });
+
+  it("BR-C07 keeps the refund as customer credit when the merchant picks it", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/orders/1001/returns": returnsOf([line()]),
+      "POST /api/dashboard/orders/1001/returns": [
+        envelopeError(422, "refund_required", "يجب رد 90.00", { refund_amount: "90.00" }),
+        json(201, { data: orderReturn({ refund_amount: "90.00", refund_method: "credit" }) }),
+      ],
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<ReturnDialog orderNumber={1001} />);
+
+    await user.click(screen.getByRole("button", { name: "تسجيل مرتجع" }));
+    await user.click(await screen.findByRole("button", { name: "الكمية المرتجعة + الأضواء علوم" }));
+    await user.type(screen.getByLabelText("سبب المرتجع"), "نهاية الموسم");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل مرتجع" }));
+    await user.click(await screen.findByRole("radio", { name: "رصيد للعميل يُخصم من طلباته القادمة" }));
+    await user.click(screen.getByRole("checkbox", { name: "تأكيد رد المبلغ" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل مرتجع" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم تسجيل المرتجع"));
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/returns")[1]?.body).toMatchObject({
+      refund: true,
+      refund_to: "credit",
+    });
   });
 
   it("shows any other refusal under the form", async () => {

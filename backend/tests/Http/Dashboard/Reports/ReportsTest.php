@@ -31,6 +31,8 @@ test('D5 the overview answers every figure', function (): void {
             'today' => ['orders' => 1, 'total' => '500.00', 'returns' => '0.00'],
             'stale_pending' => 1,
             'outstanding_total' => '300.00',
+            'overdue_total' => '300.00',
+            'overdue_customers' => 1,
             'low_stock_count' => 1,
         ]]);
 });
@@ -81,9 +83,11 @@ test('D5 the outstanding report lists what each customer owes, paginated', funct
         ->assertJsonPath('data.0', [
             'customer' => ['id' => $this->customer->id, 'name' => $this->customer->name, 'phone' => $this->customer->phone],
             'orders' => 1, 'total' => '500.00', 'collected' => '200.00', 'outstanding' => '300.00',
+            'aging' => ['current' => '0.00', '0_30' => '300.00', '31_60' => '0.00', '61_90' => '0.00', 'over_90' => '0.00'],
+            'overdue' => '300.00',
         ])
         ->assertJsonPath('meta.total', 1)
-        ->assertExactJsonStructure(['data' => ['*' => ['customer' => ['id', 'name', 'phone'], 'orders', 'total', 'collected', 'outstanding']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['customer' => ['id', 'name', 'phone'], 'orders', 'total', 'collected', 'outstanding', 'aging' => ['current', '0_30', '31_60', '61_90', 'over_90'], 'overdue']], 'links', 'meta']);
 });
 
 test('D36 the low-stock report lists low skus, paginated', function (): void {

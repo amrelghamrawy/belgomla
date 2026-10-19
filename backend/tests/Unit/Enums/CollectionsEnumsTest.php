@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Collections\Enums\CollectionKind;
 use App\Modules\Collections\Enums\CollectionMethod;
+use App\Modules\Collections\Enums\LedgerEntryType;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Reports\Enums\SalesGrouping;
 
@@ -12,10 +13,14 @@ test('every collections and reports enum exposes labels for all cases', function
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([CollectionMethod::class, CollectionKind::class, SalesGrouping::class]);
+})->with([CollectionMethod::class, CollectionKind::class, LedgerEntryType::class, SalesGrouping::class]);
 
-test('BR-C02 cash is the only collection method in V1', function (): void {
-    expect(CollectionMethod::toArray())->toBe(['cash' => 'نقدي']);
+test('BR-C08 a statement row is an order, a return, a payment, credit applied, a refund, a refund to credit or a credit created', function (): void {
+    expect(array_keys(LedgerEntryType::toArray()))->toBe(['order', 'return', 'payment', 'credit_applied', 'refund', 'refund_to_credit', 'credit_created']);
+});
+
+test('BR-C02 BR-C07 money is cash, or drawn from customer credit', function (): void {
+    expect(CollectionMethod::toArray())->toBe(['cash' => 'نقدي', 'credit' => 'رصيد العميل']);
 });
 
 test('BR-R04 a collection is a payment or a refund', function (): void {

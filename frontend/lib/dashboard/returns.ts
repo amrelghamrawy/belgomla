@@ -19,6 +19,7 @@ export type ReturnInput = {
   reason: string;
   returned_at?: string;
   refund?: boolean;
+  refund_to?: "cash" | "credit";
   items: { order_item_id: number; quantity: number }[];
 };
 

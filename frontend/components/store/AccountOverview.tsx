@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRightIcon, LogOutIcon, MapPinIcon, PackageIcon } from "lucide-react";
+import { ChevronRightIcon, LogOutIcon, MapPinIcon, PackageIcon, ReceiptTextIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -10,7 +10,7 @@ import { ar } from "@/lib/copy/ar";
 import { formatDate } from "@/lib/format/date";
 import { formatPhone } from "@/lib/format/phone";
 
-/** `/account`: who is logged in, links to orders and addresses, logout. The profile is read-only in V1 (D63). */
+/** `/account`: who is logged in, links to orders, the statement and addresses, logout. The profile is read-only in V1 (D63). */
 export function AccountOverview() {
   const { data: customer } = useRequiredCustomer();
   const logout = useLogout("store");
@@ -21,6 +21,7 @@ export function AccountOverview() {
 
   const links = [
     { href: "/account/orders", label: ar.account.orders, icon: PackageIcon },
+    { href: "/account/statement", label: ar.account.statement, icon: ReceiptTextIcon },
     { href: "/account/addresses", label: ar.account.addresses, icon: MapPinIcon },
   ];
 

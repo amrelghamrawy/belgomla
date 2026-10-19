@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $require_customer_approval
  * @property int $stale_pending_hours
  * @property string|null $invitation_message
+ * @property int|null $default_payment_terms_days applied to new customers (BR-C06)
+ * @property string|null $default_credit_limit applied to new customers (BR-C05)
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Tenant $tenant
@@ -67,6 +69,8 @@ final class TenantSetting extends Model
             'require_login_for_prices' => 'boolean',
             'require_customer_approval' => 'boolean',
             'stale_pending_hours' => 'integer',
+            'default_payment_terms_days' => 'integer',
+            'default_credit_limit' => 'decimal:2',
         ];
     }
 }

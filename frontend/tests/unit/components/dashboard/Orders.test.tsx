@@ -27,6 +27,7 @@ function collection(overrides: Partial<Collection> = {}): Collection {
     kind: "payment",
     kind_label: "تحصيل",
     order_return_id: null,
+    customer_credit_id: null,
     amount: "100.00",
     method: "cash",
     method_label: "نقدي",
@@ -48,6 +49,7 @@ function orderReturn(overrides: Partial<OrderReturn> = {}): OrderReturn {
     number: 1,
     total: "180.00",
     refund_amount: "90.00",
+    refund_method: "cash",
     reason: "مرتجع نهاية الموسم",
     returned_at: "2026-10-04T08:00:00Z",
     recorded_by: 1,
@@ -462,6 +464,8 @@ function pickerCustomer(): DashboardCustomer {
     approved_by: null,
     blocked_at: null,
     blocked_reason: null,
+    credit_limit: null,
+    payment_terms_days: null,
   };
 }
 

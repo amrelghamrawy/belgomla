@@ -42,6 +42,7 @@ final class CollectionResource extends JsonResource
             'kind' => $collection->kind->value,
             'kind_label' => $collection->kind->label(),
             'order_return_id' => $collection->order_return_id,
+            'customer_credit_id' => $collection->customer_credit_id,
             'amount' => $collection->amount,
             'method' => $collection->method->value,
             'method_label' => $collection->method->label(),

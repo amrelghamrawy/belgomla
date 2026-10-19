@@ -38,6 +38,18 @@ final readonly class CurrentTenantSettingsQuery
     }
 
     /**
+     * BR-C05, BR-C06: the credit limit and payment terms a new customer starts with (null = none). Used by Customers.
+     *
+     * @return array{credit_limit: string|null, payment_terms_days: int|null}
+     */
+    public function creditDefaults(): array
+    {
+        $settings = $this->get();
+
+        return ['credit_limit' => $settings->default_credit_limit, 'payment_terms_days' => $settings->default_payment_terms_days];
+    }
+
+    /**
      * BR-MOV01: the minimum order value. Enabled without an amount counts as disabled.
      *
      * @return array{enabled: bool, amount: string|null}

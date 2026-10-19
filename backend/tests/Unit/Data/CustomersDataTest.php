@@ -76,3 +76,13 @@ test('BR-U05 a cart line is two integers', function (): void {
 
     expect(CartLineData::fromRequest($request))->toEqual(new CartLineData(12, 5));
 });
+
+test('BR-C05 BR-C06 credit terms come as a 2-decimal limit and integer days, with which ones were sent', function (): void {
+    $sent = CustomerData::fromRequest(validatedCustomersRequest(StoreCustomerRequest::class, ['name' => 'مكتبة', 'phone' => '01012345678', 'credit_limit' => '1500.5', 'payment_terms_days' => '30']));
+    $cleared = CustomerData::fromRequest(validatedCustomersRequest(UpdateCustomerRequest::class, ['name' => 'مكتبة', 'credit_limit' => null]));
+    $missing = CustomerData::fromRequest(validatedCustomersRequest(UpdateCustomerRequest::class, ['name' => 'مكتبة']));
+
+    expect([$sent->creditLimit, $sent->paymentTermsDays, $sent->creditTermsSent])->toBe(['1500.50', 30, ['credit_limit', 'payment_terms_days']])
+        ->and([$cleared->creditLimit, $cleared->creditTermsSent])->toBe([null, ['credit_limit']])
+        ->and($missing->creditTermsSent)->toBe([]);
+});

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { compact } from "@/components/dashboard/reports/SalesChart";
-import { LowStockSection, SalesSection } from "@/components/dashboard/reports/ReportsPage";
+import { LowStockSection, OutstandingSection, SalesSection } from "@/components/dashboard/reports/ReportsPage";
 
 import { page } from "../../fixtures";
 import { callsTo, json, stubApi } from "../../http";
@@ -73,6 +73,34 @@ describe("SalesSection", () => {
 
   it("compacts axis ticks", () => {
     expect([compact(950), compact(1200), compact(3_400_000)]).toEqual(["950", "1.2K", "3.4M"]);
+  });
+});
+
+describe("OutstandingSection", () => {
+  it("BR-C06 shows each customer's debt aged by days past due, with the overdue part", async () => {
+    stubApi({
+      "GET /api/dashboard/reports/outstanding": json(
+        200,
+        page([
+          {
+            customer: { id: 7, name: "مكتبة الأمل", phone: "+201012345678" },
+            orders: 2,
+            total: "900.00",
+            collected: "100.00",
+            outstanding: "800.00",
+            aging: { current: "300.00", "0_30": "0.00", "31_60": "500.00", "61_90": "0.00", over_90: "0.00" },
+            overdue: "500.00",
+          },
+        ]),
+      ),
+    });
+
+    renderWithQuery(<OutstandingSection page={1} onPage={vi.fn()} />);
+
+    const row = (await screen.findByRole("link", { name: "مكتبة الأمل" })).closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("300.00 ج.م");
+    expect(within(row).getByTestId("overdue")).toHaveTextContent("500.00 ج.م");
+    expect(screen.getByRole("columnheader", { name: "31–60" })).toBeInTheDocument();
   });
 });
 

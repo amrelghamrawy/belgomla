@@ -18,6 +18,7 @@ export const queryKeys = {
   ordersLists: ["store", "orders", "list"] as const,
   ordersList: (params: ListParams) => ["store", "orders", "list", params] as const,
   order: (number: number) => ["store", "orders", "detail", number] as const,
+  accountStatement: (params: ListParams) => ["store", "statement", params] as const,
 
   // Dashboard (tasks/10)
   dashboardSettings: ["dashboard", "settings"] as const,
@@ -42,7 +43,8 @@ export const queryKeys = {
   dashboardCustomersLists: ["dashboard", "customers", "list"] as const,
   dashboardCustomersList: (params: ListParams) => ["dashboard", "customers", "list", params] as const,
   dashboardCustomer: (id: number) => ["dashboard", "customers", "detail", id] as const,
-  dashboardStatement: (id: number, page: number) => ["dashboard", "customers", "statement", id, page] as const,
+  dashboardStatement: (id: number, params: ListParams) => ["dashboard", "customers", "statement", id, params] as const,
+  dashboardCustomerCredits: (id: number) => ["dashboard", "customers", "credits", id] as const,
   dashboardOrdersLists: ["dashboard", "orders", "list"] as const,
   dashboardOrdersList: (params: ListParams) => ["dashboard", "orders", "list", params] as const,
   dashboardOrder: (number: number) => ["dashboard", "orders", "detail", number] as const,

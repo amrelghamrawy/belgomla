@@ -405,6 +405,10 @@ arch('collections fill the refunds payments contract of orders')
     ->expect(App\Modules\Collections\Services\ReturnRefunds::class)
     ->toImplement(App\Modules\Orders\Contracts\RefundsPayments::class);
 
+arch('collections fill the customer exposure contract of orders')
+    ->expect(App\Modules\Collections\Queries\CustomerExposureQuery::class)
+    ->toImplement(App\Modules\Orders\Contracts\CustomerExposure::class);
+
 arch('collections fill the outstanding balances contract of customers')
     ->expect(App\Modules\Collections\Queries\OutstandingByCustomerQuery::class)
     ->toImplement(App\Modules\Customers\Contracts\OutstandingBalances::class);

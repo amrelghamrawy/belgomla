@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $confirmed_at
  * @property CarbonImmutable|null $delivered_at
  * @property CarbonImmutable|null $cancelled_at
+ * @property CarbonImmutable|null $due_at delivered_at + the customer's payment terms at delivery (BR-C06)
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Customer $customer
@@ -133,6 +134,7 @@ final class Order extends Model
             'confirmed_at' => 'datetime',
             'delivered_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'due_at' => 'datetime',
         ];
     }
 }

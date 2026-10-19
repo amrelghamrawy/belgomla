@@ -311,6 +311,8 @@ Order detail shape (shared with dashboard, dashboard adds customer + collections
 
 Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `cancelled_by`, and each item `sku_id`, `sku_name`, `conversion_factor`, `cover_price`, `discount_percent`, `tier_min_quantity`. The list leaves out `items` and `history`. `{number}` is the per-tenant order number; another customer's or another tenant's order is `404` (D57). In `checkout_failed`, `requested`/`available` are selling units; an empty cart is `422 cart_empty`; an address that is not the customer's active address is `422 validation_failed` on `address_id`; a customer who is not active gets `403` with the status as code. Cancel needs `reason` (≤ 300); `has_collections` (409) when money was collected. Orders routes need status `active` (like the cart). Audit: `order.created`, `order.cancelled`.
 
+V2 Task 02: `checkout_failed` adds `details.credit { limit, exposure, order_total }` when the order would pass the customer's credit limit (BR-C05, D78). `GET /api/store/account/statement` is described in §10.
+
 V2 Task 01: the order also carries `returned_total` and `net_total` (BR-O08), and the detail `returns[]`, the live returns without the merchant's reason (see §9 Returns).
 
 ---
@@ -498,6 +500,8 @@ Delivered (Task 3):
 | POST   | `/api/dashboard/customers/{id}/block`   | `reason`                                                 |
 | POST   | `/api/dashboard/customers/{id}/unblock` |                                                          |
 
+V2 Task 02: create and update take `credit_limit` (≥ 0, null = no limit) and `payment_terms_days` (0–365, null = due on delivery); not sent on create = the store defaults, not sent on update = unchanged; changes are audited `customer.credit_terms_changed`; the dashboard customer shows both.
+
 Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by Collections since Task 7: delivered orders only, D59), `created_by`, `approved_by`, `blocked_at`, `blocked_reason`; the detail page adds `addresses` (active) and `recent_orders` ([] until Orders, Task 6). `PUT` takes `addresses[]` as the full list (D54). `invite` answers `200 { sent_via, expires_at, sent_count }`; only `invited` customers. `approve` only from `pending_approval`; `block` from any other status (keeps it), `unblock` restores it. Invalid transitions → `409 invalid_transition` with `details.from`. Duplicate phone → `409 phone_taken`. Audit actions: `customer.created`, `customer.updated`, `customer.invited`, `customer.approved`, `customer.blocked`, `customer.unblocked`.
 
 ---
@@ -526,6 +530,7 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 | GET    | `/api/dashboard/returns`                      | `?from=&to=&customer_id=&q=`, paginated, newest `returned_at` first          |
 
 - **Return** shape: `{ id, number, order { id, number, order_total, returned_total, net_total, collected_amount, collection_status }, customer { id, name }, total, refund_amount, reason, returned_at, recorded_by, is_voided, voided_at, void_reason, voided_by, items: [{ id, order_item_id, product_name, sku_code, unit, quantity, quantity_base, unit_price, line_total }], created_at }`. `order` (the balance after the change) is on the list and the writes, not on the order's own returns list or inside the order detail; `customer` is on the list only.
+- **Refund to credit** (V2 Task 02): `refund_to: "credit"` with `refund: true` keeps the over-collection as customer credit (BR-C07); the return's `refund_method` says how it went back (`cash` | `credit` | null).
 - **Record**: answers `201`. Only a delivered order (`409 return_not_allowed`, `details.status`). Each line at most its returnable quantity (`422 return_exceeds_delivered`, `items: [{ order_item_id, requested, returnable }]`). `items` 1..200, each line once, `quantity ≥ 1`; `returned_at` defaults to now and cannot be in the future; `reason` ≤ 300. Priced at the line's snapshot price (D74). When the order was collected beyond its new net total: `422 refund_required` with `details.refund_amount`, unless `refund: true`, which records the cash refund. Honors `Idempotency-Key`. Audit: `order.returned` (+ `collection.refunded`).
 - **Void**: answers the return. `409 already_voided`; `409 return_has_refund` while its refund is live; `422 insufficient_stock` when the goods are gone again (D76). Honors `Idempotency-Key`. Audit: `order.return_voided`.
 - `returnable[]`: `{ order_item_id, product_name, sku_code, unit, unit_price, ordered, returned, returnable }` (`returned` = live returns).
@@ -540,7 +545,10 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 | GET    | `/api/dashboard/collections`                 | `?from=&to=&customer_id=&order=`                                            |
 | POST   | `/api/dashboard/orders/{number}/collections` | `{ amount, collected_at?, note? }`; `422 exceeds_balance` if over remaining |
 | POST   | `/api/dashboard/collections/{id}/void`       | `{ reason }`                                                                |
-| GET    | `/api/dashboard/customers/{id}/statement`    | orders with totals, collected, outstanding (basis for V2 statements)        |
+| GET    | `/api/dashboard/customers/{id}/statement`    | V2: ledger `?from=&to=` (BR-C08)                                            |
+| GET    | `/api/dashboard/customers/{id}/credits`      | V2: customer credits (BR-C07)                                               |
+| POST   | `/api/dashboard/orders/{number}/apply-credit` | V2: `{ credit_id, amount }`                                                |
+| POST   | `/api/dashboard/credits/{id}/void`           | V2: `{ reason }`                                                            |
 
 Delivered in Task 7:
 
@@ -551,10 +559,11 @@ Delivered in Task 7:
 - **Void**: `reason` is at most 300 characters. Answers the collection; a second void is `409 already_voided`. Voiding everything makes the order cancellable again (BR-O03). Honors `Idempotency-Key`.
 - `orders.collected_amount` / `collection_status` are recomputed after every record or void (BR-C03).
 - **Shortcut**: `transition` to `delivered` with `collect_full_amount: true` records one collection for whatever is left, in the same transaction. Nothing is recorded when a deposit already covered the order; if the collection fails, the delivery rolls back.
-- **Statement**: `{ data: [ { number, status, status_label, placed_at, delivered_at, order_total, returned_total, net_total, collected_amount, balance, collection_status } ], links, meta, customer { id, name, phone }, summary { orders_count, total, collected, outstanding } }`.
-  - Lists the customer's non-cancelled orders, newest first.
-  - `balance` = `order_total − returned_total − collected_amount`; the summary's `total` is net of returns too.
-  - `summary.outstanding` counts delivered orders only (D59), the same figure as the customer list's `outstanding_amount`.
+- **Statement** (V2 Task 02, BR-C08): `GET /api/dashboard/customers/{id}/statement?from=&to=&page=&per_page=` answers `{ data: [ { date, type, type_label, order_number, return_number, debit, credit, balance } ], links, meta { …page, opening_balance, closing_balance }, customer { id, name, phone }, summary { orders_count, total, collected, outstanding, credit_limit, payment_terms_days, available_credit, credit_balance, overdue } }`.
+  - `type` is `order`, `return`, `payment`, `credit_applied`, `refund`, `refund_to_credit` or `credit_created` (info, 0/0). Voided rows are left out. Oldest first; `balance` runs across pages and starts from `opening_balance` (everything before `from`). `from`/`to` are Cairo days (D60).
+  - `summary.outstanding` counts delivered orders only (D59); `available_credit` = `credit_limit − exposure` (D77, null without a limit); `credit_balance` = unused customer credit; `overdue` per BR-C06.
+- **Customer credits** (BR-C07): `GET /api/dashboard/customers/{id}/credits` lists `{ id, customer_id, source_return_id, amount, remaining, note, created_by, created_at, is_voided, voided_at, void_reason, voided_by }`, newest first. `POST /api/dashboard/orders/{number}/apply-credit { credit_id, amount }` answers `201` with the `credit` collection (`422 exceeds_credit` with `details.remaining`, `422 exceeds_balance`, `409 credit_voided`, another customer's credit `404`). `POST /api/dashboard/credits/{id}/void { reason }` answers the credit (`409 credit_applied` with `details.applied`, `409 credit_voided`). Both writes honor `Idempotency-Key`. Audit: `customer_credit.created`, `customer_credit.applied`; a voided credit is audited through its refund's `collection.voided`.
+- **Store statement**: `GET /api/store/account/statement?from=&to=` — the signed-in customer's own ledger (the same rows), `meta.opening_balance/closing_balance`, `summary { outstanding, credit_limit, available_credit, credit_balance, overdue }`. Needs a session only (a blocked customer still sees what they owe).
 - Audit actions: `collection.recorded`, `collection.voided`.
 
 ---
@@ -571,7 +580,7 @@ Delivered in Task 7:
 Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 
 - **overview**:
-  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total, returns }, stale_pending, outstanding_total, low_stock_count }`.
+  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total, returns }, stale_pending, outstanding_total, overdue_total, overdue_customers, low_stock_count }` (`overdue_*` per BR-C06).
   - `today` counts orders placed since local midnight; its total leaves cancelled orders out and takes off today's live returns (`returns`, BR-R05).
   - `outstanding_total` follows D59.
 - **sales**:
@@ -580,7 +589,7 @@ Delivered in Task 7. All days are business days in Africa/Cairo (D60).
   - Every bucket of the range is listed, with empty ones as zero. Weeks start on Saturday (D58) and the first bucket starts on the Saturday on or before `from`.
   - Without `from`/`to`, it covers the last 30 days up to today; `group` defaults to `day`.
 - **outstanding**:
-  - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding }` rows, largest debt first.
+  - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding, aging { current, 0_30, 31_60, 61_90, over_90 }, overdue }` rows, largest debt first. `aging` splits the outstanding by days past each order's due date (`current` = not due yet; BR-C06).
   - It covers delivered orders that are not fully collected (D59); `total` and `outstanding` are net of returns.
 - **low-stock**:
   - Paginated `{ sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold }`, ordered by code.
@@ -644,10 +653,10 @@ php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-g
 | -------------- | --------: |
 | Store public   |         6 |
 | Store auth     |        10 |
-| Store customer |        13 |
-| Dashboard      |        75 |
+| Store customer |        14 |
+| Dashboard      |        78 |
 | Webhooks       |         2 |
-| **Total**      |   **106** |
+| **Total**      |   **110** |
 
 ---
 

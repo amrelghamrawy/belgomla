@@ -66,3 +66,11 @@ test('when the code cannot be sent nothing is created', function (): void {
 
     expect(Customer::query()->count())->toBe(0);
 });
+
+test('BR-C05 BR-C06 a self-registered customer starts with the store\'s default credit terms', function (): void {
+    $this->tenant->settings->update(['default_payment_terms_days' => 14, 'default_credit_limit' => '750.00']);
+
+    app(RegisterCustomer::class)->handle(registration());
+
+    expect(Customer::query()->sole()->only(['credit_limit', 'payment_terms_days']))->toBe(['credit_limit' => '750.00', 'payment_terms_days' => 14]);
+});

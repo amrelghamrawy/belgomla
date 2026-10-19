@@ -53,6 +53,8 @@ export function overviewReport(overrides: Partial<OverviewReport> = {}): Overvie
     today: { orders: 4, total: "1250.50", returns: "0.00" },
     stale_pending: 1,
     outstanding_total: "3000.00",
+    overdue_total: "0.00",
+    overdue_customers: 0,
     low_stock_count: 2,
     ...overrides,
   };

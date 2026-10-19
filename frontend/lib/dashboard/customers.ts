@@ -4,19 +4,22 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { apiFetch, apiFetchPage, withQuery } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/keys";
+import { useIdempotencyKey } from "@/lib/api/idempotency";
 import type {
   AddressRequest,
+  Collection,
+  CustomerCredit,
   CustomerRef,
   DashboardCustomer,
   InviteResult,
-  PaginationMeta,
-  StatementOrder,
+  LedgerMeta,
+  LedgerRow,
   StatementSummary,
 } from "@/lib/api/types";
 
 import type { ListQuery } from "./list-query";
 
-// Customers (08 §8) and their statement (08 §10).
+// Customers (08 §8) with their credit terms, their statement and credits (08 §10, BR-C05..C08).
 
 export const CUSTOMER_LIST_KEYS = ["q", "status"] as const;
 
@@ -55,7 +58,7 @@ export function useCreateCustomer() {
   const store = useStoreCustomer();
 
   return useMutation({
-    mutationFn: (body: { name: string; phone: string; addresses?: AddressRequest[] }) =>
+    mutationFn: (body: { name: string; phone: string; addresses?: AddressRequest[] } & CreditTermsInput) =>
       apiFetch<DashboardCustomer>("/api/dashboard/customers", { method: "POST", body }),
     onSuccess: store,
   });
@@ -63,12 +66,15 @@ export function useCreateCustomer() {
 
 export type CustomerAddressInput = AddressRequest & { id?: number };
 
+/** BR-C05, BR-C06: a credit term left out keeps its value (store default on create); null clears it. */
+export type CreditTermsInput = { credit_limit?: string | null; payment_terms_days?: number | null };
+
 /** Name and the full address list: rows with an id are edited, new rows added, missing rows archived (D54). */
 export function useUpdateCustomer(id: number) {
   const store = useStoreCustomer();
 
   return useMutation({
-    mutationFn: (body: { name: string; addresses: CustomerAddressInput[] }) =>
+    mutationFn: (body: { name: string; addresses: CustomerAddressInput[] } & CreditTermsInput) =>
       apiFetch<DashboardCustomer>(`/api/dashboard/customers/${id}`, { method: "PUT", body }),
     onSuccess: store,
   });
@@ -101,14 +107,63 @@ export function useCustomerAction(id: number) {
 
 type StatementExtras = { customer: CustomerRef; summary: StatementSummary };
 
-/** The customer's non-cancelled orders with balances, and the summary (D59: outstanding is delivered only). */
-export function useStatement(id: number, page: number) {
+export const STATEMENT_KEYS = ["tab", "from", "to"] as const;
+
+/** BR-C08: one page of the customer's ledger with its opening/closing balance, the customer and the summary. */
+export function useStatement(id: number, query: { from?: string; to?: string; page: number }) {
   return useQuery({
-    queryKey: queryKeys.dashboardStatement(id, page),
+    queryKey: queryKeys.dashboardStatement(id, query),
     queryFn: () =>
-      apiFetchPage<StatementOrder, PaginationMeta, StatementExtras>(
-        withQuery(`/api/dashboard/customers/${id}/statement`, { page }),
+      apiFetchPage<LedgerRow, LedgerMeta, StatementExtras>(
+        withQuery(`/api/dashboard/customers/${id}/statement`, query),
       ),
     placeholderData: keepPreviousData,
+  });
+}
+
+/** BR-C07: every credit of the customer with what is left. */
+export function useCustomerCredits(id: number | undefined) {
+  return useQuery({
+    queryKey: queryKeys.dashboardCustomerCredits(id ?? 0),
+    queryFn: () => apiFetch<CustomerCredit[]>(`/api/dashboard/customers/${id}/credits`),
+    enabled: id !== undefined,
+  });
+}
+
+/** BR-C07: pays part of an order from a credit of the same customer; retry-safe (D55). */
+export function useApplyCredit(orderNumber: number) {
+  const queryClient = useQueryClient();
+  const idempotency = useIdempotencyKey(`credit-${orderNumber}`);
+
+  return useMutation({
+    mutationFn: (body: { credit_id: number; amount: string }) =>
+      apiFetch<Collection>(`/api/dashboard/orders/${orderNumber}/apply-credit`, {
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotency.keyFor(body) },
+      }),
+    onSuccess: () => {
+      idempotency.reset();
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+/** BR-C07: voids an unused credit with the refund that created it; retry-safe (D55). */
+export function useVoidCredit() {
+  const queryClient = useQueryClient();
+  const idempotency = useIdempotencyKey("void-credit");
+
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      apiFetch<CustomerCredit>(`/api/dashboard/credits/${id}/void`, {
+        method: "POST",
+        body: { reason },
+        headers: { "Idempotency-Key": idempotency.keyFor({ id, reason }) },
+      }),
+    onSuccess: () => {
+      idempotency.reset();
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 }

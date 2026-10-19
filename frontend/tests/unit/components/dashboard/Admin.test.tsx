@@ -23,6 +23,8 @@ function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings
     stale_pending_hours: 24,
     invitation_message: null,
     invitation_message_default: DEFAULT_INVITATION,
+    default_payment_terms_days: null,
+    default_credit_limit: null,
     ...overrides,
   };
 }
@@ -102,6 +104,34 @@ describe("SettingsForm", () => {
       invitation_message: null,
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["store", "tenant"] });
+  });
+
+  it("BR-C05 BR-C06 saves the credit terms new customers start with, blank as none", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings({ default_credit_limit: "1000.00" })} />);
+
+    await user.type(screen.getByLabelText("مهلة السداد الافتراضية (يوم)"), "30");
+    await user.clear(screen.getByLabelText("حد الائتمان الافتراضي"));
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+      default_payment_terms_days: 30,
+      default_credit_limit: null,
+    });
+  });
+
+  it("BR-C06 refuses payment terms over a year", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    await user.type(screen.getByLabelText("مهلة السداد الافتراضية (يوم)"), "400");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("رقم صحيح أكبر من صفر")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
   });
 
   it("requires an amount when the minimum order value is on", async () => {

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Requests;
 
 use App\Modules\Tenancy\Rules\InvitationTemplate;
 use App\Support\InvitationMessage;
+use App\Support\Money;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -15,7 +16,7 @@ final class UpdateSettingsRequest extends FormRequest
     private const array FIELDS = [
         'name', 'primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description',
         'working_hours', 'mov_enabled', 'mov_amount', 'require_login_for_prices', 'require_customer_approval',
-        'stale_pending_hours', 'invitation_message',
+        'stale_pending_hours', 'invitation_message', 'default_payment_terms_days', 'default_credit_limit',
     ];
 
     /**
@@ -41,6 +42,8 @@ final class UpdateSettingsRequest extends FormRequest
             'require_customer_approval' => ['sometimes', 'boolean'],
             'stale_pending_hours' => ['sometimes', 'integer', 'between:1,720'],
             'invitation_message' => ['sometimes', 'nullable', 'string', 'max:'.InvitationMessage::MAX_LENGTH, new InvitationTemplate],
+            'default_payment_terms_days' => ['sometimes', 'nullable', 'integer', 'between:0,365'],
+            'default_credit_limit' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
         ];
     }
 
@@ -98,6 +101,17 @@ final class UpdateSettingsRequest extends FormRequest
         }
 
         return number_format($this->float('mov_amount'), 2, '.', '');
+    }
+
+    public function nullableInteger(string $field): ?int
+    {
+        return $this->filled($field) ? $this->integer($field) : null;
+    }
+
+    /** A nullable money field as "150.00" (bcmath, never a float). */
+    public function nullableMoney(string $field): ?string
+    {
+        return $this->filled($field) ? Money::normalize($this->string($field)->value()) : null;
     }
 
     public function stalePendingHours(): ?int

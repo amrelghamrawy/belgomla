@@ -59,7 +59,7 @@ final readonly class Checkout
             $lines = $this->lines($customer);
 
             $stock = $this->ledger->lock(array_values($lines->map(fn (CartItem $line): int => $line->sku_id)->all()));
-            $checked = $this->validator->validate($lines, $stock);
+            $checked = $this->validator->validate($lines, $stock, $customer);
 
             $order = $this->createOrder($customer, $address, $data, $checked);
             $this->history->handle($order, null, ActorType::Customer, $customer->id);
@@ -82,7 +82,9 @@ final readonly class Checkout
             throw CheckoutFailed::storeUnavailable();
         }
 
-        $status = $customer->refresh()->status;
+        // Locked so two checkouts of one customer queue up and cannot both fit under the credit limit (BR-C05).
+        $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+        $status = $customer->status;
 
         if ($status !== CustomerStatus::Active) {
             throw CheckoutFailed::customerNotActive($status);

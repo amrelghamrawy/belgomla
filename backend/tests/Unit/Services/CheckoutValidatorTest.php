@@ -23,7 +23,7 @@ beforeEach(function (): void {
         $lines = app(CartQuery::class)->linesOf($this->customer);
         $stock = SkuInventory::query()->whereIn('sku_id', $lines->pluck('sku_id'))->get()->keyBy('sku_id');
 
-        return app(CheckoutValidator::class)->validate($lines, $stock);
+        return app(CheckoutValidator::class)->validate($lines, $stock, $this->customer->refresh());
     };
     $this->failure = function (): CheckoutFailed {
         try {
@@ -145,4 +145,48 @@ test('BR-MOV02 line problems and the minimum order value are reported together',
 
     expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'below_moq', 'moq' => 5]])
         ->and($e->details)->toBe(['mov' => ['required' => '1000.00', 'current' => '360.00']]);
+});
+
+test('BR-C05 an order that brings the exposure exactly to the credit limit passes', function (): void {
+    $this->customer->forceFill(['credit_limit' => '540.00'])->save();
+    $this->fillCart($this->customer, [$this->sku->id => 6]);
+
+    expect(($this->validate)())->toHaveCount(1);
+});
+
+test('BR-C05 D78 an order that passes the credit limit is refused with the limit, the exposure and the order total', function (): void {
+    $this->customer->forceFill(['credit_limit' => '700.00'])->save();
+    App\Modules\Orders\Models\Order::factory()->delivered()->for($this->customer)->create(['items_total' => '160.01', 'order_total' => '160.01']);
+    $this->fillCart($this->customer, [$this->sku->id => 6]);
+
+    $e = ($this->failure)();
+
+    expect($e->items)->toBe([])
+        ->and($e->details)->toBe(['credit' => ['limit' => '700.00', 'exposure' => '160.01', 'order_total' => '540.00']]);
+});
+
+test('BR-C05 a customer without a credit limit is never refused for it', function (): void {
+    App\Modules\Orders\Models\Order::factory()->delivered()->for($this->customer)->create(['items_total' => '99999.00', 'order_total' => '99999.00']);
+    $this->fillCart($this->customer, [$this->sku->id => 6]);
+
+    expect(($this->validate)())->toHaveCount(1);
+});
+
+test('BR-C05 without an exposure figure (no collections module) the limit is not enforced', function (): void {
+    app()->bind(App\Modules\Orders\Contracts\CustomerExposure::class, App\Modules\Orders\Services\NullCustomerExposure::class);
+    $this->customer->forceFill(['credit_limit' => '1.00'])->save();
+    $this->fillCart($this->customer, [$this->sku->id => 6]);
+
+    expect(($this->validate)())->toHaveCount(1);
+});
+
+test('BR-C05 BR-MOV02 the credit limit is reported together with the other problems', function (): void {
+    ($this->mov)('1000.00');
+    $this->customer->forceFill(['credit_limit' => '100.00'])->save();
+    $this->fillCart($this->customer, [$this->sku->id => 4]);
+
+    $e = ($this->failure)();
+
+    expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'below_moq', 'moq' => 5]])
+        ->and($e->details)->toBe(['mov' => ['required' => '1000.00', 'current' => '360.00'], 'credit' => ['limit' => '100.00', 'exposure' => '0.00', 'order_total' => '360.00']]);
 });

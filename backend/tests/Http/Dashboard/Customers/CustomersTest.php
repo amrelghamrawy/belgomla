@@ -31,7 +31,7 @@ test('the customer list shows every customer, newest first, with the outstanding
         ->assertJsonPath('data.0.outstanding_amount', '0.00')
         ->assertJsonPath('data.1.id', $old->id)
         ->assertJsonPath('meta.total', 2)
-        ->assertExactJsonStructure(['data' => ['*' => ['id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days']], 'links', 'meta']);
 });
 
 test('D5 the outstanding amount comes from the OutstandingBalances contract', function (): void {
@@ -102,7 +102,7 @@ test('BR-CU08 the merchant creates an invited customer with addresses, audited',
 
     $audit = $this->inTenant(fn () => AuditLog::query()->sole());
     expect($audit->only(['action', 'entity_type', 'entity_id', 'actor_id', 'old_values']))->toBe(['action' => 'customer.created', 'entity_type' => 'customers', 'entity_id' => $response->json('data.id'), 'actor_id' => $this->me->id, 'old_values' => null])
-        ->and($audit->new_values)->toBe(['name' => 'مكتبة الأمل', 'phone' => '+201012345678', 'status' => 'invited']);
+        ->and($audit->new_values)->toBe(['name' => 'مكتبة الأمل', 'phone' => '+201012345678', 'status' => 'invited', 'credit_limit' => null, 'payment_terms_days' => null]);
 });
 
 test('BR-CU04 a phone already used in the tenant cannot be created again', function (): void {
@@ -129,7 +129,25 @@ test('create validation', function (array $body, string $field): void {
     'too many addresses' => [['name' => 'س', 'phone' => '01012345678', 'addresses' => array_fill(0, 11, dashboardAddress())], 'addresses'],
     'address without a city' => [['name' => 'س', 'phone' => '01012345678', 'addresses' => [dashboardAddress(['city' => null])]], 'addresses.0.city'],
     'address with an invalid phone' => [['name' => 'س', 'phone' => '01012345678', 'addresses' => [dashboardAddress(['phone' => '1'])]], 'addresses.0.phone'],
+    'negative credit limit' => [['name' => 'س', 'phone' => '01012345678', 'credit_limit' => '-1'], 'credit_limit'],
+    'credit limit three decimals' => [['name' => 'س', 'phone' => '01012345678', 'credit_limit' => '1.001'], 'credit_limit'],
+    'terms over a year' => [['name' => 'س', 'phone' => '01012345678', 'payment_terms_days' => 366], 'payment_terms_days'],
+    'terms not an integer' => [['name' => 'س', 'phone' => '01012345678', 'payment_terms_days' => 'x'], 'payment_terms_days'],
 ]);
+
+test('BR-C05 BR-C06 a new customer takes the store\'s default credit terms unless the merchant sends them', function (): void {
+    $this->tenant->settings->update(['default_payment_terms_days' => 30, 'default_credit_limit' => '2000.00']);
+
+    $this->tenantJson('POST', '/api/dashboard/customers', ['name' => 'أ', 'phone' => '01012345678'])
+        ->assertCreated()
+        ->assertJsonPath('data.credit_limit', '2000.00')
+        ->assertJsonPath('data.payment_terms_days', 30);
+
+    $this->tenantJson('POST', '/api/dashboard/customers', ['name' => 'ب', 'phone' => '01012345679', 'credit_limit' => null, 'payment_terms_days' => 7])
+        ->assertCreated()
+        ->assertJsonPath('data.credit_limit', null)
+        ->assertJsonPath('data.payment_terms_days', 7);
+});
 
 test('the customer page shows the profile, active addresses and recent orders', function (): void {
     $customer = $this->makeCustomer();
@@ -206,7 +224,32 @@ test('update validation', function (array $body, string $field): void {
 })->with([
     'missing name' => [[], 'name'],
     'address id not an integer' => [['name' => 'س', 'addresses' => [dashboardAddress(['id' => 'x'])]], 'addresses.0.id'],
+    'negative credit limit' => [['name' => 'س', 'credit_limit' => '-5'], 'credit_limit'],
+    'negative terms' => [['name' => 'س', 'payment_terms_days' => -1], 'payment_terms_days'],
 ]);
+
+test('BR-C05 BR-C06 the merchant changes a customer\'s credit terms, audited apart; terms left out stay', function (): void {
+    $customer = $this->makeCustomer(['credit_limit' => '1000.00', 'payment_terms_days' => 15]);
+
+    $this->tenantJson('PUT', "/api/dashboard/customers/{$customer->id}", ['name' => $customer->name, 'credit_limit' => '3000'])
+        ->assertOk()
+        ->assertJsonPath('data.credit_limit', '3000.00')
+        ->assertJsonPath('data.payment_terms_days', 15);
+
+    $audit = $this->inTenant(fn () => AuditLog::query()->where('action', 'customer.credit_terms_changed')->sole());
+    expect($audit->only(['entity_id', 'actor_id', 'old_values', 'new_values']))->toBe([
+        'entity_id' => $customer->id, 'actor_id' => $this->me->id,
+        'old_values' => ['credit_limit' => '1000.00'], 'new_values' => ['credit_limit' => '3000.00'],
+    ]);
+});
+
+test('BR-C05 sending the same credit terms again writes no credit audit', function (): void {
+    $customer = $this->makeCustomer(['credit_limit' => '1000.00']);
+
+    $this->tenantJson('PUT', "/api/dashboard/customers/{$customer->id}", ['name' => $customer->name, 'credit_limit' => '1000.00', 'payment_terms_days' => null])->assertOk();
+
+    expect($this->inTenant(fn () => AuditLog::query()->where('action', 'customer.credit_terms_changed')->count()))->toBe(0);
+});
 
 test('BR-T04 BR-CU02 a customer of another tenant is 404 on every customer endpoint and unchanged', function (string $method, string $suffix, array $body): void {
     $foreign = $this->makeCustomer(['name' => 'هناك', 'status' => CustomerStatus::PendingApproval], $this->otherTenant());

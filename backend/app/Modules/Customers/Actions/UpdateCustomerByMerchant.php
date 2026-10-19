@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * The merchant edits a customer's name and, when sent, their address list (08-api-contract.md §8, D54): rows
  * with an id are edited, rows without one are added, active addresses missing from the list are archived.
- * The phone never changes here. An address id of another customer is `404`. Audited as `customer.updated`.
+ * The phone never changes here. An address id of another customer is `404`. Audited as `customer.updated`; changed
+ * credit terms (BR-C05, BR-C06) are audited apart as `customer.credit_terms_changed`.
  * Owns its transaction.
  */
 final readonly class UpdateCustomerByMerchant
@@ -44,8 +45,26 @@ final readonly class UpdateCustomerByMerchant
                 $this->audit->log('customer.updated', $customer, $old, $new);
             }
 
+            $this->updateCreditTerms($customer, $data);
+
             return $customer;
         });
+    }
+
+    private function updateCreditTerms(Customer $customer, CustomerData $data): void
+    {
+        $old = ['credit_limit' => $customer->credit_limit, 'payment_terms_days' => $customer->payment_terms_days];
+        $new = [
+            'credit_limit' => in_array('credit_limit', $data->creditTermsSent, true) ? $data->creditLimit : $old['credit_limit'],
+            'payment_terms_days' => in_array('payment_terms_days', $data->creditTermsSent, true) ? $data->paymentTermsDays : $old['payment_terms_days'],
+        ];
+
+        if ($new === $old) {
+            return;
+        }
+
+        $customer->forceFill($new)->save();
+        $this->audit->log('customer.credit_terms_changed', $customer, $old, ['credit_limit' => $customer->credit_limit, 'payment_terms_days' => $customer->payment_terms_days]);
     }
 
     /**

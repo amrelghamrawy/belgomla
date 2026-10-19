@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $order_id
  * @property CollectionKind $kind
  * @property int|null $order_return_id
+ * @property int|null $customer_credit_id the credit a `credit` collection draws from or creates (BR-C07)
  * @property string $amount
  * @property CollectionMethod $method
  * @property CarbonImmutable $collected_at
@@ -36,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Order $order
+ * @property-read CustomerCredit|null $customerCredit
  */
 final class CashCollection extends Model
 {
@@ -63,6 +65,14 @@ final class CashCollection extends Model
     }
 
     /**
+     * @return BelongsTo<CustomerCredit, $this>
+     */
+    public function customerCredit(): BelongsTo
+    {
+        return $this->belongsTo(CustomerCredit::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -70,6 +80,7 @@ final class CashCollection extends Model
         return [
             'kind' => CollectionKind::class,
             'order_return_id' => 'integer',
+            'customer_credit_id' => 'integer',
             'amount' => 'decimal:2',
             'method' => CollectionMethod::class,
             'collected_at' => 'datetime',

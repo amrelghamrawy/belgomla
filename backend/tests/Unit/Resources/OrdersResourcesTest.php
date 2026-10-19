@@ -131,6 +131,7 @@ test('BR-R05 the store order detail shows live returns without the merchant\'s r
         'number' => 1,
         'total' => '85.00',
         'refund_amount' => '0.00',
+        'refund_method' => null,
         'returned_at' => now()->toIso8601String(),
         'items' => [['product_name' => $item->orderItem->product_name, 'sku_code' => $item->orderItem->sku_code, 'unit' => $item->orderItem->unit_name, 'quantity' => 1, 'unit_price' => '85.00', 'line_total' => '85.00']],
     ]]);
@@ -139,7 +140,7 @@ test('BR-R05 the store order detail shows live returns without the merchant\'s r
 test('BR-R06 a return renders its order balance, customer, lines and void details', function (): void {
     $order = Order::query()->with('customer')->findOrFail($this->order->id);
     $owner = $this->makeOwner();
-    $return = OrderReturn::factory()->for($order)->voided('مكرر')->create(['total' => '85.00', 'refund_amount' => '5.00', 'recorded_by' => $owner->id, 'voided_by' => $owner->id, 'returned_at' => now()]);
+    $return = OrderReturn::factory()->for($order)->voided('مكرر')->create(['total' => '85.00', 'refund_amount' => '5.00', 'refund_method' => 'cash', 'recorded_by' => $owner->id, 'voided_by' => $owner->id, 'returned_at' => now()]);
     $item = OrderReturnItem::factory()->for($return)->create(['order_item_id' => $order->items()->sole()->id, 'quantity' => 1]);
     $return = OrderReturn::query()->with('items.orderItem')->findOrFail($return->id)->setRelation('order', $order);
 
@@ -150,6 +151,7 @@ test('BR-R06 a return renders its order balance, customer, lines and void detail
         'customer' => ['id' => $this->customer->id, 'name' => 'مكتبة الأمل'],
         'total' => '85.00',
         'refund_amount' => '5.00',
+        'refund_method' => 'cash',
         'reason' => 'مرتجع نهاية الموسم',
         'returned_at' => now()->toIso8601String(),
         'recorded_by' => $owner->id,

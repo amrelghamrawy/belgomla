@@ -12,6 +12,8 @@ final readonly class NullRefundsPayments implements RefundsPayments
 {
     public function refund(Order $order, int $orderReturnId, string $amount, ?int $actorId): void {}
 
+    public function keepAsCredit(Order $order, int $orderReturnId, string $amount, ?int $actorId): void {}
+
     public function hasLiveRefund(int $orderReturnId): bool
     {
         return false;

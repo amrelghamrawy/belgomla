@@ -65,6 +65,7 @@ describe("OrderDetailView", () => {
             number: 1,
             total: "180.00",
             refund_amount: "50.00",
+            refund_method: "cash",
             returned_at: "2026-10-12T08:00:00Z",
             items: [
               {

@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Modules\Customers\Contracts\RecentOrders;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Orders\Contracts\CollectsPayments;
+use App\Modules\Orders\Contracts\CustomerExposure;
 use App\Modules\Orders\Contracts\OrderCollections;
 use App\Modules\Orders\Contracts\RefundsPayments;
 use App\Modules\Orders\Models\Order;
@@ -15,6 +16,7 @@ use App\Modules\Orders\Policies\OrderPolicy;
 use App\Modules\Orders\Policies\OrderReturnPolicy;
 use App\Modules\Orders\Services\CustomerRecentOrders;
 use App\Modules\Orders\Services\NullCollectsPayments;
+use App\Modules\Orders\Services\NullCustomerExposure;
 use App\Modules\Orders\Services\NullOrderCollections;
 use App\Modules\Orders\Services\NullRefundsPayments;
 use App\Modules\Orders\Services\OrdersHoldingSku;
@@ -36,6 +38,7 @@ final class OrdersServiceProvider extends ServiceProvider
         CollectsPayments::class => NullCollectsPayments::class,
         OrderCollections::class => NullOrderCollections::class,
         RefundsPayments::class => NullRefundsPayments::class,
+        CustomerExposure::class => NullCustomerExposure::class,
     ];
 
     public function boot(): void

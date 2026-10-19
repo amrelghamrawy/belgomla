@@ -7,13 +7,18 @@ use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\NotificationType;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Enums\RefundMethod;
 
 test('every orders enum exposes labels for all cases', function (string $enum): void {
     $labels = $enum::toArray();
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class]);
+})->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class, RefundMethod::class]);
+
+test('BR-C07 a refund goes back in cash or as customer credit', function (): void {
+    expect(RefundMethod::toArray())->toBe(['cash' => 'رد نقدي', 'credit' => 'رصيد للعميل']);
+});
 
 test('BR-O01 the order statuses match the domain model', function (): void {
     expect(array_map(fn (OrderStatus $status): string => $status->value, OrderStatus::cases()))

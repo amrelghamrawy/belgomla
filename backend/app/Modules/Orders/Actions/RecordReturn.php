@@ -11,6 +11,7 @@ use App\Modules\Orders\Contracts\RefundsPayments;
 use App\Modules\Orders\Data\ReturnData;
 use App\Modules\Orders\Data\ReturnLineData;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Enums\RefundMethod;
 use App\Modules\Orders\Exceptions\RefundRequired;
 use App\Modules\Orders\Exceptions\ReturnExceedsDelivered;
 use App\Modules\Orders\Exceptions\ReturnNotAllowed;
@@ -56,7 +57,7 @@ final readonly class RecordReturn
             $return = $this->createReturn($order, $data, $items, $actorId);
 
             $order->forceFill(['returned_total' => Money::add($order->returned_total, $return->total)])->save();
-            $this->settle($order, $return, $data->refund, $actorId);
+            $this->settle($order, $return, $data->refund, $data->refundTo, $actorId);
 
             $this->history->handle($order, $order->status, $actorId === null ? ActorType::System : ActorType::TenantUser, $actorId, "مرتجع #{$return->number}");
             $this->audit->log('order.returned', $return, null, [
@@ -65,6 +66,7 @@ final readonly class RecordReturn
                 'number' => $return->number,
                 'total' => $return->total,
                 'refund_amount' => $return->refund_amount,
+                'refund_method' => $return->refund_method?->value,
                 'reason' => $return->reason,
                 'items' => $return->items->map(fn (OrderReturnItem $item): array => ['order_item_id' => $item->order_item_id, 'quantity' => $item->quantity])->values()->all(),
             ]);
@@ -143,8 +145,11 @@ final readonly class RecordReturn
         return $return->load('items.orderItem');
     }
 
-    /** BR-R04: pay back what was collected beyond the new net total (confirmed by the merchant), then re-derive the status. */
-    private function settle(Order $order, OrderReturn $return, bool $refund, ?int $actorId): void
+    /**
+     * BR-R04: pay back what was collected beyond the new net total (confirmed by the merchant), in cash or kept as
+     * customer credit (BR-C07), then re-derive the status.
+     */
+    private function settle(Order $order, OrderReturn $return, bool $refund, RefundMethod $refundTo, ?int $actorId): void
     {
         $excess = Money::subtract($order->collected_amount, $order->netTotal());
 
@@ -153,8 +158,14 @@ final readonly class RecordReturn
                 throw RefundRequired::amount($excess);
             }
 
-            $return->forceFill(['refund_amount' => $excess])->save();
-            $this->refunds->refund($order, $return->id, $excess, $actorId);
+            $return->forceFill(['refund_amount' => $excess, 'refund_method' => $refundTo])->save();
+
+            if ($refundTo === RefundMethod::Credit) {
+                $this->refunds->keepAsCredit($order, $return->id, $excess, $actorId);
+            } else {
+                $this->refunds->refund($order, $return->id, $excess, $actorId);
+            }
+
             $order->refresh();
         }
 

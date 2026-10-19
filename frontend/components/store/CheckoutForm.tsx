@@ -15,7 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api/errors";
 import { useRequiredCustomer } from "@/lib/auth/session";
 import { ar, messageFor } from "@/lib/copy/ar";
+import { useTenant } from "@/lib/auth/tenant";
 import { formatMoney } from "@/lib/format/money";
+import { formatPhone } from "@/lib/format/phone";
 import { useAddresses } from "@/lib/store/addresses";
 import { useCart } from "@/lib/store/cart";
 import { useCheckout } from "@/lib/store/checkout";
@@ -38,6 +40,7 @@ export function CheckoutForm() {
   const cart = useCart(active);
   const addresses = useAddresses(active);
   const checkout = useCheckout();
+  const tenant = useTenant();
   const [chosen, setChosen] = useState<number | null>(null);
   const [note, setNote] = useState("");
   const [adding, setAdding] = useState(false);
@@ -117,6 +120,17 @@ export function CheckoutForm() {
                 </li>
               ))}
               {failure.mov !== null && <li>{failure.mov}</li>}
+              {failure.credit !== null && (
+                <li data-testid="credit-limit-failure">
+                  {failure.credit}
+                  {(tenant.data?.whatsapp ?? tenant.data?.phone) && (
+                    <span className="block">
+                      {ar.checkout.creditContact}{" "}
+                      <bdi>{formatPhone(tenant.data?.whatsapp ?? tenant.data?.phone ?? "")}</bdi>
+                    </span>
+                  )}
+                </li>
+              )}
             </ul>
           </AlertDescription>
         </Alert>

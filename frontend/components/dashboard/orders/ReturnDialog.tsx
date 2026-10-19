@@ -18,6 +18,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api/errors";
 import type { ReturnableLine } from "@/lib/api/types";
@@ -68,6 +69,7 @@ function ReturnForm({ orderNumber, onDone }: { orderNumber: number; onDone: () =
   const [date, setDate] = useState(today);
   const [refundAmount, setRefundAmount] = useState<string | null>(null);
   const [refundConfirmed, setRefundConfirmed] = useState(false);
+  const [refundTo, setRefundTo] = useState<"cash" | "credit">("cash");
   const [error, setError] = useState<string | null>(null);
 
   if (returns.isError) {
@@ -115,7 +117,7 @@ function ReturnForm({ orderNumber, onDone }: { orderNumber: number; onDone: () =
         reason: reason.trim(),
         items,
         ...(date !== today() && date !== "" ? { returned_at: `${date}T12:00:00` } : {}),
-        ...(refundAmount !== null ? { refund: true } : {}),
+        ...(refundAmount !== null ? { refund: true, refund_to: refundTo } : {}),
       },
       {
         onSuccess: () => {
@@ -212,6 +214,22 @@ function ReturnForm({ orderNumber, onDone }: { orderNumber: number; onDone: () =
         <Alert>
           <AlertDescription className="flex flex-col gap-2">
             <span>{copy.refundNeeded(formatMoney(refundAmount))}</span>
+            <span className="text-xs font-medium">{copy.refundHow}</span>
+            <RadioGroup
+              dir="rtl"
+              value={refundTo}
+              onValueChange={(value) => setRefundTo(value === "credit" ? "credit" : "cash")}
+              className="gap-2"
+            >
+              <span className="flex items-center gap-2">
+                <RadioGroupItem id="return-refund-cash" value="cash" />
+                <Label htmlFor="return-refund-cash">{copy.refundCash}</Label>
+              </span>
+              <span className="flex items-center gap-2">
+                <RadioGroupItem id="return-refund-credit" value="credit" />
+                <Label htmlFor="return-refund-credit">{copy.refundCredit}</Label>
+              </span>
+            </RadioGroup>
             <span className="flex items-center gap-2">
               <Checkbox
                 id="return-refund"
