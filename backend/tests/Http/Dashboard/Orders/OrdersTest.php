@@ -109,6 +109,7 @@ test('BR-T04 the list never shows another tenant\'s orders', function (): void {
 });
 
 test('the merchant opens an order with lines, history, customer and collections', function (): void {
+    $this->freezeSecond();
     $order = $this->placeOrder($this->customer, [$this->sku->id => 12], 'صباحًا');
 
     $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
@@ -147,4 +148,20 @@ test('BR-T04 an order number of another tenant is 404 here', function (): void {
 
 test('Tech §6 a dashboard session of this store is refused on another store\'s host', function (): void {
     $this->tenantJson('GET', '/api/dashboard/orders', tenant: $this->otherTenant())->assertUnauthorized();
+});
+
+test('BR-N03 the order page lists the messages sent about the order', function (): void {
+    Illuminate\Support\Facades\Queue::fake();
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+
+    $this->tenantJson('POST', "/api/dashboard/orders/{$order->number}/transition", ['to' => 'confirmed'])->assertOk();
+
+    $response = $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
+        ->assertOk()
+        ->assertJsonCount(1, 'data.messages')
+        ->assertJsonPath('data.messages.0.purpose', 'order_status')
+        ->assertJsonPath('data.messages.0.channel', 'whatsapp')
+        ->assertJsonPath('data.messages.0.status', 'queued');
+
+    expectDocumentedShape($response->json('data.messages.0'), 'OrderMessage');
 });

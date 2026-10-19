@@ -87,6 +87,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/account/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Turns WhatsApp messages about the customer's orders on or off (BR-N03) */
+        patch: operations["storeUpdatePreferences"];
+        trace?: never;
+    };
     "/api/store/categories": {
         parameters: {
             query?: never;
@@ -1799,6 +1816,8 @@ export interface components {
              * @example +201012345678
              */
             phone: string;
+            /** @description BR-N03: false when the customer turned order messages off */
+            order_notifications: boolean;
             /** @enum {string} */
             status: "pending_verification" | "invited" | "pending_approval" | "active" | "blocked";
             status_label: string;
@@ -2123,6 +2142,15 @@ export interface components {
             tenant: components["schemas"]["Tenant"];
         };
         DashboardSettings: components["schemas"]["TenantSettings"] & {
+            /** @description BR-N03 the statuses customers are told about */
+            order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
+            /** @description BR-N03 status => the store wording; a missing status uses order_status_message_defaults */
+            order_status_messages: {
+                [key: string]: string;
+            };
+            order_status_message_defaults: {
+                [key: string]: string;
+            };
             /** @description BR-C06 terms a new customer starts with */
             default_payment_terms_days: number | null;
             /** @description BR-C05 limit a new customer starts with */
@@ -2170,6 +2198,11 @@ export interface components {
             invitation_message?: string | null;
             default_payment_terms_days?: number | null;
             default_credit_limit?: string | null;
+            order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
+            /** @description status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); null or the default text = the default */
+            order_status_messages?: {
+                [key: string]: string | null;
+            };
         };
         IdName: {
             id: number;
@@ -2505,6 +2538,7 @@ export interface components {
             collections: components["schemas"]["Collection"][];
             /** @description Every return, voided included, without `order` (BR-R06) */
             returns: components["schemas"]["OrderReturn"][];
+            messages: components["schemas"]["OrderMessage"][];
         };
         OrderReturnLine: {
             id: number;
@@ -2580,17 +2614,32 @@ export interface components {
                 line_total: components["schemas"]["Money"];
             }[];
         };
+        /** @description A WhatsApp/SMS message sent about the order (BR-N03), fallbacks included, oldest first */
+        OrderMessage: {
+            /** @enum {string} */
+            purpose: "otp" | "invitation" | "system_alert" | "order_status";
+            purpose_label: string;
+            /** @enum {string} */
+            channel: "whatsapp" | "sms";
+            /** @enum {string} */
+            status: "queued" | "sent" | "delivered" | "failed" | "fell_back";
+            /** Format: date-time */
+            sent_at: string;
+        };
         MerchantNotification: {
             id: number;
             /** @enum {string} */
-            type: "new_order" | "customer_cancelled";
+            type: "new_order" | "customer_cancelled" | "whatsapp_dropped";
             type_label: string;
+            /** @description Orders: order_number, customer_name, order_total (+ reason when customer_cancelled); whatsapp_dropped: phone, reason */
             details: {
-                order_number: number;
-                customer_name: string;
-                order_total: components["schemas"]["Money"];
-                /** @description customer_cancelled only */
+                order_number?: number;
+                customer_name?: string;
+                order_total?: components["schemas"]["Money"];
+                /** @description customer_cancelled and whatsapp_dropped */
                 reason?: string | null;
+                /** @description whatsapp_dropped only */
+                phone?: string | null;
             };
             /** Format: date-time */
             read_at: string | null;
@@ -3163,6 +3212,36 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+        };
+    };
+    storeUpdatePreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    order_notifications: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The customer, as GET /me answers it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Customer"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
         };
     };
     storeCategories: {

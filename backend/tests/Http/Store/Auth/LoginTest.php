@@ -19,7 +19,7 @@ function customerLogin(string $phone = '01012345678', string $password = 'secret
 test('BR-CU04 an active customer logs in with phone and password and reads their profile', function (): void {
     customerLogin()
         ->assertOk()
-        ->assertExactJsonStructure(['data' => ['id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at']])
+        ->assertExactJsonStructure(['data' => ['id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'order_notifications']])
         ->assertJsonPath('data.phone', '+201012345678')
         ->assertJsonPath('data.status', 'active');
 

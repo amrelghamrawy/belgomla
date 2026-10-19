@@ -370,6 +370,10 @@ export const ar = {
     addresses: "عناويني",
     statement: "كشف حسابي",
     profileReadOnly: "لتعديل الاسم أو رقم الهاتف تواصل مع المتجر.",
+    // BR-N03: the customer's opt-out of order status messages.
+    orderNotifications: "رسائل واتساب عن طلباتي",
+    orderNotificationsHint: "نرسل لك رسالة عند تأكيد طلبك وخروجه للتوصيل وتوصيله أو إلغائه.",
+    preferencesSaved: "تم حفظ اختيارك",
   },
   addresses: {
     title: "عناويني",

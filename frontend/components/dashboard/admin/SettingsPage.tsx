@@ -29,14 +29,23 @@ import {
   renderInvitation,
   unknownPlaceholders,
 } from "@/lib/dashboard/invitation-message";
+import {
+  NOTIFIABLE_STATUSES,
+  type NotifiableStatus,
+  ORDER_MESSAGE_MAX_LENGTH,
+  orderMessagesBody,
+  unknownOrderPlaceholders,
+} from "@/lib/dashboard/order-status-message";
 import { toPiasters } from "@/lib/dashboard/price-math";
 import { applyServerErrors } from "@/lib/forms/server-errors";
 
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { OrderMessagesCard } from "./OrderMessagesCard";
 import { StoreWhatsAppCard } from "./StoreWhatsAppCard";
 
 const copy = ar.dashboard.settings;
 const COLOR = /^#[0-9A-Fa-f]{6}$/;
+const orderMessage = z.string().max(ORDER_MESSAGE_MAX_LENGTH, copy.invitation.tooLong(ORDER_MESSAGE_MAX_LENGTH));
 
 // Mirrors UpdateSettingsRequest.
 const schema = z
@@ -69,6 +78,14 @@ const schema = z
       .string()
       .trim()
       .refine((value) => value === "" || toPiasters(value) !== null, ar.dashboard.productForm.invalidMoney),
+    order_notify_statuses: z.array(z.enum(["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"])),
+    order_status_messages: z.object({
+      confirmed: orderMessage,
+      preparing: orderMessage,
+      out_for_delivery: orderMessage,
+      delivered: orderMessage,
+      cancelled: orderMessage,
+    }),
   })
   .superRefine((values, context) => {
     const unknown = unknownPlaceholders(values.invitation_message);
@@ -79,6 +96,18 @@ const schema = z
         path: ["invitation_message"],
         message: copy.invitation.unknown(unknown.join("، ")),
       });
+    }
+
+    for (const status of NOTIFIABLE_STATUSES) {
+      const unknownTokens = unknownOrderPlaceholders(values.order_status_messages[status], status);
+
+      if (unknownTokens.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["order_status_messages", status],
+          message: copy.orderMessages.unknown(unknownTokens.join("، ")),
+        });
+      }
     }
 
     if (values.mov_enabled && (toPiasters(values.mov_amount) === null || toPiasters(values.mov_amount) === 0n)) {
@@ -101,7 +130,34 @@ const SERVER_FIELDS = [
   "invitation_message",
   "default_payment_terms_days",
   "default_credit_limit",
+  "order_notify_statuses",
+  "order_status_messages.confirmed",
+  "order_status_messages.preparing",
+  "order_status_messages.out_for_delivery",
+  "order_status_messages.delivered",
+  "order_status_messages.cancelled",
 ] as const;
+
+function messageDefaults(settings: DashboardSettings): Record<NotifiableStatus, string> {
+  const texts = {} as Record<NotifiableStatus, string>;
+
+  for (const status of NOTIFIABLE_STATUSES) {
+    texts[status] = settings.order_status_message_defaults[status] ?? "";
+  }
+
+  return texts;
+}
+
+function messageTexts(settings: DashboardSettings): Record<NotifiableStatus, string> {
+  const fallback = messageDefaults(settings);
+  const texts = {} as Record<NotifiableStatus, string>;
+
+  for (const status of NOTIFIABLE_STATUSES) {
+    texts[status] = settings.order_status_messages[status] ?? fallback[status];
+  }
+
+  return texts;
+}
 
 function defaults(settings: DashboardSettings): Values {
   return {
@@ -122,6 +178,8 @@ function defaults(settings: DashboardSettings): Values {
     default_payment_terms_days:
       settings.default_payment_terms_days === null ? "" : String(settings.default_payment_terms_days),
     default_credit_limit: settings.default_credit_limit ?? "",
+    order_notify_statuses: settings.order_notify_statuses,
+    order_status_messages: messageTexts(settings),
   };
 }
 
@@ -151,10 +209,19 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
   const [error, setError] = useState<string | null>(null);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults(settings) });
   const errors = form.formState.errors;
-  const [primary, secondary, movEnabled, hours, invitation] = useWatch({
+  const [primary, secondary, movEnabled, hours, invitation, notifyStatuses, statusMessages] = useWatch({
     control: form.control,
-    name: ["primary_color", "secondary_color", "mov_enabled", "hours", "invitation_message"],
+    name: [
+      "primary_color",
+      "secondary_color",
+      "mov_enabled",
+      "hours",
+      "invitation_message",
+      "order_notify_statuses",
+      "order_status_messages",
+    ],
   });
+  const statusDefaults = messageDefaults(settings);
 
   const submit = form.handleSubmit((values) => {
     setError(null);
@@ -178,6 +245,8 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         default_payment_terms_days:
           values.default_payment_terms_days === "" ? null : Number(values.default_payment_terms_days),
         default_credit_limit: empty(values.default_credit_limit),
+        order_notify_statuses: values.order_notify_statuses,
+        order_status_messages: orderMessagesBody(values.order_status_messages, statusDefaults),
       },
       {
         onSuccess: () => toast.success(copy.saved),
@@ -407,6 +476,23 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         value={invitation}
         error={errors.invitation_message?.message}
         onChange={(text) => form.setValue("invitation_message", text, { shouldDirty: true, shouldValidate: true })}
+      />
+      <OrderMessagesCard
+        storeName={settings.name}
+        statuses={notifyStatuses}
+        texts={statusMessages}
+        defaults={statusDefaults}
+        errors={{
+          confirmed: errors.order_status_messages?.confirmed?.message,
+          preparing: errors.order_status_messages?.preparing?.message,
+          out_for_delivery: errors.order_status_messages?.out_for_delivery?.message,
+          delivered: errors.order_status_messages?.delivered?.message,
+          cancelled: errors.order_status_messages?.cancelled?.message,
+        }}
+        onStatuses={(next) => form.setValue("order_notify_statuses", next, { shouldDirty: true })}
+        onText={(status, text) =>
+          form.setValue(`order_status_messages.${status}`, text, { shouldDirty: true, shouldValidate: true })
+        }
       />
       <div className="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t p-3 backdrop-blur md:hidden">
         <Button type="submit" className="h-11 w-full" disabled={save.isPending}>

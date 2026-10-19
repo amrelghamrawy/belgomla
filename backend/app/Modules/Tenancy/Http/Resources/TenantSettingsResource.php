@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Resources;
 
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Support\InvitationMessage;
+use App\Support\OrderStatusMessage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -44,6 +45,9 @@ final class TenantSettingsResource extends JsonResource
             'invitation_message_default' => $this->when($dashboard, InvitationMessage::DEFAULT),
             'default_payment_terms_days' => $this->when($dashboard, $this->resource->default_payment_terms_days),
             'default_credit_limit' => $this->when($dashboard, $this->resource->default_credit_limit),
+            'order_notify_statuses' => $this->when($dashboard, $this->resource->order_notify_statuses),
+            'order_status_messages' => $this->when($dashboard, (object) ($this->resource->order_status_messages ?? [])),
+            'order_status_message_defaults' => $this->when($dashboard, OrderStatusMessage::DEFAULTS),
         ];
     }
 }

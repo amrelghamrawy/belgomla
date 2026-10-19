@@ -17,6 +17,15 @@ import { renderWithQuery, router, searchParams } from "../../render";
 const DEFAULT_INVITATION =
   "أهلًا {اسم_العميل}، دعاك {اسم_المتجر} للطلب من متجره.\nاضغط الرابط لتحديد كلمة المرور وتفعيل حسابك (صالح {عدد_الأيام} أيام):";
 
+const ORDER_MESSAGE_DEFAULTS = {
+  confirmed:
+    "أهلًا {اسم_العميل}، تم تأكيد طلبك رقم {رقم_الطلب} من {اسم_المتجر} بإجمالي {الإجمالي}. سنبلغك عند خروجه للتوصيل.",
+  preparing: "أهلًا {اسم_العميل}، طلبك رقم {رقم_الطلب} من {اسم_المتجر} قيد التجهيز الآن.",
+  out_for_delivery: "أهلًا {اسم_العميل}، طلبك رقم {رقم_الطلب} من {اسم_المتجر} خرج للتوصيل وفي الطريق إليك.",
+  delivered: "أهلًا {اسم_العميل}، تم توصيل طلبك رقم {رقم_الطلب} من {اسم_المتجر}. شكرًا لتعاملك معنا.",
+  cancelled: "أهلًا {اسم_العميل}، تم إلغاء طلبك رقم {رقم_الطلب} من {اسم_المتجر}. السبب: {سبب_الإلغاء}",
+};
+
 function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings {
   return {
     ...tenantSettings({ working_hours: [{ day: 0, from: "09:00", to: "21:00" }] }),
@@ -25,6 +34,9 @@ function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings
     invitation_message_default: DEFAULT_INVITATION,
     default_payment_terms_days: null,
     default_credit_limit: null,
+    order_notify_statuses: ["confirmed", "out_for_delivery", "delivered", "cancelled"],
+    order_status_messages: {},
+    order_status_message_defaults: ORDER_MESSAGE_DEFAULTS,
     ...overrides,
   };
 }
@@ -167,7 +179,8 @@ describe("invitation message", () => {
 
     await user.clear(box);
     await user.type(box, "يا ");
-    await user.click(screen.getByRole("button", { name: "اسم العميل" }));
+    // The invitation card comes before the order-message card, which has the same chips.
+    await user.click(screen.getAllByRole("button", { name: "اسم العميل" })[0]!);
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
     await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
@@ -183,7 +196,7 @@ describe("invitation message", () => {
     renderWithQuery(<SettingsForm settings={settings({ invitation_message: "نص خاص" })} />);
 
     expect(screen.getByLabelText("نص الرسالة")).toHaveValue("نص خاص");
-    await user.click(screen.getByRole("button", { name: "استرجاع النص الافتراضي" }));
+    await user.click(screen.getAllByRole("button", { name: "استرجاع النص الافتراضي" })[0]!);
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
     await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
@@ -215,6 +228,104 @@ describe("invitation message", () => {
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
     expect(await screen.findByText("نص مرفوض")).toBeInTheDocument();
+  });
+});
+
+describe("order status messages", () => {
+  const card = () => within(screen.getByTestId("order-messages"));
+
+  it("BR-N03 lists every status, the notified ones open with the default text previewed", () => {
+    stubApi({});
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    expect(card().getByLabelText("أرسل رسالة عند: مؤكد")).toBeChecked();
+    expect(card().getByLabelText("أرسل رسالة عند: قيد التجهيز")).not.toBeChecked();
+    expect(card().queryByLabelText("نص رسالة «قيد التجهيز»")).not.toBeInTheDocument();
+    expect(card().getByLabelText("نص رسالة «مؤكد»")).toHaveValue(ORDER_MESSAGE_DEFAULTS.confirmed);
+    expect(screen.getByTestId("order-message-confirmed-preview")).toHaveTextContent(
+      "أهلًا أحمد محمود، تم تأكيد طلبك رقم 1024 من مكتبة النور بإجمالي 1,250.00 ج.م.",
+    );
+  });
+
+  it("BR-N03 the cancel reason chip is offered in the cancelled text only", () => {
+    stubApi({});
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    expect(
+      within(screen.getByTestId("order-message-cancelled")).getByRole("button", { name: "سبب الإلغاء" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("order-message-confirmed")).queryByRole("button", { name: "سبب الإلغاء" }),
+    ).toBeNull();
+  });
+
+  it("BR-N03 saves the statuses in the platform order and the store's own words, defaults as null", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    await user.click(card().getByLabelText("أرسل رسالة عند: قيد التجهيز"));
+    await user.click(card().getByLabelText("أرسل رسالة عند: تم التوصيل"));
+    const box = card().getByLabelText("نص رسالة «قيد التجهيز»");
+    await user.clear(box);
+    await user.type(box, "طلبك ");
+    await user.click(within(screen.getByTestId("order-message-preparing")).getByRole("button", { name: "رقم الطلب" }));
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+      order_notify_statuses: ["confirmed", "preparing", "out_for_delivery", "cancelled"],
+      order_status_messages: {
+        confirmed: null,
+        preparing: "طلبك {رقم_الطلب}",
+        out_for_delivery: null,
+        delivered: null,
+        cancelled: null,
+      },
+    });
+  });
+
+  it("BR-N03 starts from the store's saved words and restores the default", async () => {
+    stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings({ order_status_messages: { delivered: "وصل {رقم_الطلب}" } })} />);
+    const box = card().getByLabelText("نص رسالة «تم التوصيل»");
+
+    expect(box).toHaveValue("وصل {رقم_الطلب}");
+    await user.click(
+      within(screen.getByTestId("order-message-delivered")).getByRole("button", { name: "استرجاع النص الافتراضي" }),
+    );
+    expect(box).toHaveValue(ORDER_MESSAGE_DEFAULTS.delivered);
+  });
+
+  it("BR-N03 blocks the cancel reason outside the cancelled text before saving", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    fireEvent.change(card().getByLabelText("نص رسالة «مؤكد»"), { target: { value: "السبب {سبب_الإلغاء}" } });
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(
+      await card().findByText("متغير غير معروف: {سبب_الإلغاء}. استخدم الأزرار لإضافة المتغيرات."),
+    ).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
+  });
+
+  it("shows the backend's error under the status box", async () => {
+    stubApi({
+      "PUT /api/dashboard/settings": envelopeError(422, "validation_failed", "بيانات غير صحيحة", {
+        "order_status_messages.delivered": ["نص التوصيل مرفوض"],
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(
+      await within(screen.getByTestId("order-message-delivered")).findByText("نص التوصيل مرفوض"),
+    ).toBeInTheDocument();
   });
 });
 

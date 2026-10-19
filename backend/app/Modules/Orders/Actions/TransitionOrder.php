@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\DB;
  * POST /api/dashboard/orders/{number}/transition: the merchant moves an order forward (BR-O01). Owns its
  * transaction: the order row is locked and re-read so two clicks cannot both pass the guard; `delivered`
  * deducts the stock (BR-INV05), sets the due date from the customer's payment terms (BR-C06) and, with `collect_full_amount`, records the remaining balance as collected
- * through CollectsPayments (BR-C04); history and the `order.status_changed` audit record are written last.
+ * through CollectsPayments (BR-C04); history and the `order.status_changed` audit record are written last, then the
+ * customer is told after commit (BR-N03).
  */
 final readonly class TransitionOrder
 {
@@ -27,6 +28,7 @@ final readonly class TransitionOrder
         private OrderStateMachine $machine,
         private ApplyTransition $apply,
         private CollectsPayments $payments,
+        private NotifyCustomerOfStatus $notify,
         private AuditLogger $audit,
     ) {}
 
@@ -46,6 +48,8 @@ final readonly class TransitionOrder
                 'status' => $plan->to->value,
                 'note' => $data->note,
             ], fn (?string $value): bool => $value !== null));
+
+            $this->notify->handle($order, $plan->to);
 
             return $order;
         });

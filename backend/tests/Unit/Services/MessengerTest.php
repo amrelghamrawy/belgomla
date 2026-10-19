@@ -90,3 +90,24 @@ test('D70 an otp of a store with a connected number is logged on the store numbe
 
     expect($this->inTenant(fn () => app(Messenger::class)->send(otp()))->provider)->toBe(Provider::WaGateway);
 });
+
+test('BR-N03 a message about an order is logged with its order', function (): void {
+    $order = $this->inTenant(fn (): App\Modules\Orders\Models\Order => App\Modules\Orders\Models\Order::factory()->create());
+
+    $message = $this->inTenant(fn () => app(Messenger::class)->send(new MessagePayload('01012345678', MessagePurpose::OrderStatus, 'تم تأكيد طلبك', orderId: $order->id)));
+
+    expect($message->refresh()->only(['purpose', 'order_id']))->toBe(['purpose' => MessagePurpose::OrderStatus, 'order_id' => $order->id]);
+});
+
+test('BR-N03 the messages of an order are listed oldest first without their text', function (): void {
+    $order = $this->inTenant(fn (): App\Modules\Orders\Models\Order => App\Modules\Orders\Models\Order::factory()->create());
+    $first = $this->inTenant(fn () => OutboundMessage::factory()->create(['purpose' => MessagePurpose::OrderStatus, 'order_id' => $order->id]));
+    $this->inTenant(fn () => OutboundMessage::factory()->create(['purpose' => MessagePurpose::OrderStatus, 'order_id' => $order->id, 'channel' => Channel::Sms]));
+    $this->inTenant(fn () => OutboundMessage::factory()->create());
+
+    $messages = $this->inTenant(fn (): array => app(App\Modules\Messaging\Queries\OrderMessagesQuery::class)->forOrder($order->id));
+
+    expect($messages)->toHaveCount(2)
+        ->and($messages[0])->toBe(['purpose' => 'order_status', 'purpose_label' => 'تحديث طلب', 'channel' => 'whatsapp', 'status' => $first->status->value, 'sent_at' => $first->created_at->toIso8601String()])
+        ->and($messages[1]['channel'])->toBe('sms');
+});

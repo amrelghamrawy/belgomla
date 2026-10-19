@@ -158,6 +158,8 @@ arch('messaging models are only used inside messaging')
     ->expect('App\Modules\Messaging\Models')
     ->toOnlyBeUsedIn(['App\Modules\Messaging', 'Database\Factories']);
 
+// V2 Task 03: Orders also lists an order's messages (OrderMessagesQuery) and tells merchants about a dropped store
+// number by filling Messaging's ConnectionAlerts contract (MerchantConnectionAlerts), nothing else.
 arch('other modules reach messaging only through Messenger, its payload and enums')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
     ->not->toUse([
@@ -167,7 +169,12 @@ arch('other modules reach messaging only through Messenger, its payload and enum
         'App\Modules\Messaging\Jobs',
         'App\Modules\Messaging\Models',
         'App\Modules\Messaging\Queries',
-    ]);
+    ])
+    ->ignoring([App\Modules\Orders\Queries\OrderDetailQuery::class, App\Modules\Orders\Services\MerchantConnectionAlerts::class]);
+
+arch('orders fill the connection alerts contract of messaging')
+    ->expect(App\Modules\Orders\Services\MerchantConnectionAlerts::class)
+    ->toImplement(App\Modules\Messaging\Contracts\ConnectionAlerts::class);
 
 arch('messaging does not depend on catalog, pricing or inventory')
     ->expect('App\Modules\Messaging')
@@ -297,9 +304,14 @@ arch('orders use customers only through its queries, cart actions, contracts and
         'App\Modules\Customers\Http',
     ]);
 
-arch('orders do not depend on messaging')
-    ->expect('App\Modules\Orders')
-    ->not->toUse('App\Modules\Messaging');
+arch('orders send messages only to tell customers about their order (BR-N03)')
+    ->expect('App\Modules\Messaging')
+    ->not->toBeUsedIn('App\Modules\Orders')
+    ->ignoring([
+        App\Modules\Orders\Actions\NotifyCustomerOfStatus::class,
+        App\Modules\Orders\Queries\OrderDetailQuery::class,
+        App\Modules\Orders\Services\MerchantConnectionAlerts::class,
+    ]);
 
 arch('orders models are used outside orders only by collections and reports')
     ->expect('App\Modules\Orders\Models')

@@ -106,6 +106,7 @@ dataset('customer authenticated routes', [
     'addresses update' => ['PUT', '/api/store/addresses/1'],
     'addresses delete' => ['DELETE', '/api/store/addresses/1'],
     'account statement' => ['GET', '/api/store/account/statement'],
+    'account preferences' => ['PATCH', '/api/store/account/preferences'],
     'cart show' => ['GET', '/api/store/cart'],
     'cart clear' => ['DELETE', '/api/store/cart'],
     'cart add' => ['POST', '/api/store/cart/items'],

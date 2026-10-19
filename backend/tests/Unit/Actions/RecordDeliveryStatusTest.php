@@ -154,3 +154,13 @@ test('D70 a replayed store number failure makes no second copy', function (): vo
 
     $this->assertDatabaseCount('outbound_messages', 2);
 });
+
+test('BR-N03 a fallback copy of an order status message keeps its order', function (): void {
+    useHypersender();
+    $order = $this->inTenant(fn (): App\Modules\Orders\Models\Order => App\Modules\Orders\Models\Order::factory()->create());
+    $message = $this->inTenant(fn () => OutboundMessage::factory()->create(['provider' => Provider::WaGateway, 'purpose' => MessagePurpose::OrderStatus, 'order_id' => $order->id]));
+
+    record($message, DriverResult::failed('session_not_open'));
+
+    expect($this->inTenant(fn () => OutboundMessage::query()->where('fallback_of_id', $message->id)->sole()->order_id))->toBe($order->id);
+});

@@ -345,4 +345,38 @@ describe("AccountOverview", () => {
 
     expect(await screen.findByText("حسابك في انتظار موافقة المتجر")).toBeInTheDocument();
   });
+
+  it("BR-N03 turns the order messages off and keeps the answer as the session", async () => {
+    const fetchMock = stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "PATCH /api/store/account/preferences": json(200, { data: customer({ order_notifications: false }) }),
+    });
+    const success = vi.spyOn(toast, "success").mockImplementation(() => "t");
+    const user = userEvent.setup();
+    renderWithQuery(<AccountOverview />);
+
+    const toggle = await screen.findByRole("switch", { name: "رسائل واتساب عن طلباتي" });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+
+    await waitFor(() => expect(screen.getByRole("switch", { name: "رسائل واتساب عن طلباتي" })).not.toBeChecked());
+    expect(callsTo(fetchMock, "PATCH /api/store/account/preferences")[0]?.body).toEqual({ order_notifications: false });
+    expect(callsTo(fetchMock, "GET /api/store/me")).toHaveLength(1);
+    expect(success).toHaveBeenCalledWith("تم حفظ اختيارك");
+  });
+
+  it("BR-N03 says why the switch did not move", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "PATCH /api/store/account/preferences": envelopeError(500, "server_error", "حدث خطأ غير متوقع"),
+    });
+    const failure = vi.spyOn(toast, "error").mockImplementation(() => "t");
+    const user = userEvent.setup();
+    renderWithQuery(<AccountOverview />);
+
+    await user.click(await screen.findByRole("switch", { name: "رسائل واتساب عن طلباتي" }));
+
+    await waitFor(() => expect(failure).toHaveBeenCalledOnce());
+    expect(screen.getByRole("switch", { name: "رسائل واتساب عن طلباتي" })).toBeChecked();
+  });
 });

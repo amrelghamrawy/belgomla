@@ -192,6 +192,27 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
               </ol>
             </CardContent>
           </Card>
+          {order.messages.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{copy.messages}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="flex flex-col gap-3 border-s ps-4 text-sm" data-testid="order-messages">
+                  {order.messages.map((message, index) => (
+                    <li key={`${message.sent_at}-${index}`} className="flex flex-col">
+                      <span className="font-medium">
+                        {message.purpose_label} · {copy.messageChannels[message.channel] ?? message.channel}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {formatDateTime(message.sent_at)} · {copy.messageStatuses[message.status] ?? message.status}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
       {editingAddress && <DeliveryAddressDialog order={order} onClose={() => setEditingAddress(false)} />}

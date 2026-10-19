@@ -1,0 +1,70 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support;
+
+/**
+ * BR-N03: the WhatsApp text that tells a customer their order moved. Each store words its own per status
+ * (tenant_settings.order_status_messages, a missing or null entry = the default below) with the placeholders below;
+ * `{سبب_الإلغاء}` only means something for `cancelled`, so other statuses reject it. Shaped like InvitationMessage.
+ */
+final class OrderStatusMessage
+{
+    public const string CUSTOMER = '{اسم_العميل}';
+
+    public const string STORE = '{اسم_المتجر}';
+
+    public const string NUMBER = '{رقم_الطلب}';
+
+    public const string STATUS = '{حالة_الطلب}';
+
+    public const string TOTAL = '{الإجمالي}';
+
+    public const string REASON = '{سبب_الإلغاء}';
+
+    /** Kept short like the invitation (D72): one WhatsApp bubble. */
+    public const int MAX_LENGTH = 500;
+
+    /** @var array<string, string> the statuses a store may notify, with the platform's wording */
+    public const array DEFAULTS = [
+        'confirmed' => 'أهلًا {اسم_العميل}، تم تأكيد طلبك رقم {رقم_الطلب} من {اسم_المتجر} بإجمالي {الإجمالي}. سنبلغك عند خروجه للتوصيل.',
+        'preparing' => 'أهلًا {اسم_العميل}، طلبك رقم {رقم_الطلب} من {اسم_المتجر} قيد التجهيز الآن.',
+        'out_for_delivery' => 'أهلًا {اسم_العميل}، طلبك رقم {رقم_الطلب} من {اسم_المتجر} خرج للتوصيل وفي الطريق إليك.',
+        'delivered' => 'أهلًا {اسم_العميل}، تم توصيل طلبك رقم {رقم_الطلب} من {اسم_المتجر}. شكرًا لتعاملك معنا.',
+        'cancelled' => 'أهلًا {اسم_العميل}، تم إلغاء طلبك رقم {رقم_الطلب} من {اسم_المتجر}. السبب: {سبب_الإلغاء}',
+    ];
+
+    /** @var list<string> */
+    public const array PLACEHOLDERS = [self::CUSTOMER, self::STORE, self::NUMBER, self::STATUS, self::TOTAL, self::REASON];
+
+    /**
+     * The text for a status: the store's template, or the default when it has none.
+     *
+     * @param  array{customer: string, store: string, number: int, status: string, total: string, reason: string|null}  $values
+     */
+    public static function render(string $status, ?string $template, array $values): string
+    {
+        return mb_trim(strtr($template ?? self::DEFAULTS[$status] ?? '', [
+            self::CUSTOMER => $values['customer'],
+            self::STORE => $values['store'],
+            self::NUMBER => (string) $values['number'],
+            self::STATUS => $values['status'],
+            self::TOTAL => $values['total'],
+            self::REASON => $values['reason'] ?? '',
+        ]));
+    }
+
+    /**
+     * Every `{...}` in the template that the status cannot fill, in order of appearance, without duplicates.
+     *
+     * @return list<string>
+     */
+    public static function unknownPlaceholders(string $template, string $status): array
+    {
+        preg_match_all('/\{[^{}]*\}/u', $template, $matches);
+        $allowed = $status === 'cancelled' ? self::PLACEHOLDERS : array_values(array_diff(self::PLACEHOLDERS, [self::REASON]));
+
+        return array_values(array_unique(array_diff($matches[0], $allowed)));
+    }
+}

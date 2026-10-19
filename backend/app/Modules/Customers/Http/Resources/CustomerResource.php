@@ -66,6 +66,7 @@ final class CustomerResource extends JsonResource
             'status_label' => $customer->status->label(),
             'phone_verified_at' => $customer->phone_verified_at?->toIso8601String(),
             'created_at' => $customer->created_at->toIso8601String(),
+            'order_notifications' => ! $customer->order_notifications_opt_out,
             'outstanding_amount' => $this->when($dashboard, $this->outstandingAmount),
             'created_by' => $this->when($dashboard, $customer->created_by),
             'approved_by' => $this->when($dashboard, $customer->approved_by),

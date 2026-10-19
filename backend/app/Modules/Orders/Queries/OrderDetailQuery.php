@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Queries;
 
+use App\Modules\Messaging\Queries\OrderMessagesQuery;
 use App\Modules\Orders\Contracts\OrderCollections;
 use App\Modules\Orders\Models\Order;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,7 +16,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 final readonly class OrderDetailQuery
 {
-    public function __construct(private OrderCollections $collections) {}
+    public function __construct(
+        private OrderCollections $collections,
+        private OrderMessagesQuery $messages,
+    ) {}
 
     public function forStore(Order $order): Order
     {
@@ -25,6 +29,16 @@ final readonly class OrderDetailQuery
     public function forDashboard(Order $order): Order
     {
         return $order->load(['items', 'history', 'customer', 'returns.items.orderItem']);
+    }
+
+    /**
+     * BR-N03: the WhatsApp/SMS messages sent about the order, for the dashboard.
+     *
+     * @return list<array{purpose: string, purpose_label: string, channel: string, status: string, sent_at: string}>
+     */
+    public function messages(Order $order): array
+    {
+        return $this->messages->forOrder($order->id);
     }
 
     /**

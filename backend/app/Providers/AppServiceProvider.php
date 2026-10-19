@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Messaging\Contracts\ConnectionAlerts;
+use App\Modules\Messaging\Services\NullConnectionAlerts;
 use App\Modules\Platform\Services\HealthProbe;
 use App\Modules\Tenancy\Services\TenantCreatedHooks;
 use App\Modules\Tenancy\TenantContext;
@@ -21,6 +23,8 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(TenantContext::class);
         $this->app->singleton(TenantCreatedHooks::class);
+        // D70: nobody is told about a dropped store number until Orders binds its dashboard notice.
+        $this->app->bind(ConnectionAlerts::class, NullConnectionAlerts::class);
     }
 
     public function boot(): void

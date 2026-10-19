@@ -714,7 +714,7 @@ OTP rules:
 - 6 digits, valid for 10 minutes, single use.
 - Maximum 5 OTP sends per phone per hour, maximum 5 verification attempts per OTP.
 - OTP sends are logged (channel, provider message id, status) per tenant.
-- OTP and customer invitations (BR-CU08) are the only customer-facing WhatsApp/SMS uses in V1 (BR-N01); order notifications remain V2. Operator alerts (D65) go to the platform operator, never to customers.
+- OTP, customer invitations (BR-CU08) and order status messages (BR-N03, V2) are the only customer-facing WhatsApp/SMS uses (BR-N01). Order status messages have their own per-phone limit, so they never use up the OTP sends (D79). Operator alerts (D65) go to the platform operator, never to customers.
 
 ### BR-CU08 — Merchant-Created Customers and Invitations
 
@@ -753,17 +753,29 @@ Each customer has at most one open cart per tenant, stored server-side. Guest (a
 
 ### BR-N01 — Channels
 
-- Email is out of scope for V1.
-- WhatsApp and SMS exist in V1 **only** for OTP and customer invitations (BR-CU07, BR-CU08). Order status notifications over these channels are V2.
+- Email is out of scope.
+- WhatsApp and SMS reach customers for OTP and invitations (BR-CU07, BR-CU08) and, since V2 Task 03, for order status messages (BR-N03). Nothing else: no marketing or broadcast sends (D70).
+- Order status messages go by WhatsApp only (store number, then platform number) and never fall back to SMS (D80).
 
 ### BR-N02 — In-App Notifications
 
-V1 provides in-app (dashboard) notifications to the merchant for:
+The merchant gets in-app (dashboard) notifications for:
 
 - New order.
 - Customer cancellation.
+- The store WhatsApp number dropped (logged out on the phone): `whatsapp_dropped`, linking to settings to scan the QR again (V2 Task 03).
 
-Customer-side notifications are an open decision, see `06-open-decisions.md`.
+Customers get no in-app notifications; they see the status on "my orders" and receive the WhatsApp messages of BR-N03 (D6).
+
+### BR-N03 — Order Status Messages (V2 Task 03)
+
+- When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`; a new store starts with all but `preparing`.
+- The merchant words each status in settings (`order_status_messages`), up to 500 characters, with the placeholders `{اسم_العميل}`, `{اسم_المتجر}`, `{رقم_الطلب}`, `{حالة_الطلب}`, `{الإجمالي}`, plus `{سبب_الإلغاء}` in the cancelled text only. Any other `{…}` is rejected. No wording (or the default sent back) = the platform default text.
+- A cancel tells the customer only when the merchant cancels; a customer cancelling their own order gets nothing.
+- The message is sent after the change commits: a change that rolls back sends nothing. A customer over their order-message limit (D79) is skipped and logged, and the change still succeeds.
+- A customer can turn the messages off from their storefront account ("رسائل واتساب عن طلباتي", `customers.order_notifications_opt_out`). OTP and invitations are not affected.
+- The order page lists the messages sent about the order (purpose, channel, status, time).
+- The demo store (`tenant:demo`) starts with an empty list: its customers have invented phones.
 
 ---
 
@@ -811,6 +823,8 @@ Tenant settings include, at minimum:
 - `stale_pending_hours`: when a `Pending` order is highlighted as stale (default 24, BR-INV07, D10).
 - `invitation_message`: the merchant's wording of the customer invitation (null = platform default, BR-CU08, D72).
 - `default_payment_terms_days`, `default_credit_limit`: the credit terms a new customer starts with (null = none; BR-C05, BR-C06).
+- `order_notify_statuses`: the order statuses customers are told about by WhatsApp (default confirmed, out for delivery, delivered, cancelled; BR-N03).
+- `order_status_messages`: the merchant's wording per status (a missing entry = platform default; BR-N03).
 - Store WhatsApp number linked by QR (D70; kept in `whatsapp_connections`, not in the settings row).
 
 ---

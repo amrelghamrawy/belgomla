@@ -16,6 +16,7 @@ function dashboardCustomer(overrides: Partial<DashboardCustomer> = {}): Dashboar
     id: 7,
     name: "مكتبة الأمل",
     phone: "+201012345678",
+    order_notifications: true,
     status: "active",
     status_label: "نشط",
     phone_verified_at: "2026-10-01T08:00:00Z",

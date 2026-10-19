@@ -77,6 +77,7 @@ function orderReturn(overrides: Partial<OrderReturn> = {}): OrderReturn {
 
 function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDetail {
   return {
+    messages: [],
     id: 1,
     number: 1001,
     status: "confirmed",
@@ -377,6 +378,43 @@ describe("OrderDetail delivery address", () => {
     expect(screen.getByText("تم إنشاء الطلب")).toBeInTheDocument();
     expect(screen.getByText("تم الاتصال")).toBeInTheDocument();
   });
+
+  it("BR-N03 lists the messages the customer was sent, and no section when there are none", () => {
+    stubApi({});
+    const { unmount } = renderWithQuery(
+      <OrderDetail
+        order={order({
+          messages: [
+            {
+              purpose: "order_status",
+              purpose_label: "تحديث طلب",
+              channel: "whatsapp",
+              status: "fell_back",
+              sent_at: "2026-10-03T09:00:00Z",
+            },
+            {
+              purpose: "order_status",
+              purpose_label: "تحديث طلب",
+              channel: "whatsapp",
+              status: "delivered",
+              sent_at: "2026-10-03T09:00:05Z",
+            },
+          ],
+        })}
+      />,
+    );
+
+    const messages = within(screen.getByTestId("order-messages"));
+    expect(screen.getByText("الرسائل")).toBeInTheDocument();
+    expect(messages.getAllByRole("listitem")).toHaveLength(2);
+    expect(messages.getAllByText("تحديث طلب · واتساب")).toHaveLength(2);
+    expect(messages.getByText(/أُعيد إرسالها من رقم آخر/)).toBeInTheDocument();
+    expect(messages.getByText(/وصلت/)).toBeInTheDocument();
+
+    unmount();
+    renderWithQuery(<OrderDetail order={order()} />);
+    expect(screen.queryByText("الرسائل")).not.toBeInTheDocument();
+  });
 });
 
 describe("OrdersPage", () => {
@@ -455,6 +493,7 @@ function pickerCustomer(): DashboardCustomer {
     id: 7,
     name: "مكتبة الأمل",
     phone: "+201012345678",
+    order_notifications: true,
     status: "active",
     status_label: "نشط",
     phone_verified_at: "2026-10-01T08:00:00Z",

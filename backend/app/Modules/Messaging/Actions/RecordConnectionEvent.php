@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Messaging\Contracts\ConnectionAlerts;
 use App\Modules\Messaging\Data\GatewayEventData;
 use App\Modules\Messaging\Enums\ConnectionStatus;
 use App\Modules\Messaging\Exceptions\WaGatewayUnavailable;
@@ -19,11 +20,16 @@ use Illuminate\Support\Facades\DB;
  *                     (`phone_in_use`) and the gateway drops the session (tasks/12 lesson 2).
  *   session.closed  → fatal: `logged_out` with the reason; an expired QR: `disconnected`; anything else
  *                     (reconnects exhausted) keeps the status for the reconcile to restart.
- * A number the merchant unlinked, or one in `error`, ignores late events.
+ * A number the merchant unlinked, or one in `error`, ignores late events. A number that logs out is reported once
+ * through ConnectionAlerts (a `whatsapp_dropped` dashboard notice, BR-N02).
  */
 final readonly class RecordConnectionEvent
 {
-    public function __construct(private StoreWhatsAppConnectionQuery $connections, private WaGatewayClient $gateway) {}
+    public function __construct(
+        private StoreWhatsAppConnectionQuery $connections,
+        private WaGatewayClient $gateway,
+        private ConnectionAlerts $alerts,
+    ) {}
 
     public function handle(WhatsAppConnection $connection, GatewayEventData $event): WhatsAppConnection
     {
@@ -34,6 +40,8 @@ final readonly class RecordConnectionEvent
                 return [$locked, false];
             }
 
+            $before = $locked->status;
+
             match ($event->event) {
                 GatewayEventData::OPEN => $this->opened($locked, $event->phone),
                 GatewayEventData::CLOSED => $this->closed($locked, $event->reason ?? 'unknown', $event->fatal),
@@ -42,6 +50,10 @@ final readonly class RecordConnectionEvent
 
             $locked->last_event_at = now();
             $locked->save();
+
+            if ($before !== ConnectionStatus::LoggedOut && $locked->status === ConnectionStatus::LoggedOut) {
+                $this->alerts->dropped($locked->phone, $locked->disconnect_reason ?? 'unknown');
+            }
 
             return [$locked, $locked->status === ConnectionStatus::Error];
         });

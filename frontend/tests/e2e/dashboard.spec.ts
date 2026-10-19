@@ -115,6 +115,33 @@ test("BR-INV08 a reserved quantity blocks the adjustment, then the order is conf
   await expect(page.getByRole("link", { name: `#${order.number}` })).toBeVisible();
 });
 
+test("BR-N03 the merchant turns on the confirmed message, confirms an order and sees the message on its page", async ({
+  page,
+  browser,
+}) => {
+  const order = await placeShopperOrder(browser, "الأضواء رياضيات ثانية إعدادي");
+  await loginAsOwner(page);
+
+  try {
+    // The demo store notifies nobody (its customers have invented phones), so the merchant turns it on.
+    await page.goto("/dashboard/settings");
+    const card = page.getByTestId("order-messages");
+    const confirmed = card.getByLabel("أرسل رسالة عند: مؤكد");
+    await confirmed.check();
+    await expect(card.getByTestId("order-message-confirmed-preview")).toContainText("تم تأكيد طلبك رقم 1024");
+    await page.getByRole("button", { name: "حفظ" }).filter({ visible: true }).first().click();
+    await expect(page.getByText("تم حفظ الإعدادات")).toBeVisible();
+
+    await page.goto(`/dashboard/orders/${order.number}`);
+    await expect(page.getByTestId("order-messages")).toHaveCount(0);
+    await page.getByRole("button", { name: "تأكيد الطلب" }).click();
+    await expect(page.getByTestId("order-status")).toHaveText("مؤكد");
+    await expect(page.getByTestId("order-messages")).toContainText("تحديث طلب · واتساب");
+  } finally {
+    await api(page, "PUT", "/api/dashboard/settings", { order_notify_statuses: [] });
+  }
+});
+
 test("BR-R01 BR-R03 a delivered order takes a return of 2: the stock comes back and the balance drops", async ({
   page,
   browser,

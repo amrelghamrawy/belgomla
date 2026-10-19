@@ -83,7 +83,7 @@ final class StorefrontDemoSeeder extends Seeder
             }
 
             $this->sectionFields($fields, $templates, $fieldDefinitions, $fieldOptions);
-            $settings->handle($tenant, TenantSetting::query()->firstOrFail(), $this->storeSettings());
+            $settings->handle($tenant, TenantSetting::query()->whereKey($tenant->id)->firstOrFail(), $this->storeSettings());
 
             $known = [];
 
@@ -275,7 +275,10 @@ final class StorefrontDemoSeeder extends Seeder
             requireCustomerApproval: null,
             stalePendingHours: null,
             invitationMessage: null,
-            sent: ['primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description', 'working_hours', 'mov_enabled', 'mov_amount'],
+            sent: ['primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description', 'working_hours', 'mov_enabled', 'mov_amount', 'order_notify_statuses'],
+            // BR-N03: the demo customers have invented phones, so the demo store tells nobody about order moves
+            // (tenant:demo also runs on production); the merchant turns the messages on in settings.
+            orderNotifyStatuses: [],
         );
     }
 

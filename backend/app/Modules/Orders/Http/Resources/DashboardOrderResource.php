@@ -26,8 +26,9 @@ final class DashboardOrderResource extends JsonResource
 {
     /**
      * @param  list<JsonResource>  $collections
+     * @param  list<array{purpose: string, purpose_label: string, channel: string, status: string, sent_at: string}>  $messages
      */
-    public function __construct(Order $resource, private readonly CarbonImmutable $staleBefore, private readonly array $collections = [])
+    public function __construct(Order $resource, private readonly CarbonImmutable $staleBefore, private readonly array $collections = [], private readonly array $messages = [])
     {
         parent::__construct($resource);
     }
@@ -69,6 +70,7 @@ final class DashboardOrderResource extends JsonResource
                 'note' => $entry->note,
             ])->values()->all()),
             'collections' => $this->when($detail, $this->collections),
+            'messages' => $this->when($detail, $this->messages),
             'returns' => $this->whenLoaded('returns', fn (): array => $order->returns->map(fn (OrderReturn $return): array => new OrderReturnResource($return)->resolve($request))->values()->all()),
         ];
     }

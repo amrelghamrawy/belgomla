@@ -211,6 +211,59 @@
                 }
             }
         },
+        "/api/store/account/preferences": {
+            "patch": {
+                "operationId": "storeUpdatePreferences",
+                "tags": [
+                    "store-auth"
+                ],
+                "summary": "Turns WhatsApp messages about the customer's orders on or off (BR-N03)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "order_notifications"
+                                ],
+                                "properties": {
+                                    "order_notifications": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The customer, as GET /me answers it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Customer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/store/categories": {
             "get": {
                 "operationId": "storeCategories",
@@ -6635,7 +6688,8 @@
                     "status",
                     "status_label",
                     "phone_verified_at",
-                    "created_at"
+                    "created_at",
+                    "order_notifications"
                 ],
                 "properties": {
                     "id": {
@@ -6650,6 +6704,10 @@
                         "examples": [
                             "+201012345678"
                         ]
+                    },
+                    "order_notifications": {
+                        "type": "boolean",
+                        "description": "BR-N03: false when the customer turned order messages off"
                     },
                     "status": {
                         "type": "string",
@@ -8068,9 +8126,39 @@
                             "invitation_message",
                             "invitation_message_default",
                             "default_payment_terms_days",
-                            "default_credit_limit"
+                            "default_credit_limit",
+                            "order_notify_statuses",
+                            "order_status_messages",
+                            "order_status_message_defaults"
                         ],
                         "properties": {
+                            "order_notify_statuses": {
+                                "type": "array",
+                                "description": "BR-N03 the statuses customers are told about",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "confirmed",
+                                        "preparing",
+                                        "out_for_delivery",
+                                        "delivered",
+                                        "cancelled"
+                                    ]
+                                }
+                            },
+                            "order_status_messages": {
+                                "type": "object",
+                                "description": "BR-N03 status => the store wording; a missing status uses order_status_message_defaults",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "order_status_message_defaults": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
                             "default_payment_terms_days": {
                                 "type": [
                                     "integer",
@@ -8267,6 +8355,29 @@
                             "string",
                             "null"
                         ]
+                    },
+                    "order_notify_statuses": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "confirmed",
+                                "preparing",
+                                "out_for_delivery",
+                                "delivered",
+                                "cancelled"
+                            ]
+                        }
+                    },
+                    "order_status_messages": {
+                        "type": "object",
+                        "description": "status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); null or the default text = the default",
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
                     }
                 }
             },
@@ -9706,7 +9817,8 @@
                             "items",
                             "history",
                             "collections",
-                            "returns"
+                            "returns",
+                            "messages"
                         ],
                         "properties": {
                             "items": {
@@ -9732,6 +9844,12 @@
                                 "description": "Every return, voided included, without `order` (BR-R06)",
                                 "items": {
                                     "$ref": "#/components/schemas/OrderReturn"
+                                }
+                            },
+                            "messages": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/OrderMessage"
                                 }
                             }
                         }
@@ -10022,6 +10140,52 @@
                     }
                 }
             },
+            "OrderMessage": {
+                "type": "object",
+                "description": "A WhatsApp/SMS message sent about the order (BR-N03), fallbacks included, oldest first",
+                "required": [
+                    "purpose",
+                    "purpose_label",
+                    "channel",
+                    "status",
+                    "sent_at"
+                ],
+                "properties": {
+                    "purpose": {
+                        "type": "string",
+                        "enum": [
+                            "otp",
+                            "invitation",
+                            "system_alert",
+                            "order_status"
+                        ]
+                    },
+                    "purpose_label": {
+                        "type": "string"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "enum": [
+                            "whatsapp",
+                            "sms"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "sent",
+                            "delivered",
+                            "failed",
+                            "fell_back"
+                        ]
+                    },
+                    "sent_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
             "MerchantNotification": {
                 "type": "object",
                 "required": [
@@ -10040,7 +10204,8 @@
                         "type": "string",
                         "enum": [
                             "new_order",
-                            "customer_cancelled"
+                            "customer_cancelled",
+                            "whatsapp_dropped"
                         ]
                     },
                     "type_label": {
@@ -10048,11 +10213,7 @@
                     },
                     "details": {
                         "type": "object",
-                        "required": [
-                            "order_number",
-                            "customer_name",
-                            "order_total"
-                        ],
+                        "description": "Orders: order_number, customer_name, order_total (+ reason when customer_cancelled); whatsapp_dropped: phone, reason",
                         "properties": {
                             "order_number": {
                                 "type": "integer"
@@ -10068,7 +10229,14 @@
                                     "string",
                                     "null"
                                 ],
-                                "description": "customer_cancelled only"
+                                "description": "customer_cancelled and whatsapp_dropped"
+                            },
+                            "phone": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "whatsapp_dropped only"
                             }
                         }
                     },

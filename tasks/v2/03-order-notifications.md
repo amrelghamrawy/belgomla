@@ -1,6 +1,15 @@
 # V2 Task 03 — Customer order notifications (WhatsApp / SMS)
 
-Status: **planned**. Requires V2 Task 00 (task 12 deployed). Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-19), except the live check on the VM, which waits for Task 00's go-live. Read `CLAUDE.md`, `rules/*.md`, then this file.
+
+### Delivered
+
+- Docs: D79, D80; BR-N01 rewritten, BR-N02 gains `whatsapp_dropped`, BR-N03 new, BR-CU07 note, §M settings; D6 updated; Tech §13 (purpose, no-SMS chain, own limit bucket, `ConnectionAlerts`); 07 `tenant_settings`, `customers.order_notifications_opt_out`, `notifications.type`, `outbound_messages.purpose/order_id`; 08 §3 preferences, §5 settings fields, §9 `messages[]`, §12 notification shape, endpoint count 111.
+- Deviations, recorded in the docs: the template rule takes the status from the field name (`order_status_messages.<status>`); `preparing` can be notified too (off by default); the "merchant-placed order flagged no notify" skip waits for Task 07, which creates such orders; the dropped-number notice goes through a `Messaging\Contracts\ConnectionAlerts` contract that Orders binds (Messaging never calls Orders directly); a store number that "logs out" raises it, a plain disconnect does not; the order messages are read through `Messaging\Queries\OrderMessagesQuery`; `tenant:demo` starts its store with an empty list, because its customers have invented phones.
+- Fixed on the way: `StorefrontDemoSeeder` wrote its settings into the first `tenant_settings` row (the model has no tenant scope), so `tenant:demo` on a database with other stores rebranded one of them. It now picks the tenant's own row, with a test. A second-boundary flake in the dashboard order detail test is frozen.
+- Tests: backend 3294 (+59), frontend 673 (+14), e2e "the merchant turns on the confirmed message, confirms an order and sees the message on its page" on mobile and desktop.
+- Smoke against `php artisan serve`: settings turn statuses on, a `{سبب_الإلغاء}` outside cancelled is 422, a transition writes an `outbound_messages` row (`order_status`, `order_id`), the queue run logs the merchant's wording, and the order page lists it. On the dev store the job tries the linked store number first and falls back to the platform WhatsApp (log driver), never SMS (D80).
+- Left: the live check on the VM with a real store number (one confirmed and one delivered message), after Task 00's go-live.
 
 ## Goal
 

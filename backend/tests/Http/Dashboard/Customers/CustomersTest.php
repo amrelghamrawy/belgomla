@@ -31,7 +31,7 @@ test('the customer list shows every customer, newest first, with the outstanding
         ->assertJsonPath('data.0.outstanding_amount', '0.00')
         ->assertJsonPath('data.1.id', $old->id)
         ->assertJsonPath('meta.total', 2)
-        ->assertExactJsonStructure(['data' => ['*' => ['id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'order_notifications', 'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days']], 'links', 'meta']);
 });
 
 test('D5 the outstanding amount comes from the OutstandingBalances contract', function (): void {

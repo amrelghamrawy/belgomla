@@ -16,7 +16,7 @@ beforeEach(function (): void {
 test('BR-N02 a new order notifies every owner with the number, customer and total', function (): void {
     $order = Order::factory()->create(['number' => 1024, 'delivery_name' => 'مكتبة الأمل', 'order_total' => '1020.00']);
 
-    $notification = app(NotifyMerchants::class)->handle(NotificationType::NewOrder, $order);
+    $notification = app(NotifyMerchants::class)->forOrder(NotificationType::NewOrder, $order);
 
     expect($notification->refresh()->only(['tenant_id', 'tenant_user_id', 'type', 'read_at']))->toBe([
         'tenant_id' => $this->tenant->id, 'tenant_user_id' => null, 'type' => NotificationType::NewOrder, 'read_at' => null,
@@ -27,8 +27,15 @@ test('BR-N02 a new order notifies every owner with the number, customer and tota
 test('BR-N02 a customer cancellation carries the reason', function (): void {
     $order = Order::factory()->cancelled(CancelledBy::Customer, 'طلبت بالخطأ')->create(['number' => 7, 'delivery_name' => 'مكتبة الأمل', 'order_total' => '90.00']);
 
-    $notification = app(NotifyMerchants::class)->handle(NotificationType::CustomerCancelled, $order);
+    $notification = app(NotifyMerchants::class)->forOrder(NotificationType::CustomerCancelled, $order);
 
     expect($notification->refresh()->data)->toEqual(['order_number' => 7, 'customer_name' => 'مكتبة الأمل', 'order_total' => '90.00', 'reason' => 'طلبت بالخطأ'])
         ->and(MerchantNotification::query()->count())->toBe(1);
+});
+
+test('D70 BR-N02 any notice can carry its own details, like a dropped store number', function (): void {
+    $notification = app(NotifyMerchants::class)->handle(NotificationType::WhatsappDropped, ['phone' => '+201012345678', 'reason' => 'logged_out']);
+
+    expect($notification->refresh()->only(['type', 'tenant_user_id']))->toBe(['type' => NotificationType::WhatsappDropped, 'tenant_user_id' => null])
+        ->and($notification->data)->toBe(['phone' => '+201012345678', 'reason' => 'logged_out']);
 });

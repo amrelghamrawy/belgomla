@@ -58,3 +58,16 @@ test('D46 the eleventh provider call in a minute is delayed, not rejected', func
 
     expect(app(MessagingRateLimiter::class)->providerDelay())->toBe(60);
 });
+
+test('D79 order status messages have their own bucket of ten per phone per hour and never use up the otp bucket', function (): void {
+    $send = fn (int $count, App\Modules\Messaging\Enums\MessagePurpose $purpose) => $this->inTenant(function () use ($count, $purpose): void {
+        foreach (range(1, $count) as $ignored) {
+            app(MessagingRateLimiter::class)->ensurePhoneAllowed('+201012345678', $purpose);
+        }
+    });
+
+    $send(10, App\Modules\Messaging\Enums\MessagePurpose::OrderStatus);
+
+    expect(fn () => $send(1, App\Modules\Messaging\Enums\MessagePurpose::OrderStatus))->toThrow(MessagingRateLimited::class)
+        ->and(fn () => $send(5, App\Modules\Messaging\Enums\MessagePurpose::Otp))->not->toThrow(MessagingRateLimited::class);
+});

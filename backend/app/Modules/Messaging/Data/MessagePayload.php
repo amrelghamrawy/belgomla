@@ -10,7 +10,8 @@ use App\Modules\Messaging\Models\OutboundMessage;
 
 /**
  * What to send and to whom. `channel` is WhatsApp unless the customer asked for SMS (BR-CU07 step 3);
- * WhatsApp falls back to SMS on its own.
+ * WhatsApp falls back to SMS on its own (not an order status, D80). `orderId` ties an order status message to its
+ * order (BR-N03).
  */
 final readonly class MessagePayload
 {
@@ -19,10 +20,11 @@ final readonly class MessagePayload
         public MessagePurpose $purpose,
         public string $text,
         public Channel $channel = Channel::WhatsApp,
+        public ?int $orderId = null,
     ) {}
 
     public static function fromMessage(OutboundMessage $message): self
     {
-        return new self($message->to_phone, $message->purpose, (string) $message->body, $message->channel);
+        return new self($message->to_phone, $message->purpose, (string) $message->body, $message->channel, $message->order_id);
     }
 }

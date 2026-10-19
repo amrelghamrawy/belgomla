@@ -6,15 +6,17 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { MerchantNotification } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { useMarkNotificationsRead, useNotifications } from "@/lib/dashboard/notifications";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
+import { formatPhone } from "@/lib/format/phone";
 import { cn } from "@/lib/utils";
 
 const copy = ar.dashboard.notifications;
 
-/** The bell: unread count (polled every 30 s), the newest notifications, each linking to its order. */
+/** The bell: unread count (polled every 30 s), the newest notifications, each linking to its order (or to settings). */
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const notifications = useNotifications();
@@ -58,7 +60,7 @@ export function NotificationsBell() {
             {items.map((item) => (
               <li key={item.id} className="border-b last:border-b-0">
                 <Link
-                  href={`/dashboard/orders/${item.details.order_number}`}
+                  href={hrefFor(item)}
                   className={cn(
                     "hover:bg-muted flex flex-col gap-1 p-3 text-sm",
                     item.read_at === null && "bg-primary/5",
@@ -71,9 +73,13 @@ export function NotificationsBell() {
                   }}
                 >
                   <span className="font-medium">{item.type_label}</span>
-                  <span>{copy.orderLine(item.details.order_number, item.details.customer_name)}</span>
+                  {item.type === "whatsapp_dropped" ? (
+                    <span>{copy.whatsappDropped(formatPhone(item.details.phone ?? ""))}</span>
+                  ) : (
+                    <span>{copy.orderLine(item.details.order_number ?? 0, item.details.customer_name ?? "")}</span>
+                  )}
                   <span className="text-muted-foreground flex justify-between gap-2 text-xs">
-                    <span>{formatMoney(item.details.order_total)}</span>
+                    <span>{item.details.order_total === undefined ? "" : formatMoney(item.details.order_total)}</span>
                     <span>{formatDateTime(item.created_at)}</span>
                   </span>
                 </Link>
@@ -84,4 +90,9 @@ export function NotificationsBell() {
       </PopoverContent>
     </Popover>
   );
+}
+
+/** BR-N02: an order notification opens its order; a dropped WhatsApp number opens settings to scan the QR again. */
+function hrefFor(item: MerchantNotification): string {
+  return item.type === "whatsapp_dropped" ? "/dashboard/settings" : `/dashboard/orders/${item.details.order_number}`;
 }

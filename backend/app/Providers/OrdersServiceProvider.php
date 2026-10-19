@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Modules\Customers\Contracts\RecentOrders;
 use App\Modules\Inventory\Contracts\ReservationHolders;
+use App\Modules\Messaging\Contracts\ConnectionAlerts;
 use App\Modules\Orders\Contracts\CollectsPayments;
 use App\Modules\Orders\Contracts\CustomerExposure;
 use App\Modules\Orders\Contracts\OrderCollections;
@@ -15,6 +16,7 @@ use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Policies\OrderPolicy;
 use App\Modules\Orders\Policies\OrderReturnPolicy;
 use App\Modules\Orders\Services\CustomerRecentOrders;
+use App\Modules\Orders\Services\MerchantConnectionAlerts;
 use App\Modules\Orders\Services\NullCollectsPayments;
 use App\Modules\Orders\Services\NullCustomerExposure;
 use App\Modules\Orders\Services\NullOrderCollections;
@@ -35,6 +37,7 @@ final class OrdersServiceProvider extends ServiceProvider
     public array $bindings = [
         ReservationHolders::class => OrdersHoldingSku::class,
         RecentOrders::class => CustomerRecentOrders::class,
+        ConnectionAlerts::class => MerchantConnectionAlerts::class,
         CollectsPayments::class => NullCollectsPayments::class,
         OrderCollections::class => NullOrderCollections::class,
         RefundsPayments::class => NullRefundsPayments::class,

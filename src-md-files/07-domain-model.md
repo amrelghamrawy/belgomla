@@ -74,6 +74,8 @@ erDiagram
 | invitation_message             | text          | nullable; null = default text (BR-CU08, D72) |
 | default_payment_terms_days     | smallint      | V2: nullable, 0–365, given to new customers (BR-C06) |
 | default_credit_limit           | numeric(12,2) | V2: nullable, ≥ 0, given to new customers (BR-C05) |
+| order_notify_statuses          | jsonb         | V2: list of statuses customers are told about; default `["confirmed","out_for_delivery","delivered","cancelled"]` (BR-N03) |
+| order_status_messages          | jsonb         | V2: nullable map status → merchant wording; a missing entry = platform default (BR-N03) |
 
 ### `tenant_users`
 
@@ -281,6 +283,7 @@ Reservation changes are **not** movements (BR-INV06).
 | status_before_block | enum          | nullable; restored on unblock (07 §11)                                               |
 | credit_limit      | numeric(12,2)   | V2: nullable = no limit, check ≥ 0 (BR-C05)                                           |
 | payment_terms_days | smallint       | V2: nullable = due on delivery, check 0–365 (BR-C06)                                  |
+| order_notifications_opt_out | boolean | V2: default false; true = no order status messages (BR-N03)                     |
 
 ### `customer_addresses` (BR-CU03)
 
@@ -449,9 +452,9 @@ Invariant (app, inside a transaction with the order row locked): `Σ live paymen
 
 ### `notifications` (BR-N02)
 
-`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled), data jsonb, read_at`.
+`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped), data jsonb, read_at`.
 
-Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57).
+Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57). `whatsapp_dropped` (V2 Task 03) has no order: `data` holds `phone` and `reason`.
 
 ### `outbound_messages` (Tech §13)
 
@@ -461,7 +464,8 @@ Our own table, not Laravel's notifications table; the model is `Orders\Models\Me
 | tenant_id           | FK           |                                                                                             |
 | uuid                | uuid unique  | our reference; sent to Hypersender SMS as `request_id`                                      |
 | to_phone            | varchar(20)  | E.164 (`App\Support\PhoneNumber`)                                                           |
-| purpose             | enum         | `otp`, `invitation`, `system_alert`                                                         |
+| purpose             | enum         | `otp`, `invitation`, `system_alert`, `order_status` (V2, BR-N03)                            |
+| order_id            | FK orders    | V2: nullable; the order an `order_status` message is about (order page message log)         |
 | channel             | enum         | `whatsapp`, `sms`                                                                           |
 | provider            | varchar(30)  | `hypersender` (platform number), `wa_gateway` (store number, D70), `meta_cloud` reserved, `log` (development) |
 | provider_request_id | varchar      | nullable, indexed; Hypersender `queued_request_uuid` polled for the final result            |

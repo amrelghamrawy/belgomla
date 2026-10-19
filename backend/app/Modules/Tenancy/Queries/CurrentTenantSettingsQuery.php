@@ -50,6 +50,23 @@ final readonly class CurrentTenantSettingsQuery
     }
 
     /**
+     * BR-N03: the statuses the store tells customers about, its own wording per status (a missing entry = the
+     * default) and its name for the `{اسم_المتجر}` placeholder. Used by Orders.
+     *
+     * @return array{statuses: list<string>, messages: array<string, string|null>, store: string}
+     */
+    public function orderNotifications(): array
+    {
+        $settings = $this->get();
+
+        return [
+            'statuses' => $settings->order_notify_statuses,
+            'messages' => $settings->order_status_messages ?? [],
+            'store' => $settings->tenant->name,
+        ];
+    }
+
+    /**
      * BR-MOV01: the minimum order value. Enabled without an amount counts as disabled.
      *
      * @return array{enabled: bool, amount: string|null}

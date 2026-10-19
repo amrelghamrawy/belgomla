@@ -33,6 +33,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property CustomerStatus|null $status_before_block
  * @property string|null $credit_limit null = no limit (BR-C05)
  * @property int|null $payment_terms_days null = due on delivery (BR-C06)
+ * @property bool $order_notifications_opt_out the customer turned off order status messages (BR-N03)
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Collection<int, CustomerAddress> $addresses
@@ -93,6 +94,7 @@ final class Customer extends Authenticatable
             'status_before_block' => CustomerStatus::class,
             'credit_limit' => 'decimal:2',
             'payment_terms_days' => 'integer',
+            'order_notifications_opt_out' => 'boolean',
         ];
     }
 }

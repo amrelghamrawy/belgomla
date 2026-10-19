@@ -31,7 +31,7 @@ test('BR-C03 the collection statuses match the domain model', function (): void 
 });
 
 test('BR-N02 the notification types match the domain model', function (): void {
-    expect(array_map(fn (NotificationType $type): string => $type->value, NotificationType::cases()))->toBe(['new_order', 'customer_cancelled']);
+    expect(array_map(fn (NotificationType $type): string => $type->value, NotificationType::cases()))->toBe(['new_order', 'customer_cancelled', 'whatsapp_dropped']);
 });
 
 test('BR-O01 delivered and cancelled are terminal', function (OrderStatus $status, bool $terminal): void {

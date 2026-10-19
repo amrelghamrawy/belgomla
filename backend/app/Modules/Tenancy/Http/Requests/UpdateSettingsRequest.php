@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Requests;
 
 use App\Modules\Tenancy\Rules\InvitationTemplate;
+use App\Modules\Tenancy\Rules\OrderStatusTemplate;
 use App\Support\InvitationMessage;
 use App\Support\Money;
+use App\Support\OrderStatusMessage;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,6 +19,7 @@ final class UpdateSettingsRequest extends FormRequest
         'name', 'primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description',
         'working_hours', 'mov_enabled', 'mov_amount', 'require_login_for_prices', 'require_customer_approval',
         'stale_pending_hours', 'invitation_message', 'default_payment_terms_days', 'default_credit_limit',
+        'order_notify_statuses', 'order_status_messages',
     ];
 
     /**
@@ -44,6 +47,10 @@ final class UpdateSettingsRequest extends FormRequest
             'invitation_message' => ['sometimes', 'nullable', 'string', 'max:'.InvitationMessage::MAX_LENGTH, new InvitationTemplate],
             'default_payment_terms_days' => ['sometimes', 'nullable', 'integer', 'between:0,365'],
             'default_credit_limit' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'order_notify_statuses' => ['sometimes', 'array'],
+            'order_notify_statuses.*' => ['string', 'distinct', 'in:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
+            'order_status_messages' => ['sometimes', 'array:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
+            'order_status_messages.*' => ['nullable', 'string', 'max:'.OrderStatusMessage::MAX_LENGTH, new OrderStatusTemplate],
         ];
     }
 
@@ -112,6 +119,43 @@ final class UpdateSettingsRequest extends FormRequest
     public function nullableMoney(string $field): ?string
     {
         return $this->filled($field) ? Money::normalize($this->string($field)->value()) : null;
+    }
+
+    /**
+     * BR-N03: the statuses to notify, in the platform's order, without duplicates.
+     *
+     * @return list<string>|null
+     */
+    public function orderNotifyStatuses(): ?array
+    {
+        if (! $this->has('order_notify_statuses')) {
+            return null;
+        }
+
+        $sent = array_map(strval(...), array_filter($this->array('order_notify_statuses'), is_string(...)));
+
+        return array_values(array_intersect(array_keys(OrderStatusMessage::DEFAULTS), $sent));
+    }
+
+    /**
+     * BR-N03: status => template; an empty text or the default text sent back is stored as null (= the default).
+     *
+     * @return array<string, string|null>|null
+     */
+    public function orderStatusMessages(): ?array
+    {
+        if (! $this->has('order_status_messages')) {
+            return null;
+        }
+
+        $messages = [];
+
+        foreach ($this->array('order_status_messages') as $status => $text) {
+            $text = is_string($text) ? mb_trim($text) : '';
+            $messages[(string) $status] = $text === '' || $text === OrderStatusMessage::DEFAULTS[(string) $status] ? null : $text;
+        }
+
+        return array_filter($messages, fn (?string $text): bool => $text !== null);
     }
 
     public function stalePendingHours(): ?int

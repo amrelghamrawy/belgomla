@@ -38,6 +38,7 @@ export function customer(overrides: Partial<Customer> = {}): Customer {
     id: 7,
     name: "مكتبة الأمل",
     phone: "+201012345678",
+    order_notifications: true,
     status: "active",
     status_label: "نشط",
     phone_verified_at: "2026-10-01T10:00:00Z",

@@ -64,7 +64,7 @@ final readonly class Checkout
             $order = $this->createOrder($customer, $address, $data, $checked);
             $this->history->handle($order, null, ActorType::Customer, $customer->id);
             $this->clearCart->handle($customer);
-            $this->notify->handle(NotificationType::NewOrder, $order);
+            $this->notify->forOrder(NotificationType::NewOrder, $order);
             $this->audit->log('order.created', $order, null, [
                 'number' => $order->number,
                 'status' => $order->status->value,

@@ -139,6 +139,30 @@ describe("NotificationsBell", () => {
     expect(links[0]).toHaveAttribute("href", "/dashboard/orders/1001");
   });
 
+  it("BR-N02 a dropped store WhatsApp number links to settings", async () => {
+    stubApi(
+      shellRoutes(
+        [
+          notification({
+            id: 9,
+            type: "whatsapp_dropped",
+            type_label: "انفصل رقم واتساب المتجر",
+            details: { phone: "+201001234567", reason: "logged_out" },
+          }),
+        ],
+        1,
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await user.click(await screen.findByRole("button", { name: "الإشعارات، 1 غير مقروءة" }));
+
+    const link = await screen.findByRole("link", { name: /اربطه من جديد من الإعدادات/ });
+    expect(link).toHaveAttribute("href", "/dashboard/settings");
+    expect(link).toHaveTextContent("01001234567");
+  });
+
   it("marks everything read and refreshes the count", async () => {
     const fetchMock = stubApi({
       ...shellRoutes(),

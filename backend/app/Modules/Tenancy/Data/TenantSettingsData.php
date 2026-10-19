@@ -34,6 +34,10 @@ final readonly class TenantSettingsData
         public array $sent,
         public ?int $defaultPaymentTermsDays = null,
         public ?string $defaultCreditLimit = null,
+        /** @var list<string>|null */
+        public ?array $orderNotifyStatuses = null,
+        /** @var array<string, string|null>|null */
+        public ?array $orderStatusMessages = null,
     ) {}
 
     public static function fromRequest(UpdateSettingsRequest $request): self
@@ -56,6 +60,8 @@ final readonly class TenantSettingsData
             sent: $request->sentKeys(),
             defaultPaymentTermsDays: $request->nullableInteger('default_payment_terms_days'),
             defaultCreditLimit: $request->nullableMoney('default_credit_limit'),
+            orderNotifyStatuses: $request->orderNotifyStatuses(),
+            orderStatusMessages: $request->orderStatusMessages(),
         );
     }
 
@@ -82,6 +88,8 @@ final readonly class TenantSettingsData
             'invitation_message' => $this->invitationMessage,
             'default_payment_terms_days' => $this->defaultPaymentTermsDays,
             'default_credit_limit' => $this->defaultCreditLimit,
+            'order_notify_statuses' => $this->orderNotifyStatuses,
+            'order_status_messages' => $this->orderStatusMessages === [] ? null : $this->orderStatusMessages,
         ];
 
         return array_intersect_key($map, array_flip($this->sent));

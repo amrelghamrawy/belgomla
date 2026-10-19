@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
 use App\Support\InvitationMessage;
+use App\Support\OrderStatusMessage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -81,7 +82,32 @@ test('settings validation', function (array $body, string $field): void {
     'default terms over a year' => [['default_payment_terms_days' => 366], 'default_payment_terms_days'],
     'default limit negative' => [['default_credit_limit' => '-1'], 'default_credit_limit'],
     'default limit three decimals' => [['default_credit_limit' => '1.001'], 'default_credit_limit'],
+    'unknown notify status' => [['order_notify_statuses' => ['pending']], 'order_notify_statuses.0'],
+    'notify statuses not a list' => [['order_notify_statuses' => 'confirmed'], 'order_notify_statuses'],
+    'duplicate notify status' => [['order_notify_statuses' => ['confirmed', 'confirmed']], 'order_notify_statuses.0'],
+    'message for an unknown status' => [['order_status_messages' => ['pending' => 'x']], 'order_status_messages'],
+    'message too long' => [['order_status_messages' => ['confirmed' => str_repeat('ا', 501)]], 'order_status_messages.confirmed'],
+    'message unknown placeholder' => [['order_status_messages' => ['confirmed' => 'أهلًا {name}']], 'order_status_messages.confirmed'],
+    'reason outside cancelled' => [['order_status_messages' => ['delivered' => '{سبب_الإلغاء}']], 'order_status_messages.delivered'],
 ]);
+
+test('BR-N03 an owner picks the statuses customers hear about and words a status, the default text sent back is dropped', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', [
+        'order_notify_statuses' => ['delivered', 'confirmed'],
+        'order_status_messages' => ['confirmed' => 'تأكد طلبك {رقم_الطلب}', 'delivered' => OrderStatusMessage::DEFAULTS['delivered'], 'cancelled' => null],
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'delivered'])
+        ->assertJsonPath('data.order_status_messages', ['confirmed' => 'تأكد طلبك {رقم_الطلب}'])
+        ->assertJsonPath('data.order_status_message_defaults.cancelled', OrderStatusMessage::DEFAULTS['cancelled']);
+});
+
+test('BR-N03 by default the four main statuses notify in the platform words', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/settings')
+        ->assertOk()
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'out_for_delivery', 'delivered', 'cancelled'])
+        ->assertJsonPath('data.order_status_messages', []);
+});
 
 test('BR-C05 BR-C06 an owner sets the credit terms new customers start with, and clears them with null', function (): void {
     $this->tenantJson('PUT', '/api/dashboard/settings', ['default_payment_terms_days' => 30, 'default_credit_limit' => '2500'])

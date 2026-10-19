@@ -33,6 +33,7 @@ test('BR-CU05 the storefront customer resource shows the profile and status only
         'status_label' => 'نشط',
         'phone_verified_at' => now()->toIso8601String(),
         'created_at' => now()->toIso8601String(),
+        'order_notifications' => true,
     ]);
 });
 
@@ -41,7 +42,7 @@ test('the dashboard customer resource adds the outstanding amount, creator, appr
     $customer = Customer::factory()->blocked()->create(['created_by' => $owner->id])->refresh();
 
     expect(array_keys(rendered(CustomerResource::forDashboard($customer, '12.50'), dashboardRequest())))->toBe([
-        'id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at',
+        'id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'order_notifications',
         'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days',
     ])
         ->and(rendered(CustomerResource::forDashboard($customer, '12.50'), dashboardRequest())['outstanding_amount'])->toBe('12.50');

@@ -6,8 +6,8 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | -- | ------------------------------------------------------ | ------------------------------------------ | ------- | ------ |
 | 00 | [V1 close-out (gate)](00-v1-closeout.md)               | deploy/, wa-gateway/, frontend             | in progress (repo side done, go-live pending) | 1b252a4 |
 | 01 | [Returns (المرتجع)](01-returns.md)                     | Orders, Inventory, Collections, Reports    | done    | d0a8beb |
-| 02 | [Credit terms & account statement](02-credit-and-statement.md) | Customers, Collections, Orders, Reports | done    | see log |
-| 03 | [Customer order notifications](03-order-notifications.md) | Messaging, Orders, Tenancy settings     | planned |        |
+| 02 | [Credit terms & account statement](02-credit-and-statement.md) | Customers, Collections, Orders, Reports | done    | 75e2782 |
+| 03 | [Customer order notifications](03-order-notifications.md) | Messaging, Orders, Tenancy settings     | done (live VM check pending) | see log |
 | 04 | [Pending order auto-expiry](04-pending-expiry.md)      | Orders, Tenancy settings                   | planned |        |
 | 05 | [Staff accounts, roles & permissions](05-staff-roles.md) | Tenancy, every dashboard route, frontend | planned |        |
 | 06 | [Catalog import/export](06-import-export.md)           | Catalog, Pricing, Inventory                | planned |        |

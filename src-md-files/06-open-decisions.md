@@ -5,7 +5,7 @@ Each item below has a **default** already written into the other documents so wo
 | #   | Decision                                                   | Default applied                                                                                               | Where       |
 | --- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
 | D5  | Basic V1 dashboard reports                                 | (a) Orders per status and total sales by date range. (b) Outstanding amount per customer. (c) Low-stock SKUs. | Roadmap §10 |
-| D6  | Customer-side in-app notifications                         | None in V1. Customer sees status on the "my orders" page only.                                                | BR-N02      |
+| D6  | Customer-side in-app notifications                         | None. The customer sees the status on the "my orders" page and, since V2 Task 03, gets WhatsApp order status messages (BR-N03). | BR-N02, BR-N03 |
 | D7  | Cancelling an order that has collections                   | Blocked until collections are voided.                                                                         | BR-O03      |
 | D9  | Can a customer change the delivery address after ordering? | No. Merchant can edit the address snapshot on the order before `Out for Delivery`.                            | BR-O10      |
 | D10 | Highlight threshold for stale Pending orders               | 24 hours.                                                                                                     | BR-INV07    |
@@ -70,6 +70,8 @@ Each item below has a **default** already written into the other documents so wo
 | D77 | Credit exposure (V2 Task 02)                               | Net outstanding of delivered orders + net totals of open (pending … out for delivery) orders − remaining customer credit. Open orders count because their stock is already reserved for the customer; deposits on open orders do not lower it. | BR-C05 |
 | D78 | A checkout refused for the credit limit                    | The customer sees their limit, current balance (exposure) and the order total, plus the store's phone/WhatsApp to arrange payment. No automatic merchant notification. | BR-C05 |
 | D76 | Voiding a return whose stock is gone (sold or reserved again) | Refused with `422 insufficient_stock` (the stock ledger's existing code, not the 409 the task proposed); the merchant adjusts stock first. | BR-R06 |
+| D79 | Order status message limit (V2 Task 03)                    | Order status messages have their own per-phone bucket, 10 per hour per tenant+phone (`messaging.limits.order_status_per_phone_per_hour`), separate from OTP/invitations (5/hour), so a busy order day never blocks a verification code. The per-number 10/min cap of D46/D70 still applies to everything. Over the limit the message is skipped and logged; the order change never fails. | BR-N03, BR-CU07 |
+| D80 | Order status messages and SMS                              | WhatsApp only (store number, then platform number); never SMS. SMS costs the platform per segment (D13), and the status is visible on "my orders". Revisit if merchants ask. | BR-N01, BR-N03 |
 
 These are treated as accepted defaults unless the product owner objects.
 

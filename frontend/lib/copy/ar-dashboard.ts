@@ -39,6 +39,7 @@ export const dashboard = {
     empty: "لا توجد إشعارات",
     markAllRead: "تحديد الكل كمقروء",
     orderLine: (number: number, customer: string) => `طلب #${number} من ${customer}`,
+    whatsappDropped: (phone: string) => `انفصل رقم واتساب المتجر ${phone}. اربطه من جديد من الإعدادات.`,
   },
 
   list: {
@@ -448,6 +449,16 @@ export const dashboard = {
     balance: "المتبقي",
     customerNote: "ملاحظة العميل",
     timeline: "مراحل الطلب",
+    // BR-N03: what the customer was sent about the order.
+    messages: "الرسائل",
+    messageStatuses: {
+      queued: "في الانتظار",
+      sent: "أُرسلت",
+      delivered: "وصلت",
+      failed: "فشلت",
+      fell_back: "أُعيد إرسالها من رقم آخر",
+    } as Record<string, string>,
+    messageChannels: { whatsapp: "واتساب", sms: "رسالة نصية" } as Record<string, string>,
     placed: "تم إنشاء الطلب",
     by: { customer: "العميل", tenant_user: "المتجر", system: "تلقائيًا" } as Record<string, string>,
     delivery: "التوصيل",
@@ -648,6 +659,26 @@ export const dashboard = {
       count: (used: number, max: number) => `${used} / ${max}`,
       unknown: (tokens: string) => `متغير غير معروف: ${tokens}. استخدم الأزرار لإضافة المتغيرات.`,
       tooLong: (max: number) => `الحد الأقصى ${max} حرف`,
+    },
+    // BR-N03: WhatsApp messages to the customer when an order moves.
+    orderMessages: {
+      title: "رسائل حالة الطلب",
+      hint: "تصل للعميل على واتساب (من رقم متجرك إن كان مربوطًا) عند تغيير حالة طلبه. لا تُرسل SMS، ويستطيع العميل إيقافها من حسابه.",
+      notify: (status: string) => `أرسل رسالة عند: ${status}`,
+      label: (status: string) => `نص رسالة «${status}»`,
+      insert: "أضف إلى النص:",
+      placeholders: {
+        customer: "اسم العميل",
+        store: "اسم المتجر",
+        number: "رقم الطلب",
+        status: "حالة الطلب",
+        total: "الإجمالي",
+        reason: "سبب الإلغاء",
+      },
+      restore: "استرجاع النص الافتراضي",
+      preview: "معاينة الرسالة",
+      sample: { customer: "أحمد محمود", number: "1024", total: "1,250.00 ج.م", reason: "نفاد الكمية" },
+      unknown: (tokens: string) => `متغير غير معروف: ${tokens}. استخدم الأزرار لإضافة المتغيرات.`,
     },
   },
 

@@ -13,6 +13,7 @@ use App\Modules\Customers\Http\Controllers\Store\Auth\SessionController;
 use App\Modules\Customers\Http\Controllers\Store\CartController;
 use App\Modules\Customers\Http\Controllers\Store\CartItemController;
 use App\Modules\Customers\Http\Controllers\Store\MeController;
+use App\Modules\Customers\Http\Controllers\Store\PreferencesController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -40,6 +41,7 @@ Route::post('cart/items', [CartItemController::class, 'store'])
 Route::middleware(['auth:customer', 'session.tenant:customer'])->group(function (): void {
     Route::post('auth/logout', [SessionController::class, 'destroy'])->name('auth.logout');
     Route::get('me', [MeController::class, 'show'])->name('me');
+    Route::patch('account/preferences', [PreferencesController::class, 'update'])->name('account.preferences');
 
     Route::middleware('customer.active')->group(function (): void {
         Route::get('addresses', [AddressController::class, 'index'])->name('addresses.index');
