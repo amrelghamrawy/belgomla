@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isApiError } from "@/lib/api/errors";
 import { ar, messageFor } from "@/lib/copy/ar";
 
 /** Placeholder rows while a list or card loads. */
@@ -22,6 +23,15 @@ export function LoadingBlock({ rows = 5 }: { rows?: number }) {
 
 /** A failed read, with its Arabic message and a retry. */
 export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  // D82: the role may not open this page; retrying would not help.
+  if (isApiError(error, "forbidden")) {
+    return (
+      <Alert data-testid="forbidden">
+        <AlertDescription>{ar.dashboard.forbidden}</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <Alert variant="destructive">
       <AlertDescription className="flex flex-wrap items-center justify-between gap-2">

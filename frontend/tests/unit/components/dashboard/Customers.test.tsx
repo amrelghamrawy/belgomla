@@ -1,15 +1,22 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerDetail } from "@/components/dashboard/customers/CustomerDetailPage";
 import { CreateCustomerDialog, CustomersPage } from "@/components/dashboard/customers/CustomersPage";
 import type { DashboardCustomer } from "@/lib/api/types";
 
+import { signedInAs } from "../../dashboard-fixtures";
 import { address, page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
-import { renderWithQuery, router, searchParams } from "../../render";
+import { renderWithQuery as renderBare, router, searchParams } from "../../render";
+
+/** These screens hide what the role may not do (D82): render them for a signed-in owner unless a test picks a role. */
+function renderWithQuery(ui: ReactElement, client = signedInAs("owner")) {
+  return renderBare(ui, client);
+}
 
 function dashboardCustomer(overrides: Partial<DashboardCustomer> = {}): DashboardCustomer {
   return {
@@ -323,5 +330,36 @@ describe("CustomerDetail", () => {
       credit_limit: "2000",
       payment_terms_days: null,
     });
+  });
+
+  it("D82 an accountant changes only the credit terms: the name stays and no addresses are sent", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/customers/7": json(200, { data: dashboardCustomer() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<CustomerDetail customer={dashboardCustomer()} />, signedInAs("accountant"));
+
+    expect(screen.getByLabelText("الاسم")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "إضافة عنوان" })).toBeNull();
+    await user.type(screen.getByLabelText("حد الائتمان"), "3000");
+    await user.click(screen.getByRole("button", { name: "حفظ البيانات" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7")[0]?.body).toEqual({
+        name: "مكتبة الأمل",
+        credit_limit: "3000",
+        payment_terms_days: null,
+      }),
+    );
+  });
+
+  it("D82 sales edits the profile but not the credit terms, which are left out of the save", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/customers/7": json(200, { data: dashboardCustomer() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<CustomerDetail customer={dashboardCustomer()} />, signedInAs("sales"));
+
+    expect(screen.getByLabelText("حد الائتمان")).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "حفظ البيانات" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7")[0]?.body).not.toHaveProperty("credit_limit");
   });
 });

@@ -40,6 +40,7 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 import { useRouteParam } from "@/lib/store/route";
+import { useCan } from "@/lib/dashboard/permissions";
 
 import { Pager } from "../common/Pager";
 import { ReasonDialog } from "../common/ReasonDialog";
@@ -66,6 +67,7 @@ export function CustomerDetailPage() {
 export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
   const [query, setQuery] = useListQuery(["tab"]);
   const tab = query.tab ?? "profile";
+  const allowed = useCan();
 
   return (
     <>
@@ -96,7 +98,7 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
             )}
           </span>
         }
-        actions={<CustomerActions customer={customer} />}
+        actions={allowed("customers.manage") ? <CustomerActions customer={customer} /> : undefined}
       />
       {customer.status === "blocked" && customer.blocked_reason !== null && (
         <Alert variant="destructive">
@@ -214,9 +216,16 @@ function addressInput(address: NonNullable<DashboardCustomer["addresses"]>[numbe
   };
 }
 
-/** Name and the address list, saved together: the PUT replaces the whole list (D54). The phone is fixed. */
+/**
+ * Name and the address list, saved together: the PUT replaces the whole list (D54). The phone is fixed. D82: the name
+ * and addresses need `customers.manage`, the credit terms `customers.credit`; what the role may not change is shown
+ * read-only and left out of the PUT.
+ */
 function ProfileForm({ customer }: { customer: DashboardCustomer }) {
   const update = useUpdateCustomer(customer.id);
+  const allowed = useCan();
+  const editsProfile = allowed("customers.manage");
+  const editsCredit = allowed("customers.credit");
   const [name, setName] = useState(customer.name);
   const [addresses, setAddresses] = useState<CustomerAddressInput[]>((customer.addresses ?? []).map(addressInput));
   const [creditLimit, setCreditLimit] = useState(customer.credit_limit ?? "");
@@ -225,12 +234,12 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
   const [error, setError] = useState<string | null>(null);
 
   const save = () => {
-    if (name.trim() === "") {
+    if (editsProfile && name.trim() === "") {
       setError(ar.validation.required);
       return;
     }
 
-    const termsBody = creditTerms(creditLimit, terms);
+    const termsBody = editsCredit ? creditTerms(creditLimit, terms) : {};
 
     if (termsBody === null) {
       setError(ar.dashboard.productForm.invalidMoney);
@@ -239,7 +248,7 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
 
     setError(null);
     update.mutate(
-      { name: name.trim(), addresses, ...termsBody },
+      editsProfile ? { name: name.trim(), addresses, ...termsBody } : { name: customer.name, ...termsBody },
       { onSuccess: () => toast.success(copy.profileSaved), onError: (failure) => setError(messageFor(failure)) },
     );
   };
@@ -249,7 +258,13 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="profile-name">{copy.name}</Label>
-          <Input id="profile-name" maxLength={150} value={name} onChange={(event) => setName(event.target.value)} />
+          <Input
+            id="profile-name"
+            maxLength={150}
+            value={name}
+            disabled={!editsProfile}
+            onChange={(event) => setName(event.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <Label htmlFor="profile-phone">{copy.phone}</Label>
@@ -266,6 +281,7 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
             inputMode="decimal"
             className="text-start"
             value={creditLimit}
+            disabled={!editsCredit}
             onChange={(event) => setCreditLimit(event.target.value)}
           />
           <p className="text-muted-foreground text-xs">{copy.creditLimitHint}</p>
@@ -278,6 +294,7 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
             inputMode="numeric"
             className="text-start"
             value={terms}
+            disabled={!editsCredit}
             onChange={(event) => setTerms(event.target.value)}
           />
           <p className="text-muted-foreground text-xs">{copy.paymentTermsHint}</p>
@@ -285,9 +302,11 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
       </div>
       <div className="flex items-center justify-between">
         <h2 className="font-medium">{copy.addresses}</h2>
-        <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
-          {copy.addAddress}
-        </Button>
+        {editsProfile && (
+          <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
+            {copy.addAddress}
+          </Button>
+        )}
       </div>
       {addresses.length === 0 ? (
         <EmptyBlock>{copy.noAddresses}</EmptyBlock>
@@ -311,7 +330,7 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
                   {[address.address_line, address.city, address.governorate].join("، ")}
                 </span>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 gap-1" hidden={!editsProfile}>
                 <Button variant="ghost" size="icon" aria-label={ar.addresses.edit} onClick={() => setEditing(index)}>
                   <PencilIcon />
                 </Button>
@@ -329,9 +348,11 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
         </ul>
       )}
       {error !== null && <FieldError role="alert">{error}</FieldError>}
-      <Button className="self-start" disabled={update.isPending} onClick={save}>
-        {update.isPending ? ar.saving : copy.saveProfile}
-      </Button>
+      {(editsProfile || editsCredit) && (
+        <Button className="self-start" disabled={update.isPending} onClick={save}>
+          {update.isPending ? ar.saving : copy.saveProfile}
+        </Button>
+      )}
       {editing !== null && (
         <AddressDialog
           address={editing === "new" ? null : (addresses[editing] ?? null)}

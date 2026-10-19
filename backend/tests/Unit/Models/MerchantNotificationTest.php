@@ -15,7 +15,7 @@ beforeEach(function (): void {
 test('to array', function (): void {
     $notification = MerchantNotification::factory()->create()->fresh();
 
-    expect(array_keys($notification?->toArray() ?? []))->toBe(['id', 'tenant_id', 'tenant_user_id', 'type', 'data', 'read_at', 'created_at', 'updated_at']);
+    expect(array_keys($notification?->toArray() ?? []))->toBe(['id', 'tenant_id', 'tenant_user_id', 'type', 'data', 'read_at', 'created_at', 'updated_at', 'permission']);
 });
 
 test('casts: type enum, data array, immutable read_at', function (): void {

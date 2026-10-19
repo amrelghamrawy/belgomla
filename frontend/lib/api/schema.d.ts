@@ -1754,7 +1754,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2126,7 +2126,8 @@ export interface components {
             name: string;
             email: string;
             /** @enum {string} */
-            role: "owner";
+            role: "owner" | "manager" | "sales" | "warehouse" | "accountant";
+            role_label: string;
             /** @enum {string} */
             status: "active" | "disabled";
             /** Format: date-time */
@@ -2143,7 +2144,11 @@ export interface components {
         DashboardMe: {
             user: components["schemas"]["TenantUser"];
             tenant: components["schemas"]["Tenant"];
+            /** @description BR-T06, D82: what the role may do; every other dashboard endpoint answers 403 forbidden */
+            permissions: components["schemas"]["Permission"][];
         };
+        /** @enum {string} */
+        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description BR-N03 the statuses customers are told about */
             order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
@@ -4198,6 +4203,11 @@ export interface operations {
                     /** Format: email */
                     email: string;
                     password: string;
+                    /**
+                     * @description BR-T06, D82; owner when left out
+                     * @enum {string}
+                     */
+                    role?: "owner" | "manager" | "sales" | "warehouse" | "accountant";
                 };
             };
         };
@@ -4233,6 +4243,11 @@ export interface operations {
                     /** @enum {string} */
                     status?: "active" | "disabled";
                     password?: string;
+                    /**
+                     * @description D82; the last active owner cannot be demoted or disabled (409 last_owner)
+                     * @enum {string}
+                     */
+                    role?: "owner" | "manager" | "sales" | "warehouse" | "accountant";
                 };
             };
         };

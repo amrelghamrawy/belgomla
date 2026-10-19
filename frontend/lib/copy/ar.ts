@@ -49,6 +49,7 @@ const errors: Record<ApiErrorCode, string> = {
   invalid_vertical: "نوع النشاط غير صالح",
   invited: "أكمل التسجيل من رابط الدعوة أولًا",
   last_active_user: "يجب أن يبقى مستخدم نشط واحد على الأقل",
+  last_owner: "يجب أن يبقى مالك نشط واحد على الأقل",
   network_error: "تعذر الاتصال، تأكد من الإنترنت وحاول مرة أخرى",
   not_found: "العنصر غير موجود",
   order_cancelled: "الطلب ملغي",

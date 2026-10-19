@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Console\TenantListCommand;
 use App\Modules\Tenancy\Console\TenantSuspendCommand;
 use App\Modules\Tenancy\Http\Middleware\EnsureSessionTenant;
 use App\Modules\Tenancy\Http\Middleware\EnsureTenantActive;
+use App\Modules\Tenancy\Http\Middleware\RequirePermission;
 use App\Modules\Tenancy\Http\Middleware\ResolveTenant;
 use App\Support\ApiException;
 use App\Support\ApiResponse;
@@ -65,6 +66,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer.active' => EnsureCustomerActive::class,
             'prices.visible' => RejectGuestsWhenPricesHidden::class,
             'idempotent' => IdempotencyKey::class,
+            'permission' => RequirePermission::class,
         ]);
 
         // Laravel re-sorts route middleware by priority and pulls `auth:*` ahead of unlisted middleware.
@@ -74,6 +76,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureTenantActive::class);
         // D53: a guest adding to the cart while prices are hidden gets 403 prices_hidden before auth's 401.
         $middleware->prependToPriorityList(AuthenticatesRequests::class, RejectGuestsWhenPricesHidden::class);
+        // D82: a role without the permission gets 403 right after auth, before route binding can answer 404.
+        $middleware->appendToPriorityList(AuthenticatesRequests::class, RequirePermission::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Every /api/* error uses the envelope from 08-api-contract.md §0.
@@ -91,7 +95,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 $e instanceof AuthenticationException => ApiResponse::error(401, 'unauthenticated', 'يجب تسجيل الدخول'),
 
-                $e instanceof AuthorizationException => ApiResponse::error(403, 'forbidden', 'غير مسموح بهذا الإجراء'),
+                // A denied policy or FormRequest::authorize() arrives as a 403 HttpException wrapping the AuthorizationException.
+                $e instanceof AuthorizationException,
+                $e instanceof HttpExceptionInterface && $e->getStatusCode() === 403 && $e->getPrevious() instanceof AuthorizationException => ApiResponse::error(403, 'forbidden', 'غير مسموح بهذا الإجراء'),
 
                 $e instanceof ModelNotFoundException,
                 $e instanceof NotFoundHttpException,

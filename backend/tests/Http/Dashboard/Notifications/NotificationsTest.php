@@ -27,6 +27,32 @@ test('BR-N02 a new order and a customer cancellation reach the dashboard, newest
     expect($response->json('data.1.details'))->toEqual(['order_number' => $order->number, 'customer_name' => 'مكتبة الأمل', 'order_total' => '450.00']);
 });
 
+test('D82 each role sees only the notifications its permissions cover, in the list, the count and when marking', function (): void {
+    $order = $this->inTenant(fn () => MerchantNotification::factory()->create());
+    $dropped = $this->inTenant(fn () => MerchantNotification::factory()->create([
+        'type' => App\Modules\Orders\Enums\NotificationType::WhatsappDropped, 'permission' => 'settings.manage', 'data' => ['phone' => '+201001234567', 'reason' => 'logged_out'],
+    ]));
+    $see = function (App\Modules\Tenancy\Enums\TenantUserRole $role): array {
+        $this->actingAsOwner($this->makeOwner(attributes: ['role' => $role]));
+        $response = $this->tenantJson('GET', '/api/dashboard/notifications')->assertOk();
+
+        return [array_column($response->json('data'), 'id'), $response->json('unread_count')];
+    };
+
+    expect($see(App\Modules\Tenancy\Enums\TenantUserRole::Owner))->toBe([[$dropped->id, $order->id], 2])
+        ->and($see(App\Modules\Tenancy\Enums\TenantUserRole::Warehouse))->toBe([[$order->id], 1])
+        ->and($see(App\Modules\Tenancy\Enums\TenantUserRole::Accountant))->toBe([[], 0]);
+
+    $this->tenantJson('POST', '/api/dashboard/notifications/read', ['all' => true])->assertOk()->assertJsonPath('data.marked', 0);
+    expect($order->refresh()->read_at)->toBeNull();
+});
+
+test('D82 a notification carries the permission of its type', function (): void {
+    $this->placeOrder($this->makeCustomer(), [$this->orderableSku()->id => 5]);
+
+    expect($this->inTenant(fn () => MerchantNotification::query()->sole()->permission))->toBe(App\Modules\Tenancy\Enums\Permission::OrdersManage);
+});
+
 test('BR-N02 ?unread=1 leaves out the read ones', function (): void {
     [$read, $unread] = $this->inTenant(fn (): array => [MerchantNotification::factory()->read()->create(), MerchantNotification::factory()->create()]);
 

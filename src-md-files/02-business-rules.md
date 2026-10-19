@@ -51,9 +51,28 @@ There is no cross-tenant product listing in V1.
 
 A tenant has one or more tenant users.
 
-V1 has a single role: `owner`. All tenant users have full dashboard access.
+Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are fixed by the platform:
 
-Roles and granular permissions are V2.
+| Permission | owner | manager | sales | warehouse | accountant |
+| ---------- | :---: | :-----: | :---: | :-------: | :--------: |
+| `catalog.manage` (products, categories, units, fields) | ✓ | ✓ | | | |
+| `pricing.manage` | ✓ | ✓ | | | |
+| `inventory.adjust` | ✓ | ✓ | | ✓ | |
+| `orders.view` (also reading the catalog and stock) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `orders.manage` (transition, cancel, address) | ✓ | ✓ | ✓ | ✓ (preparing / out for delivery only, no cancel) | |
+| `orders.returns` | ✓ | ✓ | | ✓ | |
+| `customers.manage` | ✓ | ✓ | ✓ | | |
+| `customers.credit` (limits, terms) | ✓ | ✓ | | | ✓ |
+| `collections.manage` | ✓ | ✓ | | | ✓ |
+| `reports.view` | ✓ | ✓ | | | ✓ |
+| `settings.manage` (incl. the WhatsApp link) | ✓ | | | | |
+| `users.manage` | ✓ | | | | |
+| `audit.view` | ✓ | ✓ | | | |
+
+- Every dashboard endpoint needs a permission; without it the answer is `403 forbidden` and the screen is hidden. Customers can be listed by anyone with `customers.manage`, `customers.credit` or `collections.manage`; changing a customer's name or addresses needs `customers.manage`, changing the credit terms `customers.credit`. Delivering with "collect the full amount" needs `collections.manage`.
+- A user sees only the notifications their role covers: order notifications need `orders.manage`, `whatsapp_dropped` needs `settings.manage`. Read state stays shared (D57).
+- A store always keeps at least one active owner: the last active owner can be neither demoted nor disabled (`409 last_owner`). A role change is audited (`tenant_user.role_changed`).
+- `tenant:create` and `tenant:demo` create an owner; a user added from the dashboard is an owner unless a role is picked.
 
 ### BR-T07 — Tenant Lifecycle
 

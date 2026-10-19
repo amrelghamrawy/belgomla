@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 | Dashboard reports (08-api-contract.md §11, D5): read-only, every figure scoped to the tenant.
 */
 
-Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->prefix('reports')->name('reports.')->group(function (): void {
+Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user', 'permission:reports.view'])->prefix('reports')->name('reports.')->group(function (): void {
     Route::get('overview', [OverviewController::class, 'show'])->name('overview');
     Route::get('sales', [SalesController::class, 'show'])->name('sales');
     Route::get('outstanding', [OutstandingController::class, 'show'])->name('outstanding');

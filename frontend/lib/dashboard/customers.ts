@@ -74,7 +74,7 @@ export function useUpdateCustomer(id: number) {
   const store = useStoreCustomer();
 
   return useMutation({
-    mutationFn: (body: { name: string; addresses: CustomerAddressInput[] } & CreditTermsInput) =>
+    mutationFn: (body: { name: string; addresses?: CustomerAddressInput[] } & CreditTermsInput) =>
       apiFetch<DashboardCustomer>(`/api/dashboard/customers/${id}`, { method: "PUT", body }),
     onSuccess: store,
   });

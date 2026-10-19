@@ -362,6 +362,51 @@ describe("order status messages", () => {
 });
 
 describe("UsersPage", () => {
+  it("D82 changes a user's role from the list and shows last_owner", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/users": json(200, {
+        data: [tenantUser(), tenantUser({ id: 2, name: "سارة", email: "sara@alnoor.test", role: "sales" })],
+      }),
+      "GET /api/dashboard/me": json(200, { data: dashboardMe() }),
+      "PATCH /api/dashboard/users/2": json(200, { data: tenantUser({ id: 2, role: "warehouse" }) }),
+      "PATCH /api/dashboard/users/1": envelopeError(409, "last_owner", "لا يمكن تغيير دور آخر مالك نشط أو تعطيله"),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<UsersPage />);
+
+    await user.selectOptions(await screen.findByRole("combobox", { name: "دور سارة" }), "warehouse");
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PATCH /api/dashboard/users/2")[0]?.body).toEqual({ role: "warehouse" }),
+    );
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "دور أحمد" }), "manager");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("لا يمكن تغيير دور آخر مالك نشط أو تعطيله"));
+  });
+
+  it("D82 adds a user with a role, sales by default", async () => {
+    const fetchMock = stubApi({ "POST /api/dashboard/users": json(201, { data: tenantUser({ id: 3 }) }) });
+    const user = userEvent.setup();
+    renderWithQuery(<CreateUserDialog onClose={() => undefined} />);
+
+    expect(screen.getByLabelText("الدور")).toHaveValue("sales");
+    expect(screen.getByText("الطلبات والعملاء")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("الاسم"), "منى");
+    await user.type(screen.getByLabelText("البريد الإلكتروني"), "mona@alnoor.test");
+    await user.type(screen.getByLabelText("كلمة المرور"), "secret123");
+    await user.selectOptions(screen.getByLabelText("الدور"), "accountant");
+    expect(screen.getByText("التحصيل وحدود الائتمان والتقارير")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "POST /api/dashboard/users")[0]?.body).toEqual({
+        name: "منى",
+        email: "mona@alnoor.test",
+        password: "secret123",
+        role: "accountant",
+      }),
+    );
+  });
+
   it("marks the logged-in user and shows cannot_disable_self", async () => {
     stubApi({
       "GET /api/dashboard/users": json(200, {

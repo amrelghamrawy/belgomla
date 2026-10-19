@@ -5,17 +5,38 @@ declare(strict_types=1);
 namespace App\Modules\Customers\Http\Requests;
 
 use App\Modules\Customers\Data\AddressData;
+use App\Modules\Customers\Models\Customer;
+use App\Modules\Tenancy\Enums\Permission;
 use App\Support\Money;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * PUT /api/dashboard/customers/{id}: `{ name, addresses[]?, credit_limit?, payment_terms_days? }`. The phone cannot change;
  * a credit term left out stays, null clears it (BR-C05/C06). When `addresses` is
  * sent it is the full list: rows with an `id` are edited, rows without one are added, the rest archived (D54).
+ * D82: changing the name or the addresses needs `customers.manage`, changing a credit term `customers.credit`
+ * (an accountant sends the name unchanged and no addresses).
  */
 final class UpdateCustomerRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        $customer = $this->route('customer');
+
+        if (! $customer instanceof Customer) {
+            return true;
+        }
+
+        $profileChanged = $this->has('addresses') || ($this->has('name') && $this->name() !== $customer->name);
+        $creditChanged = (in_array('credit_limit', $this->creditTermsSent(), true) && $this->creditLimit() !== $customer->credit_limit)
+            || (in_array('payment_terms_days', $this->creditTermsSent(), true) && $this->paymentTermsDays() !== $customer->payment_terms_days);
+
+        return (! $profileChanged || Gate::allows(Permission::CustomersManage->value))
+            && (! $creditChanged || Gate::allows(Permission::CustomersCredit->value));
+    }
+
     /**
      * @return array<string, list<string|ValidationRule>>
      */

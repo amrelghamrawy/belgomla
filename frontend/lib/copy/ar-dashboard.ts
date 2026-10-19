@@ -30,6 +30,11 @@ export const dashboard = {
     admin: "الإدارة",
   },
 
+  // BR-T06, D82: a page the role may not open.
+  forbidden: "ليس لديك صلاحية لفتح هذه الصفحة. تواصل مع مالك المتجر إن كنت تحتاجها.",
+  welcome: (name: string) => `أهلًا ${name}`,
+  welcomeHint: "اختر من القائمة ما تريد العمل عليه.",
+
   userMenu: "حساب المستخدم",
   viewStore: "عرض المتجر",
 
@@ -736,7 +741,23 @@ export const dashboard = {
 
   users: {
     title: "المستخدمون",
-    description: "كل المستخدمين بصلاحية مالك في الإصدار الأول.",
+    description: "لكل مستخدم دور يحدد ما يراه وما يستطيع تعديله.",
+    role: "الدور",
+    roles: {
+      owner: "مالك",
+      manager: "مدير",
+      sales: "مبيعات",
+      warehouse: "مخزن",
+      accountant: "محاسب",
+    } as Record<string, string>,
+    roleHints: {
+      owner: "كل شيء، ومنها الإعدادات والمستخدمون",
+      manager: "كل شيء عدا الإعدادات والمستخدمين",
+      sales: "الطلبات والعملاء",
+      warehouse: "تجهيز الطلبات وشحنها والمخزون والمرتجعات",
+      accountant: "التحصيل وحدود الائتمان والتقارير",
+    } as Record<string, string>,
+    roleOf: (name: string) => `دور ${name}`,
     add: "مستخدم جديد",
     addTitle: "مستخدم جديد",
     name: "الاسم",

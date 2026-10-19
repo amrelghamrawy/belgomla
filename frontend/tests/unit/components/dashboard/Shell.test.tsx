@@ -6,7 +6,7 @@ import { DashboardShell } from "@/components/dashboard/shell/DashboardShell";
 import { isActive } from "@/components/dashboard/shell/DashboardNav";
 import { NOTIFICATIONS_POLL_MS } from "@/lib/dashboard/notifications";
 
-import { notification, shellRoutes, stubDashboard } from "../../dashboard-fixtures";
+import { dashboardMe, notification, shellRoutes, stubDashboard } from "../../dashboard-fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { pathname, renderWithQuery, router } from "../../render";
 
@@ -118,6 +118,29 @@ describe("isActive", () => {
     expect(isActive("/dashboard", "/dashboard/orders")).toBe(false);
     expect(isActive("/dashboard/orders", "/dashboard/orders/12")).toBe(true);
     expect(isActive("/dashboard/orders", "/dashboard/ordersx")).toBe(false);
+  });
+});
+
+describe("DashboardNav per role (D82)", () => {
+  it("shows a sales user only the sections their role opens", async () => {
+    stubApi({ ...shellRoutes(), "GET /api/dashboard/me": json(200, { data: dashboardMe({ role: "sales" }) }) });
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    const nav = await screen.findByRole("navigation", { name: "القائمة الرئيسية" });
+    expect(within(nav).getByRole("link", { name: "الطلبات" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "العملاء" })).toBeInTheDocument();
+    for (const hidden of ["الإعدادات", "المستخدمون", "سجل التغييرات", "التقارير", "التحصيلات"]) {
+      expect(within(nav).queryByRole("link", { name: hidden })).toBeNull();
+    }
+  });
+
+  it("shows the owner every section", async () => {
+    stubApi(shellRoutes());
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    const nav = await screen.findByRole("navigation", { name: "القائمة الرئيسية" });
+    expect(within(nav).getByRole("link", { name: "الإعدادات" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "المستخدمون" })).toBeInTheDocument();
   });
 });
 

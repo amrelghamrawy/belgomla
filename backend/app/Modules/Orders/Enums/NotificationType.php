@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Enums;
 
+use App\Modules\Tenancy\Enums\Permission;
+
 /**
  * BR-N02: what the merchant is told about in the dashboard; `whatsapp_dropped` is the store number logging out (D70),
  * `order_expired` a pending order the system cancelled (BR-INV07, D81).
@@ -22,6 +24,15 @@ enum NotificationType: string
             self::CustomerCancelled => 'إلغاء من العميل',
             self::WhatsappDropped => 'انقطع رقم واتساب المتجر',
             self::OrderExpired => 'إلغاء تلقائي لطلب غير مؤكد',
+        };
+    }
+
+    /** D82: the permission a dashboard user needs to see this notification. */
+    public function permission(): Permission
+    {
+        return match ($this) {
+            self::NewOrder, self::CustomerCancelled, self::OrderExpired => Permission::OrdersManage,
+            self::WhatsappDropped => Permission::SettingsManage,
         };
     }
 

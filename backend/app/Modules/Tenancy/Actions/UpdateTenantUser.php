@@ -6,11 +6,15 @@ namespace App\Modules\Tenancy\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Tenancy\Data\TenantUserChanges;
+use App\Modules\Tenancy\Enums\TenantUserRole;
 use App\Modules\Tenancy\Enums\TenantUserStatus;
 use App\Modules\Tenancy\Exceptions\TenantUserConflict;
 use App\Modules\Tenancy\Models\TenantUser;
 
-/** Rename, disable/enable, or reset the password of a tenant user. */
+/**
+ * Rename, disable/enable, change the role of (BR-T06, D82), or reset the password of a tenant user. The last active
+ * owner can be neither demoted nor disabled (`409 last_owner`); a role change is audited `tenant_user.role_changed`.
+ */
 final readonly class UpdateTenantUser
 {
     public function __construct(private AuditLogger $audit) {}
@@ -21,10 +25,17 @@ final readonly class UpdateTenantUser
             $this->guardDisable($user, $actor);
         }
 
+        if ($changes->disables() || ($changes->role instanceof TenantUserRole && $changes->role !== TenantUserRole::Owner)) {
+            $this->guardLastOwner($user);
+        }
+
+        $oldRole = $user->role;
+
         $values = array_filter([
             'name' => $changes->name,
             'status' => $changes->status,
             'password' => $changes->password,
+            'role' => $changes->role,
         ], fn (mixed $value): bool => $value !== null);
 
         $old = $this->snapshot($user);
@@ -36,6 +47,10 @@ final readonly class UpdateTenantUser
         }
 
         $this->audit->log('tenant_user.updated', $user, $old, $new);
+
+        if ($user->role !== $oldRole) {
+            $this->audit->log('tenant_user.role_changed', $user, ['role' => $oldRole->value], ['role' => $user->role->value]);
+        }
 
         return $user;
     }
@@ -53,6 +68,23 @@ final readonly class UpdateTenantUser
 
         if (! $othersActive) {
             throw TenantUserConflict::lastActiveUser();
+        }
+    }
+
+    private function guardLastOwner(TenantUser $user): void
+    {
+        if ($user->role !== TenantUserRole::Owner || $user->status !== TenantUserStatus::Active) {
+            return;
+        }
+
+        $otherOwners = TenantUser::query()
+            ->where('role', TenantUserRole::Owner)
+            ->where('status', TenantUserStatus::Active)
+            ->whereKeyNot($user->getKey())
+            ->exists();
+
+        if (! $otherOwners) {
+            throw TenantUserConflict::lastOwner();
         }
     }
 

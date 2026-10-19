@@ -87,7 +87,7 @@ erDiagram
 | name          | varchar(100) |                               |
 | email         | varchar(190) | **unique (tenant_id, email)** |
 | password_hash | varchar      |                               |
-| role          | enum         | `owner` only in V1 (BR-T06)   |
+| role          | enum         | `owner`, `manager`, `sales`, `warehouse`, `accountant`; CHECK (V2, BR-T06, D82) |
 | status        | enum         | `active`, `disabled`          |
 | last_login_at | timestamptz  |                               |
 
@@ -455,7 +455,7 @@ Invariant (app, inside a transaction with the order row locked): `Σ live paymen
 
 `id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped|order_expired), data jsonb, read_at`.
 
-Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57). `whatsapp_dropped` (V2 Task 03) has no order: `data` holds `phone` and `reason`.
+Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57). `whatsapp_dropped` (V2 Task 03) has no order: `data` holds `phone` and `reason`. `permission` varchar(40) (V2 Task 05, D82): who may see the row (`orders.manage` for order notifications, `settings.manage` for `whatsapp_dropped`).
 
 ### `outbound_messages` (Tech §13)
 

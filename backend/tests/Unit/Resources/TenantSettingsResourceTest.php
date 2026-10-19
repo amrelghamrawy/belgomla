@@ -32,7 +32,7 @@ test('the user resource never exposes the password or token', function (): void 
 
     $data = new TenantUserResource($user)->resolve(Request::create('/'));
 
-    expect(array_keys($data))->toBe(['id', 'name', 'email', 'role', 'status', 'last_login_at'])
+    expect(array_keys($data))->toBe(['id', 'name', 'email', 'role', 'role_label', 'status', 'last_login_at'])
         ->and($data['role'])->toBe('owner')
         ->and($data['last_login_at'])->toBe('2026-10-09T10:00:00+00:00');
 });

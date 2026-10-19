@@ -15,12 +15,12 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
-    Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
-    Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
-    Route::get('customers/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
-    Route::put('customers/{customer}', [CustomerController::class, 'update'])->whereNumber('customer')->name('customers.update');
-    Route::post('customers/{customer}/invite', [CustomerInviteController::class, 'store'])->whereNumber('customer')->name('customers.invite');
-    Route::post('customers/{customer}/approve', [CustomerApprovalController::class, 'store'])->whereNumber('customer')->name('customers.approve');
-    Route::post('customers/{customer}/block', [CustomerBlockController::class, 'store'])->whereNumber('customer')->name('customers.block');
-    Route::post('customers/{customer}/unblock', [CustomerUnblockController::class, 'store'])->whereNumber('customer')->name('customers.unblock');
+    Route::get('customers', [CustomerController::class, 'index'])->middleware('permission:customers.manage,customers.credit,collections.manage')->name('customers.index');
+    Route::post('customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage')->name('customers.store');
+    Route::get('customers/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->middleware('permission:customers.manage,customers.credit,collections.manage')->name('customers.show');
+    Route::put('customers/{customer}', [CustomerController::class, 'update'])->whereNumber('customer')->middleware('permission:customers.manage,customers.credit')->name('customers.update');
+    Route::post('customers/{customer}/invite', [CustomerInviteController::class, 'store'])->whereNumber('customer')->middleware('permission:customers.manage')->name('customers.invite');
+    Route::post('customers/{customer}/approve', [CustomerApprovalController::class, 'store'])->whereNumber('customer')->middleware('permission:customers.manage')->name('customers.approve');
+    Route::post('customers/{customer}/block', [CustomerBlockController::class, 'store'])->whereNumber('customer')->middleware('permission:customers.manage')->name('customers.block');
+    Route::post('customers/{customer}/unblock', [CustomerUnblockController::class, 'store'])->whereNumber('customer')->middleware('permission:customers.manage')->name('customers.unblock');
 });

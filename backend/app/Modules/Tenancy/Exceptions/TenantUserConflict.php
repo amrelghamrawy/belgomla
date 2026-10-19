@@ -18,6 +18,12 @@ final class TenantUserConflict extends ApiException
         return new self(409, 'cannot_disable_self', 'لا يمكنك تعطيل حسابك الحالي');
     }
 
+    /** D82: a store always keeps at least one active owner. */
+    public static function lastOwner(): self
+    {
+        return new self(409, 'last_owner', 'لا يمكن تغيير دور آخر مالك نشط أو تعطيله');
+    }
+
     public static function lastActiveUser(): self
     {
         return new self(409, 'last_active_user', 'لا يمكن تعطيل آخر مستخدم نشط في المتجر');

@@ -12,7 +12,8 @@ use App\Modules\Orders\Models\Order;
  * BR-N02: tells every owner of the tenant about something in the dashboard, as a row in our own `notifications`
  * table (07-domain-model.md §9; an Action, not a Laravel Notification, because it is a plain write inside the
  * transaction of the change it reports): a new order or a customer cancellation (`forOrder`), or a store number that
- * dropped (`whatsapp_dropped` with the phone and reason, D70). Joins the caller's transaction.
+ * dropped (`whatsapp_dropped` with the phone and reason, D70). Each row names the permission a user needs to see it
+ * (D82). Joins the caller's transaction.
  */
 final readonly class NotifyMerchants
 {
@@ -24,6 +25,7 @@ final readonly class NotifyMerchants
         return MerchantNotification::query()->create([
             'tenant_user_id' => null,
             'type' => $type,
+            'permission' => $type->permission(),
             'data' => $data,
         ]);
     }

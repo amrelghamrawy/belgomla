@@ -1,12 +1,18 @@
 import { screen, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { Overview } from "@/components/dashboard/overview/Overview";
 
-import { overviewReport } from "../../dashboard-fixtures";
+import { overviewReport, signedInAs } from "../../dashboard-fixtures";
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
-import { renderWithQuery } from "../../render";
+import { renderWithQuery as renderBare } from "../../render";
+
+/** These screens hide what the role may not do (D82): render them for a signed-in owner unless a test picks a role. */
+function renderWithQuery(ui: ReactElement, client = signedInAs("owner")) {
+  return renderBare(ui, client);
+}
 
 const emptySales = {
   from: "2026-09-11",
@@ -17,6 +23,15 @@ const emptySales = {
 };
 
 describe("Overview", () => {
+  it("D82 a role without reports gets a greeting and no report calls", () => {
+    const fetchMock = stubApi({});
+    renderWithQuery(<Overview />, signedInAs("sales"));
+
+    expect(screen.getByRole("heading", { name: "أهلًا أحمد" })).toBeInTheDocument();
+    expect(screen.getByTestId("welcome")).toHaveTextContent("اختر من القائمة ما تريد العمل عليه.");
+    expect(callsTo(fetchMock, "GET /api/dashboard/reports/overview")).toHaveLength(0);
+  });
+
   it("charts the last 30 days of sales and the five largest debts", async () => {
     const fetchMock = stubApi({
       "GET /api/dashboard/reports/overview": json(200, { data: overviewReport() }),

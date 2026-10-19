@@ -162,6 +162,35 @@ test("BR-INV07 D81 the merchant turns on the automatic expiry and a pending orde
   }
 });
 
+test("BR-T06 D82 the owner adds a sales user, who sees orders but cannot open the settings", async ({
+  page,
+  browser,
+}) => {
+  const email = `sales-${uniqueSuffix()}@alnoor.test`;
+  await loginAsOwner(page);
+  await page.goto("/dashboard/users");
+  await page.getByRole("button", { name: "مستخدم جديد" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الاسم").fill("موظف مبيعات");
+  await dialog.getByLabel("البريد الإلكتروني").fill(email);
+  await dialog.getByLabel("كلمة المرور").fill("secret123");
+  await expect(dialog.getByLabel("الدور")).toHaveValue("sales");
+  await dialog.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByRole("combobox", { name: "دور موظف مبيعات" }).first()).toHaveValue("sales");
+
+  const context = await browser.newContext();
+  const sales = await context.newPage();
+  await loginAsOwner(sales, email, "secret123");
+  await expect(sales.getByTestId("welcome")).toBeVisible();
+
+  await sales.goto("/dashboard/orders");
+  await expect(sales.getByRole("heading", { name: "الطلبات" })).toBeVisible();
+
+  await sales.goto("/dashboard/settings");
+  await expect(sales.getByTestId("forbidden")).toContainText("ليس لديك صلاحية لفتح هذه الصفحة");
+  await context.close();
+});
+
 test("BR-R01 BR-R03 a delivered order takes a return of 2: the stock comes back and the balance drops", async ({
   page,
   browser,

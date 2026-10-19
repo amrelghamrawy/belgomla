@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CollectionsPage } from "@/components/dashboard/collections/CollectionsPage";
@@ -8,9 +9,15 @@ import { OrderDetail } from "@/components/dashboard/orders/OrderDetailPage";
 import { OrdersPage } from "@/components/dashboard/orders/OrdersPage";
 import type { Collection, DashboardCustomer, DashboardOrderDetail, OrderReturn } from "@/lib/api/types";
 
+import { signedInAs } from "../../dashboard-fixtures";
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
-import { renderWithQuery, router, searchParams } from "../../render";
+import { renderWithQuery as renderBare, router, searchParams } from "../../render";
+
+/** These screens hide what the role may not do (D82): render them for a signed-in owner unless a test picks a role. */
+function renderWithQuery(ui: ReactElement, client = signedInAs("owner")) {
+  return renderBare(ui, client);
+}
 
 function collection(overrides: Partial<Collection> = {}): Collection {
   return {
@@ -150,6 +157,32 @@ beforeEach(() => {
 });
 
 describe("OrderDetail actions", () => {
+  const buttons = () =>
+    within(screen.getByTestId("order-actions"))
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+
+  it("D82 the warehouse prepares and sends out, but neither delivers, collects nor cancels", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={order({ status: "preparing" })} />, signedInAs("warehouse"));
+
+    expect(buttons()).toEqual(["خرج للتوصيل"]);
+  });
+
+  it("D82 the accountant only collects", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={order({ status: "preparing" })} />, signedInAs("accountant"));
+
+    expect(buttons()).toEqual(["تسجيل تحصيل"]);
+  });
+
+  it("D82 sales moves and cancels the order but does not collect", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={order({ status: "preparing" })} />, signedInAs("sales"));
+
+    expect(buttons()).toEqual(["خرج للتوصيل", "تم التسليم", "إلغاء الطلب"]);
+  });
+
   it("BR-O01 shows only the forward steps the status allows, plus cancel", () => {
     stubApi({});
     renderWithQuery(<OrderDetail order={order({ status: "preparing" })} />);

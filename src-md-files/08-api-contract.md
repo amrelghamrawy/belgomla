@@ -48,7 +48,7 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | ---- | -------------------------- | --------------------------------------------------------- |
 | 400  | `stateful_request_required` | login/OTP/invitation POST without a SPA origin (no session) |
 | 401  | `unauthenticated`          | no/invalid session, tenant mismatch                       |
-| 403  | `forbidden`                | a policy denied the action                                |
+| 403  | `forbidden`                | a policy denied the action, or the dashboard user's role lacks the endpoint's permission (D82; possible on every dashboard endpoint except auth and `me`) |
 | 403  | `pending_approval` / `blocked` / `phone_not_verified` / `invited` / `pending_verification` | customer not `active` (the code is the status, BR-CU05) |
 | 403  | `tenant_suspended`         | tenant suspended (dashboard, BR-T07)                      |
 | 403  | `user_disabled`            | disabled dashboard user logging in                        |
@@ -325,7 +325,7 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | ------ | ---------------------------- | ----------------- | ------ |
 | POST   | `/api/dashboard/auth/login`  | `email, password` | `{ data: { id, name, email, role, status, last_login_at } }` |
 | POST   | `/api/dashboard/auth/logout` |                   | `204`  |
-| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, status, last_login_at }, tenant: { name, subdomain, status, vertical } } }` |
+| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, role_label, status, last_login_at }, tenant: { name, subdomain, status, vertical }, permissions: [...] } }` (V2: the role's permissions, BR-T06) |
 
 `login` errors: `422 invalid_credentials`, `403 user_disabled`, `429 rate_limited` after 5 failures per tenant+email+IP per minute, `400 stateful_request_required` without a SPA origin. Suspended tenant → `403 tenant_suspended`. The email is matched case-insensitively.
 
@@ -342,8 +342,8 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
 | DELETE | `/api/dashboard/settings/whatsapp` | unlink (logout from the phone, then delete the session); audited (`whatsapp.unlinked`); adds `logged_out_on_phone` |
 | GET    | `/api/dashboard/users`         | tenant users                                |
-| POST   | `/api/dashboard/users`         | `name, email, password`; role fixed `owner` |
-| PATCH  | `/api/dashboard/users/{id}`    | `status`, `password`                        |
+| POST   | `/api/dashboard/users`         | `name, email, password, role?` (owner when left out; V2 D82) |
+| PATCH  | `/api/dashboard/users/{id}`    | `name`, `status`, `password`, `role`; `409 last_owner` when the last active owner would be demoted or disabled; a role change is audited `tenant_user.role_changed` |
 
 ---
 
@@ -612,7 +612,7 @@ Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 | POST   | `/api/dashboard/notifications/read` | `{ ids: [] }` or `{ all: true }`                         |
 | GET    | `/api/dashboard/audit`              | `?entity_type=&entity_id=&actor_id=&from=&to=&batch_id=` |
 
-Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled|whatsapp_dropped|order_expired, type_label, details: { order_number, customer_name, order_total, reason? } (whatsapp_dropped: { phone, reason }), read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`.
+Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled|whatsapp_dropped|order_expired, type_label, details: { order_number, customer_name, order_total, reason? } (whatsapp_dropped: { phone, reason }), read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`. V2 Task 05: the list, `unread_count` and `read` cover only the notifications the user's role may see (D82).
 
 Delivered in Task 7 (audit):
 - The list is paginated newest first, as `{ id, actor { type, id }, action, entity { type, id }, old_values, new_values, batch_id, ip, created_at }`.

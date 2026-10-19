@@ -894,6 +894,7 @@ paths:
                 name: { type: string, maxLength: 100 }
                 email: { type: string, format: email, maxLength: 190 }
                 password: { type: string, minLength: 8, maxLength: 200 }
+                role: { type: string, enum: [owner, manager, sales, warehouse, accountant], description: 'BR-T06, D82; owner when left out' }
       responses:
         '201': { $ref: '#/components/responses/TenantUser' }
         '401': { $ref: '#/components/responses/Error' }
@@ -919,6 +920,7 @@ paths:
                   type: string
                   enum: [active, disabled]
                 password: { type: string, minLength: 8, maxLength: 200 }
+                role: { type: string, enum: [owner, manager, sales, warehouse, accountant], description: 'D82; the last active owner cannot be demoted or disabled (409 last_owner)' }
       responses:
         '200': { $ref: '#/components/responses/TenantUser' }
         '401': { $ref: '#/components/responses/Error' }
@@ -2911,6 +2913,7 @@ components:
         - inventory_below_reserved
         - invited
         - last_active_user
+        - last_owner
         - not_found
         - order_cancelled
         - otp_attempts_exceeded
@@ -3501,14 +3504,15 @@ components:
 
     TenantUser:
       type: object
-      required: [id, name, email, role, status, last_login_at]
+      required: [id, name, email, role, role_label, status, last_login_at]
       properties:
         id: { type: integer }
         name: { type: string }
         email: { type: string }
         role:
           type: string
-          enum: [owner]
+          enum: [owner, manager, sales, warehouse, accountant]
+        role_label: { type: string }
         status:
           type: string
           enum: [active, disabled]
@@ -3529,10 +3533,18 @@ components:
 
     DashboardMe:
       type: object
-      required: [user, tenant]
+      required: [user, tenant, permissions]
       properties:
         user: { $ref: '#/components/schemas/TenantUser' }
         tenant: { $ref: '#/components/schemas/Tenant' }
+        permissions:
+          type: array
+          description: 'BR-T06, D82: what the role may do; every other dashboard endpoint answers 403 forbidden'
+          items: { $ref: '#/components/schemas/Permission' }
+
+    Permission:
+      type: string
+      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
 
     # ---- Dashboard schemas (Task 10) ----
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Data;
 
+use App\Modules\Tenancy\Enums\TenantUserRole;
 use App\Modules\Tenancy\Http\Requests\StoreTenantUserRequest;
 
 final readonly class TenantUserData
@@ -12,6 +13,7 @@ final readonly class TenantUserData
         public string $name,
         public string $email,
         public string $password,
+        public TenantUserRole $role = TenantUserRole::Owner,
     ) {}
 
     public static function fromRequest(StoreTenantUserRequest $request): self
@@ -20,6 +22,7 @@ final readonly class TenantUserData
             name: $request->name(),
             email: $request->email(),
             password: $request->password(),
+            role: $request->role(),
         );
     }
 }

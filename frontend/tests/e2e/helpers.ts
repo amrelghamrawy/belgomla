@@ -63,10 +63,10 @@ export async function api<T = unknown>(
   ) as Promise<{ status: number; body: T }>;
 }
 
-export async function loginAsOwner(page: Page): Promise<void> {
+export async function loginAsOwner(page: Page, email = "owner@alnoor.test", password = "password"): Promise<void> {
   await page.goto("/dashboard/login");
-  await page.getByLabel("البريد الإلكتروني").fill("owner@alnoor.test");
-  await page.getByLabel("كلمة المرور").fill("password");
+  await page.getByLabel("البريد الإلكتروني").fill(email);
+  await page.getByLabel("كلمة المرور").fill(password);
   await page.getByRole("button", { name: "دخول" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 }

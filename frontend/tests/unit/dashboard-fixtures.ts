@@ -11,7 +11,10 @@ import type {
   Unit,
 } from "@/lib/api/types";
 
+import { queryKeys } from "@/lib/api/keys";
+
 import { json, stubApi } from "./http";
+import { testQueryClient } from "./render";
 import { page, tenantSettings } from "./fixtures";
 
 // Builders for dashboard API data (tasks/10), shaped like the generated schema so a spec change breaks them.
@@ -22,17 +25,65 @@ export function tenantUser(overrides: Partial<TenantUser> = {}): TenantUser {
     name: "أحمد",
     email: "owner@alnoor.test",
     role: "owner",
+    role_label: "مالك",
     status: "active",
     last_login_at: null,
     ...overrides,
   };
 }
 
+/** BR-T06, D82: the backend's role table (TenantUserRole::permissions()). */
+export const ROLE_PERMISSIONS: Record<TenantUser["role"], DashboardMe["permissions"]> = {
+  owner: [
+    "catalog.manage",
+    "pricing.manage",
+    "inventory.adjust",
+    "orders.view",
+    "orders.manage",
+    "orders.returns",
+    "customers.manage",
+    "customers.credit",
+    "collections.manage",
+    "reports.view",
+    "settings.manage",
+    "users.manage",
+    "audit.view",
+  ],
+  manager: [
+    "catalog.manage",
+    "pricing.manage",
+    "inventory.adjust",
+    "orders.view",
+    "orders.manage",
+    "orders.returns",
+    "customers.manage",
+    "customers.credit",
+    "collections.manage",
+    "reports.view",
+    "audit.view",
+  ],
+  sales: ["orders.view", "orders.manage", "customers.manage"],
+  warehouse: ["inventory.adjust", "orders.view", "orders.manage", "orders.returns"],
+  accountant: ["orders.view", "customers.credit", "collections.manage", "reports.view"],
+};
+
 export function dashboardMe(overrides: Partial<TenantUser> = {}): DashboardMe {
+  const user = tenantUser(overrides);
+
   return {
-    user: tenantUser(overrides),
+    user,
     tenant: { name: "مكتبة النور", subdomain: "alnoor", status: "active", vertical: "school-books" },
+    permissions: ROLE_PERMISSIONS[user.role],
   };
+}
+
+/** A query client whose dashboard session is already this role's (D82), so permission checks pass at once. */
+export function signedInAs(role: TenantUser["role"]) {
+  const client = testQueryClient();
+  client.setQueryDefaults(queryKeys.dashboardSession, { staleTime: Infinity });
+  client.setQueryData(queryKeys.dashboardSession, dashboardMe({ role }));
+
+  return client;
 }
 
 export function notification(overrides: Partial<MerchantNotification> = {}): MerchantNotification {

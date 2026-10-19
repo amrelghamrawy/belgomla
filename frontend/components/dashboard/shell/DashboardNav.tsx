@@ -30,8 +30,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { ar } from "@/lib/copy/ar";
+import { type Permission, useCan } from "@/lib/dashboard/permissions";
 
-type NavItem = { href: string; label: string; icon: LucideIcon };
+/** `permissions`: any one of them shows the item (D82); none = every role. */
+type NavItem = { href: string; label: string; icon: LucideIcon; permissions?: Permission[] };
 
 const copy = ar.dashboard.nav;
 
@@ -42,9 +44,19 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/dashboard", label: copy.overview, icon: LayoutDashboardIcon },
       { href: "/dashboard/orders", label: copy.orders, icon: ShoppingBagIcon },
       { href: "/dashboard/returns", label: copy.returns, icon: Undo2Icon },
-      { href: "/dashboard/collections", label: copy.collections, icon: WalletIcon },
-      { href: "/dashboard/customers", label: copy.customers, icon: UsersIcon },
-      { href: "/dashboard/reports", label: copy.reports, icon: BarChart3Icon },
+      {
+        href: "/dashboard/collections",
+        label: copy.collections,
+        icon: WalletIcon,
+        permissions: ["collections.manage"],
+      },
+      {
+        href: "/dashboard/customers",
+        label: copy.customers,
+        icon: UsersIcon,
+        permissions: ["customers.manage", "customers.credit", "collections.manage"],
+      },
+      { href: "/dashboard/reports", label: copy.reports, icon: BarChart3Icon, permissions: ["reports.view"] },
     ],
   },
   {
@@ -60,9 +72,9 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: copy.admin,
     items: [
-      { href: "/dashboard/settings", label: copy.settings, icon: SettingsIcon },
-      { href: "/dashboard/users", label: copy.users, icon: UserCogIcon },
-      { href: "/dashboard/audit", label: copy.audit, icon: HistoryIcon },
+      { href: "/dashboard/settings", label: copy.settings, icon: SettingsIcon, permissions: ["settings.manage"] },
+      { href: "/dashboard/users", label: copy.users, icon: UserCogIcon, permissions: ["users.manage"] },
+      { href: "/dashboard/audit", label: copy.audit, icon: HistoryIcon, permissions: ["audit.view"] },
     ],
   },
 ];
@@ -79,10 +91,15 @@ export function isActive(href: string, path: string): boolean {
 export function DashboardNav() {
   const path = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
+  const allowed = useCan();
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.permissions === undefined || allowed(...item.permissions)),
+  })).filter((section) => section.items.length > 0);
 
   return (
     <nav aria-label={copy.label}>
-      {NAV_SECTIONS.map((section) => (
+      {sections.map((section) => (
         <SidebarGroup key={section.title}>
           <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
           <SidebarGroupContent>

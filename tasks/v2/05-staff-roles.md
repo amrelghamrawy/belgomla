@@ -1,6 +1,13 @@
 # V2 Task 05 — Staff accounts, roles and permissions
 
-Status: **planned**. Requires V2 Task 00. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-19). Read `CLAUDE.md`, `rules/*.md`, then this file.
+
+### Delivered
+
+- Docs: D82; BR-T06 rewritten with the role table; 07 `tenant_users.role` CHECK and `notifications.permission`; 08 §0 `403 forbidden` on dashboard endpoints, `/me` permissions, users `role`/`409 last_owner`, notifications filter; rules/02 §2 amended (permission middleware, policies for what a permission cannot express, `CurrentPermissionsQuery`).
+- Deviations, recorded in the docs: the middleware is `Tenancy\Http\Middleware\RequirePermission` (it reads the TenantUser model, so it lives in Tenancy, not `App\Support`), runs right after auth in the priority list so a forbidden role gets 403 before route binding can answer 404, and takes several permissions as "any one of them"; the gates are registered in `AppServiceProvider` (there is no Tenancy provider); reading the catalog, stock and orders needs `orders.view`, which every role has; customers can be listed with `customers.manage`, `customers.credit` or `collections.manage`, and the customer update splits name/addresses (`customers.manage`) from credit terms (`customers.credit`) in the request's `authorize()`; "collect the full amount" on delivery needs `collections.manage`; the warehouse rule is in `OrderPolicy::transition` / `cancelFromDashboard`, reading the role through `Tenancy\Queries\CurrentPermissionsQuery`; order notifications need `orders.manage` (so the accountant, who has `orders.view`, does not see new orders, as the test list asks); without a dashboard user (seeders, commands) every notification is visible; `/me` carries the permissions next to `user` and `tenant` (no separate MeResource); the shared `dashboard authenticated routes` dataset moved to `tests/Datasets`; the "every route has a permission" check is a Unit test (the Arch folder does not boot the app); a denied policy or `authorize()` now renders as `forbidden` instead of `http_error`.
+- Tests: backend 3898 (+573: role table, middleware, permission matrix of 79 routes × 5 roles, role rules, users/last owner, `/me`, notifications filter, route rule), frontend 691 (+12), e2e "the owner adds a sales user, who sees orders but cannot open the settings" on mobile and desktop; the whole dashboard e2e passes on desktop.
+- Smoke against `php artisan serve`: the owner creates a manager, sales, warehouse and accountant user; the last owner cannot demote themself (409 last_owner); each role against one read and one write per module answers 403 exactly where the table says; the smoke users are disabled afterwards. `tenant:create` still makes an owner (TenantCommandsTest).
 
 ## Goal
 

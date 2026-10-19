@@ -5,8 +5,10 @@ import type { ReactNode } from "react";
 
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OrderStatus } from "@/lib/api/types";
+import { useDashboardSession } from "@/lib/auth/session";
 import { ar } from "@/lib/copy/ar";
 import { useOrders } from "@/lib/dashboard/orders";
+import { useCan } from "@/lib/dashboard/permissions";
 import { useLowStockReport, useOutstandingReport, useOverviewReport, useSalesReport } from "@/lib/dashboard/reports";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -49,9 +51,27 @@ function Stat({
 
 /**
  * The landing page (D42): today's numbers and what needs attention, from `reports/overview` (D5), with the
- * last 30 days of sales, orders per status and the largest debts as charts.
+ * last 30 days of sales, orders per status and the largest debts as charts. A role without `reports.view` (D82)
+ * gets a greeting instead.
  */
 export function Overview() {
+  const allowed = useCan();
+
+  return allowed("reports.view") ? <ReportsOverview /> : <Welcome />;
+}
+
+function Welcome() {
+  const me = useDashboardSession().data;
+
+  return (
+    <PageHeader
+      title={ar.dashboard.welcome(me?.user.name ?? "")}
+      description={<span data-testid="welcome">{ar.dashboard.welcomeHint}</span>}
+    />
+  );
+}
+
+function ReportsOverview() {
   const report = useOverviewReport();
 
   return (
