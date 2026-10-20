@@ -59,3 +59,11 @@ test('BR-O10 an address without a phone falls back to the customer phone', funct
 
     expect(new OrderSnapshots()->delivery($this->customer, $address)['delivery_phone'])->toBe('+201012345678');
 });
+
+test('D88 a converted order takes the pre-order\'s delivery snapshot as it is', function (): void {
+    $preorder = App\Modules\Orders\Models\Order::factory()->preorder()->create(['delivery_name' => 'فرع الدقي', 'delivery_phone' => '+201155555555']);
+
+    expect(app(OrderSnapshots::class)->deliveryOf($preorder))->toBe([
+        'delivery_name' => 'فرع الدقي', 'delivery_phone' => '+201155555555', 'delivery_address' => $preorder->delivery_address,
+    ]);
+});

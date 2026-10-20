@@ -4,12 +4,13 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { apiFetch, apiFetchPage, withQuery, type Page } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/keys";
-import type { Order, OrderDetail, OrderStatus } from "@/lib/api/types";
+import type { Order, OrderDetail, OrderKind, OrderStatus } from "@/lib/api/types";
 
 // The customer's orders (08 §3). No in-app notifications for customers (D6): this page is where they see status.
+// Normal orders and pre-orders (BR-O14) are listed apart (`kind`).
 
-export function useOrdersInfinite(status: OrderStatus | undefined) {
-  const params = { status };
+export function useOrdersInfinite(status: OrderStatus | undefined, kind: OrderKind = "order") {
+  const params = { status, kind };
 
   return useInfiniteQuery({
     queryKey: queryKeys.ordersList(params),
@@ -27,7 +28,7 @@ export function useOrder(number: number) {
   });
 }
 
-/** BR-O02: only a pending order, with a reason. */
+/** BR-O02: only a pending order (an open pre-order too, BR-O14), with a reason. */
 export function useCancelOrder(number: number) {
   const queryClient = useQueryClient();
 

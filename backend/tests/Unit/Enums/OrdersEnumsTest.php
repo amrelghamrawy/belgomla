@@ -7,7 +7,9 @@ use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\NotificationType;
 use App\Modules\Orders\Enums\OrderItemChangeType;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Enums\PreorderState;
 use App\Modules\Orders\Enums\RefundMethod;
 
 test('every orders enum exposes labels for all cases', function (string $enum): void {
@@ -15,7 +17,7 @@ test('every orders enum exposes labels for all cases', function (string $enum): 
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class, RefundMethod::class, OrderItemChangeType::class]);
+})->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class, RefundMethod::class, OrderItemChangeType::class, OrderKind::class, PreorderState::class]);
 
 test('BR-C07 a refund goes back in cash or as customer credit', function (): void {
     expect(RefundMethod::toArray())->toBe(['cash' => 'رد نقدي', 'credit' => 'رصيد للعميل']);
@@ -32,7 +34,7 @@ test('BR-C03 the collection statuses match the domain model', function (): void 
 });
 
 test('BR-N02 the notification types match the domain model', function (): void {
-    expect(array_map(fn (NotificationType $type): string => $type->value, NotificationType::cases()))->toBe(['new_order', 'customer_cancelled', 'whatsapp_dropped', 'order_expired']);
+    expect(array_map(fn (NotificationType $type): string => $type->value, NotificationType::cases()))->toBe(['new_order', 'customer_cancelled', 'whatsapp_dropped', 'order_expired', 'new_preorder']);
 });
 
 test('BR-O01 delivered and cancelled are terminal', function (OrderStatus $status, bool $terminal): void {
@@ -133,5 +135,17 @@ test('BR-O12 the lines are edited only while pending or confirmed', function (Or
 ]);
 
 test('BR-O12 BR-O13 the line change kinds match the domain model', function (): void {
-    expect(OrderItemChangeType::toArray())->toBe(['added' => 'صنف مضاف', 'removed' => 'صنف محذوف', 'quantity' => 'تعديل الكمية', 'delivered_short' => 'تسليم جزئي']);
+    expect(OrderItemChangeType::toArray())->toBe(['added' => 'صنف مضاف', 'removed' => 'صنف محذوف', 'quantity' => 'تعديل الكمية', 'delivered_short' => 'تسليم جزئي', 'converted' => 'تحويل إلى طلب']);
+});
+
+test('BR-O14 an order is a normal order or a pre-order', function (): void {
+    expect(OrderKind::toArray())->toBe(['order' => 'طلب', 'preorder' => 'حجز مسبق']);
+});
+
+test('D88 a pre-order is open, converted or cancelled', function (): void {
+    expect(PreorderState::toArray())->toBe(['open' => 'محجوز', 'converted' => 'تم التحويل إلى طلب', 'cancelled' => 'ملغي']);
+});
+
+test('BR-O14 the merchant sees a new pre-order with the orders permission', function (): void {
+    expect(NotificationType::NewPreorder->permission())->toBe(App\Modules\Tenancy\Enums\Permission::OrdersManage);
 });

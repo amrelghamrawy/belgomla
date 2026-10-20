@@ -10,6 +10,12 @@ use App\Support\ApiException;
 /** BR-O12, BR-O13: why the lines of an order cannot be changed, or delivered as asked. */
 final class OrderEditRefused extends ApiException
 {
+    /** D88: a pre-order's lines are not edited; the customer cancels it and pre-orders again: `409 order_locked`. */
+    public static function preorder(): self
+    {
+        return new self(409, 'order_locked', 'لا يمكن تعديل أصناف حجز مسبق، يلغيه العميل ويحجز من جديد', ['status' => OrderStatus::Pending->value, 'kind' => 'preorder']);
+    }
+
     /** Only a pending or confirmed order has its lines edited: `409 order_locked`. */
     public static function locked(OrderStatus $status): self
     {

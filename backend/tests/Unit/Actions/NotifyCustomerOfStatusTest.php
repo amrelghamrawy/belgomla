@@ -162,3 +162,19 @@ test('D87 a line edit is not told when the store leaves edited out, nor to a cus
 
     expect(($this->message)())->toBeNull();
 });
+
+test('D88 the preorder_converted message is sent whatever statuses the store notifies, with the new order\'s number and total', function (): void {
+    $this->tenant->settings->update(['order_notify_statuses' => []]);
+
+    app(NotifyCustomerOfStatus::class)->preorderConverted($this->order->refresh());
+
+    expect(($this->message)()?->body)->toBe("أهلًا محمود، توفر ما حجزته من مكتبة النور وتم تسجيل طلبك رقم {$this->order->number} بإجمالي {$this->order->netTotal()}. سنبلغك عند تأكيده.");
+});
+
+test('D88 the preorder_converted message respects the customer\'s opt-out', function (): void {
+    $this->customer->forceFill(['order_notifications_opt_out' => true])->save();
+
+    app(NotifyCustomerOfStatus::class)->preorderConverted($this->order->refresh());
+
+    expect(($this->message)())->toBeNull();
+});

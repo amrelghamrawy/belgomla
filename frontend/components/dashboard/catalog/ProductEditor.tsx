@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api/errors";
@@ -43,6 +44,7 @@ import { CustomFieldInputs } from "./CustomFieldInputs";
 import { ProductImages } from "./ProductImages";
 import { ProductRelations } from "./ProductRelations";
 import { PriceInput } from "./PriceInput";
+import { PreorderPanel } from "./PreorderPanel";
 import { TiersEditor } from "./TiersEditor";
 
 const copy = ar.dashboard.productForm;
@@ -331,6 +333,49 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
             {text("conversion_factor", copy.conversion, "required", true)}
             {creating && text("opening_stock", copy.openingStock, "optional", true)}
           </div>
+          <fieldset className="mt-6 grid gap-4 rounded-xl border p-4 md:grid-cols-3" data-testid="preorder-settings">
+            <legend className="px-1 font-bold">{copy.preorder.title}</legend>
+            <p className="text-muted-foreground text-sm md:col-span-3">{copy.preorder.hint}</p>
+            <Field orientation="horizontal" className="md:col-span-3">
+              <Controller
+                control={form.control}
+                name="preorder_enabled"
+                render={({ field }) => (
+                  <Switch id="product-preorder_enabled" checked={field.value} onCheckedChange={field.onChange} />
+                )}
+              />
+              <FieldLabel htmlFor="product-preorder_enabled">{copy.preorder.enabled}</FieldLabel>
+            </Field>
+            <Field data-invalid={errors.expected_at !== undefined}>
+              <FieldLabel htmlFor="product-expected_at">
+                <LabelText text={copy.preorder.expectedAt} need="optional" />
+              </FieldLabel>
+              <Input
+                id="product-expected_at"
+                type="date"
+                dir="ltr"
+                className="text-start"
+                aria-invalid={errors.expected_at !== undefined}
+                {...form.register("expected_at")}
+              />
+              <FieldError errors={[errors.expected_at]} />
+            </Field>
+            <Field data-invalid={errors.preorder_limit !== undefined}>
+              <FieldLabel htmlFor="product-preorder_limit">
+                <LabelText text={copy.preorder.limit} need="optional" />
+              </FieldLabel>
+              <Input
+                id="product-preorder_limit"
+                dir="ltr"
+                className="text-start"
+                inputMode="numeric"
+                aria-invalid={errors.preorder_limit !== undefined}
+                {...form.register("preorder_limit")}
+              />
+              <FieldError errors={[errors.preorder_limit]} />
+            </Field>
+          </fieldset>
+          {!creating && <PreorderPanel product={product} />}
         </TabsContent>
 
         <TabsContent value="fields" forceMount className="data-[state=inactive]:hidden">

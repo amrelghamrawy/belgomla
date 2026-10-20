@@ -47,3 +47,11 @@ test('Collections fills the exposure contract, and without it no figure is given
     expect(app(CustomerExposure::class))->toBeInstanceOf(CustomerExposureQuery::class)
         ->and(new NullCustomerExposure()->of($this->customer))->toBeNull();
 });
+
+test('D88 an open pre-order counts at what is left of its indicative total; a converted or cancelled one adds nothing', function (): void {
+    ($this->order)('preorder', '450.00');
+    ($this->order)('converted', '0.00');
+    Order::factory()->preorder()->cancelled()->create(['customer_id' => $this->customer->id, 'items_total' => '900.00', 'order_total' => '900.00']);
+
+    expect(app(CustomerExposureQuery::class)->of($this->customer))->toBe('450.00');
+});

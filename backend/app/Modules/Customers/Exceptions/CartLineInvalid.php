@@ -24,6 +24,12 @@ final class CartLineInvalid extends ApiException
         return new self(422, 'cart_line_invalid', 'الكمية غير متوفرة', null, [['sku_id' => $skuId, 'reason' => 'insufficient_stock', 'available' => $available]]);
     }
 
+    /** BR-O14, D88: only a Coming Soon product with pre-orders on can be pre-ordered. */
+    public static function preorderUnavailable(int $skuId): self
+    {
+        return new self(422, 'cart_line_invalid', 'الحجز المسبق غير متاح لهذا المنتج', null, [['sku_id' => $skuId, 'reason' => 'preorder_unavailable']]);
+    }
+
     /** BR-P04, D21: inactive and coming-soon products cannot be added. */
     public static function productInactive(int $skuId): self
     {

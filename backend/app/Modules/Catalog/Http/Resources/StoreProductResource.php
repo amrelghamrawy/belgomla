@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Http\Resources;
 
+use App\Modules\Catalog\Contracts\PreorderDemand;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Category;
@@ -27,6 +28,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * option label, only for active fields marked `show_on_storefront` that apply to the category's section (D69). When prices are hidden (D1) the
  * SKU prices are omitted and `prices_hidden: true` is added. `coming_soon` products are listed with
  * `in_stock: false, coming_soon: true` and no `available` (BR-P04). The detail page adds `gallery` and `related` (BR-P10).
+ * `preorder` is null unless the product is Coming Soon; then `{ enabled, expected_at, remaining }`, `remaining` being what
+ * is left under the merchant's cap in selling units (null = no cap), from Orders through PreorderDemand (BR-O14, D88).
  *
  * `discount_percent` (off the cover price) and `tiers` come from Pricing's PriceResolver, read-only
  * (BR-PR03, BR-PR10). `available` is the SKU's stock in base units from Inventory (BR-INV02, BR-U03; no
@@ -79,6 +82,7 @@ final class StoreProductResource extends JsonResource
             'category' => $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null,
             'custom_fields' => $this->customFields(),
             'sku' => $sku instanceof Sku ? $this->sku($sku) : null,
+            'preorder' => $this->preorder(),
             'prices_hidden' => $this->when($this->pricesHidden, true),
             'gallery' => $this->when($product->relationLoaded('images'), fn (): AnonymousResourceCollection => ProductImageResource::collection($product->images)),
             'related' => $this->when(
@@ -86,6 +90,24 @@ final class StoreProductResource extends JsonResource
                 fn (): array => $product->relations->concat($product->incomingRelations)->sortBy('id')->values()->map($this->related(...))->all(),
             ),
         ];
+    }
+
+    /**
+     * @return array{enabled: bool, expected_at: string|null, remaining: int|null}|null
+     */
+    private function preorder(): ?array
+    {
+        $product = $this->resource;
+
+        if ($product->status !== ProductStatus::ComingSoon) {
+            return null;
+        }
+
+        $remaining = $product->preorder_enabled && $product->preorder_limit !== null
+            ? max(0, $product->preorder_limit - app(PreorderDemand::class)->of($product)['quantity'])
+            : null;
+
+        return ['enabled' => $product->preorder_enabled, 'expected_at' => $product->expected_at?->toDateString(), 'remaining' => $remaining];
     }
 
     /**

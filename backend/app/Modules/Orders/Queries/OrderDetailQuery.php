@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * An order with what its detail page shows (08-api-contract.md §3, §9): lines (removed ones too) and their changes
- * (BR-O12, BR-O13), status history and returns (live
+ * (BR-O12, BR-O13), the pre-order it came from or the orders it was converted into (BR-O14), status history and returns (live
  * ones for the customer, all for the merchant, BR-R05), plus the customer and its collection records (through OrderCollections, filled by Collections) for the dashboard.
  */
 final readonly class OrderDetailQuery
@@ -24,12 +24,12 @@ final readonly class OrderDetailQuery
 
     public function forStore(Order $order): Order
     {
-        return $order->load(['items', 'itemChanges.orderItem', 'history', 'returns' => fn (HasMany $returns): HasMany => $returns->whereNull('voided_at'), 'returns.items.orderItem']);
+        return $order->load(['items', 'itemChanges.orderItem', 'history', 'convertedFrom', 'conversions', 'returns' => fn (HasMany $returns): HasMany => $returns->whereNull('voided_at'), 'returns.items.orderItem']);
     }
 
     public function forDashboard(Order $order): Order
     {
-        return $order->load(['items', 'itemChanges.orderItem', 'history', 'customer', 'returns.items.orderItem']);
+        return $order->load(['items', 'itemChanges.orderItem', 'history', 'customer', 'convertedFrom', 'conversions', 'returns.items.orderItem']);
     }
 
     /**

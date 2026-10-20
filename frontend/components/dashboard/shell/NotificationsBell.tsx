@@ -75,6 +75,8 @@ export function NotificationsBell() {
                   <span className="font-medium">{item.type_label}</span>
                   {item.type === "whatsapp_dropped" ? (
                     <span>{copy.whatsappDropped(formatPhone(item.details.phone ?? ""))}</span>
+                  ) : item.type === "new_preorder" ? (
+                    <span>{copy.preorderLine(item.details.order_number ?? 0, item.details.customer_name ?? "")}</span>
                   ) : (
                     <span>{copy.orderLine(item.details.order_number ?? 0, item.details.customer_name ?? "")}</span>
                   )}

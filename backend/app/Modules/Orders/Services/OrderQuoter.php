@@ -10,6 +10,7 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Data\OrderQuote;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -78,7 +79,7 @@ final readonly class OrderQuoter
 
     private function order(Customer $customer, int $number): Order
     {
-        return Order::query()->where('customer_id', $customer->id)->where('number', $number)->first() ?? throw CheckoutFailed::orderUnavailable();
+        return Order::query()->where('customer_id', $customer->id)->where('kind', OrderKind::Order)->where('number', $number)->first() ?? throw CheckoutFailed::orderUnavailable(); // a pre-order is not edited (D88)
     }
 
     /**

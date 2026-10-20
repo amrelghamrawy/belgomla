@@ -125,3 +125,21 @@ test('V2 Task 06 the creation is audited under the batch it is given', function 
 
     expect(AuditLog::query()->where('action', 'product.created')->value('batch_id'))->toBe('0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a');
 });
+
+test('D88 a product starts without pre-orders unless the settings are given, which the creation audit records', function (): void {
+    $basics = $this->catalogBasics();
+    $plain = app(CreateProduct::class)->handle(($this->data)());
+    $preorderable = app(CreateProduct::class)->handle(new ProductData(
+        name: 'سلاح التلميذ ٢٠٢٧',
+        categoryId: $basics['category']->id,
+        sku: new SkuData('BOOK-27', $basics['carton']->id, $basics['piece']->id, 12, new SkuPricingData(basePrice: '30.00')),
+        status: ProductStatus::ComingSoon,
+        preorder: new App\Modules\Catalog\Data\PreorderData(true, Carbon\CarbonImmutable::parse('2026-12-01', 'UTC'), 500),
+    ));
+
+    expect($plain->refresh()->only(['preorder_enabled', 'expected_at', 'preorder_limit']))->toBe(['preorder_enabled' => false, 'expected_at' => null, 'preorder_limit' => null])
+        ->and($preorderable->refresh()->preorder_enabled)->toBeTrue()
+        ->and($preorderable->expected_at?->toDateString())->toBe('2026-12-01')
+        ->and($preorderable->preorder_limit)->toBe(500)
+        ->and(AuditLog::query()->where('entity_id', $preorderable->id)->sole()->new_values)->toMatchArray(['preorder_enabled' => true, 'expected_at' => '2026-12-01', 'preorder_limit' => 500]);
+});

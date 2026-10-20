@@ -17,7 +17,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * detail loads them (OrderDetailQuery; the customer sees live returns only, without the merchant's reason, BR-R05).
  * `net_total` = order_total − returned_total, `order_total` = items_total − the order discount (`discount`, null for
  * none, without the merchant's reason, D85) (BR-O08). The detail lists every line, removed ones too (BR-O12), and
- * `changes[]`, the line changes after placement (BR-O12, BR-O13). DashboardOrderResource builds on this shape.
+ * `changes[]`, the line changes after placement (BR-O12, BR-O13). A pre-order (BR-O14, D88) says so in `kind`, where it
+ * stands in `preorder_state` (null for a normal order) and, on the detail, the normal orders it was converted into
+ * (`conversions`); a converted order names its pre-order (`converted_from`, detail only). DashboardOrderResource builds
+ * on this shape.
  *
  * @property-read Order $resource
  */
@@ -53,9 +56,12 @@ final class OrderResource extends JsonResource
 
         return [
             'number' => $order->number,
+            'kind' => $order->kind->value,
             'status' => $order->status->value,
             'status_label' => $order->status->label(),
             'placed_at' => $order->placed_at->toIso8601String(),
+            'preorder_state' => $order->preorderState()?->value,
+            'converted_at' => $order->converted_at?->toIso8601String(),
             'items_total' => $order->items_total,
             'discount' => $order->discount_type === null ? null : ['type' => $order->discount_type->value, 'value' => $order->discount_value, 'amount' => $order->discount_amount],
             'order_total' => $order->order_total,
@@ -72,6 +78,13 @@ final class OrderResource extends JsonResource
             'cancel_reason' => $order->cancel_reason,
             'cancelled_by' => $order->cancelled_by_type?->value,
             'items' => OrderItemResource::collection($this->whenLoaded('items')),
+            'converted_from' => $this->whenLoaded('convertedFrom', fn (): ?int => $order->convertedFrom?->number),
+            'conversions' => $this->whenLoaded('conversions', fn (): array => $order->conversions->map(fn (Order $converted): array => [
+                'number' => $converted->number,
+                'status' => $converted->status->value,
+                'order_total' => $converted->order_total,
+                'placed_at' => $converted->placed_at->toIso8601String(),
+            ])->values()->all()),
             'changes' => $this->whenLoaded('itemChanges', fn (): array => self::changes($order, withActor: false)),
             // The customer sees status changes only; a return's note keeps the status (BR-R05) and stays on the dashboard.
             'history' => $this->whenLoaded('history', fn (): array => $order->history->filter(fn (OrderStatusHistory $entry): bool => $entry->from_status !== $entry->to_status)->map(fn (OrderStatusHistory $entry): array => [

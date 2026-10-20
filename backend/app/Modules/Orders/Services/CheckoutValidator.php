@@ -90,6 +90,55 @@ final readonly class CheckoutValidator
         return new CheckoutReport($priced, $problems, $total, null, null, null);
     }
 
+    /**
+     * BR-O14, D88: the checks of a pre-order, which holds no stock: the product is Coming Soon with pre-orders on, the MOQ,
+     * the merchant's cap on what every open pre-order adds up to (`$open` = what is already pre-ordered per sku_id, read
+     * under the product lock) and the credit limit. The minimum order value does not apply.
+     *
+     * @param  list<CartLineInput>  $lines
+     * @param  array<int, int>  $open  sku_id => open pre-ordered selling units
+     */
+    public function checkPreorder(array $lines, Customer $customer, array $open): CheckoutReport
+    {
+        $priced = [];
+        $problems = [];
+        $total = '0.00';
+
+        foreach ($lines as $line) {
+            $sku = $line->sku;
+            $price = $this->prices->resolve($sku, $line->quantity);
+            $total = Money::add($total, $price->lineTotal);
+            $priced[] = new CheckoutLine($sku, $line->quantity, $price);
+            $problem = $this->preorderProblem($line, $open[$sku->id] ?? 0);
+
+            if ($problem instanceof CheckoutProblem) {
+                $problems[$sku->id] = $problem;
+            }
+        }
+
+        return new CheckoutReport($priced, $problems, $total, null, null, $this->creditShortfall($customer, $total));
+    }
+
+    private function preorderProblem(CartLineInput $line, int $open): ?CheckoutProblem
+    {
+        $sku = $line->sku;
+        $product = $sku->product;
+
+        if ($product->status !== ProductStatus::ComingSoon || ! $product->preorder_enabled) {
+            return CheckoutProblem::preorderUnavailable($sku->id);
+        }
+
+        if ($line->quantity < $sku->moq) {
+            return CheckoutProblem::belowMoq($sku->id, $sku->moq);
+        }
+
+        if ($product->preorder_limit !== null && $open + $line->quantity > $product->preorder_limit) {
+            return CheckoutProblem::preorderLimit($sku->id, $line->quantity, max(0, $product->preorder_limit - $open));
+        }
+
+        return null;
+    }
+
     private function problem(CartLineInput $line, int $available): ?CheckoutProblem
     {
         $sku = $line->sku;

@@ -129,7 +129,9 @@ V1 supports:
 - Coming Soon (visible on the storefront with "قريبًا", not orderable, no stock check)
 - Inactive
 
-Coming Soon exists because publishers announce new-year editions and final revisions before they ship, and retailers plan purchases around them. Pre-ordering a Coming Soon product is V2 (see `06-open-decisions.md` D21).
+Coming Soon exists because publishers announce new-year editions and final revisions before they ship, and retailers plan purchases around them.
+
+V2 (Task 10, D21 resolved, D88): the merchant may open a Coming Soon product to **pre-orders** (`preorder_enabled`), with the day it is expected (`expected_at`, shown on the storefront) and an optional cap on the total pre-ordered quantity (`preorder_limit`, selling units). Customers then pre-order it ("احجز الآن", BR-O14); it is still not orderable as a normal order and no stock is checked or held. Going `active` does not convert anything by itself: the merchant sees the pre-order demand and converts the pre-orders when the stock is in.
 
 Inactive products:
 
@@ -548,7 +550,7 @@ Dashboard behavior:
 
 A `Pending` order holds its reservation until the merchant confirms or cancels it. The dashboard highlights Pending orders older than `stale_pending_hours` (default 24, D10).
 
-Optional automatic expiry (V2 Task 04, D81): a store may set `pending_expiry_hours` (1–720, off by default, never below `stale_pending_hours`). A Pending order still unconfirmed that many hours after it was placed is cancelled by the system (`cancelled_by = system`, reason "انتهت مهلة تأكيد الطلب"), which releases its stock (BR-INV04). The merchant gets an `order_expired` notification and the customer the cancelled message when the store sends it (BR-N03). An order with money collected is never expired (BR-O03); it is left pending and logged. The check runs every 15 minutes, so an order may expire up to 15 minutes late. The orders list shows when each pending order will expire.
+Optional automatic expiry (V2 Task 04, D81): a store may set `pending_expiry_hours` (1–720, off by default, never below `stale_pending_hours`). A Pending order still unconfirmed that many hours after it was placed is cancelled by the system (`cancelled_by = system`, reason "انتهت مهلة تأكيد الطلب"), which releases its stock (BR-INV04). The merchant gets an `order_expired` notification and the customer the cancelled message when the store sends it (BR-N03). An order with money collected is never expired (BR-O03); it is left pending and logged. The check runs every 15 minutes, so an order may expire up to 15 minutes late. The orders list shows when each pending order will expire. A pre-order (BR-O14) holds no stock and waits for its product by design: it is never stale and never expires.
 
 ---
 
@@ -565,6 +567,8 @@ Only forward transitions along this path are allowed. Skipping a step is allowed
 `Cancelled` can be reached from any status except `Delivered`.
 
 `Delivered` and `Cancelled` are terminal.
+
+V2 (Task 10, BR-O14): a pre-order (`kind = preorder`) stays `Pending` until it is cancelled; it never moves forward. It becomes normal orders by conversion.
 
 ### BR-O02 — Who Can Cancel
 
@@ -653,6 +657,17 @@ When moving an order to `delivered`, the merchant may record what each line actu
 - What was already collected must still fit (`409 below_collected`); "collect the full amount" collects the new total.
 - Each short line is recorded as a `delivered_short` line change; the history note defaults to «تسليم جزئي»; the audit lists the short lines.
 - Returns count the delivered quantity (BR-R02).
+
+### BR-O14 — Pre-orders (V2 Task 10, D88)
+
+A customer secures a quantity of a Coming Soon product that takes pre-orders (BR-P04) before it ships.
+
+- **Creation.** Pre-order lines sit in the cart apart from the order lines (BR-CU06) and are confirmed on their own (`POST /store/checkout/preorder`). The result is an order of `kind = preorder` with the next order number (BR-O09): `pending`, priced at today's tiers (indicative), its lines snapshotted like checkout (BR-PR07). The checks: the product is still Coming Soon with pre-orders on, the MOQ (BR-MOQ01), the merchant's cap over every open pre-order (under the product row lock), and the credit limit (BR-C05). No stock check and no minimum order value. The merchant gets a `new_preorder` notification.
+- **No reservation.** A pre-order holds no stock (BR-INV01 stays true): its lines are not reserved, a cancel releases nothing, and it never appears among the orders holding a SKU (BR-INV08). It is never stale and never expires (BR-INV07).
+- **What it cannot do.** It is never confirmed or moved on (`409 invalid_transition`); its lines and prices are not edited and take no discount (`409 order_locked`); it takes no collection or credit (`409 is_preorder`). Its delivery address can still be edited by the merchant (BR-O10).
+- **Conversion, FIFO.** Once the product is `active` the merchant converts its open pre-orders (`orders.manage`), oldest `placed_at` first. Each pre-order, in its own transaction, gets what the stock allows of its lines of that product: a normal pending order of those quantities, placed by the merchant (`converted_from_id`), delivered to the pre-order's address snapshot with its note, re-priced at today's tiers for the quantity converted and reserved (BR-INV03). The MOQ, the minimum order value and the credit limit are not checked again. What is left stays on the pre-order (`converted_quantity`, recorded as a `converted` line change) until a later conversion or a cancel; a pre-order with nothing left is closed (`converted_at`). Pre-orders that get nothing (no stock left, or a customer who can no longer order) are untouched. The customer gets the `preorder_converted` WhatsApp text for each new order (BR-N03); the merchant gets the summary (orders created, partly converted, untouched).
+- **Cancellation.** The customer cancels their open pre-order at any time, the merchant too (BR-O02); a partly converted one cancels only what is left, its converted orders live on. A pre-order converted in full cannot be cancelled.
+- **Reports.** Pre-orders are left out of the overview counts (D5); they never reach sales (only delivered orders do).
 ---
 
 ## H2. Returns (المرتجع) — V2 Task 01 (D20)
@@ -729,7 +744,7 @@ Example:
 
 `Order = Delivered`, `Collection = Unpaid` is valid.
 
-Collections can be recorded at any order status except `Cancelled`.
+Collections can be recorded at any order status except `Cancelled`. A pre-order takes no collection or credit (`409 is_preorder`, D88); its converted orders are collected as usual.
 
 The "mark Delivered" action in the dashboard offers a shortcut "and collected full amount" to create both changes in one step.
 
@@ -825,6 +840,8 @@ Only `Active` customers can log in and order.
 
 Each customer has at most one open cart per tenant, stored server-side. Guest (anonymous) carts are not supported in V1; the customer must log in to add to cart.
 
+V2 (Task 10, BR-O14): the cart holds order lines and pre-order lines side by side (`kind`), each SKU once per kind. Checkout takes only the order lines; the pre-order confirmation only the pre-order lines.
+
 ---
 
 ## K. Notifications
@@ -842,6 +859,7 @@ The merchant gets in-app (dashboard) notifications for:
 - New order.
 - Customer cancellation.
 - An unconfirmed order the system cancelled after `pending_expiry_hours`: `order_expired` (V2 Task 04).
+- A customer's pre-order: `new_preorder` (V2 Task 10, BR-O14).
 - The store WhatsApp number dropped (logged out on the phone): `whatsapp_dropped`, linking to settings to scan the QR again (V2 Task 03).
 
 Customers get no in-app notifications; they see the status on "my orders" and receive the WhatsApp messages of BR-N03 (D6).
@@ -851,6 +869,7 @@ Customers get no in-app notifications; they see the status on "my orders" and re
 - When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`, from V2 Task 08 `discount` (the merchant changed the order's discounts; the message gives the new total, D85), and from V2 Task 09 `edited` (the merchant changed the order's lines, with the new total, D87); a new store starts with all but `preparing` and `discount`. `edited` was also added to every store that already notified something.
 - The merchant words each status in settings (`order_status_messages`), up to 500 characters, with the placeholders `{اسم_العميل}`, `{اسم_المتجر}`, `{رقم_الطلب}`, `{حالة_الطلب}`, `{الإجمالي}`, plus `{سبب_الإلغاء}` in the cancelled text only. Any other `{…}` is rejected. No wording (or the default sent back) = the platform default text.
 - A cancel tells the customer only when the merchant cancels; a customer cancelling their own order gets nothing.
+- V2 Task 10 (D88): each normal order converted from a customer's pre-order sends the `preorder_converted` text (with the new order's number and total) whatever `order_notify_statuses` says, like `placed`; the store may word it in `order_status_messages`; the customer's opt-out applies.
 - The message is sent after the change commits: a change that rolls back sends nothing. A customer over their order-message limit (D79) is skipped and logged, and the change still succeeds.
 - A customer can turn the messages off from their storefront account ("رسائل واتساب عن طلباتي", `customers.order_notifications_opt_out`). OTP and invitations are not affected.
 - The order page lists the messages sent about the order (purpose, channel, status, time).

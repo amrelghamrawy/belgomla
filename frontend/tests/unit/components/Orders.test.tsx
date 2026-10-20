@@ -296,3 +296,72 @@ describe("CheckoutSuccess", () => {
     expect(screen.getByRole("link", { name: "متابعة التسوق" })).toBeInTheDocument();
   });
 });
+
+describe("pre-orders in the account (BR-O14)", () => {
+  const preorder = (overrides: Parameters<typeof order>[0] = {}) =>
+    order({ kind: "preorder", preorder_state: "open", ...overrides });
+
+  it("lists the normal orders by default and the pre-orders on their own tab, with where each stands", async () => {
+    const fetchMock = stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/orders": json(200, page([preorder(), preorder({ number: 1000, preorder_state: "converted" })])),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrdersList />);
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "GET /api/store/orders")[0]?.url.searchParams.get("kind")).toBe("order"),
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "الحجوزات" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "GET /api/store/orders").at(-1)?.url.searchParams.get("kind")).toBe("preorder"),
+    );
+    expect(await screen.findByRole("link", { name: /حجز رقم 1001/ })).toHaveTextContent("محجوز");
+    expect(screen.getByRole("link", { name: /حجز رقم 1000/ })).toHaveTextContent("تم التحويل إلى طلب");
+    expect(screen.queryByRole("button", { name: "ملغي" })).not.toBeInTheDocument();
+  });
+
+  it("an open pre-order says its prices are indicative, shows what was converted and can be cancelled", async () => {
+    const detail = preorder({
+      items: [{ ...order().items[0]!, converted_quantity: 2 }],
+      conversions: [{ number: 1005, status: "pending", order_total: "180.00", placed_at: "2026-10-12T08:00:00Z" }],
+    });
+    stubOrder(detail);
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByRole("heading", { name: "حجز رقم 1001" })).toBeInTheDocument();
+    expect(screen.getByTestId("order-status")).toHaveTextContent("محجوز");
+    expect(screen.getByText("أسعار الحجز مبدئية، وتُحسب عند تحويله إلى طلب.")).toBeInTheDocument();
+    expect(screen.getByTestId("converted-61")).toHaveTextContent("تحوّل 2 من 6 كرتونة إلى طلب");
+    expect(within(screen.getByTestId("conversions")).getByRole("link", { name: "طلب رقم 1005" })).toHaveAttribute(
+      "href",
+      "/account/orders/1005",
+    );
+    expect(screen.getByRole("button", { name: "إلغاء الحجز" })).toBeInTheDocument();
+    expect(screen.queryByText("التحصيل")).not.toBeInTheDocument();
+  });
+
+  it("a pre-order converted in full cannot be cancelled", async () => {
+    stubOrder(preorder({ preorder_state: "converted", converted_at: "2026-10-12T08:00:00Z" }));
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("order-status")).toHaveTextContent("تم التحويل إلى طلب");
+    expect(screen.queryByRole("button", { name: "إلغاء الحجز" })).not.toBeInTheDocument();
+  });
+
+  it("a converted order links back to its pre-order", async () => {
+    stubOrder(order({ converted_from: 990 }));
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("converted-from")).toHaveAttribute("href", "/account/orders/990");
+  });
+
+  it("the success page of a pre-order says what happens next", () => {
+    searchParams.value = new URLSearchParams("order=1002&preorder=1");
+    renderWithQuery(<CheckoutSuccess />);
+
+    expect(screen.getByRole("heading", { name: "تم تسجيل حجزك" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "عرض الحجز" })).toHaveAttribute("href", "/account/orders/1002");
+  });
+});

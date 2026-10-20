@@ -6,7 +6,9 @@ namespace App\Modules\Orders\Data;
 
 /**
  * One SKU that fails checkout (BR-PR06), as an `items[]` entry of `422 checkout_failed`: `product_inactive`,
- * `below_moq` with `moq`, or `insufficient_stock` with `requested` and `available` in selling units.
+ * `below_moq` with `moq`, or `insufficient_stock` with `requested` and `available` in selling units. A pre-order
+ * (BR-O14, D88) adds `preorder_unavailable` (the product no longer takes pre-orders) and `preorder_limit` with
+ * `requested` and `remaining` under the merchant's cap, in selling units.
  */
 final readonly class CheckoutProblem
 {
@@ -32,6 +34,16 @@ final readonly class CheckoutProblem
     public static function insufficientStock(int $skuId, int $requested, int $available): self
     {
         return new self($skuId, 'insufficient_stock', ['requested' => $requested, 'available' => $available]);
+    }
+
+    public static function preorderUnavailable(int $skuId): self
+    {
+        return new self($skuId, 'preorder_unavailable');
+    }
+
+    public static function preorderLimit(int $skuId, int $requested, int $remaining): self
+    {
+        return new self($skuId, 'preorder_limit', ['requested' => $requested, 'remaining' => $remaining]);
     }
 
     /**

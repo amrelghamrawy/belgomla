@@ -30,6 +30,7 @@ dataset('customer authenticated routes', [
     'cart update' => ['PATCH', '/api/store/cart/items/1'],
     'cart remove' => ['DELETE', '/api/store/cart/items/1'],
     'checkout' => ['POST', '/api/store/checkout'],
+    'preorder checkout' => ['POST', '/api/store/checkout/preorder'],
     'orders list' => ['GET', '/api/store/orders'],
     'orders show' => ['GET', '/api/store/orders/1'],
     'orders cancel' => ['POST', '/api/store/orders/1/cancel'],

@@ -6,7 +6,9 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Enums\PreorderState;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
@@ -16,6 +18,7 @@ use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
@@ -29,6 +32,7 @@ test('to array', function (): void {
         'delivery_name', 'delivery_phone', 'delivery_address', 'customer_note', 'cancel_reason', 'cancelled_by_type',
         'placed_at', 'confirmed_at', 'delivered_at', 'cancelled_at', 'created_at', 'updated_at', 'returned_total', 'due_at',
         'placed_by_type', 'placed_by_id', 'discount_type', 'discount_value', 'discount_amount', 'discount_reason',
+        'kind', 'converted_from_id', 'converted_at',
     ]);
 });
 
@@ -126,4 +130,50 @@ test('BR-O12 BR-O13 an order lists its line changes oldest first', function (): 
     $second = App\Modules\Orders\Models\OrderItemChange::factory()->removed()->create(['order_item_id' => $item->id]);
 
     expect($item->order->itemChanges->pluck('id')->all())->toBe([$first->id, $second->id]);
+});
+
+test('BR-O14 a new order is a normal order; the pre-order state is null for it', function (): void {
+    $order = Order::factory()->create()->fresh();
+
+    expect($order?->kind)->toBe(OrderKind::Order)
+        ->and($order?->isPreorder())->toBeFalse()
+        ->and($order?->preorderState())->toBeNull();
+});
+
+test('D88 a pre-order is open while something is left, converted once nothing is, cancelled when cancelled', function (): void {
+    $open = Order::factory()->preorder()->create();
+    $converted = Order::factory()->converted()->create();
+    $cancelled = Order::factory()->preorder()->cancelled()->create();
+
+    expect($open->fresh()?->preorderState())->toBe(PreorderState::Open)
+        ->and($converted->fresh()?->preorderState())->toBe(PreorderState::Converted)
+        ->and($converted->fresh()?->converted_at)->toBeInstanceOf(CarbonImmutable::class)
+        ->and($cancelled->fresh()?->preorderState())->toBe(PreorderState::Cancelled);
+});
+
+test('BR-O14 relations: a converted order and its pre-order, the conversions oldest first', function (): void {
+    $preorder = Order::factory()->preorder()->create();
+    $first = Order::factory()->create(['converted_from_id' => $preorder->id]);
+    $second = Order::factory()->create(['converted_from_id' => $preorder->id]);
+
+    expect($first->convertedFrom?->is($preorder))->toBeTrue()
+        ->and($preorder->conversions->pluck('id')->all())->toBe([$first->id, $second->id]);
+});
+
+test('BR-O14 the database refuses an unknown kind, a converted pre-order of a normal order and a pre-order converted from another', function (array $attributes, string $constraint): void {
+    $preorder = Order::factory()->preorder()->create();
+    $order = Order::factory()->create();
+
+    expect(fn () => DB::table('orders')->where('id', $attributes['preorder'] ? $preorder->id : $order->id)->update([...$attributes['values'], ...($attributes['from'] ? ['converted_from_id' => $preorder->id] : [])]))
+        ->toThrow(QueryException::class, $constraint);
+})->with([
+    'unknown kind' => [['preorder' => false, 'from' => false, 'values' => ['kind' => 'backorder']], 'orders_kind_known'],
+    'converted_at on a normal order' => [['preorder' => false, 'from' => false, 'values' => ['converted_at' => now()]], 'orders_converted_at_preorder'],
+    'a pre-order converted from a pre-order' => [['preorder' => true, 'from' => true, 'values' => []], 'orders_converted_from_order'],
+]);
+
+test('D88 a pre-order is never stale: it waits for its product by design', function (): void {
+    Order::factory()->preorder()->create(['placed_at' => now()->subDays(30)]);
+
+    expect(Order::query()->tap(new Stale(24))->count())->toBe(0);
 });

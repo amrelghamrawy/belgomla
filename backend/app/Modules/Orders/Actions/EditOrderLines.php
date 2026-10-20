@@ -75,6 +75,10 @@ final readonly class EditOrderLines
         return DB::transaction(function () use ($order, $data, $actorId): EditedOrder {
             $order = Order::query()->lockForUpdate()->findOrFail($order->id);
 
+            if ($order->isPreorder()) {
+                throw OrderEditRefused::preorder();
+            }
+
             if (! $order->status->allowsLineEdit()) {
                 throw OrderEditRefused::locked($order->status);
             }

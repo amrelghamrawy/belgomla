@@ -21,7 +21,8 @@ test('the store product resource key set with visible prices', function (): void
 
     $data = rendered(new StoreProductResource($product, new Collection, false), storeRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category', 'custom_fields', 'sku'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category', 'custom_fields', 'sku', 'preorder'])
+        ->and($data['preorder'])->toBeNull()
         ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'])
         ->and($data['sku']['unit'])->toBe($product->sku->sellingUnit->name);
 });
@@ -124,4 +125,21 @@ test('BR-P13 the price list row key set, with and without prices', function (): 
         ->and($visible['kind'])->toBe('general')
         ->and($visible['availability'])->toBe('available')
         ->and($hidden)->not->toHaveKeys(['cover_price', 'base_price']);
+});
+
+test('BR-O14 a coming soon product shows its pre-order offer; the remaining quantity follows the cap and what is pre-ordered', function (): void {
+    $product = Product::factory()->withSku(['conversion_factor' => 1])->preorderable(limit: 30, expectedAt: '2026-12-01')->create()->load('sku');
+    App\Modules\Orders\Models\Order::factory()->preorder()->withItems([['sku_id' => $product->sku->id, 'quantity' => 12, 'reserved' => false]])->create();
+
+    $data = rendered(new StoreProductResource($product, new Collection, false), storeRequest());
+
+    expect($data['preorder'])->toBe(['enabled' => true, 'expected_at' => '2026-12-01', 'remaining' => 18]);
+});
+
+test('BR-O14 a coming soon product without pre-orders, or without a cap, has no remaining quantity', function (): void {
+    $closed = Product::factory()->withSku()->comingSoon()->create();
+    $uncapped = Product::factory()->withSku()->preorderable(expectedAt: null)->create();
+
+    expect(rendered(new StoreProductResource($closed, new Collection, false), storeRequest())['preorder'])->toBe(['enabled' => false, 'expected_at' => null, 'remaining' => null])
+        ->and(rendered(new StoreProductResource($uncapped, new Collection, false), storeRequest())['preorder'])->toBe(['enabled' => true, 'expected_at' => null, 'remaining' => null]);
 });

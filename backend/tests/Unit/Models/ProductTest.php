@@ -11,6 +11,8 @@ use App\Modules\Catalog\Models\Scopes\VisibleOnStore;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Services\FacetCacheVersion;
 use App\Modules\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
@@ -21,6 +23,7 @@ test('to array', function (): void {
 
     expect(array_keys($product->toArray()))->toBe([
         'id', 'tenant_id', 'category_id', 'name', 'slug', 'description', 'status', 'custom_fields', 'created_by', 'created_at', 'updated_at',
+        'preorder_enabled', 'expected_at', 'preorder_limit',
     ]);
 });
 
@@ -129,3 +132,21 @@ test('deleting a product bumps the facet cache version', function (): void {
 
     expect(app(FacetCacheVersion::class)->current($this->tenant->id))->toBe($before + 1);
 });
+
+test('BR-O14 pre-orders are off by default; the settings are cast', function (): void {
+    $plain = $this->inTenant(fn () => Product::factory()->create()->fresh());
+    $preorderable = $this->inTenant(fn () => Product::factory()->preorderable(limit: 50, expectedAt: '2026-12-01')->create()->fresh());
+
+    expect($plain->preorder_enabled)->toBeFalse()
+        ->and($plain->expected_at)->toBeNull()
+        ->and($plain->preorder_limit)->toBeNull()
+        ->and($preorderable->preorder_enabled)->toBeTrue()
+        ->and($preorderable->expected_at?->toDateString())->toBe('2026-12-01')
+        ->and($preorderable->preorder_limit)->toBe(50);
+});
+
+test('BR-O14 the database refuses a pre-order cap below one', function (): void {
+    $product = $this->inTenant(fn () => Product::factory()->create());
+
+    DB::table('products')->where('id', $product->id)->update(['preorder_limit' => 0]);
+})->throws(QueryException::class, 'products_preorder_limit_positive');

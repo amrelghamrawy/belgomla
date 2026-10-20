@@ -87,6 +87,11 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
     messages: [],
     id: 1,
     number: 1001,
+    kind: "order",
+    preorder_state: null,
+    converted_at: null,
+    converted_from: null,
+    conversions: [],
     status: "confirmed",
     status_label: "مؤكد",
     placed_at: "2026-10-02T08:00:00Z",
@@ -138,6 +143,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
         line_total: "450.00",
         delivered_quantity: null,
         removed_at: null,
+        converted_quantity: 0,
       },
     ],
     changes: [],
@@ -417,6 +423,7 @@ describe("OrderDetail discounts (BR-PR08, D85)", () => {
           line_total: "405.00",
           delivered_quantity: null,
           removed_at: null,
+          converted_quantity: 0,
         },
       ],
     });
@@ -1048,5 +1055,83 @@ describe("CollectionsPage", () => {
     expect(within(row).getByRole("link", { name: "#1001" })).toHaveAttribute("href", "/dashboard/orders/1001");
     expect(within(screen.getByTestId("collection-32")).getByText("ملغي")).toBeInTheDocument();
     expect(within(screen.getByTestId("collection-32")).getByTestId("void-reason")).toHaveTextContent("خطأ");
+  });
+});
+
+describe("pre-orders on the dashboard (BR-O14, D88)", () => {
+  const preorder = (overrides: Partial<DashboardOrderDetail> = {}) =>
+    order({ kind: "preorder", status: "pending", status_label: "قيد الانتظار", preorder_state: "open", ...overrides });
+
+  it("lists pre-orders with their own badge and keeps one kind through the URL", async () => {
+    stubApi({
+      "GET /api/dashboard/orders": json(
+        200,
+        page([{ ...preorder(), items: undefined, history: undefined, collections: undefined }]),
+      ),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrdersPage />);
+
+    const row = await screen.findByTestId("order-1001");
+    expect(within(row).getByTestId("preorder-badge")).toHaveTextContent("حجز مسبق · محجوز");
+    await user.click(screen.getByRole("button", { name: /تصفية/ }));
+    await user.selectOptions(screen.getByLabelText("النوع"), "preorder");
+
+    expect(router.replace).toHaveBeenCalledWith("/?kind=preorder", { scroll: false });
+  });
+
+  it("an open pre-order is only cancelled: no steps, discount, line edits or collections", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={preorder()} />);
+
+    expect(screen.getByRole("heading", { name: "حجز مسبق #1001" })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("order-actions"))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["إلغاء الطلب"]);
+    expect(screen.queryByTestId("collection-status")).not.toBeInTheDocument();
+  });
+
+  it("a converted pre-order has no actions and links to its orders; its lines say what was converted", () => {
+    stubApi({});
+    const converted = preorder({
+      preorder_state: "converted",
+      converted_at: "2026-10-12T08:00:00Z",
+      items: [{ ...order().items[0]!, converted_quantity: 5 }],
+      conversions: [{ number: 1005, status: "pending", order_total: "450.00", placed_at: "2026-10-12T08:00:00Z" }],
+      changes: [
+        {
+          order_item_id: 61,
+          product_name: "الأضواء علوم",
+          sku_code: "ADW-SCI-1",
+          change: "converted",
+          old_quantity: 5,
+          new_quantity: 0,
+          unit_price_before: "90.00",
+          unit_price_after: "95.00",
+          at: "2026-10-12T08:00:00Z",
+          actor_id: 1,
+        },
+      ],
+    });
+    renderWithQuery(<OrderDetail order={converted} />);
+
+    expect(screen.queryByTestId("order-actions")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("order-conversions")).getByRole("link", { name: "#1005" })).toHaveAttribute(
+      "href",
+      "/dashboard/orders/1005",
+    );
+    expect(screen.getByTestId("converted-61")).toHaveTextContent("تحوّل 5 من 5");
+    expect(screen.getByText("الأضواء علوم: تحوّل 5 إلى طلب، والمتبقي محجوزًا 0")).toBeInTheDocument();
+  });
+
+  it("an order converted from a pre-order links back to it", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={order({ converted_from: 990 })} />);
+
+    expect(
+      within(screen.getByTestId("order-conversions")).getByRole("link", { name: "من الحجز المسبق #990" }),
+    ).toHaveAttribute("href", "/dashboard/orders/990");
   });
 });

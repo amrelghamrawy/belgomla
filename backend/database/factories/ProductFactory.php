@@ -44,6 +44,12 @@ final class ProductFactory extends Factory
         return $this->state(['status' => ProductStatus::ComingSoon]);
     }
 
+    /** BR-O14, D88: Coming Soon and taking pre-orders, optionally capped (selling units over every open pre-order). */
+    public function preorderable(?int $limit = null, ?string $expectedAt = '2026-12-01'): static
+    {
+        return $this->state(['status' => ProductStatus::ComingSoon, 'preorder_enabled' => true, 'preorder_limit' => $limit, 'expected_at' => $expectedAt]);
+    }
+
     public function inactive(): static
     {
         return $this->state(['status' => ProductStatus::Inactive]);

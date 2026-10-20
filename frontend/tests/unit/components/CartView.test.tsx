@@ -156,3 +156,65 @@ describe("CartView", () => {
     });
   });
 });
+
+describe("CartView pre-orders (BR-O14)", () => {
+  const preorderLine = {
+    ...cartItem({
+      sku_id: 777,
+      product_name: "سلاح التلميذ ٢٠٢٧",
+      product_slug: "selah",
+      quantity: 5,
+      available: 0,
+      line_total: "450.00",
+    }),
+    expected_at: "2026-12-01",
+  };
+
+  function stubPreorders(
+    answer = cart({ preorders: { items: [preorderLine], items_total: "450.00" } }),
+    routes: Parameters<typeof stubApi>[0] = {},
+  ) {
+    return stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/cart": json(200, { data: answer }),
+      ...routes,
+    });
+  }
+
+  it("lists the pre-order lines apart with the expected day, their indicative total and their own confirmation", async () => {
+    stubPreorders();
+    renderWithQuery(<CartView />);
+
+    const section = await screen.findByTestId("preorders");
+    expect(section).toHaveTextContent("الحجز المسبق");
+    expect(section).toHaveTextContent("سلاح التلميذ ٢٠٢٧");
+    expect(section).toHaveTextContent("متوقع 1 ديسمبر 2026");
+    expect(screen.getByTestId("preorders-total")).toHaveTextContent("450.00 ج.م");
+    expect(screen.getByRole("link", { name: "تأكيد الحجز" })).toHaveAttribute("href", "/checkout/preorder");
+    expect(screen.getByRole("link", { name: "إتمام الطلب" })).toHaveAttribute("href", "/checkout");
+  });
+
+  it("a cart with only pre-orders is not empty and offers no checkout", async () => {
+    stubPreorders(
+      cart({ items: [], items_total: "0.00", preorders: { items: [preorderLine], items_total: "450.00" } }),
+    );
+    renderWithQuery(<CartView />);
+
+    expect(await screen.findByTestId("preorders")).toBeInTheDocument();
+    expect(screen.queryByText("سلتك فارغة")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "إتمام الطلب" })).not.toBeInTheDocument();
+  });
+
+  it("removes a pre-order line by its kind", async () => {
+    const fetchMock = stubPreorders(undefined, {
+      "DELETE /api/store/cart/items/777": json(200, { data: cart() }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CartView />);
+
+    await user.click(await screen.findByRole("button", { name: "حذف من السلة: سلاح التلميذ ٢٠٢٧" }));
+
+    await waitFor(() => expect(screen.queryByTestId("preorders")).not.toBeInTheDocument());
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/777")[0]?.url.searchParams.get("kind")).toBe("preorder");
+  });
+});

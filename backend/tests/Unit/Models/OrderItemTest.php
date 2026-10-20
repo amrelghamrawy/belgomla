@@ -7,6 +7,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
@@ -19,7 +20,7 @@ test('to array', function (): void {
         'id', 'tenant_id', 'order_id', 'sku_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name',
         'conversion_factor', 'quantity', 'quantity_base', 'cover_price', 'unit_price', 'discount_percent',
         'tier_min_quantity', 'line_total', 'created_at', 'updated_at', 'list_unit_price', 'manual_discount_type', 'manual_discount_value',
-        'delivered_quantity', 'removed_at',
+        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity',
     ]);
 });
 
@@ -86,3 +87,24 @@ test('BR-O12 the live scope leaves removed lines out', function (): void {
 
     expect(OrderItem::query()->tap(new App\Modules\Orders\Models\Scopes\Live)->pluck('id')->all())->toBe([$live->id]);
 });
+
+test('BR-O14 a line holds stock and has nothing converted unless it is a pre-order line', function (): void {
+    $line = OrderItem::factory()->create(['quantity' => 6])->fresh();
+    $preorderLine = OrderItem::factory()->preorderLine(converted: 2)->create(['quantity' => 6])->fresh();
+
+    expect($line?->reserved)->toBeTrue()
+        ->and($line?->converted_quantity)->toBe(0)
+        ->and($line?->remainingQuantity())->toBe(6)
+        ->and($preorderLine?->reserved)->toBeFalse()
+        ->and($preorderLine?->remainingQuantity())->toBe(4);
+});
+
+test('BR-O14 the database keeps the converted quantity within the line and off reserved lines', function (array $attributes, string $constraint): void {
+    $line = OrderItem::factory()->create(['quantity' => 6]);
+
+    expect(fn () => DB::table('order_items')->where('id', $line->id)->update($attributes))->toThrow(QueryException::class, $constraint);
+})->with([
+    'above the quantity' => [['reserved' => false, 'converted_quantity' => 7], 'order_items_converted_within_ordered'],
+    'below zero' => [['reserved' => false, 'converted_quantity' => -1], 'order_items_converted_within_ordered'],
+    'on a reserved line' => [['converted_quantity' => 1], 'order_items_converted_unreserved'],
+]);

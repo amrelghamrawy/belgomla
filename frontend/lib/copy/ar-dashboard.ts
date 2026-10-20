@@ -44,6 +44,7 @@ export const dashboard = {
     empty: "لا توجد إشعارات",
     markAllRead: "تحديد الكل كمقروء",
     orderLine: (number: number, customer: string) => `طلب #${number} من ${customer}`,
+    preorderLine: (number: number, customer: string) => `حجز مسبق #${number} من ${customer}`,
     whatsappDropped: (phone: string) => `انفصل رقم واتساب المتجر ${phone}. اربطه من جديد من الإعدادات.`,
   },
 
@@ -299,6 +300,36 @@ export const dashboard = {
     invalidMoney: "أدخل مبلغًا صحيحًا مثل 120.00",
     invalidPercent: "نسبة بين 0 و 100",
     invalidInteger: "رقم صحيح أكبر من صفر",
+    invalidDate: "تاريخ صحيح",
+    // BR-O14, D88: pre-orders while the product is Coming Soon.
+    preorder: {
+      title: "الحجز المسبق",
+      hint: "يحجز العملاء المنتج وهو «قريبًا» دون خصم من المخزون، وتحوّل الحجوزات إلى طلبات عند وصول الكمية.",
+      enabled: "السماح بالحجز المسبق",
+      expectedAt: "تاريخ التوفر المتوقع",
+      limit: "أقصى كمية للحجز (بوحدة البيع)",
+    },
+  },
+
+  // BR-O14, D88: a product's pre-orders on its page.
+  preorders: {
+    title: "الحجوزات المسبقة",
+    quantity: (quantity: number, unit: string) => `${quantity} ${unit} محجوزة`,
+    customers: (n: number) => `${n} عميل`,
+    count: (n: number) => `${n} حجز`,
+    remaining: (n: number, unit: string) => `متبقٍ للحجز ${n} ${unit}`,
+    none: "لا توجد حجوزات مفتوحة",
+    convert: "تحويل الحجوزات إلى طلبات",
+    converting: "جارٍ التحويل…",
+    convertHint: "الأقدم أولًا وبقدر المخزون المتاح، وتُسعَّر بأسعار اليوم.",
+    activateFirst: "فعّل المنتج وأضف المخزون قبل تحويل الحجوزات.",
+    summaryTitle: "نتيجة التحويل",
+    convertedOrder: (order: number, preorder: number, quantity: number) =>
+      `طلب #${order} من الحجز #${preorder} (${quantity})`,
+    partially: (n: number) => `${n} حجز تحوّل جزئيًا وبقي الباقي محجوزًا`,
+    untouched: (n: number) => `${n} حجز لم يتحول لعدم كفاية المخزون`,
+    nothingConverted: "لم يتحول أي حجز: لا يوجد مخزون كافٍ",
+    viewList: "عرض الحجوزات",
   },
 
   inventory: {
@@ -461,6 +492,17 @@ export const dashboard = {
     newOrder: "طلب جديد",
     placedByMerchant: "أنشأه التاجر",
     placedByMerchantHint: "سجّله أحد مستخدمي المتجر نيابةً عن العميل",
+    // BR-O14, D88: pre-orders in the list and on the order page.
+    kind: "النوع",
+    allKinds: "الطلبات والحجوزات",
+    kinds: { order: "الطلبات", preorder: "الحجوزات المسبقة" } as Record<string, string>,
+    preorder: "حجز مسبق",
+    preorderTitle: (n: number) => `حجز مسبق #${n}`,
+    preorderStates: { open: "محجوز", converted: "تم التحويل", cancelled: "ملغي" } as Record<string, string>,
+    preorderHint: "لا يُحجز له مخزون ولا يُؤكَّد؛ يتحول إلى طلب من صفحة المنتج عند توفره.",
+    convertedTo: "تحوّل إلى",
+    convertedFrom: (n: number) => `من الحجز المسبق #${n}`,
+    convertedOf: (converted: number, ordered: number) => `تحوّل ${converted} من ${ordered}`,
     newOrderForm: {
       title: "طلب جديد لعميل",
       hint: "لطلب وصل بالهاتف أو واتساب. يمر بنفس الأسعار والحد الأدنى والمخزون وحد الائتمان مثل طلب المتجر.",
@@ -648,6 +690,9 @@ export const dashboard = {
       quantity: (name: string, from: number | null, to: number | null) => `${name}: من ${from ?? 0} إلى ${to ?? 0}`,
       delivered_short: (name: string, ordered: number | null, delivered: number | null) =>
         `${name}: سُلِّم ${delivered ?? 0} من ${ordered ?? 0}`,
+      // BR-O14: part of a pre-order line went into a normal order; old/new = what was left to convert.
+      converted: (name: string, before: number | null, after: number | null) =>
+        `${name}: تحوّل ${(before ?? 0) - (after ?? 0)} إلى طلب، والمتبقي محجوزًا ${after ?? 0}`,
       unknownLine: "صنف",
     },
     removedBadge: "محذوف",

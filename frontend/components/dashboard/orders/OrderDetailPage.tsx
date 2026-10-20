@@ -31,7 +31,14 @@ import { ReasonDialog } from "../common/ReasonDialog";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { DeliveryAddressDialog } from "./DeliveryAddressDialog";
 import { OrderActions } from "./OrderActions";
-import { CollectionStatusBadge, ExpiryBadge, OrderStatusBadge, PlacedByMerchantBadge, StaleBadge } from "./OrderBadges";
+import {
+  CollectionStatusBadge,
+  ExpiryBadge,
+  OrderStatusBadge,
+  PlacedByMerchantBadge,
+  PreorderBadge,
+  StaleBadge,
+} from "./OrderBadges";
 
 const copy = ar.dashboard.orders;
 
@@ -68,11 +75,15 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
         </Link>
       </Button>
       <PageHeader
-        title={copy.orderTitle(order.number)}
+        title={order.kind === "preorder" ? copy.preorderTitle(order.number) : copy.orderTitle(order.number)}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <OrderStatusBadge status={order.status} />
-            <CollectionStatusBadge status={order.collection_status} />
+            {order.preorder_state === null ? (
+              <OrderStatusBadge status={order.status} />
+            ) : (
+              <PreorderBadge state={order.preorder_state} />
+            )}
+            {order.kind === "order" && <CollectionStatusBadge status={order.collection_status} />}
             {order.is_stale && <StaleBadge />}
             {order.expires_at !== null && <ExpiryBadge expiresAt={order.expires_at} />}
             {order.placed_by === "tenant_user" && <PlacedByMerchantBadge />}
@@ -81,6 +92,28 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
         }
       />
       <OrderActions order={order} />
+      {(order.conversions.length > 0 || order.converted_from !== null) && (
+        <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="order-conversions">
+          {order.converted_from !== null ? (
+            <Link href={`/dashboard/orders/${order.converted_from}`} className="text-primary underline">
+              {copy.convertedFrom(order.converted_from)}
+            </Link>
+          ) : (
+            <>
+              <span className="font-medium">{copy.convertedTo}:</span>
+              {order.conversions.map((conversion) => (
+                <Link
+                  key={conversion.number}
+                  href={`/dashboard/orders/${conversion.number}`}
+                  className="text-primary underline"
+                >
+                  <bdi>#{conversion.number}</bdi>
+                </Link>
+              ))}
+            </>
+          )}
+        </p>
+      )}
       {order.status === "cancelled" && order.cancel_reason !== null && (
         <Alert>
           <AlertDescription>
@@ -118,6 +151,11 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {ar.orders.quantityOf(item.quantity, item.unit)}
+                        {item.converted_quantity > 0 && (
+                          <span className="text-primary block text-xs" data-testid={`converted-${item.id}`}>
+                            {copy.convertedOf(item.converted_quantity, item.quantity)}
+                          </span>
+                        )}
                         {item.delivered_quantity !== null && item.delivered_quantity < item.quantity && (
                           <span className="text-destructive block text-xs" data-testid={`delivered-${item.id}`}>
                             {copy.deliveredOf(item.delivered_quantity, item.quantity)}
@@ -304,7 +342,9 @@ function ChangesCard({ changes }: { changes: DashboardOrderItemChange[] }) {
                       ? labels.removed(name, change.old_quantity)
                       : change.change === "quantity"
                         ? labels.quantity(name, change.old_quantity, change.new_quantity)
-                        : labels.delivered_short(name, change.old_quantity, change.new_quantity)}
+                        : change.change === "converted"
+                          ? labels.converted(name, change.old_quantity, change.new_quantity)
+                          : labels.delivered_short(name, change.old_quantity, change.new_quantity)}
                 </span>
                 <span className="text-muted-foreground text-xs">{formatDateTime(change.at)}</span>
               </li>

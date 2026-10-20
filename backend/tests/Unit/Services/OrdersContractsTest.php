@@ -109,3 +109,11 @@ test('BR-R04 without collections a return refunds nothing and has no live refund
     expect($order->refresh()->collected_amount)->toBe('0.00')
         ->and(new NullRefundsPayments()->hasLiveRefund(1))->toBeFalse();
 });
+
+test('BR-O14 a pre-order holds no reservation of the sku', function (): void {
+    $sku = $this->preorderableSku();
+    $this->placePreorder($this->customer, [$sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(app(OrdersHoldingSku::class)->ordersHolding($sku))->toBe([]);
+});

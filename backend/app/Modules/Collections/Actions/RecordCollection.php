@@ -13,6 +13,7 @@ use App\Modules\Collections\Exceptions\ExceedsBalance;
 use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Queries\CollectedAmountQuery;
 use App\Modules\Orders\Actions\ApplyCollectedAmount;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Support\Money;
@@ -40,6 +41,10 @@ final readonly class RecordCollection
 
             if ($order->status === OrderStatus::Cancelled) {
                 throw CannotCollect::cancelled();
+            }
+
+            if ($order->kind === OrderKind::Preorder) {
+                throw CannotCollect::preorder();
             }
 
             $collected = $this->collected->forOrder($order->id);

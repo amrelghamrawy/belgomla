@@ -6,6 +6,7 @@ use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\CartSkuQuery;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Exceptions\CartLineInvalid;
 use App\Modules\Customers\Services\OrderableQuantity;
 use App\Modules\Tenancy\TenantContext;
@@ -50,3 +51,31 @@ test('BR-P04 D21 only active products are orderable', function (ProductStatus $s
     expect(fn () => app(OrderableQuantity::class)->assert(orderableSku($status), 5))
         ->toThrow(CartLineInvalid::class, 'المنتج غير متاح للطلب');
 })->with(['inactive' => [ProductStatus::Inactive], 'coming soon' => [ProductStatus::ComingSoon]]);
+
+test('BR-O14 a pre-order line needs a coming soon product with pre-orders on and the MOQ, never stock', function (): void {
+    $sku = orderableSku(ProductStatus::ComingSoon, onHand: null);
+    Product::query()->whereKey($sku->product_id)->update(['preorder_enabled' => true]);
+    $sku = app(CartSkuQuery::class)->find($sku->id);
+
+    app(OrderableQuantity::class)->assert($sku, 500, CartLineKind::Preorder);
+
+    expect(app(OrderableQuantity::class)->preorderable($sku))->toBeTrue()
+        ->and(fn () => app(OrderableQuantity::class)->assert($sku, 4, CartLineKind::Preorder))->toThrow(function (CartLineInvalid $e) use ($sku): void {
+            expect($e->items)->toBe([['sku_id' => $sku->id, 'reason' => 'below_moq', 'moq' => 5]]);
+        });
+});
+
+test('BR-O14 a product that does not take pre-orders cannot be pre-ordered', function (ProductStatus $status, bool $enabled): void {
+    $sku = orderableSku($status);
+    Product::query()->whereKey($sku->product_id)->update(['preorder_enabled' => $enabled]);
+    $sku = app(CartSkuQuery::class)->find($sku->id);
+
+    expect(app(OrderableQuantity::class)->preorderable($sku))->toBeFalse()
+        ->and(fn () => app(OrderableQuantity::class)->assert($sku, 5, CartLineKind::Preorder))->toThrow(function (CartLineInvalid $e) use ($sku): void {
+            expect($e->items)->toBe([['sku_id' => $sku->id, 'reason' => 'preorder_unavailable']]);
+        });
+})->with([
+    'coming soon, pre-orders off' => [ProductStatus::ComingSoon, false],
+    'active' => [ProductStatus::Active, true],
+    'inactive' => [ProductStatus::Inactive, true],
+]);

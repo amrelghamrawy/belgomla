@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
+import type { CollectionStatus, OrderStatus, PreorderState } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { expiryLeft, useMinuteClock } from "@/lib/dashboard/order-expiry";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,22 @@ export function StaleBadge() {
     <Hint text={ar.dashboard.orders.staleHint}>
       <Badge variant="outline" className="border-amber-500 text-amber-900" tabIndex={0}>
         {ar.dashboard.orders.stale}
+      </Badge>
+    </Hint>
+  );
+}
+
+/** BR-O14, D88: a pre-order, with where it stands (open, converted, cancelled), instead of a status. */
+export function PreorderBadge({ state }: { state: PreorderState }) {
+  return (
+    <Hint text={ar.dashboard.orders.preorderHint}>
+      <Badge
+        variant="outline"
+        className={cn("border-primary text-primary", state === "cancelled" && "border-muted text-muted-foreground")}
+        tabIndex={0}
+        data-testid="preorder-badge"
+      >
+        {ar.dashboard.orders.preorder} · {ar.dashboard.orders.preorderStates[state]}
       </Badge>
     </Hint>
   );

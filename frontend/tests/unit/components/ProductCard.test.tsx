@@ -184,3 +184,91 @@ describe("QuickAdd on the card", () => {
     expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")).toHaveLength(1);
   });
 });
+
+describe("pre-orders on the card (BR-O14)", () => {
+  const preorderable = (remaining: number | null = null) =>
+    storeProduct({
+      status: "coming_soon",
+      sku: comingSoonSku(),
+      preorder: { enabled: true, expected_at: "2026-12-01", remaining },
+    });
+  const bookButton = () => screen.getByRole("button", { name: "احجز «الأضواء علوم أولى إعدادي»" });
+
+  it("shows the expected day and that the final price is set when it arrives", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={preorderable()} />);
+
+    expect(screen.getByTestId("preorder-note")).toHaveTextContent("متوقع 1 ديسمبر 2026 · السعر النهائي عند التوفر");
+  });
+
+  it("a coming soon product without pre-orders still cannot be added", () => {
+    stubApi(guest);
+    renderWithQuery(
+      <ProductCard
+        product={storeProduct({
+          status: "coming_soon",
+          sku: comingSoonSku(),
+          preorder: { enabled: false, expected_at: null, remaining: null },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "قريبًا" })).toBeDisabled();
+    expect(screen.queryByTestId("preorder-note")).not.toBeInTheDocument();
+  });
+
+  it("books the MOQ as a pre-order line in one tap", async () => {
+    const fetchMock = stubApi({
+      ...signedIn(),
+      "POST /api/store/cart/items": json(200, {
+        data: cart({
+          items: [],
+          preorders: {
+            items: [{ ...cartItem({ quantity: 2, available: 0 }), expected_at: "2026-12-01" }],
+            items_total: "180.00",
+          },
+        }),
+      }),
+    });
+    renderWithQuery(<ProductCard product={preorderable()} />);
+    await waitFor(() => expect(callsTo(fetchMock, "GET /api/store/cart")).toHaveLength(1));
+    expect(bookButton()).toHaveTextContent("احجز 2 كرتونة");
+
+    await userEvent.click(bookButton());
+
+    expect(await screen.findByRole("group", { name: "محجوز 2 كرتونة" })).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({
+      sku_id: 501,
+      quantity: 2,
+      kind: "preorder",
+    });
+  });
+
+  it("changes and removes the pre-order line by its kind", async () => {
+    const booked = cart({
+      items: [],
+      preorders: { items: [{ ...cartItem({ quantity: 2, available: 0 }), expected_at: null }], items_total: "180.00" },
+    });
+    const fetchMock = stubApi({
+      ...signedIn(booked),
+      "PATCH /api/store/cart/items/501": json(200, { data: booked }),
+      "DELETE /api/store/cart/items/501": json(200, { data: cart({ items: [] }) }),
+    });
+    renderWithQuery(<ProductCard product={preorderable()} />);
+    const line = await screen.findByRole("group", { name: "محجوز 2 كرتونة" });
+
+    await userEvent.click(within(line).getByRole("button", { name: "زيادة الكمية" }));
+    await userEvent.click(within(line).getByRole("button", { name: "حذف من السلة" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PATCH /api/store/cart/items/501")[0]?.body).toEqual({ quantity: 3, kind: "preorder" });
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")[0]?.url.searchParams.get("kind")).toBe("preorder");
+  });
+
+  it("is full when nothing remains under the merchant's cap", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={preorderable(0)} />);
+
+    expect(screen.getByRole("button", { name: "اكتمل الحجز" })).toBeDisabled();
+  });
+});

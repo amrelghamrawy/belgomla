@@ -45,6 +45,12 @@ final class OrderItemFactory extends Factory
     }
 
     /** BR-O12: the merchant removed the line. */
+    /** BR-O14: a pre-order line, holding no stock, `$converted` selling units of it already in a normal order. */
+    public function preorderLine(int $converted = 0): self
+    {
+        return $this->state(['reserved' => false, 'converted_quantity' => $converted]);
+    }
+
     public function removed(): self
     {
         return $this->state(['removed_at' => now()]);

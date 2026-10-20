@@ -7,6 +7,7 @@ namespace App\Modules\Reports\Queries;
 use App\Modules\Collections\Queries\OutstandingByCustomerQuery;
 use App\Modules\Collections\Queries\OverdueQuery;
 use App\Modules\Inventory\Queries\LowStockQuery;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderReturn;
@@ -17,7 +18,8 @@ use App\Support\Money;
 /**
  * GET /api/dashboard/reports/overview (D5): orders per status, today's orders (placed today in business time, D60;
  * the total leaves cancelled ones out and takes off today's live returns, BR-R05, which are also given apart), pending orders past the stale threshold (BR-INV07), what customers owe
- * (D59), what is overdue and for how many customers (BR-C06), and how many SKUs are low on stock (D36).
+ * (D59), what is overdue and for how many customers (BR-C06), and how many SKUs are low on stock (D36). Pre-orders are
+ * left out: they are not orders to handle yet (BR-O14, D88).
  */
 final readonly class OverviewQuery
 {
@@ -36,7 +38,7 @@ final readonly class OverviewQuery
         return [
             'orders_by_status' => $this->byStatus(),
             'today' => $this->today($timezone),
-            'stale_pending' => Order::query()->where('status', OrderStatus::Pending)->where('placed_at', '<', $this->orders->pendingClock()->staleBefore)->count(),
+            'stale_pending' => Order::query()->where('kind', OrderKind::Order)->where('status', OrderStatus::Pending)->where('placed_at', '<', $this->orders->pendingClock()->staleBefore)->count(),
             'outstanding_total' => $this->outstanding->total(),
             'overdue_total' => $this->overdue->total(),
             'overdue_customers' => $this->overdue->customersCount(),
@@ -49,7 +51,7 @@ final readonly class OverviewQuery
      */
     private function byStatus(): array
     {
-        $counts = Order::query()->toBase()->select('status')->selectRaw('count(*) as orders')->groupBy('status')->pluck('orders', 'status');
+        $counts = Order::query()->where('kind', OrderKind::Order)->toBase()->select('status')->selectRaw('count(*) as orders')->groupBy('status')->pluck('orders', 'status');
         $out = [];
 
         foreach (OrderStatus::cases() as $status) {
@@ -66,7 +68,7 @@ final readonly class OverviewQuery
     private function today(string $timezone): array
     {
         $day = BusinessCalendar::today($timezone);
-        $placed = Order::query()->whereBetween('placed_at', [BusinessCalendar::dayStart($day, $timezone), BusinessCalendar::dayEnd($day, $timezone)]);
+        $placed = Order::query()->where('kind', OrderKind::Order)->whereBetween('placed_at', [BusinessCalendar::dayStart($day, $timezone), BusinessCalendar::dayEnd($day, $timezone)]);
         $total = (clone $placed)->where('status', '!=', OrderStatus::Cancelled)->sum('order_total');
         $returns = Money::add('0.00', (string) OrderReturn::query()
             ->whereNull('voided_at')

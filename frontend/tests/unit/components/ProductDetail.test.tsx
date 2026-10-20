@@ -134,3 +134,39 @@ describe("ProductDetail", () => {
     expect(await screen.findByRole("heading", { name: "الصفحة غير موجودة" })).toBeInTheDocument();
   });
 });
+
+describe("pre-ordering on the product page (BR-O14)", () => {
+  const preorderable = (remaining: number | null) =>
+    storeProduct({
+      status: "coming_soon",
+      sku: comingSoonSku(),
+      preorder: { enabled: true, expected_at: "2026-12-01", remaining },
+    });
+
+  it("books from the MOQ without stock, with the expected day, the price note and what remains", async () => {
+    const success = vi.spyOn(toast, "success").mockImplementation(() => "t");
+    const fetchMock = stubProduct(preorderable(30));
+    const user = userEvent.setup();
+    renderWithQuery(<ProductDetail />);
+
+    expect(await screen.findByRole("spinbutton", { name: "الكمية" })).toHaveValue(2);
+    expect(screen.getByTestId("preorder-terms")).toHaveTextContent(
+      "متوقع 1 ديسمبر 2026 · السعر النهائي عند التوفر · متبقٍ للحجز 30 كرتونة",
+    );
+    await user.click(screen.getByRole("button", { name: "احجز الآن" }));
+
+    await waitFor(() => expect(success).toHaveBeenCalledWith("أضيف إلى حجوزاتك في السلة", expect.anything()));
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({
+      sku_id: 501,
+      quantity: 2,
+      kind: "preorder",
+    });
+  });
+
+  it("cannot book past the merchant's cap", async () => {
+    stubProduct(preorderable(0));
+    renderWithQuery(<ProductDetail />);
+
+    expect(await screen.findByRole("button", { name: "اكتمل الحجز" })).toBeDisabled();
+  });
+});

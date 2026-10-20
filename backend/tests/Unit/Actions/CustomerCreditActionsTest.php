@@ -181,3 +181,11 @@ test('BR-C07 a credit is voided only once', function (): void {
 test('BR-R06 a return kept as credit is voided only after its credit refund', function (): void {
     expect(fn (): OrderReturn => app(VoidReturn::class)->handle($this->return, 'خطأ', $this->owner->id))->toThrow(ReturnHasRefund::class);
 });
+
+test('D88 credit is not applied to a pre-order', function (): void {
+    $preorder = Order::factory()->preorder()->for($this->customer)->create(['items_total' => '100.00', 'order_total' => '100.00']);
+
+    expect(fn (): CashCollection => ($this->apply)('10.00', $preorder))->toThrow(function (CannotCollect $e): void {
+        expect($e->errorCode)->toBe('is_preorder');
+    });
+});

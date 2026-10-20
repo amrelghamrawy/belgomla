@@ -152,3 +152,12 @@ test('a failing insert leaves the order and the audit trail untouched', function
         ->and(CashCollection::query()->count())->toBe(0)
         ->and(AuditLog::query()->count())->toBe(0);
 });
+
+test('D88 nothing is collected on a pre-order', function (): void {
+    $preorder = Order::factory()->preorder()->create(['items_total' => '500.00', 'order_total' => '500.00']);
+
+    expect(fn () => ($this->record)('100.00', $preorder))->toThrow(function (CannotCollect $e): void {
+        expect([$e->status, $e->errorCode])->toBe([409, 'is_preorder']);
+    })
+        ->and(CashCollection::query()->count())->toBe(0);
+});

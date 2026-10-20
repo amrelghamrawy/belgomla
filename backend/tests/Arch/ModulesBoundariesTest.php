@@ -343,6 +343,10 @@ arch('orders fill the reservation holders contract of inventory')
     ->expect(App\Modules\Orders\Services\OrdersHoldingSku::class)
     ->toImplement(App\Modules\Inventory\Contracts\ReservationHolders::class);
 
+arch('orders fill the pre-order demand contract of catalog')
+    ->expect(App\Modules\Orders\Queries\PreorderDemandQuery::class)
+    ->toImplement(App\Modules\Catalog\Contracts\PreorderDemand::class);
+
 arch('orders fill the recent orders contract of customers')
     ->expect(App\Modules\Orders\Services\CustomerRecentOrders::class)
     ->toImplement(App\Modules\Customers\Contracts\RecentOrders::class);

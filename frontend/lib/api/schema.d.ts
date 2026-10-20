@@ -417,6 +417,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/checkout/preorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Places a pre-order from the cart's pre-order lines (BR-O14, D88); no stock held, no minimum order value; retry-safe with Idempotency-Key */
+        post: operations["storePreorderCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/store/orders": {
         parameters: {
             query?: never;
@@ -424,7 +441,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The customer's orders, newest first (D6) */
+        /** The customer's orders, newest first (D6); `kind` keeps orders or pre-orders only (BR-O14) */
         get: operations["storeOrders"];
         put?: never;
         post?: never;
@@ -1070,6 +1087,61 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["dashboardSetProductStatus"];
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/preorder-demand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        /** What customers pre-ordered of the product and did not receive yet (BR-O14), for purchase planning */
+        get: operations["dashboardPreorderDemand"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/convert-preorders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Converts the product's open pre-orders into normal orders, oldest first, as far as the stock goes (BR-O14, D88); orders.manage, retry-safe with Idempotency-Key */
+        post: operations["dashboardConvertPreorders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/preorders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pre-orders, oldest first (the conversion order), with their lines (BR-O14) */
+        get: operations["dashboardPreorders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/dashboard/products/{product}/duplicate": {
@@ -1950,7 +2022,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2103,6 +2175,13 @@ export interface components {
             /** @constant */
             coming_soon?: true;
         };
+        /** @description A Coming Soon product's pre-order offer (BR-O14, D88); `remaining` is what is left under the merchant's cap in selling units, null = no cap */
+        StorePreorder: {
+            enabled: boolean;
+            /** Format: date */
+            expected_at: string | null;
+            remaining: number | null;
+        };
         StoreProduct: {
             id: number;
             name: string;
@@ -2111,6 +2190,8 @@ export interface components {
             /** @enum {string} */
             status: "active" | "coming_soon";
             main_image_url: string | null;
+            /** @description Null unless the product is Coming Soon */
+            preorder: components["schemas"]["StorePreorder"] | null;
             category: components["schemas"]["CategoryRef"] | null;
             custom_fields: components["schemas"]["CustomFieldValue"][];
             sku: components["schemas"]["StoreSku"] | null;
@@ -2224,10 +2305,22 @@ export interface components {
             /** @description Base units (D37) */
             available: number;
         };
+        PreorderCartItem: components["schemas"]["CartItem"] & {
+            /** Format: date */
+            expected_at: string | null;
+        };
+        /**
+         * @description A cart line to order now, or to pre-order (BR-O14); order by default
+         * @enum {string}
+         */
+        CartLineKind: "order" | "preorder";
         RemovedCartItem: {
             product_name: string;
-            /** @constant */
-            reason: "inactive";
+            /**
+             * @description inactive = the product can no longer be ordered (BR-P04); preorder_closed = it no longer takes pre-orders (BR-O14)
+             * @enum {string}
+             */
+            reason: "inactive" | "preorder_closed";
         };
         Cart: {
             items: components["schemas"]["CartItem"][];
@@ -2239,14 +2332,21 @@ export interface components {
                 amount: components["schemas"]["Money"] | null;
                 satisfied: boolean;
             };
+            /** @description The pre-order lines (BR-O14), confirmed apart; prices are indicative and the minimum order value does not apply (D88) */
+            preorders: {
+                items: components["schemas"]["PreorderCartItem"][];
+                items_total: components["schemas"]["Money"];
+            };
         };
         /** @description One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units. */
         LineProblem: {
             sku_id: number;
             /** @enum {string} */
-            reason: "insufficient_stock" | "below_moq" | "product_inactive";
+            reason: "insufficient_stock" | "below_moq" | "product_inactive" | "preorder_unavailable" | "preorder_limit";
             requested?: number;
             available?: number;
+            /** @description preorder_limit: what is left under the merchant's cap (BR-O14) */
+            remaining?: number;
             moq?: number;
         };
         /** @enum {string} */
@@ -2280,6 +2380,8 @@ export interface components {
              * @description The merchant removed the line (BR-O12): kept for history, out of every total
              */
             removed_at: string | null;
+            /** @description Selling units of a pre-order line already converted into a normal order (BR-O14); line_total charges the rest. 0 on a normal order */
+            converted_quantity: number;
         };
         /**
          * @description D85: EGP off, or % off (below 100)
@@ -2320,6 +2422,14 @@ export interface components {
         };
         Order: {
             number: number;
+            kind: components["schemas"]["OrderKind"];
+            /** @description Where a pre-order stands (D88); null for a normal order */
+            preorder_state: components["schemas"]["PreorderState"] | null;
+            /**
+             * Format: date-time
+             * @description A pre-order converted in full (D88)
+             */
+            converted_at: string | null;
             status: components["schemas"]["OrderStatus"];
             status_label: string;
             /** Format: date-time */
@@ -2355,7 +2465,28 @@ export interface components {
              */
             cancelled_by: "customer" | "tenant_user" | "system" | null;
         };
+        /**
+         * @description A normal order, or a pre-order of a Coming Soon product that holds no stock (BR-O14, D88)
+         * @enum {string}
+         */
+        OrderKind: "order" | "preorder";
+        /**
+         * @description open = something left to convert (partly converted too), converted = everything went into normal orders (D88)
+         * @enum {string}
+         */
+        PreorderState: "open" | "converted" | "cancelled";
+        OrderConversion: {
+            number: number;
+            status: components["schemas"]["OrderStatus"];
+            order_total: components["schemas"]["Money"];
+            /** Format: date-time */
+            placed_at: string;
+        };
         OrderDetail: components["schemas"]["Order"] & {
+            /** @description The pre-order number this order was converted from (BR-O14) */
+            converted_from: number | null;
+            /** @description The normal orders a pre-order was converted into, oldest first (empty for a normal order) */
+            conversions: components["schemas"]["OrderConversion"][];
             /** @description Every line, removed ones too (removed_at) */
             items: components["schemas"]["OrderItem"][];
             changes: components["schemas"]["OrderItemChange"][];
@@ -2560,6 +2691,7 @@ export interface components {
             custom_fields: {
                 [key: string]: string | number | boolean;
             };
+            preorder: components["schemas"]["ProductPreorder"];
             sku: components["schemas"]["DashboardSku"] | null;
             main_image_url: string | null;
             /** @description Detail responses only */
@@ -2598,10 +2730,54 @@ export interface components {
             moq?: number;
             tiers?: components["schemas"]["TierRequest"][];
         };
+        /** @description Pre-orders while Coming Soon (BR-O14, D88): on/off, the expected day, and the cap on every open pre-order in selling units (null = none) */
+        ProductPreorder: {
+            enabled: boolean;
+            /** Format: date */
+            expected_at: string | null;
+            limit: number | null;
+        };
+        PreorderDemandCounts: {
+            /** @description Open pre-ordered selling units, not yet converted */
+            quantity: number;
+            customers: number;
+            preorders: number;
+        };
+        PreorderDemand: components["schemas"]["PreorderDemandCounts"] & {
+            product_id: number;
+            status: components["schemas"]["ProductStatus"];
+            preorder_enabled: boolean;
+            /** Format: date */
+            expected_at: string | null;
+            limit: number | null;
+            /** @description What is left under the cap; null = no cap */
+            remaining: number | null;
+        };
+        PreorderConversion: {
+            converted_orders: {
+                /** @description The new normal order */
+                number: number;
+                preorder_number: number;
+                /** @description Selling units converted */
+                quantity: number;
+                order_total: components["schemas"]["Money"];
+            }[];
+            /** @description Pre-orders that got only part of what they asked for; the rest stays pre-ordered */
+            partially: number;
+            /** @description Open pre-orders that got nothing (no stock left, or the customer cannot order) */
+            untouched: number;
+        };
         ProductRequest: {
             name: string;
             category_id: number;
             description?: string | null;
+            /** @description Optional: left out = off on create, kept on update (D88) */
+            preorder?: {
+                enabled: boolean;
+                /** Format: date */
+                expected_at?: string | null;
+                limit?: number | null;
+            };
             custom_fields?: {
                 [key: string]: string | number | boolean | null;
             };
@@ -2872,7 +3048,7 @@ export interface components {
             product_name: string | null;
             sku_code: string | null;
             /** @enum {string} */
-            change: "added" | "removed" | "quantity" | "delivered_short";
+            change: "added" | "removed" | "quantity" | "delivered_short" | "converted";
             old_quantity: number | null;
             new_quantity: number | null;
             unit_price_before: components["schemas"]["Money"] | null;
@@ -2957,6 +3133,9 @@ export interface components {
             } | null;
         };
         DashboardOrder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"];
+        DashboardPreorder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"] & {
+            items: components["schemas"]["OrderItem"][];
+        };
         DashboardOrderHistoryEntry: {
             from: components["schemas"]["OrderStatus"] | null;
             to: components["schemas"]["OrderStatus"];
@@ -2967,6 +3146,10 @@ export interface components {
             note: string | null;
         };
         DashboardOrderDetail: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"] & {
+            /** @description The pre-order number this order was converted from (BR-O14) */
+            converted_from: number | null;
+            /** @description The normal orders a pre-order was converted into, oldest first */
+            conversions: components["schemas"]["OrderConversion"][];
             /** @description Every line, removed ones too (removed_at) */
             items: components["schemas"]["OrderItem"][];
             changes: components["schemas"]["DashboardOrderItemChange"][];
@@ -3068,7 +3251,7 @@ export interface components {
         MerchantNotification: {
             id: number;
             /** @enum {string} */
-            type: "new_order" | "customer_cancelled" | "whatsapp_dropped" | "order_expired";
+            type: "new_order" | "customer_cancelled" | "whatsapp_dropped" | "order_expired" | "new_preorder";
             type_label: string;
             /** @description Orders: order_number, customer_name, order_total (+ reason when customer_cancelled); whatsapp_dropped: phone, reason */
             details: {
@@ -4187,6 +4370,7 @@ export interface operations {
                 "application/json": {
                     sku_id: number;
                     quantity: number;
+                    kind?: components["schemas"]["CartLineKind"];
                 };
             };
         };
@@ -4200,7 +4384,10 @@ export interface operations {
     };
     storeRemoveCartItem: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The order line (default) or the pre-order line of the SKU (BR-O14) */
+                kind?: components["schemas"]["CartLineKind"];
+            };
             header?: never;
             path: {
                 sku: number;
@@ -4228,6 +4415,7 @@ export interface operations {
             content: {
                 "application/json": {
                     quantity: number;
+                    kind?: components["schemas"]["CartLineKind"];
                 };
             };
         };
@@ -4285,10 +4473,57 @@ export interface operations {
             503: components["responses"]["Error"];
         };
     };
+    storePreorderCheckout: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    address_id: number;
+                    customer_note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Placed; the cart's pre-order lines are emptied */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            order: components["schemas"]["OrderDetail"];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            /** @description checkout_failed with `items` (preorder_unavailable, below_moq, preorder_limit with `requested` and `remaining`) and `details.credit` past the credit limit; cart_empty; validation_failed on address_id. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            503: components["responses"]["Error"];
+        };
+    };
     storeOrders: {
         parameters: {
             query?: {
                 status?: components["schemas"]["OrderStatus"];
+                kind?: components["schemas"]["OrderKind"];
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -5462,10 +5697,123 @@ export interface operations {
             };
         };
         responses: {
-            200: components["responses"]["DashboardProduct"];
+            /** @description The product, with `meta.preorder_demand` (what customers pre-ordered, BR-O14) so going active shows it; converting stays an explicit step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardProduct"];
+                        meta: {
+                            preorder_demand: components["schemas"]["PreorderDemandCounts"];
+                        };
+                    };
+                };
+            };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreorderDemand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open pre-ordered quantity, customers and pre-orders, with the product's pre-order settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PreorderDemand"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardConvertPreorders: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The merchant's summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PreorderConversion"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description product_not_active (details.status) while the product is not active; idempotency_in_progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreorders: {
+        parameters: {
+            query?: {
+                product_id?: number;
+                status?: components["schemas"]["PreorderState"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of pre-orders in the dashboard order shape, with `items` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardPreorder"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };
@@ -6287,6 +6635,8 @@ export interface operations {
                 to?: components["parameters"]["To"];
                 q?: string;
                 stale?: 0 | 1;
+                /** @description Normal orders or pre-orders only (BR-O14) */
+                kind?: components["schemas"]["OrderKind"];
                 sort?: "placed_at" | "-placed_at" | "number" | "-number" | "order_total" | "-order_total";
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];

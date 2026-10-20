@@ -12,6 +12,7 @@ use App\Modules\Catalog\Models\ProductImage;
 const STORE_PRODUCT_KEYS = [
     'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name', 'kind'],
     'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'],
+    'preorder',
 ];
 
 beforeEach(function (): void {

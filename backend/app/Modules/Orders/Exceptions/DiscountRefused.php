@@ -16,6 +16,12 @@ final class DiscountRefused extends ApiException
         return new self(409, 'order_locked', "لا يمكن تعديل أسعار طلب حالته «{$status->label()}»", ['status' => $status->value]);
     }
 
+    /** D88: a pre-order's price is indicative and set again on conversion, so it takes no discount: `409 order_locked`. */
+    public static function preorder(): self
+    {
+        return new self(409, 'order_locked', 'سعر الحجز المسبق مبدئي ويُحسب عند تحويله إلى طلب، فلا يقبل خصمًا', ['status' => OrderStatus::Pending->value, 'kind' => 'preorder']);
+    }
+
     /** The new total would be less than what was already collected: `409 below_collected`. */
     public static function belowCollected(string $collected, string $total): self
     {

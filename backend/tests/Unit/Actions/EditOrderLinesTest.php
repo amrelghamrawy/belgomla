@@ -377,3 +377,14 @@ test('BR-O12 a failed edit sends nothing', function (): void {
 
     expect(OutboundMessage::query()->count())->toBe(0);
 });
+
+test('D88 a pre-order\'s lines are not edited', function (): void {
+    $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
+    $line = OrderItem::query()->where('order_id', $preorder->id)->sole();
+
+    expect(fn (): EditedOrder => app(EditOrderLines::class)->handle($preorder, new OrderEditData([new OrderEditLineData($line->id, $line->sku_id, 8)]), $this->owner->id))
+        ->toThrow(function (OrderEditRefused $e): void {
+            expect([$e->status, $e->errorCode, $e->details])->toBe([409, 'order_locked', ['status' => 'pending', 'kind' => 'preorder']]);
+        })
+        ->and($line->refresh()->quantity)->toBe(5);
+});

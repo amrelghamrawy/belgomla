@@ -46,6 +46,7 @@ test('BR-CU06 an empty cart has no items and a zero total', function (): void {
             'removed_items' => [],
             'items_total' => '0.00',
             'mov' => ['enabled' => false, 'amount' => null, 'satisfied' => true],
+            'preorders' => ['items' => [], 'items_total' => '0.00'],
         ]]);
 });
 
@@ -69,6 +70,7 @@ test('BR-CU06 BR-PR04 adding a sku returns the cart with the price resolved for 
             'removed_items' => [],
             'items_total' => '540.00',
             'mov' => ['enabled' => false, 'amount' => null, 'satisfied' => true],
+            'preorders' => ['items' => [], 'items_total' => '0.00'],
         ]]);
 
     $this->assertDatabaseHas('cart_items', ['sku_id' => $this->sku->id, 'quantity' => 6]);

@@ -224,3 +224,64 @@ test('BR-MOV02 the shortfall of a total against the minimum order value', functi
     'exactly the minimum' => ['500.00', '500.00', null],
     'one piaster short' => ['500.00', '499.99', ['required' => '500.00', 'current' => '499.99']],
 ]);
+
+/** BR-O14: a pre-order line of the preorderable SKU, with `$open` units already pre-ordered by others. */
+function preorderReport(Sku $sku, int $quantity, App\Modules\Customers\Models\Customer $customer, int $open = 0): App\Modules\Orders\Data\CheckoutReport
+{
+    $sku = Sku::query()->with(App\Modules\Catalog\Queries\CartSkuQuery::RELATIONS)->findOrFail($sku->id);
+
+    return app(CheckoutValidator::class)->checkPreorder([new CartLineInput($sku, $quantity)], $customer->refresh(), [$sku->id => $open]);
+}
+
+test('BR-O14 a pre-order line needs no stock, is priced at the tiers and reports no minimum order value', function (): void {
+    TenantSetting::query()->firstOrFail()->update(['mov_enabled' => true, 'mov_amount' => '5000.00']);
+
+    $report = preorderReport($this->preorderableSku(), 10, $this->customer);
+
+    expect($report->problems)->toBe([])
+        ->and($report->total)->toBe('850.00')
+        ->and($report->mov)->toBeNull()
+        ->and($report->movAmount)->toBeNull()
+        ->and($report->credit)->toBeNull();
+});
+
+test('BR-O14 the pre-order cap: up to it passes, past it reports what remains', function (int $open, int $quantity, ?array $problem): void {
+    $sku = $this->preorderableSku(limit: 20);
+
+    $report = preorderReport($sku, $quantity, $this->customer, $open);
+
+    expect(array_map(fn (App\Modules\Orders\Data\CheckoutProblem $p): array => $p->toArray(), array_values($report->problems)))->toBe($problem === null ? [] : [['sku_id' => $sku->id, ...$problem]]);
+})->with([
+    'exactly at the cap' => [12, 8, null],
+    'one past the cap' => [12, 9, ['reason' => 'preorder_limit', 'requested' => 9, 'remaining' => 8]],
+    'the cap already passed' => [25, 5, ['reason' => 'preorder_limit', 'requested' => 5, 'remaining' => 0]],
+]);
+
+test('BR-O14 a product that no longer takes pre-orders, and the MOQ, are reported per line', function (): void {
+    $closed = $this->preorderableSku();
+    Product::query()->whereKey($closed->product_id)->update(['preorder_enabled' => false]);
+    $small = $this->preorderableSku(name: 'أطلس');
+
+    expect(preorderReport($closed, 5, $this->customer)->problemFor($closed->id)?->reason)->toBe('preorder_unavailable')
+        ->and(preorderReport($small, 4, $this->customer)->problemFor($small->id)?->toArray())->toBe(['sku_id' => $small->id, 'reason' => 'below_moq', 'moq' => 5]);
+});
+
+test('BR-C05 a pre-order past the credit limit is reported', function (): void {
+    $this->customer->forceFill(['credit_limit' => '100.00'])->save();
+
+    expect(preorderReport($this->preorderableSku(), 5, $this->customer)->credit)->toBe(['limit' => '100.00', 'exposure' => '0.00', 'order_total' => '450.00']);
+});
+
+test('D88 a conversion only needs its lines orderable now: below the MOQ, the minimum order value and the credit limit pass', function (): void {
+    $report = new App\Modules\Orders\Data\CheckoutReport([], [7 => App\Modules\Orders\Data\CheckoutProblem::belowMoq(7, 5)], '10.00', '500.00', ['required' => '500.00', 'current' => '10.00'], ['limit' => '1.00', 'exposure' => '0.00', 'order_total' => '10.00']);
+
+    expect($report->assertConvertible())->toBe([]);
+});
+
+test('D88 a conversion still refuses a line out of stock or no longer active', function (): void {
+    $report = new App\Modules\Orders\Data\CheckoutReport([], [7 => App\Modules\Orders\Data\CheckoutProblem::insufficientStock(7, 5, 2)], '10.00', null, null, null);
+
+    expect(fn (): array => $report->assertConvertible())->toThrow(function (CheckoutFailed $e): void {
+        expect($e->items)->toBe([['sku_id' => 7, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 2]]);
+    });
+});

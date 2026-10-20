@@ -251,3 +251,15 @@ test('BR-C06 the overview shows what is overdue and for how many customers', fun
         ->overdue_total->toBe('300.00')
         ->overdue_customers->toBe(1);
 });
+
+test('D88 the overview leaves pre-orders out: no status count, no today\'s order, never stale', function (): void {
+    Order::factory()->pending()->create(['items_total' => '100.00', 'order_total' => '100.00', 'placed_at' => now()]);
+    Order::factory()->preorder()->create(['items_total' => '500.00', 'order_total' => '500.00', 'placed_at' => now()]);
+    Order::factory()->preorder()->create(['placed_at' => now()->subDays(5)]);
+
+    $overview = app(OverviewQuery::class)->get('Africa/Cairo');
+
+    expect($overview['orders_by_status']['pending'])->toBe(1)
+        ->and($overview['today'])->toBe(['orders' => 1, 'total' => '100.00', 'returns' => '0.00'])
+        ->and($overview['stale_pending'])->toBe(0);
+});

@@ -72,6 +72,21 @@ describe("checkoutFailure", () => {
     });
   });
 
+  it("BR-O14 explains a pre-order past the cap with what remains, and one that no longer takes pre-orders", () => {
+    const failure = checkoutFailure(
+      failed([
+        { sku_id: 501, reason: "preorder_limit", requested: 6, remaining: 2 },
+        { sku_id: 502, reason: "preorder_unavailable" },
+      ]),
+      lines,
+    );
+
+    expect(failure?.problems.map((problem) => problem.message)).toEqual([
+      "المتبقي للحجز 2 كرتونة فقط",
+      "لم يعد متاحًا للحجز",
+    ]);
+  });
+
   it("reads cart_line_invalid the same way", () => {
     const error = new ApiError(422, "cart_line_invalid", "x", null, [{ sku_id: 501, reason: "below_moq", moq: 5 }]);
 

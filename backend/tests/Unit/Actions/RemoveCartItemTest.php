@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Customers\Actions\RemoveCartItem;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
@@ -26,4 +27,13 @@ test('another customer cannot remove it', function (): void {
     expect(fn () => app(RemoveCartItem::class)->handle(Customer::factory()->create(), $this->item->sku_id))->toThrow(ModelNotFoundException::class);
 
     expect(CartItem::query()->count())->toBe(1);
+});
+
+test('BR-O14 removing the pre-order line of a sku keeps its order line', function (): void {
+    $preorder = CartItem::factory()->preorder()->create(['cart_id' => $this->item->cart_id, 'sku_id' => $this->item->sku_id]);
+
+    app(RemoveCartItem::class)->handle($this->customer, $this->item->sku_id, CartLineKind::Preorder);
+
+    expect(CartItem::query()->pluck('id')->all())->toBe([$this->item->id])
+        ->and(CartItem::query()->find($preorder->id))->toBeNull();
 });

@@ -6,7 +6,7 @@ import type { Category } from "@/lib/api/types";
 import { categoryOptions, categoryPath, findCategory, useProductsInfinite } from "@/lib/store/catalog";
 import { newIdempotencyKey } from "@/lib/api/idempotency";
 import { useCheckout } from "@/lib/store/checkout";
-import { useAddToCart } from "@/lib/store/cart";
+import { useAddToCart, useRemoveCartItem, useUpdateCartItem } from "@/lib/store/cart";
 import { useVerifyOtp } from "@/lib/store/auth";
 import { forgetReset, pendingReset, rememberReset } from "@/lib/store/reset-flow";
 
@@ -131,6 +131,31 @@ describe("useAddToCart", () => {
   });
 });
 
+describe("pre-order cart lines (BR-O14)", () => {
+  it("adds, changes and removes a pre-order line by its kind", async () => {
+    const fetchMock = stubApi({
+      "POST /api/store/cart/items": json(200, { data: cart() }),
+      "PATCH /api/store/cart/items/777": json(200, { data: cart() }),
+      "DELETE /api/store/cart/items/777": json(200, { data: cart() }),
+    });
+    const add = renderHookWithQuery(() => useAddToCart());
+    const update = renderHookWithQuery(() => useUpdateCartItem());
+    const remove = renderHookWithQuery(() => useRemoveCartItem());
+
+    await act(() => add.result.current.mutateAsync({ sku_id: 777, quantity: 5, kind: "preorder" }));
+    await act(() => update.result.current.mutateAsync({ sku_id: 777, quantity: 8, kind: "preorder" }));
+    await act(() => remove.result.current.mutateAsync({ sku_id: 777, kind: "preorder" }));
+
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({
+      sku_id: 777,
+      quantity: 5,
+      kind: "preorder",
+    });
+    expect(callsTo(fetchMock, "PATCH /api/store/cart/items/777")[0]?.body).toEqual({ quantity: 8, kind: "preorder" });
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/777")[0]?.url.search).toBe("?kind=preorder");
+  });
+});
+
 describe("useVerifyOtp", () => {
   it("BR-CU04 a verified registration becomes the logged-in session", async () => {
     stubApi({ "POST /api/store/auth/verify-otp": json(200, { data: customer() }) });
@@ -217,5 +242,20 @@ describe("reset flow", () => {
     expect(pendingReset()).toEqual({ phone: "01012345678", code: "123456" });
     forgetReset();
     expect(pendingReset()).toBeNull();
+  });
+});
+
+describe("useCheckout for pre-orders (BR-O14)", () => {
+  it("confirms the pre-order lines with a key of its own and caches the pre-order", async () => {
+    const preorder = order({ number: 1002, kind: "preorder", preorder_state: "open" });
+    const fetchMock = stubApi({ "POST /api/store/checkout/preorder": json(201, { data: { order: preorder } }) });
+    const { result, client } = renderHookWithQuery(() => useCheckout("preorder"));
+
+    await act(() => result.current.mutateAsync({ address_id: 31, customer_note: null }));
+
+    expect(callsTo(fetchMock, "POST /api/store/checkout/preorder")[0]?.headers["Idempotency-Key"]).toMatch(
+      /^preorder-/,
+    );
+    expect(client.getQueryData(queryKeys.order(1002))).toEqual(preorder);
   });
 });

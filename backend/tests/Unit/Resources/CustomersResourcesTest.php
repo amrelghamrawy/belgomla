@@ -92,7 +92,33 @@ test('BR-CU06 the cart resource matches the contract, money as strings', functio
         'removed_items' => [['product_name' => 'قديم', 'reason' => 'inactive']],
         'items_total' => '1020.00',
         'mov' => ['enabled' => true, 'amount' => '1000.00', 'satisfied' => true],
+        'preorders' => ['items' => [], 'items_total' => '0.00'],
     ]);
+});
+
+test('BR-O14 the cart lists its pre-order lines apart with the expected day and their own total', function (): void {
+    $cart = new PricedCart(
+        lines: [],
+        removed: [['product_name' => 'أطلس', 'reason' => 'preorder_closed']],
+        itemsTotal: '0.00',
+        movEnabled: false,
+        movAmount: null,
+        movSatisfied: true,
+        preorderLines: [new PricedCartLine(77, 'سلاح التلميذ ٢٠٢٧', 'selah', 'كرتونة', 20, 5, new ResolvedPrice('90.00', null, null, null, '450.00'), 5, 0, '2026-12-01')],
+        preorderTotal: '450.00',
+    );
+
+    $data = rendered(new CartResource($cart), storeRequest('/api/store/cart'));
+
+    expect($data['items'])->toBe([])
+        ->and($data['removed_items'])->toBe([['product_name' => 'أطلس', 'reason' => 'preorder_closed']])
+        ->and($data['preorders'])->toBe([
+            'items' => [[
+                'sku_id' => 77, 'product_name' => 'سلاح التلميذ ٢٠٢٧', 'product_slug' => 'selah', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 5, 'unit_price' => '90.00',
+                'tier_min_quantity' => null, 'line_total' => '450.00', 'moq' => 5, 'available' => 0, 'expected_at' => '2026-12-01',
+            ]],
+            'items_total' => '450.00',
+        ]);
 });
 
 test('BR-CU08 the invitation page masks the phone', function (): void {

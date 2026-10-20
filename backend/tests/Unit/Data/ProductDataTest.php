@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Data\BulkStatusData;
+use App\Modules\Catalog\Data\PreorderData;
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Enums\ProductStatus;
@@ -11,6 +12,7 @@ use App\Modules\Catalog\Http\Requests\ListDashboardProductsRequest;
 use App\Modules\Catalog\Http\Requests\StoreProductListRequest;
 use App\Modules\Catalog\Http\Requests\StoreProductRequest;
 use App\Modules\Catalog\Http\Requests\UpdateProductRequest;
+use Carbon\CarbonImmutable;
 
 /**
  * @param  array<string, mixed>  $payload
@@ -112,4 +114,15 @@ test('bulk status data reads the nested filter and the target status', function 
 
     expect($data->status)->toBe(ProductStatus::Inactive)
         ->and($data->filter->fields)->toBe(['academic_year' => '3']);
+});
+
+test('D88 the pre-order settings come as a flag, a day and a cap; left out they are null (off on create, kept on update)', function (): void {
+    $with = ProductData::fromRequest(productRequest(StoreProductRequest::class, $this->productPayload(['preorder' => ['enabled' => '1', 'expected_at' => '2026-12-01', 'limit' => '300']])));
+    $empty = ProductData::fromRequest(productRequest(UpdateProductRequest::class, $this->productPayload(['preorder' => ['enabled' => false, 'expected_at' => null, 'limit' => null]])));
+    $without = ProductData::fromRequest(productRequest(UpdateProductRequest::class, $this->productPayload()));
+
+    expect($with->preorder)->toEqual(new PreorderData(true, CarbonImmutable::parse('2026-12-01 00:00:00', 'UTC'), 300))
+        ->and($with->preorder?->attributes())->toEqual(['preorder_enabled' => true, 'expected_at' => CarbonImmutable::parse('2026-12-01', 'UTC'), 'preorder_limit' => 300])
+        ->and($empty->preorder)->toEqual(new PreorderData(false))
+        ->and($without->preorder)->toBeNull();
 });

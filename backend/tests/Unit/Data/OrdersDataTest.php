@@ -124,7 +124,7 @@ test('the delivery snapshot of the data has the checkout keys', function (): voi
 test('dashboard filters: enums, customer, whole days, search, stale and sort', function (): void {
     $request = validatedOrdersRequest(ListDashboardOrdersRequest::class, [
         'status' => 'pending', 'collection_status' => 'unpaid', 'customer_id' => '4', 'from' => '2026-10-01', 'to' => '2026-10-09',
-        'q' => ' 1024 ', 'stale' => '1', 'sort' => '-order_total',
+        'q' => ' 1024 ', 'stale' => '1', 'sort' => '-order_total', 'kind' => 'preorder',
     ], 'GET');
 
     expect(OrderFiltersData::fromRequest($request))->toEqual(new OrderFiltersData(
@@ -136,6 +136,7 @@ test('dashboard filters: enums, customer, whole days, search, stale and sort', f
         search: '1024',
         stale: true,
         sort: ['order_total', 'desc'],
+        kind: App\Modules\Orders\Enums\OrderKind::Preorder,
     ));
 });
 
@@ -146,6 +147,18 @@ test('dashboard filters default to everything, newest first', function (): void 
 test('the store order list takes an optional status', function (): void {
     expect(validatedOrdersRequest(ListOrdersRequest::class, ['status' => 'delivered'], 'GET')->status())->toBe(OrderStatus::Delivered)
         ->and(validatedOrdersRequest(ListOrdersRequest::class, [], 'GET')->status())->toBeNull();
+});
+
+test('BR-O14 the store order list takes an optional kind', function (): void {
+    expect(validatedOrdersRequest(ListOrdersRequest::class, ['kind' => 'preorder'], 'GET')->kind())->toBe(App\Modules\Orders\Enums\OrderKind::Preorder)
+        ->and(validatedOrdersRequest(ListOrdersRequest::class, [], 'GET')->kind())->toBeNull();
+});
+
+test('BR-O14 the pre-order list filters by product and by where each stands', function (): void {
+    expect(App\Modules\Orders\Data\PreorderFiltersData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\ListPreordersRequest::class, ['product_id' => '7', 'status' => 'open'], 'GET')))
+        ->toEqual(new App\Modules\Orders\Data\PreorderFiltersData(7, App\Modules\Orders\Enums\PreorderState::Open))
+        ->and(App\Modules\Orders\Data\PreorderFiltersData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\ListPreordersRequest::class, [], 'GET')))
+        ->toEqual(new App\Modules\Orders\Data\PreorderFiltersData);
 });
 
 test('the notification list reads the unread flag', function (): void {

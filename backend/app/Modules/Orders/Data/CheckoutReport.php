@@ -51,4 +51,21 @@ final readonly class CheckoutReport
 
         return $this->lines;
     }
+
+    /**
+     * D88: a pre-order converted by the merchant only needs its lines to be orderable now (product active, stock). The
+     * MOQ, the minimum order value and the credit limit were the pre-order's to meet; a short conversion may fall under them.
+     *
+     * @return list<CheckoutLine>
+     */
+    public function assertConvertible(): array
+    {
+        $problems = array_values(array_filter($this->problems, fn (CheckoutProblem $problem): bool => $problem->reason !== 'below_moq'));
+
+        if ($problems !== []) {
+            throw CheckoutFailed::with($problems);
+        }
+
+        return $this->lines;
+    }
 }

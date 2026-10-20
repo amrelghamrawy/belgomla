@@ -8,7 +8,9 @@ use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Enums\PreorderState;
 use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Support\Money;
@@ -29,6 +31,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $tenant_id
  * @property int $number
  * @property int $customer_id
+ * @property OrderKind $kind a normal order, or a pre-order that holds no stock and waits to be converted (BR-O14, D88)
+ * @property int|null $converted_from_id the pre-order a normal order was converted from
+ * @property CarbonImmutable|null $converted_at a pre-order with nothing left to convert
  * @property OrderStatus $status
  * @property string $items_total
  * @property DiscountType|null $discount_type the manual order discount (BR-PR08, D85)
@@ -60,6 +65,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, OrderItemChange> $itemChanges
  * @property-read Collection<int, OrderStatusHistory> $history
  * @property-read Collection<int, OrderReturn> $returns
+ * @property-read Order|null $convertedFrom
+ * @property-read Collection<int, Order> $conversions the normal orders a pre-order was converted into, oldest first
  */
 final class Order extends Model
 {
@@ -74,6 +81,9 @@ final class Order extends Model
         'collected_amount' => '0.00',
         'collection_status' => 'unpaid',
         'placed_by_type' => 'customer',
+        'kind' => 'order',
+        'converted_from_id' => null,
+        'converted_at' => null,
     ];
 
     public function getRouteKeyName(): string
@@ -142,6 +152,45 @@ final class Order extends Model
         return $this->hasMany(OrderReturn::class)->orderBy('number');
     }
 
+    /**
+     * BR-O14: the pre-order a normal order was converted from.
+     *
+     * @return BelongsTo<Order, $this>
+     */
+    public function convertedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'converted_from_id');
+    }
+
+    /**
+     * BR-O14: the normal orders a pre-order was converted into, oldest first.
+     *
+     * @return HasMany<Order, $this>
+     */
+    public function conversions(): HasMany
+    {
+        return $this->hasMany(self::class, 'converted_from_id')->orderBy('id');
+    }
+
+    public function isPreorder(): bool
+    {
+        return $this->kind === OrderKind::Preorder;
+    }
+
+    /** D88: where a pre-order stands (open, converted, cancelled); null for a normal order. */
+    public function preorderState(): ?PreorderState
+    {
+        if (! $this->isPreorder()) {
+            return null;
+        }
+
+        if ($this->status === OrderStatus::Cancelled) {
+            return PreorderState::Cancelled;
+        }
+
+        return $this->converted_at === null ? PreorderState::Open : PreorderState::Converted;
+    }
+
     /** BR-O08: what the customer owes for the order once returns are taken off, as "150.00". */
     public function netTotal(): string
     {
@@ -155,6 +204,9 @@ final class Order extends Model
     {
         return [
             'number' => 'integer',
+            'kind' => OrderKind::class,
+            'converted_from_id' => 'integer',
+            'converted_at' => 'datetime',
             'status' => OrderStatus::class,
             'items_total' => 'decimal:2',
             'discount_type' => DiscountType::class,

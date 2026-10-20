@@ -1,9 +1,10 @@
-import { PackageIcon, TrendingUpIcon } from "lucide-react";
+import { CalendarClockIcon, PackageIcon, TrendingUpIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 import type { StoreProduct } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
+import { formatDay } from "@/lib/format/date";
 import { formatPercent } from "@/lib/format/money";
 import { unitSummary } from "@/lib/store/quantity";
 
@@ -14,7 +15,7 @@ import { QuickAdd } from "./QuickAdd";
 /**
  * One product in a grid or rail (D67): the photo or a generated cover with the retailer's margin as a badge,
  * name, pack summary, the price panel, and add-to-cart in place. Coming-soon and out-of-stock
- * show as a tag.
+ * show as a tag; a Coming Soon product that takes pre-orders (BR-O14) adds the expected day and books in place.
  */
 export function ProductCard({ product, priority = false }: { product: StoreProduct; priority?: boolean }) {
   const href = `/p/${encodeURIComponent(product.slug)}`;
@@ -22,6 +23,7 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
   const outOfStock = !comingSoon && product.sku?.in_stock === false;
   const pack = product.sku === null ? "" : unitSummary(product.sku);
   const margin = product.prices_hidden === true ? null : (product.sku?.discount_percent ?? null);
+  const preorder = comingSoon && product.preorder?.enabled === true ? product.preorder : null;
 
   return (
     <article className="group bg-card hover:border-primary/30 hover:shadow-card flex h-full flex-col overflow-hidden rounded-2xl border transition-[box-shadow,border-color,translate] duration-200 motion-safe:hover:-translate-y-0.5">
@@ -69,6 +71,14 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <PackageIcon className="size-3.5 shrink-0" aria-hidden />
             {pack}
+          </p>
+        )}
+        {preorder !== null && (
+          <p className="text-primary flex items-center gap-1.5 text-xs font-semibold" data-testid="preorder-note">
+            <CalendarClockIcon className="size-3.5 shrink-0" aria-hidden />
+            {preorder.expected_at === null
+              ? ar.catalog.finalPriceNote
+              : `${ar.catalog.expectedAt(formatDay(preorder.expected_at))} · ${ar.catalog.finalPriceNote}`}
           </p>
         )}
         <div className="bg-brand-soft mt-1 rounded-xl px-2 py-2 sm:px-3 sm:py-2.5">

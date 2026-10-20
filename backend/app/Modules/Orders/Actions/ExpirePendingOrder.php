@@ -38,7 +38,7 @@ final readonly class ExpirePendingOrder
             $order = Order::query()->lockForUpdate()->findOrFail($order->id);
             $hours = $this->settings->get()->pending_expiry_hours;
 
-            if ($hours === null || $order->status !== OrderStatus::Pending || ! $order->placed_at->lessThan(Stale::threshold($hours))) {
+            if ($hours === null || $order->status !== OrderStatus::Pending || $order->isPreorder() || ! $order->placed_at->lessThan(Stale::threshold($hours))) {
                 return false;
             }
 

@@ -12,7 +12,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 
 const DASHBOARD_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name', 'kind'], 'custom_fields',
+    'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name', 'kind'], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
     'sku' => ['id', 'code', 'selling_unit' => ['id', 'name'], 'base_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq'],
     'main_image_url', 'created_at', 'updated_at',
 ];
@@ -422,3 +422,25 @@ test('BR-T04 a product of another tenant is 404 on show and update, and untouche
 
     $this->assertDatabaseHas('products', ['id' => $foreign->id, 'name' => 'original']);
 })->with(['GET', 'PUT']);
+test('D88 the product form takes the pre-order settings; a product left out of them keeps its own', function (): void {
+    $created = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload([
+        'status' => 'coming_soon',
+        'preorder' => ['enabled' => true, 'expected_at' => '2027-01-15', 'limit' => 300],
+    ]))->assertCreated()->assertJsonPath('data.preorder', ['enabled' => true, 'expected_at' => '2027-01-15', 'limit' => 300]);
+
+    $this->tenantJson('PUT', '/api/dashboard/products/'.$created->json('data.id'), $this->productPayload())
+        ->assertOk()
+        ->assertJsonPath('data.preorder', ['enabled' => true, 'expected_at' => '2027-01-15', 'limit' => 300]);
+});
+
+test('D88 the pre-order settings are validated', function (array $preorder, string $field): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['preorder' => $preorder]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor($field, 'error.details');
+})->with([
+    'flag missing' => [['limit' => 5], 'preorder.enabled'],
+    'flag not boolean' => [['enabled' => 'yes'], 'preorder.enabled'],
+    'day not a date' => [['enabled' => true, 'expected_at' => '15/01/2027'], 'preorder.expected_at'],
+    'cap below one' => [['enabled' => true, 'limit' => 0], 'preorder.limit'],
+    'cap too large' => [['enabled' => true, 'limit' => 10_000_001], 'preorder.limit'],
+]);

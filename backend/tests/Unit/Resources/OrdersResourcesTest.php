@@ -31,9 +31,12 @@ beforeEach(function (): void {
     OrderStatusHistory::factory()->for($this->order)->create(['actor_id' => $this->customer->id]);
     $this->expectedBase = fn (Order $order): array => [
         'number' => 1024,
+        'kind' => 'order',
         'status' => 'pending',
         'status_label' => 'قيد الانتظار',
         'placed_at' => now()->toIso8601String(),
+        'preorder_state' => null,
+        'converted_at' => null,
         'items_total' => '170.00',
         'discount' => null,
         'order_total' => '170.00',
@@ -64,7 +67,7 @@ test('the store order detail adds the lines and the history', function (): void 
             'id' => $item->id, 'sku_id' => $item->sku_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
             'unit' => $item->unit_name, 'conversion_factor' => 1, 'quantity' => 2, 'cover_price' => null, 'list_unit_price' => '85.00',
             'manual_discount' => null, 'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => null, 'line_total' => '170.00',
-            'delivered_quantity' => null, 'removed_at' => null,
+            'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0,
         ]],
         'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
     ]);
@@ -100,6 +103,7 @@ test('the order item resource is the line snapshot', function (): void {
     expect(array_keys(rendered(new OrderItemResource($item), storeRequest())))->toBe([
         'id', 'sku_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'list_unit_price',
         'manual_discount', 'unit_price', 'discount_percent', 'tier_min_quantity', 'line_total', 'delivered_quantity', 'removed_at',
+        'converted_quantity',
     ]);
 });
 
@@ -284,4 +288,51 @@ test('BR-O12 the lists leave the changes out', function (): void {
 
     expect(rendered(new OrderResource($order), storeRequest('/api/store/orders')))->not->toHaveKey('changes')
         ->and(rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders')))->not->toHaveKey('changes');
+});
+
+test('BR-O14 a pre-order says so, with where it stands; it is never stale and never expires', function (): void {
+    $preorder = Order::factory()->preorder()->create(['placed_at' => now()->subDays(3)]);
+    $clock = new PendingClockData(now()->subHours(24), 48);
+
+    $data = rendered(new DashboardOrderResource($preorder, $clock), dashboardRequest());
+
+    expect($data)->toMatchArray(['kind' => 'preorder', 'status' => 'pending', 'preorder_state' => 'open', 'converted_at' => null, 'is_stale' => false, 'expires_at' => null]);
+});
+
+test('D88 a converted pre-order lists its orders and a converted order names its pre-order', function (): void {
+    $preorder = Order::factory()->converted()->create(['number' => 7]);
+    $order = Order::factory()->create(['number' => 8, 'converted_from_id' => $preorder->id, 'order_total' => '90.00']);
+
+    $preorderData = rendered(new OrderResource($preorder->load(['convertedFrom', 'conversions'])), storeRequest());
+    $orderData = rendered(new OrderResource($order->load(['convertedFrom', 'conversions'])), storeRequest());
+
+    expect($preorderData)->toMatchArray(['preorder_state' => 'converted', 'converted_from' => null, 'conversions' => [['number' => 8, 'status' => 'pending', 'order_total' => '90.00', 'placed_at' => now()->toIso8601String()]]])
+        ->and($preorderData['converted_at'])->toBe(now()->toIso8601String())
+        ->and($orderData)->toMatchArray(['kind' => 'order', 'converted_from' => 7, 'conversions' => []]);
+});
+
+test('BR-O14 the pre-order list entry carries the lines but not the order page', function (): void {
+    $preorder = Order::factory()->preorder()->withItems([['quantity' => 3]])->create()->load(['customer', 'items']);
+
+    $data = rendered(new DashboardOrderResource($preorder, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/preorders'));
+
+    expect($data['items'])->toHaveCount(1)
+        ->and($data)->not->toHaveKeys(['collections', 'messages', 'history']);
+});
+
+test('BR-O14 the pre-order demand resource: the product\'s settings, the counts and what remains under the cap', function (): void {
+    $product = App\Modules\Catalog\Models\Product::factory()->preorderable(limit: 50)->create()->refresh();
+
+    expect(rendered(new App\Modules\Orders\Http\Resources\PreorderDemandResource($product, ['quantity' => 60, 'customers' => 3, 'preorders' => 4]), dashboardRequest()))->toBe([
+        'product_id' => $product->id, 'status' => 'coming_soon', 'preorder_enabled' => true, 'expected_at' => '2026-12-01',
+        'limit' => 50, 'remaining' => 0, 'quantity' => 60, 'customers' => 3, 'preorders' => 4,
+    ]);
+});
+
+test('D88 the conversion summary resource', function (): void {
+    $summary = new App\Modules\Orders\Data\ConvertedPreorders([['number' => 12, 'preorder_number' => 7, 'quantity' => 5, 'order_total' => '450.00']], 1, 2);
+
+    expect(rendered(new App\Modules\Orders\Http\Resources\ConvertedPreordersResource($summary), dashboardRequest()))->toBe([
+        'converted_orders' => [['number' => 12, 'preorder_number' => 7, 'quantity' => 5, 'order_total' => '450.00']], 'partially' => 1, 'untouched' => 2,
+    ]);
 });

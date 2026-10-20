@@ -51,6 +51,10 @@ final readonly class ApplyOrderDiscount
         return DB::transaction(function () use ($order, $data, $actorId, $notifyCustomer): Order {
             $order = Order::query()->lockForUpdate()->findOrFail($order->id);
 
+            if ($order->isPreorder()) {
+                throw DiscountRefused::preorder();
+            }
+
             if (! $order->status->allowsPriceChange()) {
                 throw DiscountRefused::locked($order->status);
             }

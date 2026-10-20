@@ -34,6 +34,7 @@ function item(overrides: Partial<OrderItem> = {}): OrderItem {
     line_total: "540.00",
     delivered_quantity: null,
     removed_at: null,
+    converted_quantity: 0,
     ...overrides,
   };
 }

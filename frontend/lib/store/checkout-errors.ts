@@ -24,12 +24,17 @@ function reasonText(problem: LineProblem, unit: string): string {
       return ar.checkout.reasons.below_moq(problem.moq ?? 1, unit);
     case "product_inactive":
       return ar.checkout.reasons.product_inactive;
+    case "preorder_unavailable":
+      return ar.checkout.reasons.preorder_unavailable;
+    case "preorder_limit":
+      return ar.checkout.reasons.preorder_limit(problem.remaining ?? 0, unit);
   }
 }
 
 /**
  * Turns `422 checkout_failed` / `cart_line_invalid` into one line per SKU (BR-PR06: the error names the SKU),
- * matched to the cart line for its name and a link back to the product. Null for any other error.
+ * matched to the cart line (an order or a pre-order line, BR-O14) for its name and a link back to the product. Null for
+ * any other error.
  */
 export function checkoutFailure(error: unknown, lines: readonly CartItem[]): CheckoutFailure | null {
   if (!isApiError(error, "checkout_failed") && !isApiError(error, "cart_line_invalid")) {

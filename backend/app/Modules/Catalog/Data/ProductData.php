@@ -11,7 +11,7 @@ use App\Modules\Catalog\Http\Requests\UpdateProductRequest;
 /**
  * Create or replace a product with its single SKU (BR-P02). `customFields` is the raw map, validated
  * against the definitions by CustomFieldValidator inside the action. `status` and `openingStock` (base
- * units, BR-U03) are create-only.
+ * units, BR-U03) are create-only. `preorder` null = not sent: off on a create, kept on an update (D88).
  */
 final readonly class ProductData
 {
@@ -26,6 +26,7 @@ final readonly class ProductData
         public array $customFields = [],
         public ?ProductStatus $status = null,
         public int $openingStock = 0,
+        public ?PreorderData $preorder = null,
     ) {}
 
     public static function fromRequest(StoreProductRequest|UpdateProductRequest $request): self
@@ -38,6 +39,7 @@ final readonly class ProductData
             customFields: $request->customFields(),
             status: $request instanceof StoreProductRequest ? $request->status() : null,
             openingStock: $request instanceof StoreProductRequest ? $request->openingStock() : 0,
+            preorder: PreorderData::fromRequest($request),
         );
     }
 }

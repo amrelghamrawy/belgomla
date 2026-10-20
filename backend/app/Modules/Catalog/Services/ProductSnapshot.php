@@ -31,6 +31,9 @@ final readonly class ProductSnapshot
             'description' => $product->description,
             'status' => $product->status->value,
             'custom_fields' => $product->custom_fields,
+            'preorder_enabled' => $product->preorder_enabled,
+            'expected_at' => $product->expected_at?->toDateString(),
+            'preorder_limit' => $product->preorder_limit,
             ...($sku instanceof Sku ? $this->sku($sku) : []),
             ...($sku instanceof Sku && $withPricing ? $this->pricing($sku) : []),
         ];

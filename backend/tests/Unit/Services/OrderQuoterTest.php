@@ -121,3 +121,12 @@ test('BR-O12 an order of another customer is a validation error on order', funct
         expect([$e->status, $e->details])->toBe([422, ['order' => ['الطلب غير موجود']]]);
     });
 });
+
+test('D88 a pre-order cannot be quoted as an edit: it is not edited', function (): void {
+    $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(fn () => $this->quoter->quote($this->customer->id, [['sku_id' => $this->sku->id, 'quantity' => 6]], $preorder->number))->toThrow(function (CheckoutFailed $e): void {
+        expect([$e->status, $e->details])->toBe([422, ['order' => ['الطلب غير موجود']]]);
+    });
+});

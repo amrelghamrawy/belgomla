@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Log;
  * Nothing is sent when the store does not notify this status or the customer opted out. The message is handed to
  * Messenger only **after commit**, so a rolled-back transition sends nothing; a customer over their per-phone limit
  * (D79) is logged, never fails the transition. Called at the end of TransitionOrder and of a merchant's or the
- * system's CancelOrder, by PlaceOrderForCustomer (`placed`) when the merchant asks, by ApplyOrderDiscount (`discount`) and by EditOrderLines
- * (`edited`).
+ * system's CancelOrder, by PlaceOrderForCustomer (`placed`) when the merchant asks, by ApplyOrderDiscount (`discount`), by EditOrderLines
+ * (`edited`) and by ConvertPreorders (`preorder_converted`).
  */
 final readonly class NotifyCustomerOfStatus
 {
@@ -51,6 +51,16 @@ final readonly class NotifyCustomerOfStatus
     public function placed(Order $order): void
     {
         $this->send($order, 'placed', $order->status->label(), $this->settings->orderNotifications());
+    }
+
+    /**
+     * BR-O14, D88: the merchant converted (part of) the customer's pre-order into this normal order (ConvertPreorders): the
+     * `preorder_converted` text with the new order's number and total. Like `placed`, the store's notified statuses do
+     * not apply (the customer must know their order exists), the customer's opt-out does.
+     */
+    public function preorderConverted(Order $order): void
+    {
+        $this->send($order, 'preorder_converted', $order->status->label(), $this->settings->orderNotifications());
     }
 
     /**

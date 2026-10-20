@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { canOrder, clampQuantity, movProgress, quantityBounds, unitSummary } from "@/lib/store/quantity";
+import {
+  canOrder,
+  clampQuantity,
+  MAX_CART_QUANTITY,
+  movProgress,
+  preorderBounds,
+  quantityBounds,
+  unitSummary,
+} from "@/lib/store/quantity";
 
 describe("quantityBounds", () => {
   it("BR-MOQ01 starts at the MOQ and stops at what the stock covers in selling units (D37)", () => {
@@ -20,6 +28,17 @@ describe("quantityBounds", () => {
 
   it("can be ordered when the stock covers exactly the MOQ", () => {
     expect(canOrder(quantityBounds({ moq: 5, conversion_factor: 20, available: 100 }))).toBe(true);
+  });
+});
+
+describe("preorderBounds", () => {
+  it("BR-O14 a pre-order starts at the MOQ and needs no stock; without a cap it stops at the cart's maximum", () => {
+    expect(preorderBounds({ moq: 5 })).toEqual({ min: 5, max: MAX_CART_QUANTITY });
+  });
+
+  it("BR-O14 stops at what remains under the merchant's cap", () => {
+    expect(preorderBounds({ moq: 5 }, 30)).toEqual({ min: 5, max: 30 });
+    expect(canOrder(preorderBounds({ moq: 5 }, 4))).toBe(false);
   });
 });
 

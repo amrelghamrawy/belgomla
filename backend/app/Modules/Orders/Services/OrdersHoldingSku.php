@@ -26,6 +26,7 @@ final readonly class OrdersHoldingSku implements ReservationHolders
             ->with('order')
             ->where('sku_id', $sku->id)
             ->tap(new Live) // a removed line gave its reservation back (BR-O12)
+            ->where('reserved', true) // a pre-order line holds nothing (BR-O14)
             ->whereHas('order', fn (Builder $order): Builder => $order->tap(new Open))
             ->orderBy('order_id')
             ->get()

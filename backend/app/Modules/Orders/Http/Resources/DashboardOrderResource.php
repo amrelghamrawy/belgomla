@@ -50,8 +50,8 @@ final class DashboardOrderResource extends JsonResource
     public function toArray(Request $request): array
     {
         $order = $this->resource;
-        $detail = $order->relationLoaded('items');
-        $pending = $order->status === OrderStatus::Pending;
+        $detail = $order->relationLoaded('history'); // the pre-order list loads the lines too, not the page
+        $pending = $order->status === OrderStatus::Pending && ! $order->isPreorder(); // a pre-order waits by design (D88)
 
         return [
             'id' => $order->id,

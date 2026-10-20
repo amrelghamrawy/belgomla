@@ -20,7 +20,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * `images` and `relations`; the list leaves them out. `custom_fields` is the raw stored map
  * (select values are option ids) because the dashboard form edits it. `sku.tiers` (with the % each was
  * entered as) is present when the tiers are loaded, i.e. on the detail, and so is `sku.inventory`
- * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros).
+ * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros). `preorder` holds the pre-order
+ * settings (`enabled`, `expected_at` as Y-m-d, `limit`, D88).
  *
  * @property-read Product $resource
  */
@@ -41,6 +42,7 @@ final class DashboardProductResource extends JsonResource
             'status' => $product->status->value,
             'category' => $this->category(),
             'custom_fields' => (object) $product->custom_fields,
+            'preorder' => ['enabled' => $product->preorder_enabled, 'expected_at' => $product->expected_at?->toDateString(), 'limit' => $product->preorder_limit],
             'sku' => $this->sku(),
             'main_image_url' => $this->mainImage()?->url(),
             'images' => $this->whenLoaded('images', fn () => ProductImageResource::collection($product->images)),

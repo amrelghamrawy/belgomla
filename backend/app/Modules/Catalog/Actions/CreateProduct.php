@@ -46,6 +46,7 @@ final readonly class CreateProduct
                 'status' => $data->status ?? ProductStatus::Active,
                 'custom_fields' => $customFields,
                 'created_by' => $createdBy,
+                ...($data->preorder?->attributes() ?? []), // D88: pre-orders off unless sent
             ]);
 
             $sku = $this->pricing->handle($product->skus()->make($data->sku->attributes()), $data->sku->pricing);

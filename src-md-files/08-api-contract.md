@@ -69,6 +69,8 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 409  | `address_locked`           | editing the delivery address from `out_for_delivery` on (D9) |
 | 422  | `exceeds_balance`          | a collection above the order's remaining balance (BR-C03, `details.remaining`) |
 | 409  | `order_cancelled`          | recording a collection on a cancelled order (BR-C04)      |
+| 409  | `is_preorder`              | recording a collection or applying credit on a pre-order (D88) |
+| 409  | `product_not_active`       | converting pre-orders of a product that is not active yet (BR-O14, `details.status`) |
 | 409  | `already_voided`           | voiding a collection twice (BR-C02, `details.voided_at`)  |
 | 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
 | 422  | `idempotency_key_reused`   | same `Idempotency-Key` with a different body (D55)        |
@@ -263,6 +265,8 @@ Cart response:
 }
 ```
 
+V2 Task 10 (BR-O14, D88): `POST /cart/items` and `PATCH /cart/items/{sku_id}` take `kind: order | preorder` (default `order`), `DELETE /cart/items/{sku_id}?kind=` too; a pre-order line needs a Coming Soon product with pre-orders on and the MOQ, never stock (`cart_line_invalid` reason `preorder_unavailable`). The cart adds `preorders: { items: [...the line shape + expected_at, available 0], items_total }` (indicative prices, no MOV). A pre-order line whose product stops taking pre-orders is dropped as `removed_items[].reason = preorder_closed`.
+
 Delivered in Task 5: every cart write answers this same body. `quantity`, `moq` are in selling units, `available` in base units (D37). A line that cannot be ordered is `422 cart_line_invalid` with `items: [{ sku_id, reason: below_moq|insufficient_stock|product_inactive, moq?|available? }]` (`available` here in selling units). Unknown or another tenant's SKU, or a SKU not in the cart for PATCH/DELETE → `404`. `mov.enabled` is false when the setting is on without an amount. Guest `POST /cart/items`: `403 prices_hidden` when `require_login_for_prices` is on, else `401` (D53). Task 9 added `product_slug` (link back to the product page) and `conversion_factor` (so the storefront can cap the quantity at `available / conversion_factor`) to each line.
 
 ### Checkout (BR-PR06, section 12 of the domain model)
@@ -318,6 +322,8 @@ Order detail shape (shared with dashboard, dashboard adds customer + collections
 Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `cancelled_by`, and each item `sku_id`, `sku_name`, `conversion_factor`, `cover_price`, `discount_percent`, `tier_min_quantity`. The list leaves out `items` and `history`. `{number}` is the per-tenant order number; another customer's or another tenant's order is `404` (D57). In `checkout_failed`, `requested`/`available` are selling units; an empty cart is `422 cart_empty`; an address that is not the customer's active address is `422 validation_failed` on `address_id`; a customer who is not active gets `403` with the status as code. Cancel needs `reason` (≤ 300); `has_collections` (409) when money was collected. Orders routes need status `active` (like the cart). Audit: `order.created`, `order.cancelled`.
 
 V2 Task 02: `checkout_failed` adds `details.credit { limit, exposure, order_total }` when the order would pass the customer's credit limit (BR-C05, D78). `GET /api/store/account/statement` is described in §10.
+
+V2 Task 10 (BR-O14, D88): `POST /api/store/checkout/preorder` `{ address_id, customer_note? }` (`idempotent`) turns the cart's pre-order lines into a pre-order and answers `201 { order }` like checkout; the order lines stay in the cart (and checkout leaves the pre-order lines). Failures: `422 checkout_failed` with `items` `preorder_unavailable`, `below_moq`, `preorder_limit { requested, remaining }` and `details.credit`; `cart_empty`; `validation_failed` on `address_id`. No MOV, no stock. Every order (store and dashboard) adds `kind` (`order` | `preorder`), `preorder_state` (`open` | `converted` | `cancelled`, null for a normal order) and `converted_at`; every line `converted_quantity`; the details `converted_from` (the pre-order number, or null) and `conversions[] { number, status, order_total, placed_at }`. `GET /api/store/orders?kind=` keeps one kind. A customer cancels an open pre-order with the usual cancel (not once converted in full: `409 invalid_transition`).
 
 V2 Task 01: the order also carries `returned_total` and `net_total` (BR-O08), and the detail `returns[]`, the live returns without the merchant's reason (see §9 Returns).
 
@@ -434,6 +440,8 @@ Create/update body:
 ```
 
 `base_price` **or** `base_price_percent` is required (BR-PR10); when percent is given, server computes the price and stores both (the percent wins if both are sent). Same for each tier (`unit_price` or `discount_percent`). On update, a body without `sku.tiers` keeps the tiers (D34). The detail response carries `sku.tiers: [{ min_quantity, unit_price, discount_percent }]`. Prices, MOQ and tiers are audited as `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed`, not inside `product.updated`. `opening_stock` is accepted only on create and writes an `opening` movement.
+
+V2 Task 10 (BR-O14, D88): both bodies take an optional `preorder { enabled, expected_at? (Y-m-d), limit? (1..10,000,000 selling units) }`; left out it is off on create and kept on update. Every dashboard product carries `preorder { enabled, expected_at, limit }` (audited as the product fields `preorder_enabled`, `expected_at`, `preorder_limit`). `PATCH …/status` answers `meta.preorder_demand { quantity, customers, preorders }` (the product's open pre-orders); going active converts nothing by itself. The storefront product adds `preorder`: null unless Coming Soon, then `{ enabled, expected_at, remaining }` (`remaining` under the cap in selling units, null = no cap).
 
 ### Catalog import / export (V2 Task 06, D83, D95)
 
@@ -572,6 +580,17 @@ V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about th
 - `POST /api/dashboard/orders/quote` accepts `order` (an order number of the customer) to quote an edit: what the order holds counts as available and its total is not counted twice against the credit limit; another customer's or store's order → `422 validation_failed` on `order`.
 - `returnable[]` adds `delivered`; `returnable = delivered − returned`.
 - Settings: `order_notify_statuses` accepts `edited` and `order_status_messages` an `edited` text.
+
+### Pre-orders (V2 Task 10, BR-O14, D88)
+
+| Method | Path | Body / Notes |
+| ------ | ---- | ------------ |
+| GET    | `/api/dashboard/preorders` | `?product_id=&status=open|converted|cancelled&page=&per_page=` → the pre-orders oldest first (the conversion order), in the dashboard order shape with `items`. `orders.view` |
+| GET    | `/api/dashboard/products/{id}/preorder-demand` | `{ product_id, status, preorder_enabled, expected_at, limit, remaining, quantity, customers, preorders }`: the open pre-ordered selling units not converted yet. `orders.view` |
+| POST   | `/api/dashboard/products/{id}/convert-preorders` | no body → `{ converted_orders: [{ number, preorder_number, quantity, order_total }], partially, untouched }`. `orders.manage`, `idempotent` |
+
+- Conversion: `409 product_not_active` (`details.status`) until the product is active; FIFO by `placed_at`; each pre-order gets what the locked stock allows of its lines of that product as a normal pending order placed by the user (`converted_from_id`, re-priced at today's tiers, reserved; no MOQ / MOV / credit check); the rest stays on the pre-order (`converted_quantity`, a `converted` line change); a pre-order with nothing left is closed (`converted_at`). Customers who can no longer order are untouched. History «تحويل إلى طلب #N» on the pre-order, audit `order.preorder_converted` (order number, lines, the pre-order's new total, `converted`), `order.created` adds `converted_from`. Each customer gets the `preorder_converted` WhatsApp text (whatever `order_notify_statuses` says; `order_status_messages.preorder_converted` words it).
+- A pre-order cannot be moved on (`409 invalid_transition`), edited or discounted (`409 order_locked`, `details.kind = preorder`), collected or credited (`409 is_preorder`); `GET /dashboard/orders?kind=` keeps one kind; a pre-order is never `is_stale` and has no `expires_at`. The quote's `order` must be a normal order. `new_preorder` notifications (`orders.manage`) tell the merchant about a customer's pre-order.
 
 ### Merchant-placed orders (V2 Task 07, BR-O11, D84)
 
@@ -719,10 +738,10 @@ php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their 
 | -------------- | --------: |
 | Store public   |         7 |
 | Store auth     |        10 |
-| Store customer |        15 |
-| Dashboard      |        88 |
+| Store customer |        16 |
+| Dashboard      |        91 |
 | Webhooks       |         2 |
-| **Total**      |   **122** |
+| **Total**      |   **126** |
 
 ---
 

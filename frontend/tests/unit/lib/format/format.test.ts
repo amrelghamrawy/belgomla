@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatClock, formatDate, formatDateTime } from "@/lib/format/date";
+import { formatClock, formatDate, formatDateTime, formatDay } from "@/lib/format/date";
 import { formatMoney, formatPercent } from "@/lib/format/money";
 import { phoneField } from "@/lib/forms/phone";
 import { formatPhone, whatsappLink } from "@/lib/format/phone";
@@ -32,6 +32,16 @@ describe("formatDate", () => {
 
   it("rejects an invalid date", () => {
     expect(() => formatDate("yesterday")).toThrow(RangeError);
+  });
+});
+
+describe("formatDay", () => {
+  it("shows a calendar day as it is, with no time zone shift", () => {
+    expect(formatDay("2026-12-01")).toBe("1 ديسمبر 2026");
+  });
+
+  it("refuses something that is not a day", () => {
+    expect(() => formatDay("soon")).toThrow(RangeError);
   });
 });
 

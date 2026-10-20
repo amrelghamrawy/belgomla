@@ -271,3 +271,23 @@ test('BR-PR06 step 1 a suspended tenant takes no order', function (): void {
 
     ($this->expectNothingWritten)();
 });
+
+test('BR-O14 checkout takes only the order lines; the pre-order lines stay in the cart for their own confirmation', function (): void {
+    $preorderable = $this->preorderableSku();
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+    $this->fillPreorderCart($this->customer, [$preorderable->id => 5]);
+
+    $order = ($this->checkout)();
+
+    expect($order->kind)->toBe(App\Modules\Orders\Enums\OrderKind::Order)
+        ->and(OrderItem::query()->where('order_id', $order->id)->pluck('sku_id')->all())->toBe([$this->sku->id])
+        ->and(CartItem::query()->pluck('sku_id')->all())->toBe([$preorderable->id]);
+});
+
+test('BR-O14 a cart with only pre-order lines is an empty checkout', function (): void {
+    $this->fillPreorderCart($this->customer, [$this->preorderableSku()->id => 5]);
+
+    expect(fn (): Order => ($this->checkout)())->toThrow(function (CheckoutFailed $e): void {
+        expect($e->errorCode)->toBe('cart_empty');
+    });
+});

@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Orders\Enums\CancelledBy;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Support\Money;
@@ -102,6 +103,18 @@ final class OrderFactory extends Factory
     public function stale(int $hours = 25): static
     {
         return $this->state(['status' => OrderStatus::Pending, 'placed_at' => now()->subHours($hours)]);
+    }
+
+    /** BR-O14: a pre-order (pending, holding no stock); give its lines the OrderItemFactory preorderLine() state. */
+    public function preorder(): static
+    {
+        return $this->state(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending]);
+    }
+
+    /** D88: a pre-order with nothing left to convert. */
+    public function converted(): static
+    {
+        return $this->state(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending, 'converted_at' => now()]);
     }
 
     /** BR-O11: placed from the dashboard by a store user on the customer's behalf. */

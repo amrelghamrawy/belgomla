@@ -162,6 +162,9 @@ erDiagram
 | status        | enum            | `active`, `coming_soon`, `inactive` (BR-P04)                                                            |
 | custom_fields | jsonb           | `{ "grade": 12, "subject": 40, "brand": "..." }` — select values store the **option id**; **GIN index** |
 | created_by    | FK tenant_users | nullable (seeded)                                                                                       |
+| preorder_enabled | boolean      | V2 Task 10: default false; a Coming Soon product takes pre-orders (BR-P04, BR-O14, D88)                  |
+| expected_at   | date            | V2 Task 10: nullable; the day the product is expected, shown on the storefront                          |
+| preorder_limit | int            | V2 Task 10: nullable, **check ≥ 1**; cap in selling units over every open pre-order (null = none)       |
 
 Search: `pg_trgm` GIN index on `name`; option labels are joined at query time for search (BR-P08).
 
@@ -357,7 +360,7 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 
 `carts`: `id, tenant_id, customer_id` with **unique (customer_id)**.
 
-`cart_items`: `id, tenant_id, cart_id, sku_id, quantity (check ≥ 1)` with **unique (cart_id, sku_id)**. No prices are stored in the cart; they are resolved on read (BR-PR06).
+`cart_items`: `id, tenant_id, cart_id, sku_id, quantity (check ≥ 1), kind varchar(10) default 'order' (check `order` | `preorder`, V2 Task 10)` with **unique (cart_id, sku_id, kind)** (was (cart_id, sku_id) before V2 Task 10). No prices are stored in the cart; they are resolved on read (BR-PR06). Pre-order lines (BR-O14) are confirmed apart from the order lines.
 
 ---
 
@@ -391,6 +394,9 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | due_at                                              | timestamptz   | V2: set on delivery = delivered_at + the customer's terms (BR-C06)                |
 | placed_by_type                                      | varchar(12)   | V2 Task 07: `customer` (default) or `tenant_user` (BR-O11); CHECK on the two values |
 | placed_by_id                                        | bigint        | nullable; the customer or dashboard user id, by `placed_by_type` (backfilled with `customer_id`) |
+| kind                                                | varchar(10)   | V2 Task 10: `order` (default) or `preorder` (BR-O14, D88), CHECK                    |
+| converted_from_id                                   | FK orders     | V2 Task 10: nullable; the pre-order a normal order was converted from; **check** only on `kind = order`; indexed |
+| converted_at                                        | timestamptz   | V2 Task 10: nullable; a pre-order with nothing left to convert (state `converted`); **check** only on `kind = preorder` |
 
 ### `tenant_order_counters` (`tenant_id` PK, `next_number int`)
 
@@ -424,6 +430,8 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | line_total        | numeric(12,2) | = quantity × unit_price; once delivered = delivered_quantity × unit_price (BR-O13) |
 | delivered_quantity | int          | V2 Task 09: selling units that went out, set on delivery (backfilled = quantity for orders delivered before); **check 0 ≤ delivered_quantity ≤ quantity**; null until delivered (BR-O13) |
 | removed_at        | timestamp     | V2 Task 09: the merchant removed the line (BR-O12); kept for history, out of totals, stock moves and returns; **check** a removed line has no delivered_quantity |
+| reserved          | boolean       | V2 Task 10: default true; false on a pre-order line, which holds no stock; transitions and cancel release reserved lines only (BR-O14) |
+| converted_quantity | int          | V2 Task 10: default 0, **check 0 ≤ converted_quantity ≤ quantity** and 0 on a reserved line; selling units of a pre-order line already in a normal order; a pre-order line's line_total = unit_price × (quantity − converted_quantity) |
 
 ### `order_status_history` (BR-O04)
 
@@ -431,7 +439,7 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 
 ### `order_item_changes` (V2 Task 09, BR-O12, BR-O13)
 
-`id, tenant_id, order_id FK, order_item_id FK nullable, change varchar(16) (added | removed | quantity | delivered_short, CHECK), old_quantity int nullable, new_quantity int nullable, unit_price_before numeric(12,2) nullable, unit_price_after numeric(12,2) nullable, actor_id FK tenant_users nullable (null = system), created_at`. Append-only, index `(order_id, id)`. `added` has only the new quantity and price, `removed` only the old ones, `quantity` both, `delivered_short` the ordered (old) and delivered (new) quantities at the line's price. Written by `EditOrderLines` and `ApplyTransition`; model `Orders\Models\OrderItemChange`. Shown as `changes[]` on both order details (the dashboard adds `actor_id`).
+`id, tenant_id, order_id FK, order_item_id FK nullable, change varchar(16) (added | removed | quantity | delivered_short | converted (V2 Task 10), CHECK), old_quantity int nullable, new_quantity int nullable, unit_price_before numeric(12,2) nullable, unit_price_after numeric(12,2) nullable, actor_id FK tenant_users nullable (null = system), created_at`. Append-only, index `(order_id, id)`. `added` has only the new quantity and price, `removed` only the old ones, `quantity` both, `delivered_short` the ordered (old) and delivered (new) quantities at the line's price, `converted` what was left to convert of a pre-order line before and after (the pre-order price before, the new order's price after). Written by `EditOrderLines`, `ApplyTransition` and `ConvertPreorders`; model `Orders\Models\OrderItemChange`. Shown as `changes[]` on both order details (the dashboard adds `actor_id`).
 
 ### `order_returns` (V2 Task 01, BR-R01..R06)
 
@@ -490,7 +498,7 @@ Invariant (app, inside a transaction with the order row locked): `Σ live paymen
 
 ### `notifications` (BR-N02)
 
-`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped|order_expired), data jsonb, read_at`.
+`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped|order_expired|new_preorder), data jsonb, read_at`. `new_preorder` (V2 Task 10): a customer's pre-order (BR-O14).
 
 Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57). `whatsapp_dropped` (V2 Task 03) has no order: `data` holds `phone` and `reason`. `permission` varchar(40) (V2 Task 05, D82): who may see the row (`orders.manage` for order notifications, `settings.manage` for `whatsapp_dropped`).
 
@@ -581,6 +589,7 @@ pending ──► confirmed ──► preparing ──► out_for_delivery ─�
 - `cancelled` allowed from any non-terminal status. Customer only from `pending`.
 - Guard on cancel: `collected_amount = 0` (BR-O03).
 - Side effects (same transaction): `delivered` → inventory deduction + `sale` movement; `cancelled` → reservation release.
+- A pre-order (`kind = preorder`, V2 Task 10) only goes `pending → cancelled` (it reserved nothing, so nothing is released), and not once it is converted in full (`converted_at`). Its derived state: `open` (pending, something left), `converted`, `cancelled` (D88).
 
 ### Collection status (derived)
 
@@ -685,5 +694,5 @@ Each module exposes services; cross-module calls go through those services, neve
 | Variants               | products 1:N skus                                      |
 | Multiple selling units | `selling_unit_id` on SKU → becomes a `sku_units` table |
 | Roles                  | `tenant_users.role` enum                               |
-| Pre-orders             | `coming_soon` product status                           |
+| Pre-orders             | Built in V2 Task 10: `products.preorder_*`, `orders.kind` / `converted_from_id` / `converted_at`, `order_items.reserved` / `converted_quantity`, `cart_items.kind` (BR-O14, D88) |
 | Order notifications    | `outbound_messages.purpose` enum                       |

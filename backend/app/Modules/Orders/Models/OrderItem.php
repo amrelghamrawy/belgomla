@@ -39,6 +39,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $tier_min_quantity
  * @property string $line_total = unit_price × the quantity charged: delivered_quantity once delivered (BR-O13), else quantity
  * @property int|null $delivered_quantity selling units that went out, set on delivery (BR-O13, D86)
+ * @property bool $reserved whether the line holds stock: false on a pre-order line (BR-O14, D88)
+ * @property int $converted_quantity selling units of a pre-order line already converted into a normal order
  * @property CarbonImmutable|null $removed_at the merchant removed the line (BR-O12): kept for history, out of every total
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -51,6 +53,11 @@ final class OrderItem extends Model
 
     /** @use HasFactory<OrderItemFactory> */
     use HasFactory;
+
+    protected $attributes = [
+        'reserved' => true,
+        'converted_quantity' => 0,
+    ];
 
     protected static function newFactory(): OrderItemFactory
     {
@@ -75,6 +82,12 @@ final class OrderItem extends Model
         return $this->belongsTo(Sku::class);
     }
 
+    /** BR-O14: what is left of a pre-order line to convert (the whole quantity on a normal order line). */
+    public function remainingQuantity(): int
+    {
+        return $this->quantity - $this->converted_quantity;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -94,6 +107,8 @@ final class OrderItem extends Model
             'line_total' => 'decimal:2',
             'delivered_quantity' => 'integer',
             'removed_at' => 'datetime',
+            'reserved' => 'boolean',
+            'converted_quantity' => 'integer',
         ];
     }
 }

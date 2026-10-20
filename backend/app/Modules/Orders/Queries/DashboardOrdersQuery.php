@@ -7,6 +7,7 @@ namespace App\Modules\Orders\Queries;
 use App\Modules\Orders\Data\OrderFiltersData;
 use App\Modules\Orders\Data\PendingClockData;
 use App\Modules\Orders\Enums\CollectionStatus;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\Scopes\Stale;
@@ -18,7 +19,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * GET /api/dashboard/orders (08-api-contract.md §9): every order of the tenant with its customer, filtered by
  * status, collection status, customer, placing day range, a search (order number, customer name or phone,
- * recipient name) and `stale` — pending for longer than the tenant's `stale_pending_hours` (BR-INV07, D10).
+ * recipient name), `stale` — pending for longer than the tenant's `stale_pending_hours` (BR-INV07, D10) — and `kind`
+ * (normal orders or pre-orders, BR-O14).
  */
 final readonly class DashboardOrdersQuery
 {
@@ -53,6 +55,7 @@ final readonly class DashboardOrdersQuery
     {
         $query
             ->when($filters->status, fn (Builder $query, OrderStatus $status): Builder => $query->where('status', $status))
+            ->when($filters->kind, fn (Builder $query, OrderKind $kind): Builder => $query->where('kind', $kind))
             ->when($filters->collectionStatus, fn (Builder $query, CollectionStatus $status): Builder => $query->where('collection_status', $status))
             ->when($filters->customerId, fn (Builder $query, int $id): Builder => $query->where('customer_id', $id))
             ->when($filters->from, fn (Builder $query, CarbonImmutable $from): Builder => $query->where('placed_at', '>=', $from))

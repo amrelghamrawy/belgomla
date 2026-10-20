@@ -8,7 +8,8 @@ use App\Modules\Pricing\Data\ResolvedPrice;
 
 /**
  * One cart line priced now (BR-PR04): quantity and MOQ in selling units, `available` in base units like the
- * storefront (D37). Read model built by CartPricer, not request input.
+ * storefront (D37). A pre-order line (BR-O14) has `available` 0 and the day its product is expected. Read model built by
+ * CartPricer, not request input.
  */
 final readonly class PricedCartLine
 {
@@ -22,5 +23,6 @@ final readonly class PricedCartLine
         public ResolvedPrice $price,
         public int $moq,
         public int $available,
+        public ?string $expectedAt = null,
     ) {}
 }

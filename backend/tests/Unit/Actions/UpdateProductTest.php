@@ -110,3 +110,14 @@ test('without a batch an update that changes nothing is still recorded, as the d
 
     expect(AuditLog::query()->pluck('action')->all())->toBe(['product.updated']);
 });
+
+test('D88 the pre-order settings change when sent and are kept when left out, audited as product fields', function (): void {
+    $sent = new ProductData(name: 'قلم', categoryId: $this->product->category_id, sku: ($this->data)()->sku, preorder: new App\Modules\Catalog\Data\PreorderData(true, null, 40));
+
+    app(UpdateProduct::class)->handle($this->product, $sent);
+    app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)());
+
+    expect($this->product->refresh()->only(['preorder_enabled', 'expected_at', 'preorder_limit']))->toBe(['preorder_enabled' => true, 'expected_at' => null, 'preorder_limit' => 40])
+        ->and(AuditLog::query()->where('action', 'product.updated')->orderBy('id')->firstOrFail()->only(['old_values', 'new_values']))
+        ->toEqual(['old_values' => ['preorder_enabled' => false, 'preorder_limit' => null], 'new_values' => ['preorder_enabled' => true, 'preorder_limit' => 40]]);
+});

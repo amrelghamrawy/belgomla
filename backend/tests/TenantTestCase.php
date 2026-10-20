@@ -12,11 +12,13 @@ use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
 use App\Modules\Orders\Actions\Checkout;
+use App\Modules\Orders\Actions\PlacePreorder;
 use App\Modules\Orders\Data\CheckoutData;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Pricing\Models\SkuPriceTier;
@@ -373,5 +375,52 @@ abstract class TenantTestCase extends TestCase
             ?? $this->addressOf($customer);
 
         return $this->asTenant($tenant, fn (): Order => app(Checkout::class)->handle($customer, new CheckoutData($address->id, $note))->refresh());
+    }
+
+    /**
+     * A SKU of a Coming Soon product that takes pre-orders (BR-O14, D88), shaped like orderableSku() (cartons of 20, MOQ 5,
+     * 90.00, 10+ → 85.00) with no stock, optionally capped at $limit selling units over every open pre-order.
+     *
+     * @param  array<string, mixed>  $attributes  SKU overrides
+     */
+    protected function preorderableSku(array $attributes = [], ?int $limit = null, ?Tenant $tenant = null, string $name = 'سلاح التلميذ ٢٠٢٧'): Sku
+    {
+        $sku = $this->orderableSku($attributes, 0, ProductStatus::ComingSoon, $tenant, $name);
+
+        $this->asTenant($tenant ?? $this->tenant, fn (): int => Product::query()->whereKey($sku->product_id)->update(['preorder_enabled' => true, 'preorder_limit' => $limit, 'expected_at' => '2026-12-01']));
+
+        return $sku->refresh();
+    }
+
+    /**
+     * Puts pre-order lines in a customer's cart, as `[sku_id => quantity]`.
+     *
+     * @param  array<int, int>  $lines
+     */
+    protected function fillPreorderCart(Customer $customer, array $lines): void
+    {
+        $this->asTenant(Tenant::query()->findOrFail($customer->tenant_id), function () use ($customer, $lines): void {
+            $cart = Cart::query()->firstOrCreate(['customer_id' => $customer->id]);
+
+            foreach ($lines as $skuId => $quantity) {
+                CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_id' => $skuId, 'kind' => CartLineKind::Preorder], ['quantity' => $quantity]);
+            }
+        });
+    }
+
+    /**
+     * A real pre-order placed through PlacePreorder (BR-O14): the cart's pre-order lines are filled with
+     * `[sku_id => quantity]` and confirmed to the customer's first address, created when there is none.
+     *
+     * @param  array<int, int>  $lines
+     */
+    protected function placePreorder(Customer $customer, array $lines, ?string $note = null): Order
+    {
+        $this->fillPreorderCart($customer, $lines);
+        $tenant = Tenant::query()->findOrFail($customer->tenant_id);
+        $address = $this->asTenant($tenant, fn (): ?CustomerAddress => CustomerAddress::query()->where('customer_id', $customer->id)->first())
+            ?? $this->addressOf($customer);
+
+        return $this->asTenant($tenant, fn (): Order => app(PlacePreorder::class)->handle($customer, new CheckoutData($address->id, $note))->refresh());
     }
 }

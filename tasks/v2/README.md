@@ -14,7 +14,7 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | 07 | [Merchant-placed orders](07-merchant-orders.md)        | Orders, Customers                          | done    | see log |
 | 08 | [Manual discounts](08-discounts.md)                    | Orders, Pricing, Collections               | done    | see log |
 | 09 | [Order editing & partial fulfilment](09-order-editing.md) | Orders, Inventory                       | done    | see log |
-| 10 | [Pre-orders on Coming Soon](10-pre-orders.md)          | Orders, Catalog, Customers (cart)          | planned |        |
+| 10 | [Pre-orders on Coming Soon](10-pre-orders.md)          | Orders, Catalog, Customers (cart)          | done    | see log |
 | 11 | [Customer groups & customer pricing](11-customer-pricing.md) | Customers, Pricing, Catalog          | planned |        |
 | 12 | [Promotional pricing](12-promotions.md)                | Pricing, Catalog                           | planned |        |
 | 13 | [Multiple selling units per SKU](13-multi-unit-skus.md) | Catalog, Pricing, Inventory, Customers, Orders | planned |    |

@@ -76,6 +76,7 @@ export function storeProduct(overrides: Partial<StoreProductDetail> = {}): Store
     category: { id: 3, name: "أولى إعدادي", kind: "books" },
     custom_fields: [{ key: "grade", label: "السنة الدراسية", value: "أولى إعدادي" }],
     sku: storeSku(),
+    preorder: null,
     gallery: [],
     related: [],
     ...overrides,
@@ -137,6 +138,7 @@ export function cart(overrides: Partial<Cart> = {}): Cart {
     removed_items: [],
     items_total: "540.00",
     mov: { enabled: true, amount: "500.00", satisfied: true },
+    preorders: { items: [], items_total: "0.00" },
     ...overrides,
   };
 }
@@ -158,6 +160,9 @@ export function address(overrides: Partial<Address> = {}): Address {
 export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
   return {
     number: 1001,
+    kind: "order",
+    preorder_state: null,
+    converted_at: null,
     status: "pending",
     status_label: "قيد الانتظار",
     placed_at: "2026-10-10T08:00:00Z",
@@ -201,11 +206,14 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
         line_total: "540.00",
         delivered_quantity: null,
         removed_at: null,
+        converted_quantity: 0,
       },
     ],
     changes: [],
     history: [{ from: null, to: "pending", at: "2026-10-10T08:00:00Z", by: "customer" }],
     returns: [],
+    converted_from: null,
+    conversions: [],
     ...overrides,
   };
 }

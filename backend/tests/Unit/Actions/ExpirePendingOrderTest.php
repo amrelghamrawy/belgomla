@@ -125,3 +125,12 @@ test('BR-T04 an order of another tenant is never visible here', function (): voi
 
     expect(fn () => app(ExpirePendingOrder::class)->handle($theirs))->toThrow(Illuminate\Database\Eloquent\ModelNotFoundException::class);
 });
+
+test('D88 a pre-order never expires, however old', function (): void {
+    $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
+    $preorder->forceFill(['placed_at' => now()->subDays(30)])->save();
+
+    expect(app(ExpirePendingOrder::class)->handle($preorder))->toBeFalse()
+        ->and($preorder->refresh()->status)->toBe(OrderStatus::Pending)
+        ->and(app(App\Modules\Orders\Queries\ExpirableOrdersQuery::class)->get()->pluck('id')->all())->not->toContain($preorder->id);
+});

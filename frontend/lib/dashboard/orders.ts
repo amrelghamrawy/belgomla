@@ -22,6 +22,7 @@ export const ORDER_LIST_KEYS = [
   "to",
   "q",
   "stale",
+  "kind",
   "sort",
 ] as const;
 export const COLLECTION_LIST_KEYS = ["from", "to", "customer_id", "order"] as const;

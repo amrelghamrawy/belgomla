@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
+import type { CollectionStatus, OrderKind, OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { ORDER_LIST_KEYS, useOrders } from "@/lib/dashboard/orders";
@@ -24,13 +24,24 @@ import { CustomerPicker } from "../common/CustomerPicker";
 import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
-import { CollectionStatusBadge, ExpiryBadge, OrderStatusBadge, PlacedByMerchantBadge, StaleBadge } from "./OrderBadges";
+import {
+  CollectionStatusBadge,
+  ExpiryBadge,
+  OrderStatusBadge,
+  PlacedByMerchantBadge,
+  PreorderBadge,
+  StaleBadge,
+} from "./OrderBadges";
 
 const copy = ar.dashboard.orders;
 const STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
 const COLLECTIONS: CollectionStatus[] = ["unpaid", "partially_collected", "collected"];
+const KINDS: OrderKind[] = ["order", "preorder"];
 
-/** Orders with status tabs, collection status, the stale badge (D10) and filters, all in the URL. */
+/**
+ * Orders with status tabs, collection status, the stale badge (D10) and filters, all in the URL. Pre-orders (BR-O14)
+ * are marked and can be kept apart with the kind filter.
+ */
 export function OrdersPage() {
   const [query, setQuery] = useListQuery(ORDER_LIST_KEYS);
   const orders = useOrders(query);
@@ -76,7 +87,7 @@ export function OrdersPage() {
         })}
       </nav>
       <FilterPanel
-        active={activeFilters(query, ["collection_status", "from", "to", "sort", "stale"])}
+        active={activeFilters(query, ["collection_status", "from", "to", "sort", "stale", "kind"])}
         onClear={
           hasFilters(query)
             ? () => {
@@ -103,6 +114,18 @@ export function OrdersPage() {
           </>
         }
       >
+        <NativeSelect
+          aria-label={copy.kind}
+          value={query.kind ?? ""}
+          onChange={(event) => setQuery({ kind: event.target.value })}
+        >
+          <option value="">{copy.allKinds}</option>
+          {KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {copy.kinds[kind]}
+            </option>
+          ))}
+        </NativeSelect>
         <NativeSelect
           aria-label={copy.collection}
           value={query.collection_status ?? ""}
@@ -175,7 +198,11 @@ export function OrdersPage() {
                   <TableCell className="whitespace-nowrap">{formatDateTime(order.placed_at)}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     <span className="flex items-center gap-1">
-                      <OrderStatusBadge status={order.status} />
+                      {order.preorder_state === null ? (
+                        <OrderStatusBadge status={order.status} />
+                      ) : (
+                        <PreorderBadge state={order.preorder_state} />
+                      )}
                       {order.is_stale && <StaleBadge />}
                       {order.expires_at !== null && <ExpiryBadge expiresAt={order.expires_at} />}
                       {order.placed_by === "tenant_user" && <PlacedByMerchantBadge />}

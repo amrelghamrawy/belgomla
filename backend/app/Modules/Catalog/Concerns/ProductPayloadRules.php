@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Concerns;
 
 use App\Modules\Pricing\Concerns\ReadsSkuPricing;
+use Carbon\CarbonImmutable;
 
 /**
  * Rules and typed accessors shared by the product create and update requests (08-api-contract.md §6).
  * The SKU price set (`sku.cover_price`, `sku.base_price[_percent]`, `sku.moq`, `sku.tiers`) is read by
  * Pricing's ReadsSkuPricing under the "sku." prefix. `opening_stock` is create-only (StoreProductRequest).
+ * `preorder { enabled, expected_at?, limit? }` is optional on both (D88).
  */
 trait ProductPayloadRules
 {
@@ -42,6 +44,26 @@ trait ProductPayloadRules
         return is_array($fields) ? $fields : [];
     }
 
+    public function hasPreorder(): bool
+    {
+        return $this->has('preorder');
+    }
+
+    public function preorderEnabled(): bool
+    {
+        return $this->boolean('preorder.enabled');
+    }
+
+    public function preorderExpectedAt(): ?CarbonImmutable
+    {
+        return $this->filled('preorder.expected_at') ? CarbonImmutable::createFromFormat('!Y-m-d', $this->string('preorder.expected_at')->value(), 'UTC') ?: null : null;
+    }
+
+    public function preorderLimit(): ?int
+    {
+        return $this->filled('preorder.limit') ? $this->integer('preorder.limit') : null;
+    }
+
     public function skuCode(): string
     {
         return mb_trim($this->string('sku.code')->value());
@@ -67,6 +89,10 @@ trait ProductPayloadRules
             'category_id' => ['required', 'integer'],
             'description' => ['nullable', 'string', 'max:5000'],
             'custom_fields' => ['sometimes', 'array'],
+            'preorder' => ['sometimes', 'array'],
+            'preorder.enabled' => ['required_with:preorder', 'boolean'],
+            'preorder.expected_at' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'preorder.limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:10000000'],
             'sku' => ['required', 'array'],
             'sku.code' => ['required', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/'],
             'sku.selling_unit_id' => ['required', 'integer'],

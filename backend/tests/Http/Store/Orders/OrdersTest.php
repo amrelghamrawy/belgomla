@@ -23,7 +23,7 @@ test('a customer lists their orders, newest first, without lines', function (): 
         ->assertJsonPath('data.1.number', $first->number)
         ->assertJsonPath('meta.total', 2)
         ->assertJsonMissingPath('data.0.items')
-        ->assertExactJsonStructure(['data' => ['*' => ['number', 'status', 'status_label', 'placed_at', 'items_total', 'discount', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount', 'delivery', 'customer_note', 'cancel_reason', 'cancelled_by']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['number', 'kind', 'status', 'status_label', 'placed_at', 'preorder_state', 'converted_at', 'items_total', 'discount', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount', 'delivery', 'customer_note', 'cancel_reason', 'cancelled_by']], 'links', 'meta']);
 });
 
 test('the list filters by status', function (): void {

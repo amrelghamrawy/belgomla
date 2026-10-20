@@ -15,6 +15,7 @@ use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Models\CustomerCredit;
 use App\Modules\Collections\Queries\CollectedAmountQuery;
 use App\Modules\Orders\Actions\ApplyCollectedAmount;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Support\ApiException;
@@ -81,6 +82,10 @@ final readonly class ApplyCustomerCredit
 
         if ($order->status === OrderStatus::Cancelled) {
             throw CannotCollect::cancelled();
+        }
+
+        if ($order->kind === OrderKind::Preorder) {
+            throw CannotCollect::preorder();
         }
 
         if (Money::compare($amount, $credit->remaining) > 0) {

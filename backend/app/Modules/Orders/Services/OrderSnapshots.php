@@ -7,6 +7,7 @@ namespace App\Modules\Orders\Services;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
 use App\Modules\Orders\Data\CheckoutLine;
+use App\Modules\Orders\Models\Order;
 
 /**
  * What an order keeps of the catalog and the customer at checkout, so later changes never rewrite it:
@@ -59,6 +60,21 @@ final readonly class OrderSnapshots
                 'address_line' => $address->address_line,
                 'landmark' => $address->landmark,
             ],
+        ];
+    }
+
+    /**
+     * D88: a normal order converted from a pre-order goes where the pre-order was to go: its delivery snapshot, as the
+     * merchant may have edited it (BR-O10), not the customer's address book.
+     *
+     * @return array{delivery_name: string, delivery_phone: string, delivery_address: array<string, string|null>}
+     */
+    public function deliveryOf(Order $order): array
+    {
+        return [
+            'delivery_name' => $order->delivery_name,
+            'delivery_phone' => $order->delivery_phone,
+            'delivery_address' => $order->delivery_address,
         ];
     }
 }

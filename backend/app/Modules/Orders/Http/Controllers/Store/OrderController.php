@@ -19,7 +19,7 @@ final readonly class OrderController
 {
     public function index(ListOrdersRequest $request, #[CurrentUser('customer')] Customer $customer, CustomerOrdersQuery $orders): AnonymousResourceCollection
     {
-        return OrderResource::collection($orders->paginate($customer, $request->status(), $request->perPage()));
+        return OrderResource::collection($orders->paginate($customer, $request->status(), $request->perPage(), $request->kind()));
     }
 
     public function show(#[CurrentUser('customer')] Customer $customer, Order $order, OrderDetailQuery $detail): OrderResource

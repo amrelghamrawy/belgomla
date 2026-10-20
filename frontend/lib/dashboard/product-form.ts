@@ -47,6 +47,19 @@ export const productSchema = z
       .refine((value) => value === "" || /^\d{1,8}$/.test(value), copy.invalidInteger),
     tiers: z.array(z.object({ min_quantity: z.string(), mode: z.enum(["price", "percent"]), value: z.string() })),
     custom: z.record(z.string(), z.string()),
+    // BR-O14, D88: pre-orders while Coming Soon.
+    preorder_enabled: z.boolean(),
+    expected_at: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value), copy.invalidDate),
+    preorder_limit: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (/^\d{1,8}$/.test(value) && Number(value) >= 1 && Number(value) <= 10_000_000),
+        copy.invalidInteger,
+      ),
   })
   .superRefine((values, context) => {
     if (values.base_mode === "percent") {
@@ -96,13 +109,17 @@ export function productDefaults(product: DashboardProduct | null): ProductFormVa
     opening_stock: "",
     tiers: tierDrafts(product),
     custom: product === null ? {} : draftsFromProduct(product.custom_fields),
+    preorder_enabled: product?.preorder.enabled ?? false,
+    expected_at: product?.preorder.expected_at ?? "",
+    preorder_limit: product?.preorder.limit === null || product === null ? "" : String(product.preorder.limit),
   };
 }
 
 /**
  * The API body. Prices go as the merchant entered them: `base_price` or `base_price_percent`, and per tier
  * `unit_price` or `discount_percent` (BR-PR10). Custom fields are those of the chosen category's section
- * (D69). `status` and `opening_stock` only on create.
+ * (D69). `status` and `opening_stock` only on create. The pre-order settings always go (D88: an empty day or cap is
+ * none).
  */
 export function productBody(
   values: ProductFormValues,
@@ -126,6 +143,11 @@ export function productBody(
       base_price_percent: percent ? values.base_value : null,
       moq: Number(values.moq),
       tiers: tiersBody(values.tiers),
+    },
+    preorder: {
+      enabled: values.preorder_enabled,
+      expected_at: values.expected_at === "" ? null : values.expected_at,
+      limit: values.preorder_limit === "" ? null : Number(values.preorder_limit),
     },
   };
 
@@ -154,4 +176,7 @@ export const SERVER_FIELDS: readonly (readonly [keyof ProductFormValues, string]
   ["base_value", "sku.base_price_percent"],
   ["moq", "sku.moq"],
   ["opening_stock", "opening_stock"],
+  ["preorder_enabled", "preorder.enabled"],
+  ["expected_at", "preorder.expected_at"],
+  ["preorder_limit", "preorder.limit"],
 ];

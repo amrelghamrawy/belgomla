@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Actions;
 
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Services\AuditLogger;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
@@ -16,10 +17,12 @@ use App\Modules\Orders\Data\CheckoutLine;
 use App\Modules\Orders\Data\CheckoutReport;
 use App\Modules\Orders\Data\OrderPlacementData;
 use App\Modules\Orders\Enums\NotificationType;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
 use App\Modules\Orders\Exceptions\CustomerCannotOrder;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Queries\PreorderDemandQuery;
 use App\Modules\Orders\Services\CheckoutValidator;
 use App\Modules\Orders\Services\OrderNumbers;
 use App\Modules\Orders\Services\OrderSnapshots;
@@ -29,10 +32,16 @@ use App\Support\Money;
 /**
  * Turns lines into a pending order (BR-PR06, 07-domain-model.md §12), whoever placed it: the customer's cart at
  * checkout, or a dashboard user's form (BR-O11). A step: it joins the caller's transaction (Checkout,
- * PlaceOrderForCustomer), so any failure rolls back the caller's own writes too. Steps, in the §12 order: tenant and
- * customer active (the customer row locked) → address → lines → lock the stock rows in sku_id order → re-check and
- * re-price every line → MOV (unless waived, D84) → order number → order and snapshotted lines → reserve → history
- * with the actor → the merchant's `new_order` notification (only for a customer's own order) → audit.
+ * PlaceOrderForCustomer, PlacePreorder, ConvertPreorders), so any failure rolls back the caller's own writes too. Steps,
+ * in the §12 order: tenant and customer active (the customer row locked) → address → lines → lock the stock rows in
+ * sku_id order → re-check and re-price every line → MOV (unless waived, D84) → order number → order and snapshotted
+ * lines → reserve → history with the actor → the merchant's `new_order` notification (only for a customer's own order)
+ * → audit.
+ *
+ * A pre-order (`kind = preorder`, BR-O14, D88) locks its products instead of stock, is checked by
+ * CheckoutValidator::checkPreorder (pre-orders on, MOQ, the merchant's cap over every open pre-order, credit limit; no
+ * MOV), reserves nothing (its lines are `reserved = false`) and rings `new_preorder`. A normal order converted from a
+ * pre-order (`convertedFrom`, D88) keeps the pre-order's delivery snapshot and only needs its lines orderable now.
  */
 final readonly class PlaceOrder
 {
@@ -41,6 +50,7 @@ final readonly class PlaceOrder
         private CustomerAddressesQuery $addresses,
         private StockLedger $ledger,
         private CheckoutValidator $validator,
+        private PreorderDemandQuery $demand,
         private OrderNumbers $numbers,
         private OrderSnapshots $snapshots,
         private RecordStatusChange $history,
@@ -51,21 +61,21 @@ final readonly class PlaceOrder
     public function handle(OrderPlacementData $data): Order
     {
         $customer = $this->lockOrderingCustomer($data);
-        $address = $this->address($customer, $data->addressId);
+        $delivery = $this->delivery($customer, $data);
 
         if ($data->lines === []) {
             throw CheckoutFailed::emptyCart();
         }
 
-        $stock = $this->ledger->lock(array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
-        $report = $this->validator->check($data->lines, $stock, $customer);
-        $checked = $report->assertPasses($data->skipMov);
+        $report = $data->kind === OrderKind::Preorder ? $this->checkPreorder($data, $customer) : $this->checkOrder($data, $customer);
+        $checked = $data->convertedFrom instanceof Order ? $report->assertConvertible() : $report->assertPasses($data->skipMov);
 
-        $order = $this->createOrder($customer, $address, $data, $checked);
+        $order = $this->createOrder($customer, $delivery, $data, $checked);
         $this->history->handle($order, null, $data->placedByType, $data->placedById);
 
         if (! $data->byMerchant()) {
-            $this->notify->forOrder(NotificationType::NewOrder, $order); // BR-O11: the merchant made it, no bell
+            // BR-O11: the merchant made it, no bell
+            $this->notify->forOrder($data->kind === OrderKind::Preorder ? NotificationType::NewPreorder : NotificationType::NewOrder, $order);
         }
 
         $this->audit->log('order.created', $order, null, [
@@ -73,6 +83,8 @@ final readonly class PlaceOrder
             'status' => $order->status->value,
             'order_total' => $order->order_total,
             'lines' => count($checked),
+            ...($data->kind === OrderKind::Preorder ? ['kind' => OrderKind::Preorder->value] : []),
+            ...($data->convertedFrom instanceof Order ? ['converted_from' => $data->convertedFrom->number] : []),
             ...$this->merchantAudit($data, $report),
         ]);
 
@@ -100,34 +112,79 @@ final readonly class PlaceOrder
         throw $data->byMerchant() ? CustomerCannotOrder::because($status) : CheckoutFailed::customerNotActive($status);
     }
 
-    private function address(Customer $customer, int $addressId): CustomerAddress
+    /**
+     * The delivery snapshot (BR-O10): from one of the customer's active addresses, or the pre-order's own for a converted
+     * order (D88).
+     *
+     * @return array{delivery_name: string, delivery_phone: string, delivery_address: array<string, string|null>}
+     */
+    private function delivery(Customer $customer, OrderPlacementData $data): array
     {
-        return $this->addresses->active($customer)->firstWhere('id', $addressId) ?? throw CheckoutFailed::addressUnavailable();
+        if ($data->convertedFrom instanceof Order) {
+            return $this->snapshots->deliveryOf($data->convertedFrom);
+        }
+
+        $address = $this->addresses->active($customer)->firstWhere('id', $data->addressId);
+
+        return $address instanceof CustomerAddress ? $this->snapshots->delivery($customer, $address) : throw CheckoutFailed::addressUnavailable();
+    }
+
+    /** BR-INV01, BR-INV03: the stock rows locked in sku_id order, then every check against them. */
+    private function checkOrder(OrderPlacementData $data, Customer $customer): CheckoutReport
+    {
+        $stock = $this->ledger->lock(array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
+
+        return $this->validator->check($data->lines, $stock, $customer);
     }
 
     /**
+     * BR-O14: the products are locked in id order, so two pre-orders cannot both take the last units under the cap; the
+     * lines are checked against the locked rows and what every open pre-order already holds of each SKU.
+     */
+    private function checkPreorder(OrderPlacementData $data, Customer $customer): CheckoutReport
+    {
+        $productIds = array_values(array_unique(array_map(fn (CartLineInput $line): int => $line->sku->product_id, $data->lines)));
+        $products = Product::query()->whereKey($productIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+
+        foreach ($data->lines as $line) {
+            $line->sku->setRelation('product', $products->get($line->sku->product_id) ?? $line->sku->product);
+        }
+
+        $open = $this->demand->openQuantities(array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
+
+        return $this->validator->checkPreorder($data->lines, $customer, $open);
+    }
+
+    /**
+     * @param  array{delivery_name: string, delivery_phone: string, delivery_address: array<string, string|null>}  $delivery
      * @param  list<CheckoutLine>  $checked
      */
-    private function createOrder(Customer $customer, CustomerAddress $address, OrderPlacementData $data, array $checked): Order
+    private function createOrder(Customer $customer, array $delivery, OrderPlacementData $data, array $checked): Order
     {
         $total = array_reduce($checked, fn (string $sum, CheckoutLine $line): string => Money::add($sum, $line->price->lineTotal), '0.00');
+        $reserves = $data->kind === OrderKind::Order;
 
         $order = Order::query()->create([
             'number' => $this->numbers->next(),
+            'kind' => $data->kind,
             'customer_id' => $customer->id,
             'status' => OrderStatus::Pending,
             'items_total' => $total,
             'order_total' => $total, // BR-O08: no fees, discounts or taxes in V1
-            ...$this->snapshots->delivery($customer, $address),
+            ...$delivery,
             'customer_note' => $data->note,
             'placed_by_type' => $data->placedByType,
             'placed_by_id' => $data->placedById,
+            'converted_from_id' => $data->convertedFrom?->id,
             'placed_at' => now(),
         ]);
 
         foreach ($checked as $line) {
-            $order->items()->create($this->snapshots->item($line));
-            $this->ledger->reserve($line->sku, $line->quantityBase()); // BR-INV03
+            $order->items()->create([...$this->snapshots->item($line), 'reserved' => $reserves]);
+
+            if ($reserves) {
+                $this->ledger->reserve($line->sku, $line->quantityBase()); // BR-INV03; a pre-order holds nothing (BR-INV01)
+            }
         }
 
         return $order;

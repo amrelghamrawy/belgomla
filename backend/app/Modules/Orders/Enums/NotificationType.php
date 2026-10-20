@@ -8,7 +8,7 @@ use App\Modules\Tenancy\Enums\Permission;
 
 /**
  * BR-N02: what the merchant is told about in the dashboard; `whatsapp_dropped` is the store number logging out (D70),
- * `order_expired` a pending order the system cancelled (BR-INV07, D81).
+ * `order_expired` a pending order the system cancelled (BR-INV07, D81), `new_preorder` a customer's pre-order (BR-O14).
  */
 enum NotificationType: string
 {
@@ -16,6 +16,7 @@ enum NotificationType: string
     case CustomerCancelled = 'customer_cancelled';
     case WhatsappDropped = 'whatsapp_dropped';
     case OrderExpired = 'order_expired';
+    case NewPreorder = 'new_preorder';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum NotificationType: string
             self::CustomerCancelled => 'إلغاء من العميل',
             self::WhatsappDropped => 'انقطع رقم واتساب المتجر',
             self::OrderExpired => 'إلغاء تلقائي لطلب غير مؤكد',
+            self::NewPreorder => 'حجز مسبق جديد',
         };
     }
 
@@ -31,7 +33,7 @@ enum NotificationType: string
     public function permission(): Permission
     {
         return match ($this) {
-            self::NewOrder, self::CustomerCancelled, self::OrderExpired => Permission::OrdersManage,
+            self::NewOrder, self::CustomerCancelled, self::OrderExpired, self::NewPreorder => Permission::OrdersManage,
             self::WhatsappDropped => Permission::SettingsManage,
         };
     }

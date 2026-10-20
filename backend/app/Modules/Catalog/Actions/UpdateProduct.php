@@ -15,7 +15,7 @@ use App\Modules\Pricing\Actions\UpdateSkuPricing;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Replaces product and SKU fields (not status, not stock). Values of archived custom fields, and of
+ * Replaces product and SKU fields (not status, not stock), and the pre-order settings when sent (D88). Values of archived custom fields, and of
  * fields bound to another section than the (new) category's kind, are carried over (BR-P08, D69). The `product.updated` audit record holds only what changed in product and SKU
  * identity fields; prices, MOQ and tiers go through Pricing's UpdateSkuPricing, which audits them as
  * `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed` (BR-L). Tiers not sent are kept.
@@ -46,6 +46,7 @@ final readonly class UpdateProduct
                 'name' => $data->name,
                 'description' => $data->description,
                 'custom_fields' => $customFields,
+                ...($data->preorder?->attributes() ?? []), // D88: kept when not sent
             ]);
 
             $sku = $product->sku instanceof Sku ? $product->sku->fill($data->sku->attributes()) : $product->skus()->make($data->sku->attributes());

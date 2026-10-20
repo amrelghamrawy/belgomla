@@ -530,6 +530,7 @@ paths:
               properties:
                 sku_id: { type: integer, minimum: 1 }
                 quantity: { type: integer, minimum: 1, maximum: 100000 }
+                kind: { $ref: '#/components/schemas/CartLineKind' }
       responses:
         '200': { $ref: '#/components/responses/Cart' }
         '401': { $ref: '#/components/responses/Error' }
@@ -555,6 +556,7 @@ paths:
               required: [quantity]
               properties:
                 quantity: { type: integer, minimum: 1, maximum: 100000 }
+                kind: { $ref: '#/components/schemas/CartLineKind' }
       responses:
         '200': { $ref: '#/components/responses/Cart' }
         '401': { $ref: '#/components/responses/Error' }
@@ -564,6 +566,11 @@ paths:
     delete:
       operationId: storeRemoveCartItem
       tags: [store-cart]
+      parameters:
+        - name: kind
+          in: query
+          description: The order line (default) or the pre-order line of the SKU (BR-O14)
+          schema: { $ref: '#/components/schemas/CartLineKind' }
       responses:
         '200': { $ref: '#/components/responses/Cart' }
         '401': { $ref: '#/components/responses/Error' }
@@ -615,15 +622,63 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         '503': { $ref: '#/components/responses/Error' }
 
+  /api/store/checkout/preorder:
+    post:
+      operationId: storePreorderCheckout
+      tags: [store-orders]
+      summary: Places a pre-order from the cart's pre-order lines (BR-O14, D88); no stock held, no minimum order value; retry-safe with Idempotency-Key
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema: { type: string, pattern: '^[A-Za-z0-9_\-:.]{1,255}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address_id]
+              properties:
+                address_id: { type: integer, minimum: 1 }
+                customer_note: { type: [string, 'null'], maxLength: 1000 }
+      responses:
+        '201':
+          description: Placed; the cart's pre-order lines are emptied
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [order]
+                    properties:
+                      order: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422':
+          description: >
+            checkout_failed with `items` (preorder_unavailable, below_moq, preorder_limit with `requested` and `remaining`) and `details.credit` past the credit limit;
+            cart_empty; validation_failed on address_id.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '503': { $ref: '#/components/responses/Error' }
+
   /api/store/orders:
     get:
       operationId: storeOrders
       tags: [store-orders]
-      summary: The customer's orders, newest first (D6)
+      summary: The customer's orders, newest first (D6); `kind` keeps orders or pre-orders only (BR-O14)
       parameters:
         - name: status
           in: query
           schema: { $ref: '#/components/schemas/OrderStatus' }
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/OrderKind' }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -1573,10 +1628,102 @@ paths:
               properties:
                 status: { $ref: '#/components/schemas/ProductStatus' }
       responses:
-        '200': { $ref: '#/components/responses/DashboardProduct' }
+        '200':
+          description: The product, with `meta.preorder_demand` (what customers pre-ordered, BR-O14) so going active shows it; converting stays an explicit step
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/DashboardProduct' }
+                  meta:
+                    type: object
+                    required: [preorder_demand]
+                    properties:
+                      preorder_demand: { $ref: '#/components/schemas/PreorderDemandCounts' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/preorder-demand:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      operationId: dashboardPreorderDemand
+      tags: [dashboard-orders]
+      summary: What customers pre-ordered of the product and did not receive yet (BR-O14), for purchase planning
+      responses:
+        '200':
+          description: The open pre-ordered quantity, customers and pre-orders, with the product's pre-order settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PreorderDemand' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/{product}/convert-preorders:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      operationId: dashboardConvertPreorders
+      tags: [dashboard-orders]
+      summary: Converts the product's open pre-orders into normal orders, oldest first, as far as the stock goes (BR-O14, D88); orders.manage, retry-safe with Idempotency-Key
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The merchant's summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PreorderConversion' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: 'product_not_active (details.status) while the product is not active; idempotency_in_progress', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/preorders:
+    get:
+      operationId: dashboardPreorders
+      tags: [dashboard-orders]
+      summary: The pre-orders, oldest first (the conversion order), with their lines (BR-O14)
+      parameters:
+        - name: product_id
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/PreorderState' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of pre-orders in the dashboard order shape, with `items`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DashboardPreorder' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
 
   /api/dashboard/products/{product}/duplicate:
@@ -2233,6 +2380,10 @@ paths:
         - name: stale
           in: query
           schema: { type: integer, enum: [0, 1] }
+        - name: kind
+          in: query
+          description: Normal orders or pre-orders only (BR-O14)
+          schema: { $ref: '#/components/schemas/OrderKind' }
         - name: sort
           in: query
           schema:
@@ -3252,6 +3403,7 @@ components:
         - invalid_vertical
         - inventory_below_reserved
         - invited
+        - is_preorder
         - last_active_user
         - last_owner
         - not_found
@@ -3265,6 +3417,7 @@ components:
         - phone_not_verified
         - phone_taken
         - prices_hidden
+        - product_not_active
         - rate_limited
         - refund_required
         - reserved_subdomain
@@ -3507,9 +3660,18 @@ components:
         in_stock: { type: boolean }
         coming_soon: { type: boolean, const: true }
 
+    StorePreorder:
+      description: 'A Coming Soon product''s pre-order offer (BR-O14, D88); `remaining` is what is left under the merchant''s cap in selling units, null = no cap'
+      type: object
+      required: [enabled, expected_at, remaining]
+      properties:
+        enabled: { type: boolean }
+        expected_at: { type: [string, 'null'], format: date }
+        remaining: { type: [integer, 'null'] }
+
     StoreProduct:
       type: object
-      required: [id, name, slug, description, status, main_image_url, category, custom_fields, sku]
+      required: [id, name, slug, description, status, main_image_url, category, custom_fields, sku, preorder]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -3519,6 +3681,11 @@ components:
           type: string
           enum: [active, coming_soon]
         main_image_url: { type: [string, 'null'] }
+        preorder:
+          description: Null unless the product is Coming Soon
+          oneOf:
+            - $ref: '#/components/schemas/StorePreorder'
+            - type: 'null'
         category:
           oneOf:
             - $ref: '#/components/schemas/CategoryRef'
@@ -3698,16 +3865,32 @@ components:
         moq: { type: integer }
         available: { type: integer, description: Base units (D37) }
 
+    PreorderCartItem:
+      allOf:
+        - $ref: '#/components/schemas/CartItem'
+        - type: object
+          required: [expected_at]
+          properties:
+            expected_at: { type: [string, 'null'], format: date }
+
+    CartLineKind:
+      type: string
+      enum: [order, preorder]
+      description: 'A cart line to order now, or to pre-order (BR-O14); order by default'
+
     RemovedCartItem:
       type: object
       required: [product_name, reason]
       properties:
         product_name: { type: string }
-        reason: { type: string, const: inactive }
+        reason:
+          type: string
+          enum: [inactive, preorder_closed]
+          description: 'inactive = the product can no longer be ordered (BR-P04); preorder_closed = it no longer takes pre-orders (BR-O14)'
 
     Cart:
       type: object
-      required: [items, removed_items, items_total, mov]
+      required: [items, removed_items, items_total, mov, preorders]
       properties:
         items:
           type: array
@@ -3727,6 +3910,15 @@ components:
                 - $ref: '#/components/schemas/Money'
                 - type: 'null'
             satisfied: { type: boolean }
+        preorders:
+          description: 'The pre-order lines (BR-O14), confirmed apart; prices are indicative and the minimum order value does not apply (D88)'
+          type: object
+          required: [items, items_total]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/PreorderCartItem' }
+            items_total: { $ref: '#/components/schemas/Money' }
 
     LineProblem:
       description: One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units.
@@ -3736,9 +3928,10 @@ components:
         sku_id: { type: integer }
         reason:
           type: string
-          enum: [insufficient_stock, below_moq, product_inactive]
+          enum: [insufficient_stock, below_moq, product_inactive, preorder_unavailable, preorder_limit]
         requested: { type: integer }
         available: { type: integer }
+        remaining: { type: integer, description: 'preorder_limit: what is left under the merchant''s cap (BR-O14)' }
         moq: { type: integer }
 
     OrderStatus:
@@ -3747,7 +3940,7 @@ components:
 
     OrderItem:
       type: object
-      required: [id, sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, line_total, delivered_quantity, removed_at]
+      required: [id, sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, line_total, delivered_quantity, removed_at, converted_quantity]
       properties:
         id: { type: integer, description: 'The order line, as PUT …/discount names it (D85)' }
         sku_id: { type: integer }
@@ -3777,6 +3970,7 @@ components:
         line_total: { $ref: '#/components/schemas/Money', description: 'unit_price × the quantity charged: delivered_quantity once delivered, else quantity' }
         delivered_quantity: { type: [integer, 'null'], description: 'Selling units that went out, set on delivery; less than quantity when delivered short (BR-O13)' }
         removed_at: { type: [string, 'null'], format: date-time, description: 'The merchant removed the line (BR-O12): kept for history, out of every total' }
+        converted_quantity: { type: integer, description: 'Selling units of a pre-order line already converted into a normal order (BR-O14); line_total charges the rest. 0 on a normal order' }
 
     DiscountType:
       type: string
@@ -3850,9 +4044,16 @@ components:
 
     Order:
       type: object
-      required: [number, status, status_label, placed_at, items_total, discount, order_total, returned_total, net_total, collection_status, collected_amount, delivery, customer_note, cancel_reason, cancelled_by]
+      required: [number, kind, status, status_label, placed_at, preorder_state, converted_at, items_total, discount, order_total, returned_total, net_total, collection_status, collected_amount, delivery, customer_note, cancel_reason, cancelled_by]
       properties:
         number: { type: integer }
+        kind: { $ref: '#/components/schemas/OrderKind' }
+        preorder_state:
+          description: 'Where a pre-order stands (D88); null for a normal order'
+          oneOf:
+            - $ref: '#/components/schemas/PreorderState'
+            - type: 'null'
+        converted_at: { type: [string, 'null'], format: date-time, description: 'A pre-order converted in full (D88)' }
         status: { $ref: '#/components/schemas/OrderStatus' }
         status_label: { type: string }
         placed_at: { type: string, format: date-time }
@@ -3891,12 +4092,36 @@ components:
           description: 'system = cancelled because nobody confirmed it in time (BR-INV07, D81)'
           enum: [customer, tenant_user, system, null]
 
+    OrderKind:
+      type: string
+      enum: [order, preorder]
+      description: 'A normal order, or a pre-order of a Coming Soon product that holds no stock (BR-O14, D88)'
+
+    PreorderState:
+      type: string
+      enum: [open, converted, cancelled]
+      description: 'open = something left to convert (partly converted too), converted = everything went into normal orders (D88)'
+
+    OrderConversion:
+      type: object
+      required: [number, status, order_total, placed_at]
+      properties:
+        number: { type: integer }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        order_total: { $ref: '#/components/schemas/Money' }
+        placed_at: { type: string, format: date-time }
+
     OrderDetail:
       allOf:
         - $ref: '#/components/schemas/Order'
         - type: object
-          required: [items, changes, history, returns]
+          required: [items, changes, history, returns, converted_from, conversions]
           properties:
+            converted_from: { type: [integer, 'null'], description: 'The pre-order number this order was converted from (BR-O14)' }
+            conversions:
+              type: array
+              description: 'The normal orders a pre-order was converted into, oldest first (empty for a normal order)'
+              items: { $ref: '#/components/schemas/OrderConversion' }
             items:
               type: array
               description: Every line, removed ones too (removed_at)
@@ -4192,7 +4417,7 @@ components:
 
     DashboardProduct:
       type: object
-      required: [id, name, slug, description, status, category, custom_fields, sku, main_image_url, created_at, updated_at]
+      required: [id, name, slug, description, status, category, custom_fields, preorder, sku, main_image_url, created_at, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -4207,6 +4432,7 @@ components:
           type: object
           description: 'Field key → option id (select), number, boolean or text'
           additionalProperties: { type: [string, integer, number, boolean] }
+        preorder: { $ref: '#/components/schemas/ProductPreorder' }
         sku:
           oneOf:
             - $ref: '#/components/schemas/DashboardSku'
@@ -4265,6 +4491,53 @@ components:
           maxItems: 20
           items: { $ref: '#/components/schemas/TierRequest' }
 
+    ProductPreorder:
+      description: 'Pre-orders while Coming Soon (BR-O14, D88): on/off, the expected day, and the cap on every open pre-order in selling units (null = none)'
+      type: object
+      required: [enabled, expected_at, limit]
+      properties:
+        enabled: { type: boolean }
+        expected_at: { type: [string, 'null'], format: date }
+        limit: { type: [integer, 'null'], minimum: 1, maximum: 10000000 }
+
+    PreorderDemandCounts:
+      type: object
+      required: [quantity, customers, preorders]
+      properties:
+        quantity: { type: integer, description: 'Open pre-ordered selling units, not yet converted' }
+        customers: { type: integer }
+        preorders: { type: integer }
+
+    PreorderDemand:
+      allOf:
+        - $ref: '#/components/schemas/PreorderDemandCounts'
+        - type: object
+          required: [product_id, status, preorder_enabled, expected_at, limit, remaining]
+          properties:
+            product_id: { type: integer }
+            status: { $ref: '#/components/schemas/ProductStatus' }
+            preorder_enabled: { type: boolean }
+            expected_at: { type: [string, 'null'], format: date }
+            limit: { type: [integer, 'null'] }
+            remaining: { type: [integer, 'null'], description: 'What is left under the cap; null = no cap' }
+
+    PreorderConversion:
+      type: object
+      required: [converted_orders, partially, untouched]
+      properties:
+        converted_orders:
+          type: array
+          items:
+            type: object
+            required: [number, preorder_number, quantity, order_total]
+            properties:
+              number: { type: integer, description: The new normal order }
+              preorder_number: { type: integer }
+              quantity: { type: integer, description: Selling units converted }
+              order_total: { $ref: '#/components/schemas/Money' }
+        partially: { type: integer, description: 'Pre-orders that got only part of what they asked for; the rest stays pre-ordered' }
+        untouched: { type: integer, description: 'Open pre-orders that got nothing (no stock left, or the customer cannot order)' }
+
     ProductRequest:
       type: object
       required: [name, category_id, sku]
@@ -4272,6 +4545,14 @@ components:
         name: { type: string, maxLength: 200 }
         category_id: { type: integer }
         description: { type: [string, 'null'], maxLength: 5000 }
+        preorder:
+          description: 'Optional: left out = off on create, kept on update (D88)'
+          type: object
+          required: [enabled]
+          properties:
+            enabled: { type: boolean }
+            expected_at: { type: [string, 'null'], format: date }
+            limit: { type: [integer, 'null'], minimum: 1, maximum: 10000000 }
         custom_fields:
           type: object
           additionalProperties: { type: [string, integer, number, boolean, 'null'] }
@@ -4644,7 +4925,7 @@ components:
         order_item_id: { type: [integer, 'null'] }
         product_name: { type: [string, 'null'] }
         sku_code: { type: [string, 'null'] }
-        change: { type: string, enum: [added, removed, quantity, delivered_short] }
+        change: { type: string, enum: [added, removed, quantity, delivered_short, converted] }
         old_quantity: { type: [integer, 'null'] }
         new_quantity: { type: [integer, 'null'] }
         unit_price_before:
@@ -4793,6 +5074,17 @@ components:
         - $ref: '#/components/schemas/Order'
         - $ref: '#/components/schemas/DashboardOrderFields'
 
+    DashboardPreorder:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - $ref: '#/components/schemas/DashboardOrderFields'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/OrderItem' }
+
     DashboardOrderHistoryEntry:
       type: object
       required: [from, to, at, by, actor_id, note]
@@ -4812,8 +5104,13 @@ components:
         - $ref: '#/components/schemas/Order'
         - $ref: '#/components/schemas/DashboardOrderFields'
         - type: object
-          required: [items, changes, history, collections, returns, messages]
+          required: [items, changes, history, collections, returns, messages, converted_from, conversions]
           properties:
+            converted_from: { type: [integer, 'null'], description: 'The pre-order number this order was converted from (BR-O14)' }
+            conversions:
+              type: array
+              description: 'The normal orders a pre-order was converted into, oldest first'
+              items: { $ref: '#/components/schemas/OrderConversion' }
             items:
               type: array
               description: Every line, removed ones too (removed_at)
@@ -4938,7 +5235,7 @@ components:
         id: { type: integer }
         type:
           type: string
-          enum: [new_order, customer_cancelled, whatsapp_dropped, order_expired]
+          enum: [new_order, customer_cancelled, whatsapp_dropped, order_expired, new_preorder]
         type_label: { type: string }
         details:
           type: object

@@ -26,7 +26,7 @@ test('the merchant lists every order of the store, newest first, with customer a
         ->assertJsonPath('data.1.is_stale', false)
         ->assertJsonPath('meta.total', 2)
         ->assertExactJsonStructure(['data' => ['*' => [
-            'id', 'number', 'status', 'status_label', 'placed_at', 'items_total', 'discount', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount',
+            'id', 'number', 'kind', 'status', 'status_label', 'placed_at', 'preorder_state', 'converted_at', 'items_total', 'discount', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount',
             'delivery', 'customer_note', 'cancel_reason', 'cancelled_by', 'customer', 'placed_by', 'placed_by_id', 'confirmed_at', 'delivered_at', 'cancelled_at', 'is_stale', 'expires_at',
         ]], 'links', 'meta']);
 });
@@ -191,4 +191,27 @@ test('BR-N03 the order page lists the messages sent about the order', function (
         ->assertJsonPath('data.messages.0.status', 'queued');
 
     expectDocumentedShape($response->json('data.messages.0'), 'OrderMessage');
+});
+
+test('BR-O14 ?kind= keeps the normal orders or the pre-orders only', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
+
+    $this->tenantJson('GET', '/api/dashboard/orders?kind=preorder')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.number', $preorder->number)
+        ->assertJsonPath('data.0.kind', 'preorder')
+        ->assertJsonPath('data.0.preorder_state', 'open');
+    $this->tenantJson('GET', '/api/dashboard/orders?kind=order')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.number', $order->number);
+});
+
+test('BR-O14 an unknown kind is refused', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/orders?kind=backorder')
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonValidationErrorFor('kind', 'error.details');
 });

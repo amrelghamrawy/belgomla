@@ -11,11 +11,12 @@ test('BR-N03 every notifiable status has a default text that fills its placehold
 
     expect($text)->toContain('محمود')->toContain('1024')->toContain('مكتبة النور')->not->toContain('{')
         ->and(OrderStatusMessage::unknownPlaceholders(OrderStatusMessage::DEFAULTS[$status], $status))->toBe([]);
-})->with(['placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled', 'discount', 'edited']);
+})->with(['placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled', 'discount', 'edited', 'preorder_converted']);
 
-test('BR-O11 placed is a text of its own, not a status a store can choose to notify', function (): void {
-    expect(array_keys(OrderStatusMessage::DEFAULTS))->toBe(['placed', ...OrderStatusMessage::NOTIFIABLE])
-        ->and(OrderStatusMessage::NOTIFIABLE)->not->toContain('placed');
+test('BR-O11 BR-O14 placed and preorder_converted are texts of their own, not statuses a store can choose to notify', function (): void {
+    expect(array_keys(OrderStatusMessage::DEFAULTS))->toBe(['placed', ...OrderStatusMessage::NOTIFIABLE, 'preorder_converted'])
+        ->and(OrderStatusMessage::NOTIFIABLE)->not->toContain('placed')
+        ->and(OrderStatusMessage::NOTIFIABLE)->not->toContain('preorder_converted');
 });
 
 test('BR-N03 the store wording replaces the default and every placeholder is filled', function () use ($values): void {

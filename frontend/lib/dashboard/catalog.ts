@@ -262,6 +262,8 @@ export function useSetProductStatus(id: number) {
     onSuccess: (product) => {
       queryClient.setQueryData(queryKeys.dashboardProduct(product.id), product);
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardProductsLists });
+      // BR-O14: going active shows what customers pre-ordered.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardPreorderDemand(product.id) });
     },
   });
 }

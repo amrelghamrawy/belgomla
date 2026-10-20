@@ -19,7 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * BR-P01..P04. V1 invariant (app-enforced): exactly one SKU per product.
+ * BR-P01..P04. V1 invariant (app-enforced): exactly one SKU per product. A Coming Soon product may take pre-orders
+ * (`preorder_enabled`, V2 Task 10, D88).
  *
  * @property int $id
  * @property int $tenant_id
@@ -29,6 +30,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $description
  * @property ProductStatus $status
  * @property array<string, int|float|string|bool> $custom_fields select values are option ids
+ * @property bool $preorder_enabled customers may pre-order it while it is Coming Soon (BR-P04, BR-O14, D88)
+ * @property CarbonImmutable|null $expected_at the day the merchant expects it, shown on the storefront
+ * @property int|null $preorder_limit at most this many selling units over every open pre-order; null = no cap
  * @property int|null $created_by
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -51,6 +55,9 @@ final class Product extends Model
     protected $attributes = [
         'status' => 'active',
         'custom_fields' => '{}',
+        'preorder_enabled' => false,
+        'expected_at' => null,
+        'preorder_limit' => null,
     ];
 
     protected static function newFactory(): ProductFactory
@@ -128,6 +135,9 @@ final class Product extends Model
         return [
             'status' => ProductStatus::class,
             'custom_fields' => JsonObject::class,
+            'preorder_enabled' => 'boolean',
+            'expected_at' => 'datetime', // a date column: the day only (Y-m-d), *_at columns cast to datetime
+            'preorder_limit' => 'integer',
         ];
     }
 }

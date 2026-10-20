@@ -209,6 +209,22 @@ describe("product form", () => {
     expect(values.tiers).toEqual([{ min_quantity: "10", mode: "percent", value: "30.00" }]);
   });
 
+  it("D88 starts from the product's pre-order settings and sends them, an empty day or cap as none", () => {
+    const values = productDefaults(
+      dashboardProduct({ preorder: { enabled: true, expected_at: "2026-12-01", limit: 40 } }),
+    );
+
+    expect(values).toMatchObject({ preorder_enabled: true, expected_at: "2026-12-01", preorder_limit: "40" });
+    expect(
+      productBody({ ...values, expected_at: "", preorder_limit: "" }, [selectField()], false, "books").preorder,
+    ).toEqual({
+      enabled: true,
+      expected_at: null,
+      limit: null,
+    });
+    expect(productDefaults(null)).toMatchObject({ preorder_enabled: false, expected_at: "", preorder_limit: "" });
+  });
+
   it("sends status and opening stock on create only", () => {
     const values = { ...productDefaults(dashboardProduct()), opening_stock: "100" };
 

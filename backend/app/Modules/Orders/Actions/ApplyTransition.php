@@ -74,7 +74,7 @@ final readonly class ApplyTransition
     private function moveStock(Order $order, TransitionPlan $plan, ?int $tenantUserId, array $deliveredQuantities): array
     {
         /** @var Collection<int, OrderItem> $items */
-        $items = $order->liveItems()->with('sku')->get()->keyBy('id');
+        $items = $order->liveItems()->where('reserved', true)->with('sku')->get()->keyBy('id'); // a pre-order line holds nothing (BR-O14)
         $this->ledger->lock(array_values($items->map(fn (OrderItem $item): int => $item->sku_id)->all()));
 
         if (! $plan->deductsStock) {

@@ -186,6 +186,18 @@ describe("NotificationsBell", () => {
     expect(link).toHaveTextContent("01001234567");
   });
 
+  it("BR-O14 a new pre-order links to the pre-order", async () => {
+    stubApi(shellRoutes([notification({ id: 5, type: "new_preorder", type_label: "حجز مسبق جديد" })], 1));
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await user.click(await screen.findByRole("button", { name: "الإشعارات، 1 غير مقروءة" }));
+
+    const link = await screen.findByRole("link", { name: /حجز مسبق جديد/ });
+    expect(link).toHaveAttribute("href", "/dashboard/orders/1001");
+    expect(link).toHaveTextContent("حجز مسبق #1001 من مكتبة الأمل");
+  });
+
   it("D81 an expired order links to the order", async () => {
     stubApi(shellRoutes([notification({ id: 4, type: "order_expired", type_label: "إلغاء تلقائي لطلب غير مؤكد" })], 1));
     const user = userEvent.setup();

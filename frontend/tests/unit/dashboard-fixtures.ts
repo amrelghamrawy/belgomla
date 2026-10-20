@@ -218,6 +218,7 @@ export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): Das
     status: "active",
     category: { id: 1, name: "المرحلة الابتدائية", kind: "books" },
     custom_fields: { grade: 11 },
+    preorder: { enabled: false, expected_at: null, limit: null },
     sku: dashboardSku(),
     main_image_url: null,
     images: [],

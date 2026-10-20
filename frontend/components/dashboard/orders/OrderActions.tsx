@@ -35,16 +35,19 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
   const warehouse = useIsWarehouse();
   const manages = allowed("orders.manage");
   const collects = allowed("collections.manage");
-  const steps = manages
-    ? nextSteps(order.status).filter((to) => !warehouse || to === "preparing" || to === "out_for_delivery")
-    : [];
-  const cancellable = manages && !warehouse && canCancel(order.status);
+  // BR-O14, D88: a pre-order is only cancelled (while something is left); it is converted from the product page.
+  const preorder = order.kind === "preorder";
+  const steps =
+    manages && !preorder
+      ? nextSteps(order.status).filter((to) => !warehouse || to === "preparing" || to === "out_for_delivery")
+      : [];
+  const cancellable = manages && !warehouse && canCancel(order.status) && order.preorder_state !== "converted";
   const balance = balanceOf(order);
   const owed = balance !== "0.00";
-  const collectable = collects && canCollect(order.status) && owed;
+  const collectable = collects && !preorder && canCollect(order.status) && owed;
   const returnable = allowed("orders.returns") && order.status === "delivered";
-  const discountable = allowed("orders.discount") && allowsPriceChange(order.status);
-  const editable = allowed("orders.edit") && allowsLineEdit(order.status);
+  const discountable = allowed("orders.discount") && !preorder && allowsPriceChange(order.status);
+  const editable = allowed("orders.edit") && !preorder && allowsLineEdit(order.status);
 
   const move = (to: (typeof steps)[number]) =>
     transition.mutate(
@@ -57,7 +60,7 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
 
   // A delivered order still takes collections (BR-C04) and returns (BR-R01); a cancelled one has no actions.
   if (steps.length === 0 && !cancellable && !collectable && !returnable && !discountable && !editable) {
-    return canCancel(order.status) || order.status === "delivered" ? null : (
+    return canCancel(order.status) || order.status === "delivered" || preorder ? null : (
       <p className="text-muted-foreground text-sm">{copy.terminal}</p>
     );
   }

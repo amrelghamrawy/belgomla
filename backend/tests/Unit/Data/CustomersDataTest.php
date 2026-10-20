@@ -6,6 +6,7 @@ use App\Modules\Customers\Data\AddressData;
 use App\Modules\Customers\Data\CartLineData;
 use App\Modules\Customers\Data\CustomerData;
 use App\Modules\Customers\Data\RegistrationData;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Http\Requests\AddCartItemRequest;
 use App\Modules\Customers\Http\Requests\RegisterCustomerRequest;
 use App\Modules\Customers\Http\Requests\SaveAddressRequest;
@@ -74,7 +75,17 @@ test('D54 an update without addresses keeps them (null), with addresses carries 
 test('BR-U05 a cart line is two integers', function (): void {
     $request = validatedCustomersRequest(AddCartItemRequest::class, ['sku_id' => '12', 'quantity' => '5']);
 
-    expect(CartLineData::fromRequest($request))->toEqual(new CartLineData(12, 5));
+    expect(CartLineData::fromRequest($request))->toEqual(new CartLineData(12, 5, CartLineKind::Order));
+});
+
+test('BR-O14 a cart line may be a pre-order line', function (): void {
+    $request = validatedCustomersRequest(AddCartItemRequest::class, ['sku_id' => '12', 'quantity' => '5', 'kind' => 'preorder']);
+
+    expect(CartLineData::fromRequest($request))->toEqual(new CartLineData(12, 5, CartLineKind::Preorder))
+        ->and(validatedCustomersRequest(App\Modules\Customers\Http\Requests\UpdateCartItemRequest::class, ['quantity' => '5', 'kind' => 'preorder'])->kind())->toBe(CartLineKind::Preorder)
+        ->and(validatedCustomersRequest(App\Modules\Customers\Http\Requests\UpdateCartItemRequest::class, ['quantity' => '5'])->kind())->toBe(CartLineKind::Order)
+        ->and(validatedCustomersRequest(App\Modules\Customers\Http\Requests\RemoveCartItemRequest::class, ['kind' => 'preorder'])->kind())->toBe(CartLineKind::Preorder)
+        ->and(validatedCustomersRequest(App\Modules\Customers\Http\Requests\RemoveCartItemRequest::class, [])->kind())->toBe(CartLineKind::Order);
 });
 
 test('BR-C05 BR-C06 credit terms come as a 2-decimal limit and integer days, with which ones were sent', function (): void {

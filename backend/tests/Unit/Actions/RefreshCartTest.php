@@ -48,3 +48,27 @@ test('a customer without a cart gets an empty one', function (): void {
 
     expect([$cart->lines, $cart->removed, $cart->itemsTotal])->toBe([[], [], '0.00']);
 });
+
+test('BR-O14 pre-order lines are priced apart; those whose product no longer takes pre-orders are dropped as preorder_closed', function (): void {
+    $open = Product::factory()->state(['name' => 'محجوز'])->preorderable()->withSku(['base_price' => '10.00'])->create()->sku()->sole();
+    $closed = Product::factory()->state(['name' => 'صار متاحًا'])->withSku(['base_price' => '10.00'], onHand: 100)->create()->sku()->sole();
+    $order = cartLine($this->cart, 'متاح');
+    CartItem::factory()->preorder()->for($this->cart)->create(['sku_id' => $open->id, 'quantity' => 4]);
+    $gone = CartItem::factory()->preorder()->for($this->cart)->create(['sku_id' => $closed->id, 'quantity' => 4]);
+
+    $cart = app(RefreshCart::class)->handle($this->customer);
+
+    expect(array_map(fn (PricedCartLine $line): int => $line->skuId, $cart->lines))->toBe([$order->sku_id])
+        ->and(array_map(fn (PricedCartLine $line): array => [$line->skuId, $line->available, $line->expectedAt], $cart->preorderLines))->toBe([[$open->id, 0, '2026-12-01']])
+        ->and($cart->preorderTotal)->toBe('40.00')
+        ->and($cart->itemsTotal)->toBe('20.00')
+        ->and($cart->removed)->toBe([['product_name' => 'صار متاحًا', 'reason' => 'preorder_closed']])
+        ->and(CartItem::query()->find($gone->id))->toBeNull();
+});
+
+test('BR-P04 an order line of a coming soon product is still dropped as inactive', function (): void {
+    $line = cartLine($this->cart, 'قريبًا', ProductStatus::ComingSoon);
+
+    expect(app(RefreshCart::class)->handle($this->customer)->removed)->toBe([['product_name' => 'قريبًا', 'reason' => 'inactive']])
+        ->and(CartItem::query()->find($line->id))->toBeNull();
+});

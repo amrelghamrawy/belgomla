@@ -276,3 +276,14 @@ test('BR-O12 a removed line takes no discount: it is not a line of the order any
         expect($e->details)->toBe(['items.0.order_item_id' => ['البند غير موجود في هذا الطلب']]);
     });
 });
+
+test('D88 a pre-order takes no discount: its price is set again on conversion', function (): void {
+    $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
+    $line = OrderItem::query()->where('order_id', $preorder->id)->sole();
+
+    expect(fn (): Order => app(ApplyOrderDiscount::class)->handle($preorder, new DiscountData([new LineDiscountData($line->id, DiscountType::Amount, '5')]), $this->owner->id))
+        ->toThrow(function (DiscountRefused $e): void {
+            expect([$e->status, $e->errorCode, $e->details])->toBe([409, 'order_locked', ['status' => 'pending', 'kind' => 'preorder']]);
+        })
+        ->and($line->refresh()->unit_price)->toBe('90.00');
+});

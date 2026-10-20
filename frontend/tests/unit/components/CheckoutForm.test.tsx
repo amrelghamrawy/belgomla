@@ -163,3 +163,72 @@ describe("CheckoutForm", () => {
     });
   });
 });
+
+describe("CheckoutForm for pre-orders (BR-O14)", () => {
+  const booked = cart({
+    preorders: {
+      items: [
+        {
+          ...cartItem({
+            sku_id: 777,
+            product_name: "سلاح التلميذ ٢٠٢٧",
+            product_slug: "selah",
+            quantity: 5,
+            available: 0,
+            line_total: "450.00",
+          }),
+          expected_at: null,
+        },
+      ],
+      items_total: "450.00",
+    },
+  });
+
+  it("confirms the pre-order lines to the chosen address, with their total and no minimum order bar", async () => {
+    const fetchMock = stubCheckout({
+      "GET /api/store/cart": json(200, { data: booked }),
+      "POST /api/store/checkout/preorder": json(201, {
+        data: { order: order({ number: 1002, kind: "preorder", preorder_state: "open" }) },
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CheckoutForm kind="preorder" />);
+
+    expect(await screen.findByRole("heading", { name: "تأكيد الحجز المسبق" })).toBeInTheDocument();
+    expect(screen.getByText(/لا يُخصم من المخزون الآن/)).toBeInTheDocument();
+    await screen.findByRole("radio", { name: /المكتبة/ });
+    expect(await screen.findByText("450.00 ج.م")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "تأكيد الحجز" }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/checkout/success?order=1002&preorder=1"));
+    const [call] = callsTo(fetchMock, "POST /api/store/checkout/preorder");
+    expect(call?.body).toEqual({ address_id: 31, customer_note: null });
+    expect(call?.headers["Idempotency-Key"]).toMatch(/^preorder-/);
+  });
+
+  it("lists a line past the cap with what remains, and one that no longer takes pre-orders", async () => {
+    stubCheckout({
+      "GET /api/store/cart": json(200, { data: booked }),
+      "POST /api/store/checkout/preorder": failure([
+        { sku_id: 777, reason: "preorder_limit", requested: 5, remaining: 2 },
+        { sku_id: 888, reason: "preorder_unavailable" },
+      ]),
+    });
+    renderWithQuery(<CheckoutForm kind="preorder" />);
+    await screen.findByRole("radio", { name: /المكتبة/ });
+    await userEvent.click(screen.getByRole("button", { name: "تأكيد الحجز" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("سلاح التلميذ ٢٠٢٧");
+    expect(alert).toHaveTextContent("المتبقي للحجز 2 كرتونة فقط");
+    expect(alert).toHaveTextContent("لم يعد متاحًا للحجز");
+  });
+
+  it("with no pre-order lines it shows the empty cart", async () => {
+    stubCheckout();
+    renderWithQuery(<CheckoutForm kind="preorder" />);
+
+    expect(await screen.findByText("سلتك فارغة")).toBeInTheDocument();
+  });
+});

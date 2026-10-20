@@ -126,3 +126,16 @@ export type CustomerCredit = Schemas["CustomerCredit"];
 export type OrderItemChange = Schemas["OrderItemChange"];
 export type DashboardOrderItemChange = Schemas["DashboardOrderItemChange"];
 export type OrderLinesRequest = Schemas["OrderLinesRequest"];
+
+// V2 Task 10 — pre-orders
+export type CartLineKind = Schemas["CartLineKind"];
+export type PreorderCartItem = Schemas["PreorderCartItem"];
+export type StorePreorder = Schemas["StorePreorder"];
+export type OrderKind = Schemas["OrderKind"];
+export type PreorderState = Schemas["PreorderState"];
+export type OrderConversion = Schemas["OrderConversion"];
+export type ProductPreorder = Schemas["ProductPreorder"];
+export type PreorderDemand = Schemas["PreorderDemand"];
+export type PreorderDemandCounts = Schemas["PreorderDemandCounts"];
+export type PreorderConversion = Schemas["PreorderConversion"];
+export type DashboardPreorder = Schemas["DashboardPreorder"];

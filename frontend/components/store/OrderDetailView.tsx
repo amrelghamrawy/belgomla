@@ -34,7 +34,11 @@ import { AddressText } from "./AddressList";
 
 const REASON_MAX = 300;
 
-/** `/account/orders/[number]`: status history, items, returns (BR-R05), payment status, delivery; cancel while pending (BR-O02). */
+/**
+ * `/account/orders/[number]`: status history, items, returns (BR-R05), payment status, delivery; cancel while pending
+ * (BR-O02). A pre-order (BR-O14) shows where it stands, how much of each line became an order and links to those
+ * orders; an order converted from a pre-order links back to it.
+ */
 export function OrderDetailView() {
   const number = Number(useRouteParam("number"));
   const session = useRequiredCustomer();
@@ -74,20 +78,54 @@ export function OrderDetailView() {
 
 function OrderDetailBody({ order }: { order: OrderDetail }) {
   const changed = changedLineIds(order);
+  const preorder = order.kind === "preorder";
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-bold">{ar.orders.number(order.number)}</h1>
+          <h1 className="text-xl font-bold">
+            {preorder ? ar.orders.preorderNumber(order.number) : ar.orders.number(order.number)}
+          </h1>
           <p className="text-muted-foreground text-sm">
             {ar.orders.placedAt}: {formatDateTime(order.placed_at)}
           </p>
         </div>
         <Badge variant={order.status === "cancelled" ? "destructive" : "default"} data-testid="order-status">
-          {order.status_label}
+          {order.preorder_state === null ? order.status_label : ar.orders.preorderStates[order.preorder_state]}
         </Badge>
       </div>
+
+      {preorder && order.preorder_state === "open" && (
+        <Alert>
+          <AlertDescription>{ar.orders.preorderPriceNote}</AlertDescription>
+        </Alert>
+      )}
+
+      {order.conversions.length > 0 && (
+        <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="conversions">
+          <span className="font-medium">{ar.orders.convertedTo}:</span>
+          {order.conversions.map((conversion) => (
+            <Link
+              key={conversion.number}
+              href={`/account/orders/${conversion.number}`}
+              className="text-primary underline"
+            >
+              {ar.orders.number(conversion.number)}
+            </Link>
+          ))}
+        </p>
+      )}
+
+      {order.converted_from !== null && (
+        <Link
+          href={`/account/orders/${order.converted_from}`}
+          className="text-primary text-sm underline"
+          data-testid="converted-from"
+        >
+          {ar.orders.convertedFrom(order.converted_from)}
+        </Link>
+      )}
 
       {order.status === "cancelled" && order.cancel_reason && (
         <Alert>
@@ -132,6 +170,11 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
                     )
                   )}
                 </span>
+                {item.converted_quantity > 0 && (
+                  <span className="text-primary text-xs" data-testid={`converted-${item.id}`}>
+                    {ar.orders.convertedOf(item.converted_quantity, item.quantity, item.unit)}
+                  </span>
+                )}
                 {item.delivered_quantity !== null && item.delivered_quantity < item.quantity && (
                   <span className="text-destructive text-xs" data-testid={`delivered-${item.id}`}>
                     {ar.orders.deliveredOf(item.delivered_quantity, item.quantity, item.unit)}
@@ -210,15 +253,17 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
         </section>
       )}
 
-      <section aria-labelledby="order-payment" className="flex flex-col gap-1 text-sm">
-        <h2 id="order-payment" className="font-bold">
-          {ar.orders.collection}
-        </h2>
-        <p>
-          {ar.orders.collectionStatuses[order.collection_status]}
-          {order.collection_status !== "unpaid" && ` · ${ar.orders.collected(formatMoney(order.collected_amount))}`}
-        </p>
-      </section>
+      {!preorder && (
+        <section aria-labelledby="order-payment" className="flex flex-col gap-1 text-sm">
+          <h2 id="order-payment" className="font-bold">
+            {ar.orders.collection}
+          </h2>
+          <p>
+            {ar.orders.collectionStatuses[order.collection_status]}
+            {order.collection_status !== "unpaid" && ` · ${ar.orders.collected(formatMoney(order.collected_amount))}`}
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="order-delivery" className="flex flex-col gap-1">
         <h2 id="order-delivery" className="font-bold">
@@ -237,7 +282,9 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
         </section>
       )}
 
-      {order.status === "pending" && <CancelOrderDialog number={order.number} />}
+      {order.status === "pending" && order.preorder_state !== "converted" && (
+        <CancelOrderDialog number={order.number} preorder={preorder} />
+      )}
     </main>
   );
 }
@@ -259,8 +306,8 @@ export function StatusTimeline({ history }: { history: readonly OrderHistoryEntr
   );
 }
 
-/** BR-O02: a pending order can be cancelled by the customer, with a reason. */
-export function CancelOrderDialog({ number }: { number: number }) {
+/** BR-O02: a pending order can be cancelled by the customer, with a reason; so can an open pre-order (BR-O14). */
+export function CancelOrderDialog({ number, preorder = false }: { number: number; preorder?: boolean }) {
   const cancel = useCancelOrder(number);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -287,12 +334,12 @@ export function CancelOrderDialog({ number }: { number: number }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant="outline" className="text-destructive h-11" onClick={() => setOpen(true)}>
-        {ar.orders.cancel}
+        {preorder ? ar.orders.cancelPreorder : ar.orders.cancel}
       </Button>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{ar.orders.cancelTitle}</DialogTitle>
-          <DialogDescription>{ar.orders.cancelBody}</DialogDescription>
+          <DialogTitle>{preorder ? ar.orders.cancelPreorder : ar.orders.cancelTitle}</DialogTitle>
+          <DialogDescription>{preorder ? ar.orders.cancelPreorderBody : ar.orders.cancelBody}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} noValidate className="flex flex-col gap-3">
           <FieldLabel htmlFor="cancel-reason">{ar.orders.cancelReason}</FieldLabel>

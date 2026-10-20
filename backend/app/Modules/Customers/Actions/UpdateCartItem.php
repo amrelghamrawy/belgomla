@@ -6,14 +6,15 @@ namespace App\Modules\Customers\Actions;
 
 use App\Modules\Catalog\Queries\CartSkuQuery;
 use App\Modules\Customers\Data\PricedCart;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\Scopes\InCartOf;
 use App\Modules\Customers\Services\OrderableQuantity;
 
 /**
- * BR-CU06: changes the quantity of a SKU already in the cart (`404` when it is not), with the same checks as
- * adding it (OrderableQuantity). Returns the refreshed cart.
+ * BR-CU06: changes the quantity of a SKU already in the cart as that kind of line (`404` when it is not), with the
+ * same checks as adding it (OrderableQuantity). Returns the refreshed cart.
  */
 final readonly class UpdateCartItem
 {
@@ -23,14 +24,15 @@ final readonly class UpdateCartItem
         private RefreshCart $refresh,
     ) {}
 
-    public function handle(Customer $customer, int $skuId, int $quantity): PricedCart
+    public function handle(Customer $customer, int $skuId, int $quantity, CartLineKind $kind = CartLineKind::Order): PricedCart
     {
         $item = CartItem::query()
             ->tap(new InCartOf($customer))
             ->where('sku_id', $skuId)
+            ->where('kind', $kind)
             ->firstOrFail();
 
-        $this->orderable->assert($this->skus->find($skuId), $quantity);
+        $this->orderable->assert($this->skus->find($skuId), $quantity, $kind);
 
         $item->forceFill(['quantity' => $quantity])->save();
 

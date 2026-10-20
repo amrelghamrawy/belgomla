@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingCartIcon, Trash2Icon } from "lucide-react";
+import { CalendarClockIcon, ShoppingCartIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -8,12 +8,13 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { CartItem, RemovedCartItem } from "@/lib/api/types";
+import type { Cart, CartItem, CartLineKind, PreorderCartItem, RemovedCartItem } from "@/lib/api/types";
 import { useRequiredCustomer } from "@/lib/auth/session";
 import { ar, messageFor } from "@/lib/copy/ar";
+import { formatDay } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { useCart, useRemoveCartItem, useUpdateCartItem } from "@/lib/store/cart";
-import { quantityBounds } from "@/lib/store/quantity";
+import { preorderBounds, quantityBounds } from "@/lib/store/quantity";
 
 import { MovProgress } from "./MovProgress";
 import { QuantityStepper } from "./QuantityStepper";
@@ -21,7 +22,10 @@ import { QuantityStepper } from "./QuantityStepper";
 /** Quantity changes wait this long for the next tap before going to the server. */
 export const CART_DEBOUNCE_MS = 400;
 
-/** `/cart` (BR-CU06): lines priced now (BR-PR04), lines removed since last time (BR-P04), the minimum order bar. */
+/**
+ * `/cart` (BR-CU06): lines priced now (BR-PR04), lines removed since last time (BR-P04), the minimum order bar. The
+ * pre-order lines (BR-O14) are a section of their own with an indicative total and their own confirmation.
+ */
 export function CartView() {
   const session = useRequiredCustomer();
   const active = session.data?.status === "active";
@@ -76,7 +80,7 @@ export function CartView() {
         </p>
       ) : cart.data === undefined ? (
         <Skeleton className="h-40" />
-      ) : cart.data.items.length === 0 ? (
+      ) : cart.data.items.length === 0 && cart.data.preorders.items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <ShoppingCartIcon className="text-muted-foreground size-12" aria-hidden />
           <p className="font-bold">{ar.cart.empty}</p>
@@ -85,8 +89,11 @@ export function CartView() {
             <Link href="/">{ar.cart.browse}</Link>
           </Button>
         </div>
+      ) : cart.data.items.length === 0 ? (
+        <PreorderSection cart={cart.data} />
       ) : (
         <>
+          {cart.data.preorders.items.length > 0 && <PreorderSection cart={cart.data} />}
           <MovProgress cart={cart.data} />
           <ul className="flex flex-col gap-3">
             {cart.data.items.map((item) => (
@@ -112,14 +119,50 @@ export function CartView() {
   );
 }
 
-/** One line: name, unit price (tier noted), line total, quantity stepper and remove. */
-export function CartLine({ item }: { item: CartItem }) {
+/** BR-O14: the pre-order lines, their indicative total and the link to confirm them (no MOV, D88). */
+function PreorderSection({ cart }: { cart: Cart }) {
+  return (
+    <section
+      aria-labelledby="preorders-title"
+      className="bg-brand-soft flex flex-col gap-3 rounded-2xl p-3"
+      data-testid="preorders"
+    >
+      <div className="flex flex-col gap-1">
+        <h2 id="preorders-title" className="font-bold">
+          {ar.cart.preordersTitle}
+        </h2>
+        <p className="text-muted-foreground text-sm">{ar.cart.preordersHint}</p>
+      </div>
+      <ul className="flex flex-col gap-3">
+        {cart.preorders.items.map((item) => (
+          <CartLine key={item.sku_id} item={item} kind="preorder" />
+        ))}
+      </ul>
+      <div className="flex items-center gap-3">
+        <div className="flex flex-1 flex-col">
+          <span className="text-muted-foreground text-xs">{ar.cart.preordersTotal}</span>
+          <span className="text-lg font-bold" data-testid="preorders-total">
+            {formatMoney(cart.preorders.items_total)}
+          </span>
+        </div>
+        <Button asChild size="lg" variant="outline" className="border-primary text-primary h-11 flex-1 border-[1.5px]">
+          <Link href="/checkout/preorder">{ar.cart.confirmPreorder}</Link>
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/** One line: name, unit price (tier noted), line total, quantity stepper and remove; a pre-order line has no stock cap. */
+export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCartItem; kind?: CartLineKind }) {
   const update = useUpdateCartItem();
   const remove = useRemoveCartItem();
   const [quantity, setQuantity] = useState(item.quantity);
   const [serverQuantity, setServerQuantity] = useState(item.quantity);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const bounds = quantityBounds(item);
+  const preorder = kind === "preorder";
+  const bounds = preorder ? preorderBounds(item) : quantityBounds(item);
+  const expectedAt = "expected_at" in item ? item.expected_at : null;
 
   if (serverQuantity !== item.quantity) {
     setServerQuantity(item.quantity);
@@ -134,7 +177,7 @@ export function CartLine({ item }: { item: CartItem }) {
     timer.current = setTimeout(
       () =>
         update.mutate(
-          { sku_id: item.sku_id, quantity: next },
+          preorder ? { sku_id: item.sku_id, quantity: next, kind } : { sku_id: item.sku_id, quantity: next },
           {
             onError: (error) => {
               setQuantity(item.quantity);
@@ -157,6 +200,12 @@ export function CartLine({ item }: { item: CartItem }) {
             {ar.cart.unitPrice(formatMoney(item.unit_price))} / {item.unit}
             {item.tier_min_quantity !== null && ` · ${ar.cart.tierApplied(item.tier_min_quantity)}`}
           </span>
+          {expectedAt !== null && (
+            <span className="text-primary flex items-center gap-1 text-xs font-semibold">
+              <CalendarClockIcon className="size-3.5" aria-hidden />
+              {ar.cart.expectedAt(formatDay(expectedAt))}
+            </span>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -164,13 +213,22 @@ export function CartLine({ item }: { item: CartItem }) {
           className="text-destructive size-11"
           aria-label={`${ar.cart.remove}: ${item.product_name}`}
           disabled={remove.isPending}
-          onClick={() => remove.mutate(item.sku_id, { onError: (error) => toast.error(messageFor(error)) })}
+          onClick={() =>
+            remove.mutate(preorder ? { sku_id: item.sku_id, kind } : item.sku_id, {
+              onError: (error) => toast.error(messageFor(error)),
+            })
+          }
         >
           <Trash2Icon />
         </Button>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <QuantityStepper id={`quantity-${item.sku_id}`} value={quantity} bounds={bounds} onChange={change} />
+        <QuantityStepper
+          id={preorder ? `quantity-preorder-${item.sku_id}` : `quantity-${item.sku_id}`}
+          value={quantity}
+          bounds={bounds}
+          onChange={change}
+        />
         <span className="font-bold">{formatMoney(item.line_total)}</span>
       </div>
     </li>
