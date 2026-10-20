@@ -7,6 +7,7 @@ namespace App\Modules\Catalog\Queries;
 use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Scopes\VisibleOnStore;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -24,14 +25,22 @@ final readonly class PriceListQuery
     {
         $limit = config()->integer('catalog.price_list_limit');
 
-        $rows = $this->filtered->builder($filter)
+        $rows = $this->builder($filter)->limit($limit + 1)->get();
+
+        return ['rows' => $rows->take($limit)->values(), 'truncated' => $rows->count() > $limit];
+    }
+
+    /**
+     * The whole selection, uncapped and sorted, with what a row shows (PriceListExportQuery reads it lazily).
+     *
+     * @return Builder<Product>
+     */
+    public function builder(ProductFilterData $filter): Builder
+    {
+        return $this->filtered->builder($filter)
             ->tap(new VisibleOnStore)
             ->with(['category', 'sku.sellingUnit'])
             ->orderBy('products.name')
-            ->orderBy('products.id')
-            ->limit($limit + 1)
-            ->get();
-
-        return ['rows' => $rows->take($limit)->values(), 'truncated' => $rows->count() > $limit];
+            ->orderBy('products.id');
     }
 }

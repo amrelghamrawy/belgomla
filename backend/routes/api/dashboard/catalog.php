@@ -10,9 +10,13 @@ use App\Modules\Catalog\Http\Controllers\Dashboard\FieldArchiveController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\FieldController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\FieldOptionArchiveController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\FieldOptionController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ImportController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ImportPreviewController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ImportTemplateController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\ProductBulkStatusController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\ProductController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\ProductDuplicateController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\ProductExportController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\ProductImageController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\ProductImageReorderController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\ProductRelationController;
@@ -46,6 +50,14 @@ Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(fun
     Route::get('products', [ProductController::class, 'index'])->middleware('permission:orders.view')->name('products.index');
     Route::post('products', [ProductController::class, 'store'])->middleware('permission:catalog.manage')->name('products.store');
     Route::post('products/bulk/status', [ProductBulkStatusController::class, 'store'])->middleware('permission:catalog.manage')->name('products.bulk-status');
+
+    // V2 Task 06: catalog export / import (the import is one run per previewed file, retry-safe).
+    Route::get('products/export', [ProductExportController::class, 'index'])->middleware('permission:catalog.manage')->name('products.export');
+    Route::get('products/export/{export}', [ProductExportController::class, 'show'])->whereUuid('export')->middleware('permission:catalog.manage')->name('products.export.download');
+    Route::get('products/import/template', [ImportTemplateController::class, 'show'])->middleware('permission:catalog.manage')->name('products.import.template');
+    Route::post('products/import/preview', [ImportPreviewController::class, 'store'])->middleware('permission:catalog.manage')->name('products.import.preview');
+    Route::post('products/import', [ImportController::class, 'store'])->middleware('idempotent')->middleware('permission:catalog.manage')->name('products.import');
+    Route::get('imports/{import}', [ImportController::class, 'show'])->whereNumber('import')->middleware('permission:catalog.manage')->name('imports.show');
     Route::get('products/{product}', [ProductController::class, 'show'])->whereNumber('product')->middleware('permission:orders.view')->name('products.show');
     Route::put('products/{product}', [ProductController::class, 'update'])->whereNumber('product')->middleware('permission:catalog.manage')->name('products.update');
     Route::patch('products/{product}/status', [ProductStatusController::class, 'update'])->whereNumber('product')->middleware('permission:catalog.manage')->name('products.status');

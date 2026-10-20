@@ -123,6 +123,10 @@ arch('catalog reaches inventory only through its actions and queries')
         'App\Modules\Inventory\Http',
     ]);
 
+// V2 Task 06: OpenSpout is wrapped by one service, so a library swap or upgrade touches one class.
+arch('only the Spreadsheet service touches OpenSpout')
+    ->expect('OpenSpout')
+    ->toOnlyBeUsedIn([App\Modules\Catalog\Services\Spreadsheet::class]);
 arch('pricing does not depend on inventory')
     ->expect('App\Modules\Pricing')
     ->not->toUse('App\Modules\Inventory');

@@ -6,15 +6,18 @@ use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\CategoryIcon;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
+use App\Modules\Catalog\Enums\ImportRowAction;
+use App\Modules\Catalog\Enums\ImportStatus;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\RelationType;
+use App\Modules\Catalog\Enums\SpreadsheetFormat;
 
 test('every catalog enum exposes labels for all cases', function (string $enum): void {
     $labels = $enum::toArray();
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([ArchiveStatus::class, ProductStatus::class, FieldType::class, RelationType::class, CategoryKind::class, CategoryIcon::class]);
+})->with([ArchiveStatus::class, ProductStatus::class, FieldType::class, RelationType::class, CategoryKind::class, CategoryIcon::class, SpreadsheetFormat::class, ImportStatus::class, ImportRowAction::class]);
 
 test('BR-PR10 the reference price is the cover price for books and the retail price for every other kind', function (CategoryKind $kind, string $label): void {
     expect($kind->referencePriceLabel())->toBe($label);
@@ -51,4 +54,28 @@ test('BR-P08 only select and boolean fields are filterable', function (FieldType
     'number' => [FieldType::Number, false],
     'select' => [FieldType::Select, true],
     'boolean' => [FieldType::Boolean, true],
+]);
+
+test('a catalog file format is known by its extension, a .txt being a csv', function (string $extension, ?SpreadsheetFormat $format): void {
+    expect(SpreadsheetFormat::fromExtension($extension))->toBe($format);
+})->with([
+    'xlsx' => ['xlsx', SpreadsheetFormat::Xlsx],
+    'upper case' => ['XLSX', SpreadsheetFormat::Xlsx],
+    'csv' => ['csv', SpreadsheetFormat::Csv],
+    'txt' => ['txt', SpreadsheetFormat::Csv],
+    'other' => ['pdf', null],
+]);
+
+test('a catalog file is sent with its spreadsheet mime type', function (): void {
+    expect(SpreadsheetFormat::Xlsx->mimeType())->toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        ->and(SpreadsheetFormat::Csv->mimeType())->toBe('text/csv; charset=UTF-8');
+});
+
+test('an import is finished once done or failed', function (ImportStatus $status, bool $finished): void {
+    expect($status->isFinished())->toBe($finished);
+})->with([
+    'queued' => [ImportStatus::Queued, false],
+    'running' => [ImportStatus::Running, false],
+    'done' => [ImportStatus::Done, true],
+    'failed' => [ImportStatus::Failed, true],
 ]);

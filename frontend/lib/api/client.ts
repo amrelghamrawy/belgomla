@@ -220,6 +220,54 @@ export async function apiFetchWith<T, E extends object>(
   return body as { data: T } & E;
 }
 
+/** A file the API sent as an attachment (an export, V2 Task 06). */
+export type DownloadedFile = { blob: Blob; fileName: string };
+
+/** The file name of a `Content-Disposition: attachment; filename=...` header (RFC 5987 `filename*` first). */
+export function fileNameOf(disposition: string | null, fallback: string): string {
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition ?? "")?.[1];
+
+  if (encoded !== undefined) {
+    return decodeURIComponent(encoded);
+  }
+
+  return /filename="?([^";]+)"?/i.exec(disposition ?? "")?.[1] ?? fallback;
+}
+
+/**
+ * GETs a file (V2 Task 06): resolves to the file, or, when the API answers `202` (a large export queued), to the
+ * envelope's `data` as `queued`. Errors and the 401 hook behave as in apiFetch.
+ */
+export async function apiDownload<Q = unknown>(
+  path: string,
+  options: Pick<ApiOptions, "signal"> = {},
+): Promise<{ file: DownloadedFile } | { queued: Q }> {
+  const response = await request(path, { signal: options.signal });
+
+  if (!response.ok) {
+    const error = await toApiError(response);
+
+    if (error.status === 401) {
+      onUnauthenticated(surfaceOf(path));
+    }
+
+    throw error;
+  }
+
+  if (response.status === 202) {
+    const body = await readJson(response);
+
+    return { queued: (isRecord(body) && "data" in body ? body.data : body) as Q };
+  }
+
+  return {
+    file: {
+      blob: await response.blob(),
+      fileName: fileNameOf(response.headers.get("Content-Disposition"), "download"),
+    },
+  };
+}
+
 /** Sends the request with CSRF bootstrap, the single 419 retry and the 401 hook; returns the parsed body. */
 async function call(path: string, options: ApiOptions): Promise<unknown> {
   const mutating = (options.method ?? "GET") !== "GET";

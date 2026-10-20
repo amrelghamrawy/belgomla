@@ -72,6 +72,14 @@ export type TierRequest = Schemas["TierRequest"];
 export type PricingRequest = Schemas["PricingRequest"];
 export type ProductFilter = Schemas["ProductFilter"];
 export type BulkStatusResult = Schemas["BulkStatusResult"];
+
+// Catalog import / export (V2 Task 06)
+export type ImportPreview = Schemas["ImportPreview"];
+export type ImportRowError = Schemas["ImportRowError"];
+export type CatalogImport = Schemas["CatalogImport"];
+export type ImportStatus = Schemas["ImportStatus"];
+export type QueuedExport = Schemas["QueuedExport"];
+export type SpreadsheetFormat = "xlsx" | "csv";
 export type SkuPricing = Schemas["SkuPricing"];
 export type BulkPricingRequest = Schemas["BulkPricingRequest"];
 export type BulkPricingResult = Schemas["BulkPricingResult"];

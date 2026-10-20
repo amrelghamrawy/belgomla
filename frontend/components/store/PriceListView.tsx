@@ -1,6 +1,6 @@
 "use client";
 
-import { PrinterIcon, Share2Icon } from "lucide-react";
+import { DownloadIcon, PrinterIcon, Share2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -13,7 +13,7 @@ import { useTenant } from "@/lib/auth/tenant";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
-import { findCategory, useCategories, usePriceList } from "@/lib/store/catalog";
+import { findCategory, useCategories, useDownloadPriceList, usePriceList } from "@/lib/store/catalog";
 import { parseListing, priceListHref, type Listing } from "@/lib/store/listing";
 
 import { PriceListFilters } from "./PriceListFilters";
@@ -59,7 +59,7 @@ function copyWithSelection(text: string): boolean {
  * `/price-list?category=&f[...]=&q=`: a print-friendly table of every product in the selection (BR-P13): name,
  * code, unit, reference and wholesale price, MOQ, availability. The reference column is named after the chosen
  * category's section (سعر الغلاف for books, سعر القطاعي otherwise, D68) and both ways when the list mixes
- * sections. The browser's print-to-PDF is the V1 export.
+ * sections. The browser's print-to-PDF is the PDF (D83); "تحميل Excel" downloads the same selection as a file.
  */
 export function PriceListView() {
   const router = useRouter();
@@ -68,6 +68,7 @@ export function PriceListView() {
   const { data: tenant } = useTenant();
   const categories = useCategories();
   const list = usePriceList(listing);
+  const download = useDownloadPriceList();
   const category = listing.category && categories.data ? findCategory(categories.data, listing.category) : null;
   const filtered = Object.keys(listing.f).length > 0 || listing.q !== undefined;
   const pricesHidden = list.data?.meta.prices_hidden === true;
@@ -89,11 +90,22 @@ export function PriceListView() {
             {filtered ? ` · ${ar.priceList.filtered}` : ""}
           </p>
         </div>
-        <div className="flex gap-2 print:hidden">
+        <div className="flex flex-wrap gap-2 print:hidden">
           <Button variant="outline" className="h-11" onClick={() => void copyPageLink()}>
             <Share2Icon />
             {ar.priceList.share}
           </Button>
+          {!pricesHidden && (
+            <Button
+              variant="outline"
+              className="h-11"
+              disabled={download.isPending}
+              onClick={() => download.mutate(listing, { onError: (error) => toast.error(messageFor(error)) })}
+            >
+              <DownloadIcon />
+              {download.isPending ? ar.priceList.downloading : ar.priceList.downloadExcel}
+            </Button>
+          )}
           <Button className="h-11" onClick={() => window.print()}>
             <PrinterIcon />
             {ar.priceList.print}

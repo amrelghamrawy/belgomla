@@ -41,5 +41,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- A dev .env may switch the local wa-gateway on; tests that need it call useWaGateway() with Http::fake(). -->
+        <env name="WA_GATEWAY_ENABLED" value="false"/>
     </php>
 </phpunit>

@@ -230,11 +230,11 @@ School-book merchants replace most of the catalog every academic year. V1 suppor
 - Bulk status change by filter (e.g. inactivate all products where `academic_year = 2025/2026`).
 - Bulk pricing by filter (BR-PR11).
 - Duplicate product (BR-P11).
-- Full bulk import/export remains V2.
+- Catalog import / export (V2 Task 06): the catalog (or any filter of it) downloads as an Excel or CSV file in the import format, and a file in that format imports back: a new SKU code creates the product, a known one updates it, after a preview that lists every row error and writes nothing (D95). Categories, units and options must exist; images are not imported.
 
 ### BR-P13 — Printable Price List
 
-Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL; the browser's print-to-PDF is used in V1. Excel/PDF export is V2.
+Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL. The page also downloads the same selection as an Excel file (V2 Task 06); PDF is the browser's print-to-PDF of the page (D83). A guest of a store that hides prices gets no file.
 
 ### BR-P07 — Product Images
 

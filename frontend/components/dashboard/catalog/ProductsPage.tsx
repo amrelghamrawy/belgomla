@@ -25,6 +25,7 @@ import {
 } from "@/lib/dashboard/catalog";
 import { activeOnly, flatten } from "@/lib/dashboard/category-tree";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
+import { useCan } from "@/lib/dashboard/permissions";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatMoney } from "@/lib/format/money";
 
@@ -33,13 +34,19 @@ import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { BulkPricingDialog } from "./BulkPricingDialog";
 import { BulkStatusDialog } from "./BulkStatusDialog";
+import { ExportButtons } from "./ExportButtons";
+import { ImportWizard } from "./ImportWizard";
 
 const copy = ar.dashboard.products;
 const STATUSES: ProductStatus[] = ["active", "coming_soon", "inactive"];
 
-/** The product list with the store's facets plus status and low stock, bulk actions and duplicate (BR-P12). */
+/**
+ * The product list with the store's facets plus status and low stock, bulk actions and duplicate (BR-P12), and the
+ * catalog file: export of the current filter and the import wizard (V2 Task 06, `catalog.manage`).
+ */
 export function ProductsPage() {
   const [query, setQuery] = useListQuery(PRODUCT_LIST_KEYS);
+  const allowed = useCan();
   const products = useDashboardProducts(query);
   const categories = useDashboardCategories();
   const fields = useFields();
@@ -51,9 +58,13 @@ export function ProductsPage() {
       <PageHeader
         title={copy.title}
         actions={
-          <Button asChild>
-            <Link href="/dashboard/products/new">{copy.add}</Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {allowed("catalog.manage") && <ExportButtons query={query} />}
+            {allowed("catalog.manage") && <ImportWizard />}
+            <Button asChild>
+              <Link href="/dashboard/products/new">{copy.add}</Link>
+            </Button>
+          </div>
         }
       />
       <Filters

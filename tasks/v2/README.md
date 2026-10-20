@@ -9,8 +9,8 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | 02 | [Credit terms & account statement](02-credit-and-statement.md) | Customers, Collections, Orders, Reports | done    | 75e2782 |
 | 03 | [Customer order notifications](03-order-notifications.md) | Messaging, Orders, Tenancy settings     | done (live VM check pending) | e068bd1 |
 | 04 | [Pending order auto-expiry](04-pending-expiry.md)      | Orders, Tenancy settings                   | done    | 1e888a1 |
-| 05 | [Staff accounts, roles & permissions](05-staff-roles.md) | Tenancy, every dashboard route, frontend | done    | see log |
-| 06 | [Catalog import/export](06-import-export.md)           | Catalog, Pricing, Inventory                | planned |        |
+| 05 | [Staff accounts, roles & permissions](05-staff-roles.md) | Tenancy, every dashboard route, frontend | done    | ef9907c |
+| 06 | [Catalog import/export](06-import-export.md)           | Catalog, Pricing, Inventory                | done    | see log |
 | 07 | [Merchant-placed orders](07-merchant-orders.md)        | Orders, Customers                          | planned |        |
 | 08 | [Manual discounts](08-discounts.md)                    | Orders, Pricing, Collections               | planned |        |
 | 09 | [Order editing & partial fulfilment](09-order-editing.md) | Orders, Inventory                       | planned |        |

@@ -189,6 +189,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/price-list/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The price list of a facet selection as an Excel file, uncapped (BR-P13, D83)
+         * @description A guest of a store that hides prices (`require_login_for_prices`) gets `403 prices_hidden`.
+         */
+        get: operations["storePriceListExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/store/auth/register": {
         parameters: {
             query?: never;
@@ -903,6 +923,112 @@ export interface paths {
         put?: never;
         /** Sets the status of every product matching a non-empty filter (BR-P12, D29) */
         post: operations["dashboardBulkProductStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The filtered catalog in the import format (V2 Task 06); streamed, or 202 with a signed link above catalog.export_sync_limit */
+        get: operations["dashboardExportProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/export/{export}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export: string;
+            };
+            cookie?: never;
+        };
+        /** The temporary signed link of a queued export (expires and signature query parameters) */
+        get: operations["dashboardDownloadExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/import/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The empty import file with the custom field columns of the store */
+        get: operations["dashboardImportTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dry-runs an uploaded catalog file (xlsx or csv) and keeps it for 24 h; writes nothing */
+        post: operations["dashboardPreviewImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues the import of a previewed file; one run per token */
+        post: operations["dashboardRunImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/imports/{import}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import: number;
+            };
+            cookie?: never;
+        };
+        /** Progress, counts and row errors of an import run */
+        get: operations["dashboardImport"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1754,7 +1880,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2378,6 +2504,61 @@ export interface components {
             skipped: number;
             /** Format: uuid */
             batch_id: string;
+        };
+        /** @description One problem of a catalog file row (V2 Task 06); row 0 is the whole file. */
+        ImportRowError: {
+            /** @description The spreadsheet row number */
+            row: number;
+            /** @description The column key (sku_code, base_price, tier_2_min, field:grade, tiers, row, file) */
+            column: string;
+            /** @description The Arabic header of that column */
+            label: string;
+            message: string;
+        };
+        ImportPreview: {
+            /** Format: uuid */
+            token: string;
+            file_name: string;
+            total: number;
+            create: number;
+            update: number;
+            /** @description Rows with errors, not imported */
+            skip: number;
+            errors: components["schemas"]["ImportRowError"][];
+            errors_truncated: boolean;
+        };
+        /** @enum {string} */
+        ImportStatus: "queued" | "running" | "done" | "failed";
+        CatalogImport: {
+            id: number;
+            file_name: string;
+            status: components["schemas"]["ImportStatus"];
+            total: number;
+            processed: number;
+            created: number;
+            updated: number;
+            /** @description Rows with errors, not written */
+            skipped: number;
+            /** @description Rows the database refused unexpectedly */
+            failed: number;
+            errors: components["schemas"]["ImportRowError"][];
+            /**
+             * Format: uuid
+             * @description The audit batch of every change of the run
+             */
+            batch_id: string;
+            /** Format: date-time */
+            started_at: string | null;
+            /** Format: date-time */
+            finished_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        QueuedExport: {
+            /** Format: uuid */
+            id: string;
+            /** @description Host-relative signed link; 409 export_not_ready until the file is written */
+            download_url: string;
         };
         SkuPricing: {
             product_id: number;
@@ -3076,6 +3257,8 @@ export interface components {
         OrderNumber: number;
         /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
         IdempotencyKey: string;
+        /** @description xlsx (default) or csv (V2 Task 06) */
+        SpreadsheetFormat: "xlsx" | "csv";
         /** @description Category id; its descendants are included */
         CategoryIdFilter: number;
         /** @description Only SKUs whose available stock is at or below MOQ × conversion factor (D36) */
@@ -3401,6 +3584,36 @@ export interface operations {
                     };
                 };
             };
+            422: components["responses"]["Error"];
+        };
+    };
+    storePriceListExport: {
+        parameters: {
+            query?: {
+                /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
+                category?: components["parameters"]["Category"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                format?: "xlsx";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The XLSX file (attachment price-list-YYYY-MM-DD.xlsx) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };
@@ -4755,6 +4968,200 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardExportProducts: {
+        parameters: {
+            query?: {
+                /** @description Category id; its descendants are included */
+                category?: components["parameters"]["CategoryIdFilter"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                status?: components["schemas"]["ProductStatus"];
+                /** @description xlsx (default) or csv (V2 Task 06) */
+                format?: components["parameters"]["SpreadsheetFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (attachment products-YYYY-MM-DD.xlsx|csv), first sheet products_v1 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            /** @description Too large to stream; a job writes the file behind the signed link */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["QueuedExport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardDownloadExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    dashboardImportTemplate: {
+        parameters: {
+            query?: {
+                /** @description xlsx (default) or csv (V2 Task 06) */
+                format?: components["parameters"]["SpreadsheetFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (attachment products-template-YYYY-MM-DD.xlsx|csv) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreviewImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The counts, the first row errors and the token to import with */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ImportPreview"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRunImport: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The queued run */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CatalogImport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CatalogImport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     dashboardProduct: {

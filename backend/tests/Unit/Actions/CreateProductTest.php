@@ -119,3 +119,9 @@ test('an invalid opening stock rolls back the product, its sku and the audit rec
         ->and(SkuInventory::query()->count())->toBe(0)
         ->and(AuditLog::query()->count())->toBe(0);
 });
+
+test('V2 Task 06 the creation is audited under the batch it is given', function (): void {
+    app(CreateProduct::class)->handle(($this->data)(), batchId: '0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a');
+
+    expect(AuditLog::query()->where('action', 'product.created')->value('batch_id'))->toBe('0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a');
+});

@@ -257,6 +257,28 @@ paths:
                   meta: { $ref: '#/components/schemas/PriceListMeta' }
         '422': { $ref: '#/components/responses/Error' }
 
+  /api/store/price-list/export:
+    get:
+      operationId: storePriceListExport
+      tags: [store]
+      summary: The price list of a facet selection as an Excel file, uncapped (BR-P13, D83)
+      description: A guest of a store that hides prices (`require_login_for_prices`) gets `403 prices_hidden`.
+      parameters:
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Facets'
+        - $ref: '#/components/parameters/Search'
+        - name: format
+          in: query
+          schema: { type: string, enum: [xlsx] }
+      responses:
+        '200':
+          description: The XLSX file (attachment price-list-YYYY-MM-DD.xlsx)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
   /api/store/auth/register:
     post:
       operationId: storeRegister
@@ -1347,6 +1369,165 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/export:
+    get:
+      operationId: dashboardExportProducts
+      tags: [dashboard-catalog]
+      summary: The filtered catalog in the import format (V2 Task 06); streamed, or 202 with a signed link above catalog.export_sync_limit
+      parameters:
+        - $ref: '#/components/parameters/CategoryIdFilter'
+        - $ref: '#/components/parameters/Facets'
+        - $ref: '#/components/parameters/Search'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ProductStatus' }
+        - $ref: '#/components/parameters/SpreadsheetFormat'
+      responses:
+        '200':
+          description: The file (attachment products-YYYY-MM-DD.xlsx|csv), first sheet products_v1
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        '202':
+          description: Too large to stream; a job writes the file behind the signed link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/QueuedExport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/export/{export}:
+    parameters:
+      - name: export
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: dashboardDownloadExport
+      tags: [dashboard-catalog]
+      summary: The temporary signed link of a queued export (expires and signature query parameters)
+      responses:
+        '200':
+          description: The file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/import/template:
+    get:
+      operationId: dashboardImportTemplate
+      tags: [dashboard-catalog]
+      summary: The empty import file with the custom field columns of the store
+      parameters:
+        - $ref: '#/components/parameters/SpreadsheetFormat'
+      responses:
+        '200':
+          description: The file (attachment products-template-YYYY-MM-DD.xlsx|csv)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/import/preview:
+    post:
+      operationId: dashboardPreviewImport
+      tags: [dashboard-catalog]
+      summary: Dry-runs an uploaded catalog file (xlsx or csv) and keeps it for 24 h; writes nothing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: The counts, the first row errors and the token to import with
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/ImportPreview' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/products/import:
+    post:
+      operationId: dashboardRunImport
+      tags: [dashboard-catalog]
+      summary: Queues the import of a previewed file; one run per token
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, format: uuid }
+      responses:
+        '202':
+          description: The queued run
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/CatalogImport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/imports/{import}:
+    parameters:
+      - name: import
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: dashboardImport
+      tags: [dashboard-catalog]
+      summary: Progress, counts and row errors of an import run
+      responses:
+        '200':
+          description: The run
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/CatalogImport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /api/dashboard/products/{product}:
     parameters:
@@ -2609,6 +2790,11 @@ components:
       in: header
       description: Retry-safe writes (D55); the same key with another body is idempotency_key_reused
       schema: { type: string, pattern: '^[A-Za-z0-9_\-:.]{1,255}$' }
+    SpreadsheetFormat:
+      name: format
+      in: query
+      description: xlsx (default) or csv (V2 Task 06)
+      schema: { type: string, enum: [xlsx, csv] }
     CategoryIdFilter:
       name: category
       in: query
@@ -2894,6 +3080,7 @@ components:
         - email_taken
         - exceeds_balance
         - exceeds_credit
+        - export_not_ready
         - field_type_locked
         - forbidden
         - gallery_full
@@ -2901,6 +3088,7 @@ components:
         - http_error
         - idempotency_in_progress
         - idempotency_key_reused
+        - import_expired
         - in_use
         - insufficient_stock
         - invalid_credentials
@@ -3888,6 +4076,63 @@ components:
         affected: { type: integer }
         skipped: { type: integer, description: Products whose status transition is not allowed (D29) }
         batch_id: { type: string, format: uuid }
+
+    ImportRowError:
+      type: object
+      description: One problem of a catalog file row (V2 Task 06); row 0 is the whole file.
+      required: [row, column, label, message]
+      properties:
+        row: { type: integer, description: The spreadsheet row number }
+        column: { type: string, description: 'The column key (sku_code, base_price, tier_2_min, field:grade, tiers, row, file)' }
+        label: { type: string, description: The Arabic header of that column }
+        message: { type: string }
+
+    ImportPreview:
+      type: object
+      required: [token, file_name, total, create, update, skip, errors, errors_truncated]
+      properties:
+        token: { type: string, format: uuid }
+        file_name: { type: string }
+        total: { type: integer }
+        create: { type: integer }
+        update: { type: integer }
+        skip: { type: integer, description: 'Rows with errors, not imported' }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ImportRowError' }
+        errors_truncated: { type: boolean }
+
+    ImportStatus:
+      type: string
+      enum: [queued, running, done, failed]
+
+    CatalogImport:
+      type: object
+      required: [id, file_name, status, total, processed, created, updated, skipped, failed, errors, batch_id, started_at, finished_at, created_at]
+      properties:
+        id: { type: integer }
+        file_name: { type: string }
+        status: { $ref: '#/components/schemas/ImportStatus' }
+        total: { type: integer }
+        processed: { type: integer }
+        created: { type: integer }
+        updated: { type: integer }
+        skipped: { type: integer, description: 'Rows with errors, not written' }
+        failed: { type: integer, description: Rows the database refused unexpectedly }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ImportRowError' }
+        batch_id: { type: string, format: uuid, description: The audit batch of every change of the run }
+        started_at: { type: [string, 'null'], format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+
+    QueuedExport:
+      type: object
+      required: [id, download_url]
+      properties:
+        id: { type: string, format: uuid }
+        download_url: { type: string, description: 'Host-relative signed link; 409 export_not_ready until the file is written' }
 
     SkuPricing:
       type: object

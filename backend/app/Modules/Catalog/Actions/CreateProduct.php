@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\DB;
  * BR-P02: creates the product and its single SKU in one transaction (owned here), audited. The SKU's
  * prices, MOQ and tiers are validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05).
  * The opening stock is written by Inventory's RecordOpeningStock in the same transaction (an `opening`
- * movement, BR-INV06) and recorded in the `product.created` audit as `opening_stock`.
+ * movement, BR-INV06) and recorded in the `product.created` audit as `opening_stock`. The catalog import passes
+ * its audit batch id (V2 Task 06).
  */
 final readonly class CreateProduct
 {
@@ -32,12 +33,12 @@ final readonly class CreateProduct
         private AuditLogger $audit,
     ) {}
 
-    public function handle(ProductData $data, ?int $createdBy = null): Product
+    public function handle(ProductData $data, ?int $createdBy = null, ?string $batchId = null): Product
     {
         $category = $this->references->check($data);
         $customFields = $this->fields->validate($data->customFields, $category->kind);
 
-        return DB::transaction(function () use ($data, $customFields, $createdBy): Product {
+        return DB::transaction(function () use ($data, $customFields, $createdBy, $batchId): Product {
             $product = Product::query()->create([
                 'category_id' => $data->categoryId,
                 'name' => $data->name,
@@ -51,7 +52,7 @@ final readonly class CreateProduct
             $this->openingStock->handle($sku, $data->openingStock, $createdBy);
             $product->load('sku.tiers');
 
-            $this->audit->log('product.created', $product, null, [...$this->snapshot->of($product), 'opening_stock' => $data->openingStock]);
+            $this->audit->log('product.created', $product, null, [...$this->snapshot->of($product), 'opening_stock' => $data->openingStock], $batchId);
 
             return $product;
         });

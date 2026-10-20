@@ -7,10 +7,13 @@ import { AccountOverview } from "@/components/store/AccountOverview";
 import { PriceListView } from "@/components/store/PriceListView";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHome } from "@/components/store/StoreHome";
+import { saveDownload } from "@/lib/api/download";
 
 import { cart, cartItem, customer, facet, omit, page, storeProduct, tenantSettings } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { renderWithQuery, router, searchParams } from "../render";
+
+vi.mock("@/lib/api/download", () => ({ saveDownload: vi.fn() }));
 
 const tree = [
   { id: 1, name: "المرحلة الإعدادية", slug: "prep", kind: "books", icon: null, image_url: null, children: [] },
@@ -204,6 +207,42 @@ describe("PriceListView", () => {
     await screen.findByTestId("price-list");
     expect(screen.queryByRole("columnheader", { name: "سعر الجملة" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "سجل الدخول لعرض الأسعار في القائمة" })).toBeInTheDocument();
+  });
+
+  it("D83 downloads the same selection as an Excel file", async () => {
+    searchParams.value = new URLSearchParams("category=prep&f[grade]=7");
+    const fetchMock = stubApi({
+      "GET /api/store/tenant": json(200, { data: tenantSettings() }),
+      "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/filters": json(200, { data: [facet()] }),
+      "GET /api/store/price-list": json(200, {
+        data: rows,
+        meta: { count: 2, truncated: false, prices_hidden: false },
+      }),
+      "GET /api/store/price-list/export": () =>
+        new Response("x", { headers: { "Content-Disposition": "attachment; filename=price-list-2026-10-20.xlsx" } }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<PriceListView />);
+    await screen.findByTestId("price-list");
+
+    await user.click(screen.getByRole("button", { name: "تحميل Excel" }));
+
+    await waitFor(() =>
+      expect(saveDownload).toHaveBeenCalledWith(expect.objectContaining({ fileName: "price-list-2026-10-20.xlsx" })),
+    );
+    expect(callsTo(fetchMock, "GET /api/store/price-list/export")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
+  });
+
+  it("D1 offers no Excel file while prices are hidden", async () => {
+    stubList(
+      { prices_hidden: true },
+      rows.map((row) => omit(row, "cover_price", "base_price")),
+    );
+    renderWithQuery(<PriceListView />);
+
+    await screen.findByTestId("price-list");
+    expect(screen.queryByRole("button", { name: "تحميل Excel" })).not.toBeInTheDocument();
   });
 
   it("says when the list was cut at the limit", async () => {

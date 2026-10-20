@@ -6,12 +6,14 @@ namespace App\Modules\Catalog\Data;
 
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Http\Requests\BulkProductStatusRequest;
+use App\Modules\Catalog\Http\Requests\ExportPriceListRequest;
+use App\Modules\Catalog\Http\Requests\ExportProductsRequest;
 use App\Modules\Catalog\Http\Requests\ListDashboardProductsRequest;
 use App\Modules\Catalog\Http\Requests\StoreProductListRequest;
 
 /**
  * The product selection shared by the store list, facets, price list, dashboard list and bulk
- * actions (08-api-contract.md §1, §6): category (id on the dashboard, slug on the store, descendants
+ * actions and the catalog / price list files (08-api-contract.md §1, §6): category (id on the dashboard, slug on the store, descendants
  * included), custom field values `f[key]` combined with AND, search `q`, and status.
  */
 final readonly class ProductFilterData
@@ -27,7 +29,7 @@ final readonly class ProductFilterData
         public ?ProductStatus $status = null,
     ) {}
 
-    public static function fromRequest(ListDashboardProductsRequest|BulkProductStatusRequest|StoreProductListRequest $request): self
+    public static function fromRequest(ListDashboardProductsRequest|BulkProductStatusRequest|StoreProductListRequest|ExportProductsRequest|ExportPriceListRequest $request): self
     {
         $input = $request->productFilterInput();
 

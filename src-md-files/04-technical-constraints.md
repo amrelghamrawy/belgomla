@@ -8,6 +8,7 @@
 - PHP 8.5 (composer allows ^8.3; development, tests and production all run 8.5, D66).
 - REST API.
 - Sanctum for authentication.
+- `openspout/openspout` 5.12.2 (pinned) for the catalog and price-list spreadsheets (XLSX/CSV, streamed, needs only ext-zip/xml); only `Catalog\Services\Spreadsheet` uses it (V2 Task 06, D83, arch test).
 
 ### Frontend
 

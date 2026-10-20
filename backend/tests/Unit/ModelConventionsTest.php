@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Catalog\Models\CatalogImport;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -74,6 +75,7 @@ function columnsEndingWith(string $model, array $suffixes): array
 test('the module model list is explicit so new models are reviewed', function (): void {
     expect(moduleModels())->toBe([
         AuditLog::class,
+        CatalogImport::class,
         Category::class,
         Product::class,
         ProductFieldDefinition::class,

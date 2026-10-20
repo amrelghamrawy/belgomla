@@ -11,13 +11,14 @@ use Tests\TenantTestCase;
 |--------------------------------------------------------------------------
 |
 | Http, Console and Unit tests all run as a tenant-aware Laravel test case with
-| RefreshDatabase (see TenantTestCase). Storage is always faked.
+| RefreshDatabase (see TenantTestCase). Storage (public and local disks) is always faked.
 |
 */
 
 pest()->extend(TenantTestCase::class)
     ->beforeEach(function (): void {
         Storage::fake('public');
+        Storage::fake('local'); // catalog import / export files (V2 Task 06)
     })
     ->in('Http', 'Console', 'Unit');
 
@@ -172,7 +173,7 @@ function useWaGateway(): void
 }
 
 /** Runs a job's handle() through the container, like a worker would, even while Queue::fake() is on. */
-function runJob(App\Modules\Messaging\Jobs\SendMessage|App\Modules\Messaging\Jobs\PollMessageStatus|App\Modules\Messaging\Jobs\ProcessProviderWebhook $job): void
+function runJob(App\Modules\Messaging\Jobs\SendMessage|App\Modules\Messaging\Jobs\PollMessageStatus|App\Modules\Messaging\Jobs\ProcessProviderWebhook|App\Modules\Catalog\Jobs\ImportCatalog|App\Modules\Catalog\Jobs\ExportCatalog $job): void
 {
     app()->call($job->handle(...));
 }
@@ -324,4 +325,49 @@ function arraySession(): Illuminate\Session\Store
     $session->start();
 
     return $session;
+}
+
+/**
+ * V2 Task 06: a catalog file as the merchant uploads it, written by the app's own Spreadsheet service: an Arabic title
+ * row over the key row (XLSX), or the key row alone (CSV). The columns are the union of the rows' keys unless given.
+ *
+ * @param  list<array<string, string>>  $rows
+ * @param  list<string>|null  $columns
+ */
+function catalogUpload(
+    array $rows,
+    App\Modules\Catalog\Enums\SpreadsheetFormat $format = App\Modules\Catalog\Enums\SpreadsheetFormat::Xlsx,
+    ?array $columns = null,
+    string $sheetName = App\Modules\Catalog\Services\CatalogRowMapper::SHEET_NAME,
+): Illuminate\Http\UploadedFile {
+    $columns ??= array_keys(array_merge([], ...$rows));
+    $headers = array_combine($columns, array_map(fn (string $column): string => "عنوان {$column}", $columns));
+    $path = sys_get_temp_dir().'/catalog-'.Illuminate\Support\Str::uuid().'.'.$format->value;
+
+    app(App\Modules\Catalog\Services\Spreadsheet::class)->write($path, $format, $headers, $rows, $sheetName, withKeys: true);
+
+    return new Illuminate\Http\UploadedFile($path, 'products.'.$format->value, null, null, true);
+}
+
+/**
+ * The rows of a spreadsheet file (row number => cells), read back with the app's Spreadsheet service.
+ *
+ * @return array<int, list<string>>
+ */
+function spreadsheetRows(string $path, App\Modules\Catalog\Enums\SpreadsheetFormat $format = App\Modules\Catalog\Enums\SpreadsheetFormat::Xlsx): array
+{
+    return iterator_to_array(app(App\Modules\Catalog\Services\Spreadsheet::class)->read($path, $format));
+}
+
+/**
+ * Writes a streamed download (an export) to a temporary file and returns its path.
+ *
+ * @param  Illuminate\Testing\TestResponse<Symfony\Component\HttpFoundation\Response>  $response
+ */
+function downloadedFile(Illuminate\Testing\TestResponse $response, App\Modules\Catalog\Enums\SpreadsheetFormat $format = App\Modules\Catalog\Enums\SpreadsheetFormat::Xlsx): string
+{
+    $path = sys_get_temp_dir().'/download-'.Illuminate\Support\Str::uuid().'.'.$format->value;
+    file_put_contents($path, $response->streamedContent());
+
+    return $path;
 }

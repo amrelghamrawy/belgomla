@@ -205,6 +205,27 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 
 V1 invariant (app-enforced): exactly one SKU per product. V2 lifts it.
 
+### `imports` (V2 Task 06)
+
+One run of the catalog import (model `Catalog\Models\CatalogImport`).
+
+| Column      | Type         | Notes                                                                 |
+| ----------- | ------------ | --------------------------------------------------------------------- |
+| id          | bigint PK    |                                                                       |
+| tenant_id   | FK           |                                                                       |
+| uuid        | uuid         | the preview token of the uploaded file; **unique (tenant_id, uuid)** (one run per token) |
+| file_name   | varchar(255) | as uploaded                                                           |
+| status      | varchar(20)  | **check** `queued`, `running`, `done`, `failed`                       |
+| total       | int          | data rows of the file (counted when the run starts)                   |
+| processed   | int          | rows read so far (progress)                                           |
+| created / updated / skipped / failed | int | **check ≥ 0**; skipped = rows with errors, failed = rows the database refused unexpectedly |
+| errors      | jsonb        | the first 500 `{ row, column, label, message }` (row 0 = the whole file) |
+| batch_id    | uuid         | the audit batch of every change of the run                            |
+| created_by  | FK tenant_users | nullable                                                          |
+| started_at / finished_at | timestamp | nullable                                                |
+
+The uploaded file waits in `storage/app/private/imports/{tenant}/{uuid}.{xlsx|csv}` for 24 h; queued exports are written to `.../exports/{tenant}/`.
+
 ---
 
 ## 4. Pricing

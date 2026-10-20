@@ -72,6 +72,8 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 409  | `already_voided`           | voiding a collection twice (BR-C02, `details.voided_at`)  |
 | 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
 | 422  | `idempotency_key_reused`   | same `Idempotency-Key` with a different body (D55)        |
+| 422  | `import_expired`           | importing a preview token older than 24 h, or unknown (V2 Task 06) |
+| 409  | `export_not_ready`         | the signed link of a queued catalog export before its file is written (V2 Task 06) |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
 | 503  | `store_unavailable`        | tenant suspended (storefront)                             |
 | 500  | `server_error`             | unexpected failure (no internals unless `app.debug`)      |
@@ -83,7 +85,7 @@ The complete list (also `otp_*`, `invalid_credentials`, `insufficient_stock`, `i
 - All text is Arabic; dates ISO-8601 UTC; money as string `"150.00"`.
 - Lists: `?page=`, `?per_page=` (max 100), `?sort=field|-field`.
 - Every mutating dashboard endpoint writes an audit record (BR-L).
-- `Idempotency-Key` header is honored on `POST /api/store/checkout` and on all `POST /api/dashboard/orders/{id}/...` transitions (24 h window).
+- `Idempotency-Key` header is honored on `POST /api/store/checkout`, on all `POST /api/dashboard/orders/{id}/...` transitions and on `POST /api/dashboard/products/import` (24 h window).
 
 ---
 
@@ -174,6 +176,10 @@ Detail notes (Task 1): `gallery` items are `{ id, url, is_main, sort_order }`; `
 Same filters as the product list; returns all matching products (no pagination, max 2000) in a compact shape for the printable page (BR-P13).
 
 Row: `{ id, name, slug, kind, code, unit, moq, cover_price, base_price, availability: "available"|"coming_soon" }`; `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
+
+### `GET /api/store/price-list/export` (V2 Task 06)
+
+Same filters, `format=xlsx` (the only value, D83). An XLSX attachment `price-list-YYYY-MM-DD.xlsx`: every visible product of the selection by name, uncapped, with section, code, unit, MOQ, reference and wholesale price, availability. A guest of a store with `require_login_for_prices` gets `403 prices_hidden`. PDF is the page printed by the browser.
 
 ---
 
@@ -429,6 +435,19 @@ Create/update body:
 
 `base_price` **or** `base_price_percent` is required (BR-PR10); when percent is given, server computes the price and stores both (the percent wins if both are sent). Same for each tier (`unit_price` or `discount_percent`). On update, a body without `sku.tiers` keeps the tiers (D34). The detail response carries `sku.tiers: [{ min_quantity, unit_price, discount_percent }]`. Prices, MOQ and tiers are audited as `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed`, not inside `product.updated`. `opening_stock` is accepted only on create and writes an `opening` movement.
 
+### Catalog import / export (V2 Task 06, D83, D95)
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET | `/api/dashboard/products/export?format=xlsx\|csv&<list filter>` | the filter's products (every status) in the import format, streamed as `products-YYYY-MM-DD.xlsx\|csv`; above `catalog.export_sync_limit` (5,000) `202 { data: { id, download_url } }` and a job writes the file |
+| GET | `/api/dashboard/products/export/{uuid}?expires=&signature=` | the signed link of a queued export (24 h): the file, `409 export_not_ready` while it is written, `404` for a wrong link or a failed export |
+| GET | `/api/dashboard/products/import/template?format=` | the empty file with the store's custom field columns |
+| POST | `/api/dashboard/products/import/preview` | multipart `file` (.xlsx/.csv, ≤ 10 MB) → `{ token, file_name, total, create, update, skip, errors: [{ row, column, label, message }], errors_truncated }`; writes nothing; a file that cannot be read as a whole is `422` on `file` |
+| POST | `/api/dashboard/products/import` | `{ token }` → `202` the run; one run per token; `Idempotency-Key` honored; `422 import_expired` after 24 h |
+| GET | `/api/dashboard/imports/{id}` | the run: `{ id, file_name, status: queued\|running\|done\|failed, total, processed, created, updated, skipped, failed, errors, batch_id, started_at, finished_at, created_at }` |
+
+All need `catalog.manage`. File format v1: sheet `products_v1`; columns `sku_code*, product_name*, category_path*, status, description, selling_unit*, base_unit*, conversion_factor*, cover_price, base_price*, base_price_percent, moq, tier_N_min, tier_N_price (N = 1…5, more when a SKU has more tiers), on_hand, field:<key>` (one per active custom field). The XLSX carries the Arabic labels with the keys in a thin second row; CSV has the keys only. Row rules: D95. Audit: one `batch_id` per import (`catalog.import_started`, the product/SKU/stock records, `catalog.imported` or `catalog.import_failed`).
+
 ### Pricing (BR-PR11)
 
 | Method | Path                                             | Body                                                                                         |
@@ -658,12 +677,12 @@ php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their 
 
 | Area           | Endpoints |
 | -------------- | --------: |
-| Store public   |         6 |
+| Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        15 |
-| Dashboard      |        78 |
+| Dashboard      |        84 |
 | Webhooks       |         2 |
-| **Total**      |   **111** |
+| **Total**      |   **118** |
 
 ---
 

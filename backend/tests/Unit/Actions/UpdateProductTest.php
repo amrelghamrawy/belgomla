@@ -93,3 +93,20 @@ test('a failing sku update rolls back the product change', function (): void {
     expect($this->product->refresh()->name)->toBe('قلم')
         ->and(AuditLog::query()->count())->toBe(0);
 });
+
+test('V2 Task 06 inside a batch every record carries it, and an update that changes nothing writes nothing', function (): void {
+    $batch = '0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a';
+
+    app(UpdateProduct::class)->handle($this->product, ($this->data)(), $batch);
+    $unchanged = AuditLog::query()->count();
+    app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)(['pricing' => new SkuPricingData('28.50', moq: 2)], name: 'قلم أحمر'), $batch);
+
+    expect($unchanged)->toBe(0)
+        ->and(AuditLog::query()->pluck('batch_id', 'action')->all())->toEqual(['product.updated' => $batch, 'sku.price_changed' => $batch]);
+});
+
+test('without a batch an update that changes nothing is still recorded, as the dashboard save', function (): void {
+    app(UpdateProduct::class)->handle($this->product, ($this->data)());
+
+    expect(AuditLog::query()->pluck('action')->all())->toBe(['product.updated']);
+});

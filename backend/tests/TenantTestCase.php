@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Customers\Models\Cart;
@@ -37,6 +40,9 @@ abstract class TenantTestCase extends TestCase
     /** @var array{category: Category, carton: Unit, piece: Unit}|null */
     private ?array $catalogBasics = null;
 
+    /** @var array{root: Category, grade: Category, carton: Unit, piece: Unit, publisher: ProductFieldDefinition, adwaa: ProductFieldOption, moallem: ProductFieldOption, brand: ProductFieldDefinition}|null */
+    private ?array $importBasics = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -56,6 +62,109 @@ abstract class TenantTestCase extends TestCase
             'carton' => Unit::factory()->create(['name' => 'كرتونة']),
             'piece' => Unit::factory()->create(['name' => 'قطعة']),
         ]);
+    }
+
+    /**
+     * V2 Task 06: the catalog a file is imported into, created once per test: the books section
+     * "كتب خارجية > أولى إعدادي", the units كرتونة and قطعة, a books-only select field `publisher` (الأضواء، المعلم)
+     * and a stationery-only text field `brand`.
+     *
+     * @return array{root: Category, grade: Category, carton: Unit, piece: Unit, publisher: ProductFieldDefinition, adwaa: ProductFieldOption, moallem: ProductFieldOption, brand: ProductFieldDefinition}
+     */
+    protected function importBasics(): array
+    {
+        return $this->importBasics ??= $this->inTenant(function (): array {
+            $root = Category::factory()->books()->create(['name' => 'كتب خارجية']);
+            $publisher = ProductFieldDefinition::factory()->select()->forKind(CategoryKind::Books)->create(['key' => 'publisher', 'label' => 'الشركة', 'sort_order' => 1]);
+
+            return [
+                'root' => $root,
+                'grade' => Category::factory()->childOf($root)->create(['name' => 'أولى إعدادي'])->refresh(),
+                'carton' => Unit::factory()->create(['name' => 'كرتونة']),
+                'piece' => Unit::factory()->create(['name' => 'قطعة']),
+                'publisher' => $publisher,
+                'adwaa' => ProductFieldOption::factory()->create(['definition_id' => $publisher->id, 'label' => 'الأضواء']),
+                'moallem' => ProductFieldOption::factory()->create(['definition_id' => $publisher->id, 'label' => 'المعلم']),
+                'brand' => ProductFieldDefinition::factory()->forKind(CategoryKind::Stationery)->create(['key' => 'brand', 'label' => 'الماركة', 'sort_order' => 2]),
+            ];
+        });
+    }
+
+    /**
+     * A valid row of the catalog file (format v1, by column key) for a new book in "كتب خارجية > أولى إعدادي";
+     * overrides replace cells, a null removes the column.
+     *
+     * @param  array<string, string|null>  $overrides
+     * @return array<string, string>
+     */
+    protected function importRow(array $overrides = []): array
+    {
+        $this->importBasics();
+
+        $row = [
+            'sku_code' => 'ADW-SCI-1',
+            'product_name' => 'الأضواء علوم أولى إعدادي',
+            'category_path' => 'كتب خارجية > أولى إعدادي',
+            'status' => 'نشط',
+            'description' => 'كتاب العلوم',
+            'selling_unit' => 'كرتونة',
+            'base_unit' => 'قطعة',
+            'conversion_factor' => '20',
+            'cover_price' => '120',
+            'base_price' => '90',
+            'base_price_percent' => '',
+            'moq' => '5',
+            'tier_1_min' => '10',
+            'tier_1_price' => '85',
+            'tier_2_min' => '',
+            'tier_2_price' => '',
+            'on_hand' => '400',
+            'field:publisher' => 'الأضواء',
+            'field:brand' => '',
+        ];
+
+        foreach ($overrides as $column => $value) {
+            if ($value === null) {
+                unset($row[$column]);
+            } else {
+                $row[$column] = $value;
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * V2 Task 06: the product importRow() describes, already in the catalog: so importing importRow() unchanged is an
+     * update that changes nothing. Overrides go to the SKU.
+     *
+     * @param  array<string, mixed>  $sku
+     */
+    protected function importedProduct(array $sku = [], int $onHand = 400, ProductStatus $status = ProductStatus::Active): Product
+    {
+        $basics = $this->importBasics();
+
+        return $this->inTenant(function () use ($basics, $sku, $onHand, $status): Product {
+            $product = Product::factory()->withSku([
+                'code' => 'ADW-SCI-1',
+                'selling_unit_id' => $basics['carton']->id,
+                'base_unit_id' => $basics['piece']->id,
+                'conversion_factor' => 20,
+                'cover_price' => '120.00',
+                'base_price' => '90.00',
+                'moq' => 5,
+                ...$sku,
+            ], onHand: $onHand)->create([
+                'name' => 'الأضواء علوم أولى إعدادي',
+                'category_id' => $basics['grade']->id,
+                'description' => 'كتاب العلوم',
+                'status' => $status,
+                'custom_fields' => ['publisher' => $basics['adwaa']->id],
+            ]);
+            SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
+
+            return $product->refresh()->load('sku.tiers');
+        });
     }
 
     /**
