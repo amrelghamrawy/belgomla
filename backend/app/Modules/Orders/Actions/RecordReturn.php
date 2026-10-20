@@ -20,6 +20,7 @@ use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Services\ReturnableQuantities;
+use App\Modules\Orders\Services\ReturnPricing;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,8 @@ use RuntimeException;
  * POST /api/dashboard/orders/{number}/returns (BR-R01..R05, V2 Task 01): the merchant records goods a customer
  * brought back. Owns its transaction: the order row is locked first (like collections, so the two never deadlock)
  * and re-read, then the SKUs in sku_id order. Only a delivered order (BR-R01), never more than returnable per line
- * (BR-R02); the goods go back into stock (BR-R03), priced at the line's snapshot price (D74); the order's net total
+ * (BR-R02); the goods go back into stock (BR-R03), priced at the line's snapshot price (D74) less the order discount's
+ * share (ReturnPricing, D85), the last return absorbing the rounding; the order's net total
  * drops, and what was collected beyond it is refunded in cash once the merchant confirms (BR-R04). The history gets
  * a note (no status change, no merchant notification) and `order.returned` is audited.
  */
@@ -37,6 +39,7 @@ final readonly class RecordReturn
 {
     public function __construct(
         private ReturnableQuantities $returnable,
+        private ReturnPricing $pricing,
         private StockLedger $ledger,
         private RefundsPayments $refunds,
         private ApplyCollectedAmount $collected,
@@ -53,8 +56,8 @@ final readonly class RecordReturn
                 throw ReturnNotAllowed::status($order->status);
             }
 
-            $items = $this->assertReturnable($order, $data->lines);
-            $return = $this->createReturn($order, $data, $items, $actorId);
+            [$items, $last] = $this->assertReturnable($order, $data->lines);
+            $return = $this->createReturn($order, $data, $items, $last, $actorId);
 
             $order->forceFill(['returned_total' => Money::add($order->returned_total, $return->total)])->save();
             $this->settle($order, $return, $data->refund, $data->refundTo, $actorId);
@@ -79,9 +82,10 @@ final readonly class RecordReturn
      * BR-R02: every line names a line of this order and stays within what is still returnable.
      *
      * @param  list<ReturnLineData>  $lines
-     * @return Collection<int, OrderItem> the order lines returned, keyed by id
+     * @return array{0: Collection<int, OrderItem>, 1: bool} the order lines returned, keyed by id, and whether this
+     *                                                       return brings back everything still out (the last one)
      */
-    private function assertReturnable(Order $order, array $lines): Collection
+    private function assertReturnable(Order $order, array $lines): array
     {
         $returnable = $this->returnable->for($order);
         $problems = [];
@@ -98,25 +102,38 @@ final readonly class RecordReturn
             throw ReturnExceedsDelivered::items($problems);
         }
 
-        return OrderItem::query()->with('sku')->whereKey(array_map(fn (ReturnLineData $line): int => $line->orderItemId, $lines))->get()->keyBy('id');
+        $items = OrderItem::query()->with('sku')->whereKey(array_map(fn (ReturnLineData $line): int => $line->orderItemId, $lines))->get()->keyBy('id');
+        $last = array_sum($returnable) === array_sum(array_map(fn (ReturnLineData $line): int => $line->quantity, $lines));
+
+        return [$items, $last];
     }
 
     /**
-     * BR-R03, D74: the return and its lines at the snapshot unit price, each line's base units back into stock.
+     * BR-R03, D74, D85: the return and its lines at the line's price after its own discount less the order discount's
+     * share, each line's base units back into stock. The last return of the order absorbs the rounding, so all its
+     * returns add up to exactly the order total.
      *
      * @param  Collection<int, OrderItem>  $items
      */
-    private function createReturn(Order $order, ReturnData $data, Collection $items, ?int $actorId): OrderReturn
+    private function createReturn(Order $order, ReturnData $data, Collection $items, bool $lastReturn, ?int $actorId): OrderReturn
     {
-        $last = OrderReturn::query()->where('order_id', $order->id)->max('number');
-        $number = (is_numeric($last) ? (int) $last : 0) + 1;
+        $previous = OrderReturn::query()->where('order_id', $order->id)->max('number');
+        $number = (is_numeric($previous) ? (int) $previous : 0) + 1;
         $lines = [];
         $total = '0.00';
 
         foreach ($data->lines as $line) {
             $item = $items->get($line->orderItemId) ?? throw new RuntimeException("Order item {$line->orderItemId} vanished.");
-            $lines[] = [$item, $line->quantity, Money::times($item->unit_price, $line->quantity)];
-            $total = Money::add($total, Money::times($item->unit_price, $line->quantity));
+            $lineTotal = $this->pricing->prorated($order, Money::times($item->unit_price, $line->quantity));
+            $lines[] = [$item, $line->quantity, $this->pricing->prorated($order, $item->unit_price), $lineTotal];
+            $total = Money::add($total, $lineTotal);
+        }
+
+        if ($lastReturn && $lines !== []) {
+            $rest = Money::subtract($order->order_total, $order->returned_total);
+            [$item, $quantity, $unitPrice, $lineTotal] = array_pop($lines);
+            $lines[] = [$item, $quantity, $unitPrice, Money::add($lineTotal, Money::subtract($rest, $total))];
+            $total = $rest;
         }
 
         $return = OrderReturn::query()->create([
@@ -130,13 +147,13 @@ final readonly class RecordReturn
 
         $this->ledger->lock(array_values($items->map(fn (OrderItem $item): int => $item->sku_id)->all()));
 
-        foreach ($lines as [$item, $quantity, $lineTotal]) {
+        foreach ($lines as [$item, $quantity, $unitPrice, $lineTotal]) {
             OrderReturnItem::query()->create([
                 'order_return_id' => $return->id,
                 'order_item_id' => $item->id,
                 'quantity' => $quantity,
                 'quantity_base' => $quantity * $item->conversion_factor,
-                'unit_price' => $item->unit_price,
+                'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
             ]);
             $this->ledger->restock($item->sku, $quantity * $item->conversion_factor, $order->id, $actorId);

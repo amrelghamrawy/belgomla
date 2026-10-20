@@ -44,10 +44,24 @@ describe("order status messages (mirrors App\\Support\\OrderStatusMessage)", () 
   });
 
   it("BR-N03 sends null for an empty box or the default text, the store's words otherwise", () => {
-    const defaults = { confirmed: "أ", preparing: "ب", out_for_delivery: "ج", delivered: "د", cancelled: "هـ" };
+    const defaults = {
+      confirmed: "أ",
+      preparing: "ب",
+      out_for_delivery: "ج",
+      delivered: "د",
+      cancelled: "هـ",
+      discount: "و",
+    };
 
     expect(
       orderMessagesBody({ ...defaults, confirmed: "  أ  ", preparing: " ", delivered: " وصل " }, defaults),
-    ).toEqual({ confirmed: null, preparing: null, out_for_delivery: null, delivered: "وصل", cancelled: null });
+    ).toEqual({
+      confirmed: null,
+      preparing: null,
+      out_for_delivery: null,
+      delivered: "وصل",
+      cancelled: null,
+      discount: null,
+    });
   });
 });

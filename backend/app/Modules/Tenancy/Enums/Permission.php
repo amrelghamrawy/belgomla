@@ -18,6 +18,7 @@ enum Permission: string
     case OrdersManage = 'orders.manage';
     case OrdersCreate = 'orders.create';
     case OrdersOverrideMov = 'orders.override_mov';
+    case OrdersDiscount = 'orders.discount';
     case OrdersReturns = 'orders.returns';
     case CustomersManage = 'customers.manage';
     case CustomersCredit = 'customers.credit';
@@ -37,6 +38,7 @@ enum Permission: string
             self::OrdersManage => 'إدارة الطلبات',
             self::OrdersCreate => 'تسجيل طلبات للعملاء',
             self::OrdersOverrideMov => 'تجاوز الحد الأدنى للطلب',
+            self::OrdersDiscount => 'خصومات الطلبات',
             self::OrdersReturns => 'تسجيل المرتجعات',
             self::CustomersManage => 'إدارة العملاء',
             self::CustomersCredit => 'حدود الائتمان ومهل السداد',

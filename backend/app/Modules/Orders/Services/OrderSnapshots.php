@@ -34,6 +34,7 @@ final readonly class OrderSnapshots
             'quantity' => $line->quantity,
             'quantity_base' => $line->quantityBase(),
             'cover_price' => $line->price->coverPrice,
+            'list_unit_price' => $line->price->unitPrice, // no manual discount yet (D85)
             'unit_price' => $line->price->unitPrice,
             'discount_percent' => $line->price->discountPercent,
             'tier_min_quantity' => $line->price->tierMinQuantity,

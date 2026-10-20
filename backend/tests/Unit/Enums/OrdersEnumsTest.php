@@ -108,3 +108,14 @@ test('BR-O02 who cancelled maps to the history actor', function (CancelledBy $by
 test('D81 a system cancel is labelled automatic', function (): void {
     expect(CancelledBy::toArray())->toBe(['customer' => 'العميل', 'tenant_user' => 'المتجر', 'system' => 'تلقائي']);
 });
+
+test('BR-PR08 D85 prices change only before the order is being prepared', function (OrderStatus $status, bool $open): void {
+    expect($status->allowsPriceChange())->toBe($open);
+})->with([
+    'pending' => [OrderStatus::Pending, true],
+    'confirmed' => [OrderStatus::Confirmed, true],
+    'preparing' => [OrderStatus::Preparing, false],
+    'out for delivery' => [OrderStatus::OutForDelivery, false],
+    'delivered' => [OrderStatus::Delivered, false],
+    'cancelled' => [OrderStatus::Cancelled, false],
+]);

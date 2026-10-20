@@ -22,7 +22,9 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { type CustomerAddressInput, useCustomer, useUpdateCustomer } from "@/lib/dashboard/customers";
 import {
   addLine,
+  discountedQuote,
   type DraftLine,
+  orderLinesBody,
   QUOTE_DELAY_MS,
   quoteBody,
   quotedLine,
@@ -33,6 +35,7 @@ import {
   usePlaceOrder,
 } from "@/lib/dashboard/new-order";
 import { useCan } from "@/lib/dashboard/permissions";
+import { type DiscountDraft, discountBody, hasDiscount, NO_DISCOUNT } from "@/lib/dashboard/price-math";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 
@@ -40,6 +43,7 @@ import { CustomerPicker } from "../common/CustomerPicker";
 import { PageHeader } from "../common/States";
 import { AddressDialog, addressInput } from "../customers/AddressDialog";
 import { CustomerStatusBadge } from "../customers/CustomerStatusBadge";
+import { DiscountInput } from "./DiscountInput";
 import { ProductPicker } from "./ProductPicker";
 
 const copy = ar.dashboard.orders.newOrderForm;
@@ -67,7 +71,8 @@ function useSettled<T>(value: T): T {
 /**
  * BR-O11: the merchant places an order for a customer (a phone or WhatsApp order): customer → address → products → the
  * live quote (the checkout's prices, tiers, stock, MOV and credit limit) → note, the customer message and, for the owner
- * or a manager, the MOV override (D84) → the order page.
+ * or a manager, the MOV override (D84) → discounts per line and on the order for users with `orders.discount` (D85,
+ * applied after the checks at list prices) → the order page.
  */
 export function NewOrderPage() {
   const searchParams = useSearchParams();
@@ -79,6 +84,9 @@ export function NewOrderPage() {
   const [note, setNote] = useState("");
   const [notify, setNotify] = useState(true);
   const [overrideMov, setOverrideMov] = useState(false);
+  const [lineDiscounts, setLineDiscounts] = useState<Record<number, DiscountDraft>>({});
+  const [orderDiscount, setOrderDiscount] = useState<DiscountDraft>(NO_DISCOUNT);
+  const [discountReason, setDiscountReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const customer = useCustomer(customerId ?? 0, customerId !== null);
   const body = useMemo(() => quoteBody(customerId, lines), [customerId, lines]);
@@ -90,14 +98,20 @@ export function NewOrderPage() {
   const shownQuote = body === null ? undefined : quote.data;
   const active = customer.data?.status === "active";
   const canOverride = allowed("orders.override_mov");
+  const canDiscount = allowed("orders.discount");
+  const discounting =
+    canDiscount && (hasDiscount(orderDiscount) || lines.some((line) => hasDiscount(lineDiscounts[line.sku_id])));
+  const discounted = discounting ? discountedQuote(shownQuote, lines, lineDiscounts, orderDiscount) : null;
+  const discountsValid =
+    !discounting || (discounted?.order_total !== null && (!hasDiscount(orderDiscount) || discountReason.trim() !== ""));
   const ready =
     active &&
     chosenAddress !== null &&
     body !== null &&
     shownQuote !== undefined &&
     !quote.isFetching &&
-    quotePasses(shownQuote, canOverride && overrideMov);
-
+    quotePasses(shownQuote, canOverride && overrideMov) &&
+    discountsValid;
   const submit = () => {
     if (customerId === null || chosenAddress === null) {
       return;
@@ -108,7 +122,12 @@ export function NewOrderPage() {
       {
         customer_id: customerId,
         address_id: chosenAddress,
-        lines: lines.map(({ sku_id, quantity }) => ({ sku_id, quantity })),
+        lines: canDiscount
+          ? orderLinesBody(lines, lineDiscounts)
+          : lines.map(({ sku_id, quantity }) => ({ sku_id, quantity })),
+        ...(canDiscount && hasDiscount(orderDiscount)
+          ? { discount: { ...discountBody(orderDiscount), reason: discountReason.trim() } }
+          : {}),
         note: note.trim() === "" ? null : note.trim(),
         notify_customer: notify,
         override_mov: canOverride && overrideMov && shownQuote?.mov.satisfied === false,
@@ -184,6 +203,9 @@ export function NewOrderPage() {
                 <LinesTable
                   lines={lines}
                   quote={shownQuote}
+                  discounts={canDiscount ? lineDiscounts : null}
+                  priced={discounted?.lines ?? null}
+                  onDiscount={(skuId, draft) => setLineDiscounts((current) => ({ ...current, [skuId]: draft }))}
                   onQuantity={(skuId, quantity) => setLines((current) => setQuantity(current, skuId, quantity))}
                   onRemove={(skuId) => setLines((current) => removeLine(current, skuId))}
                 />
@@ -208,6 +230,41 @@ export function NewOrderPage() {
               </Alert>
             )}
             {shownQuote !== undefined && <QuoteAlerts quote={shownQuote} />}
+            {canDiscount && (
+              <div className="flex flex-col gap-2 rounded-md border p-3" data-testid="new-order-discounts">
+                <Label htmlFor="new-order-discount">{ar.dashboard.orders.discount.order}</Label>
+                <DiscountInput
+                  id="new-order-discount"
+                  label={ar.dashboard.orders.discount.order}
+                  draft={orderDiscount}
+                  invalid={
+                    discounted !== null && discounted.items_total !== null && discounted.discount_amount === null
+                  }
+                  onChange={setOrderDiscount}
+                />
+                {hasDiscount(orderDiscount) && (
+                  <>
+                    <Label htmlFor="new-order-discount-reason">{ar.dashboard.orders.discount.reason}</Label>
+                    <Textarea
+                      id="new-order-discount-reason"
+                      rows={2}
+                      maxLength={300}
+                      value={discountReason}
+                      onChange={(event) => setDiscountReason(event.target.value)}
+                    />
+                  </>
+                )}
+                <span className="text-muted-foreground text-xs">{copy.discountsHint}</span>
+                {discounting && (
+                  <span className="flex justify-between text-sm font-bold">
+                    <span>{copy.totalAfterDiscount}</span>
+                    <span data-testid="discounted-total">
+                      {discounted?.order_total == null ? "—" : formatMoney(discounted.order_total)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
             {shownQuote !== undefined && !shownQuote.mov.satisfied && canOverride && (
               <div className="flex items-start gap-2">
                 <Checkbox
@@ -340,11 +397,19 @@ function CustomerSummary({
 function LinesTable({
   lines,
   quote,
+  discounts,
+  priced,
+  onDiscount,
   onQuantity,
   onRemove,
 }: {
   lines: DraftLine[];
   quote: OrderQuote | undefined;
+  /** The line discounts, or null when the user may not discount (D85). */
+  discounts: Record<number, DiscountDraft> | null;
+  /** The prices after the discounts, by line, while any discount is typed. */
+  priced: ({ unit_price: string; line_total: string } | null)[] | null;
+  onDiscount: (skuId: number, draft: DiscountDraft) => void;
   onQuantity: (skuId: number, quantity: number) => void;
   onRemove: (skuId: number) => void;
 }) {
@@ -359,14 +424,18 @@ function LinesTable({
             <TableHead>{orders.quantity}</TableHead>
             <TableHead>{orders.unitPrice}</TableHead>
             <TableHead>{orders.lineTotal}</TableHead>
+            {discounts !== null && <TableHead>{orders.discount.button}</TableHead>}
             <TableHead>
               <span className="sr-only">{copy.remove}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {lines.map((line) => {
+          {lines.map((line, index) => {
             const quoted = quotedLine(quote, line.sku_id);
+            const after = priced?.[index];
+            const draft = discounts?.[line.sku_id] ?? NO_DISCOUNT;
+            const shown = hasDiscount(draft) && after ? after : null;
 
             return (
               <TableRow key={line.sku_id} data-testid={`line-${line.sku_id}`}>
@@ -392,11 +461,31 @@ function LinesTable({
                   />
                 </TableCell>
                 <TableCell className="align-top whitespace-nowrap">
-                  {quoted === undefined ? "—" : formatMoney(quoted.unit_price)}
+                  {quoted === undefined ? (
+                    "—"
+                  ) : shown ? (
+                    <>
+                      <s className="text-muted-foreground me-1 text-xs">{formatMoney(quoted.unit_price)}</s>
+                      {formatMoney(shown.unit_price)}
+                    </>
+                  ) : (
+                    formatMoney(quoted.unit_price)
+                  )}
                 </TableCell>
                 <TableCell className="align-top whitespace-nowrap">
-                  {quoted === undefined ? "—" : formatMoney(quoted.line_total)}
+                  {quoted === undefined ? "—" : formatMoney(shown?.line_total ?? quoted.line_total)}
                 </TableCell>
+                {discounts !== null && (
+                  <TableCell className="align-top">
+                    <DiscountInput
+                      id={`line-discount-${line.sku_id}`}
+                      label={line.name}
+                      draft={draft}
+                      invalid={hasDiscount(draft) && priced !== null && after === null}
+                      onChange={(next) => onDiscount(line.sku_id, next)}
+                    />
+                  </TableCell>
+                )}
                 <TableCell className="align-top">
                   <Button
                     type="button"

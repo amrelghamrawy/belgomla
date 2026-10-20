@@ -66,6 +66,12 @@ final readonly class CurrentTenantSettingsQuery
         ];
     }
 
+    /** D85: the most a sales user may take off an order line, in % ("10.00"); null = sales users cannot discount. Used by Orders. */
+    public function maxDiscountPercentSales(): ?string
+    {
+        return $this->get()->max_discount_percent_sales;
+    }
+
     /**
      * BR-MOV01: the minimum order value. Enabled without an amount counts as disabled.
      *

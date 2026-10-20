@@ -22,35 +22,37 @@ beforeEach(function (): void {
 test('BR-PR06 checkout answers 201 with the order detail', function (): void {
     $this->freezeSecond();
 
-    ($this->checkout)(['customer_note' => 'صباحًا'])
-        ->assertCreated()
-        ->assertExactJson(['data' => ['order' => [
-            'number' => 1,
-            'status' => 'pending',
-            'status_label' => 'قيد الانتظار',
-            'placed_at' => now()->toIso8601String(),
-            'items_total' => '1020.00',
-            'order_total' => '1020.00',
-            'returned_total' => '0.00',
-            'net_total' => '1020.00',
-            'collection_status' => 'unpaid',
-            'collected_amount' => '0.00',
-            'delivery' => [
-                'name' => 'مكتبة الأمل',
-                'phone' => '+201012345678',
-                'address' => ['label' => 'المحل', 'governorate' => 'القاهرة', 'city' => 'مدينة نصر', 'address_line' => '12 شارع عباس العقاد', 'landmark' => null],
-            ],
-            'customer_note' => 'صباحًا',
-            'cancel_reason' => null,
-            'cancelled_by' => null,
-            'items' => [[
-                'sku_id' => $this->sku->id, 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
-                'conversion_factor' => 20, 'quantity' => 12, 'cover_price' => null, 'unit_price' => '85.00', 'discount_percent' => null,
-                'tier_min_quantity' => 10, 'line_total' => '1020.00',
-            ]],
-            'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
-            'returns' => [],
-        ]]]);
+    $response = ($this->checkout)(['customer_note' => 'صباحًا'])->assertCreated();
+    $itemId = $this->inTenant(fn (): int => App\Modules\Orders\Models\OrderItem::query()->sole()->id);
+
+    $response->assertExactJson(['data' => ['order' => [
+        'number' => 1,
+        'status' => 'pending',
+        'status_label' => 'قيد الانتظار',
+        'placed_at' => now()->toIso8601String(),
+        'items_total' => '1020.00',
+        'discount' => null,
+        'order_total' => '1020.00',
+        'returned_total' => '0.00',
+        'net_total' => '1020.00',
+        'collection_status' => 'unpaid',
+        'collected_amount' => '0.00',
+        'delivery' => [
+            'name' => 'مكتبة الأمل',
+            'phone' => '+201012345678',
+            'address' => ['label' => 'المحل', 'governorate' => 'القاهرة', 'city' => 'مدينة نصر', 'address_line' => '12 شارع عباس العقاد', 'landmark' => null],
+        ],
+        'customer_note' => 'صباحًا',
+        'cancel_reason' => null,
+        'cancelled_by' => null,
+        'items' => [[
+            'id' => $itemId, 'sku_id' => $this->sku->id, 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
+            'conversion_factor' => 20, 'quantity' => 12, 'cover_price' => null, 'list_unit_price' => '85.00', 'manual_discount' => null,
+            'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => 10, 'line_total' => '1020.00',
+        ]],
+        'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
+        'returns' => [],
+    ]]]);
 
     $this->assertDatabaseHas('sku_inventory', ['sku_id' => $this->sku->id, 'on_hand' => 400, 'reserved' => 240]);
     $this->assertDatabaseCount('cart_items', 0);

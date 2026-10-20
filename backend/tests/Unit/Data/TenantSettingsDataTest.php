@@ -64,3 +64,8 @@ test('working hours are normalised to typed rows', function (): void {
 
     expect($data->workingHours)->toBe([['day' => 6, 'from' => '09:00', 'to' => '21:00']]);
 });
+
+test('D85 the sales discount cap is a 2-decimal string, null when cleared', function (): void {
+    expect(TenantSettingsData::fromRequest(settingsRequest(['max_discount_percent_sales' => '7.5']))->settingColumns())->toBe(['max_discount_percent_sales' => '7.50'])
+        ->and(TenantSettingsData::fromRequest(settingsRequest(['max_discount_percent_sales' => null]))->settingColumns())->toBe(['max_discount_percent_sales' => null]);
+});

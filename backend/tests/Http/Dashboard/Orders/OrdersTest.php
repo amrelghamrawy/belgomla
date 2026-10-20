@@ -26,7 +26,7 @@ test('the merchant lists every order of the store, newest first, with customer a
         ->assertJsonPath('data.1.is_stale', false)
         ->assertJsonPath('meta.total', 2)
         ->assertExactJsonStructure(['data' => ['*' => [
-            'id', 'number', 'status', 'status_label', 'placed_at', 'items_total', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount',
+            'id', 'number', 'status', 'status_label', 'placed_at', 'items_total', 'discount', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount',
             'delivery', 'customer_note', 'cancel_reason', 'cancelled_by', 'customer', 'placed_by', 'placed_by_id', 'confirmed_at', 'delivered_at', 'cancelled_at', 'is_stale', 'expires_at',
         ]], 'links', 'meta']);
 });

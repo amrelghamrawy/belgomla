@@ -37,6 +37,7 @@ final class OrderItemFactory extends Factory
             'quantity_base' => fn (array $attributes): int => $this->int($attributes['quantity']) * $this->int($attributes['conversion_factor']),
             'cover_price' => null,
             'unit_price' => '100.00',
+            'list_unit_price' => fn (array $attributes): string => $this->string($attributes['unit_price']),
             'discount_percent' => null,
             'tier_min_quantity' => null,
             'line_total' => fn (array $attributes): string => Money::times($this->string($attributes['unit_price']), $this->int($attributes['quantity'])),

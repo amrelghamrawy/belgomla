@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Data;
 
 use App\Modules\Orders\Http\Requests\StoreMerchantOrderRequest;
+use App\Modules\Pricing\Enums\DiscountType;
 
 /**
  * POST /api/dashboard/orders input (BR-O11): for which customer and address, the lines in selling units, the note,
- * whether to tell the customer on WhatsApp, and whether the minimum order value is waived for this order (D84).
+ * whether to tell the customer on WhatsApp, whether the minimum order value is waived for this order (D84), and the
+ * discounts given on the form, per line and on the order (D85).
  */
 final readonly class MerchantOrderData
 {
     /**
      * @param  list<array{sku_id: int, quantity: int}>  $lines
+     * @param  array<int, array{type: DiscountType, value: string}>  $lineDiscounts  sku id => the line's discount
      */
     public function __construct(
         public int $customerId,
@@ -22,6 +25,10 @@ final readonly class MerchantOrderData
         public ?string $note = null,
         public bool $notifyCustomer = false,
         public bool $overrideMov = false,
+        public array $lineDiscounts = [],
+        public ?DiscountType $discountType = null,
+        public ?string $discountValue = null,
+        public ?string $discountReason = null,
     ) {}
 
     public static function fromRequest(StoreMerchantOrderRequest $request): self
@@ -33,6 +40,10 @@ final readonly class MerchantOrderData
             $request->note(),
             $request->notifyCustomer(),
             $request->overrideMov(),
+            $request->lineDiscounts(),
+            $request->discountType(),
+            $request->discountValue(),
+            $request->discountReason(),
         );
     }
 }

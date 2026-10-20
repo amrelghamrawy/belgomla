@@ -9,6 +9,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Services\ReturnableQuantities;
+use App\Modules\Orders\Services\ReturnPricing;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -21,7 +22,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 final readonly class ReturnsQuery
 {
-    public function __construct(private ReturnableQuantities $returnable) {}
+    public function __construct(private ReturnableQuantities $returnable, private ReturnPricing $pricing) {}
 
     /**
      * @return LengthAwarePaginator<int, OrderReturn>
@@ -61,7 +62,7 @@ final readonly class ReturnsQuery
             'product_name' => $item->product_name,
             'sku_code' => $item->sku_code,
             'unit' => $item->unit_name,
-            'unit_price' => $item->unit_price,
+            'unit_price' => $this->pricing->prorated($order, $item->unit_price), // what a unit returns at (D85)
             'ordered' => $item->quantity,
             'returned' => $returned[$item->id] ?? 0,
             'returnable' => $item->quantity - ($returned[$item->id] ?? 0),

@@ -39,6 +39,7 @@ final readonly class TenantSettingsData
         /** @var array<string, string|null>|null */
         public ?array $orderStatusMessages = null,
         public ?int $pendingExpiryHours = null,
+        public ?string $maxDiscountPercentSales = null,
     ) {}
 
     public static function fromRequest(UpdateSettingsRequest $request): self
@@ -64,6 +65,7 @@ final readonly class TenantSettingsData
             orderNotifyStatuses: $request->orderNotifyStatuses(),
             orderStatusMessages: $request->orderStatusMessages(),
             pendingExpiryHours: $request->pendingExpiryHours(),
+            maxDiscountPercentSales: $request->nullableMoney('max_discount_percent_sales'),
         );
     }
 
@@ -93,6 +95,7 @@ final readonly class TenantSettingsData
             'order_notify_statuses' => $this->orderNotifyStatuses,
             'order_status_messages' => $this->orderStatusMessages === [] ? null : $this->orderStatusMessages,
             'pending_expiry_hours' => $this->pendingExpiryHours,
+            'max_discount_percent_sales' => $this->maxDiscountPercentSales,
         ];
 
         return array_intersect_key($map, array_flip($this->sent));

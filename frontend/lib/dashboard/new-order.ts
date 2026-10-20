@@ -7,6 +7,8 @@ import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { queryKeys } from "@/lib/api/keys";
 import type { DashboardOrderDetail, MerchantOrderRequest, OrderQuote, OrderQuoteLine } from "@/lib/api/types";
 
+import { type DiscountDraft, discountBody, discountTotals } from "./price-math";
+
 // BR-O11, D84: the merchant places an order for a customer (POST /api/dashboard/orders), quoting it first
 // (POST /api/dashboard/orders/quote) so the form shows the checkout's prices, stock and problems as it is filled.
 
@@ -93,4 +95,39 @@ export function usePlaceOrder() {
       }
     },
   });
+}
+
+/**
+ * D85: the order's lines for the API with each line's discount (only lines that have one carry `discount`). The
+ * discounts apply after the order is placed at list prices, so the quote's checks stay those of the list prices.
+ */
+export function orderLinesBody(lines: DraftLine[], discounts: Record<number, DiscountDraft>) {
+  return lines.map(({ sku_id, quantity }) => {
+    const discount = discountBody(discounts[sku_id]);
+
+    return discount === null ? { sku_id, quantity } : { sku_id, quantity, discount };
+  });
+}
+
+/** D85: the totals after the form's discounts, priced from the quote (each line's quoted price is its list price). */
+export function discountedQuote(
+  quote: OrderQuote | undefined,
+  lines: DraftLine[],
+  discounts: Record<number, DiscountDraft>,
+  order: DiscountDraft,
+) {
+  const quoted = lines.map((line) => quotedLine(quote, line.sku_id));
+
+  if (quote === undefined || quoted.some((line) => line === undefined)) {
+    return null;
+  }
+
+  return discountTotals(
+    lines.map((line, index) => ({
+      list_unit_price: quoted[index]?.unit_price ?? "0.00",
+      quantity: line.quantity,
+      discount: discounts[line.sku_id],
+    })),
+    order,
+  );
 }

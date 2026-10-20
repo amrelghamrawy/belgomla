@@ -109,13 +109,31 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
               <div className="flex flex-col gap-0.5">
                 <span className="font-medium">{item.product_name}</span>
                 <span className="text-muted-foreground">
-                  {ar.orders.quantityOf(item.quantity, item.unit)} × {formatMoney(item.unit_price)}
+                  {ar.orders.quantityOf(item.quantity, item.unit)} ×{" "}
+                  {item.manual_discount !== null && (
+                    <s aria-label={ar.orders.listPrice} data-testid="list-price">
+                      {formatMoney(item.list_unit_price)}
+                    </s>
+                  )}{" "}
+                  {formatMoney(item.unit_price)}
                 </span>
               </div>
               <span className="font-medium whitespace-nowrap">{formatMoney(item.line_total)}</span>
             </li>
           ))}
         </ul>
+        {order.discount !== null && (
+          <>
+            <p className="text-muted-foreground flex justify-between text-sm">
+              <span>{ar.orders.itemsTotal}</span>
+              <span>{formatMoney(order.items_total)}</span>
+            </p>
+            <p className="text-muted-foreground flex justify-between text-sm" data-testid="order-discount">
+              <span>{ar.orders.orderDiscount}</span>
+              <span>−{formatMoney(order.discount.amount)}</span>
+            </p>
+          </>
+        )}
         <p className="flex justify-between font-bold">
           <span>{ar.orders.total}</span>
           <span>{formatMoney(order.order_total)}</span>

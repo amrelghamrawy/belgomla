@@ -120,6 +120,13 @@ test('BR-R02 the returnable lines show what was ordered, what came back by live 
     ]]);
 });
 
+test('D85 a returnable line shows what one unit returns at: its price less the order discount share', function (): void {
+    $order = Order::factory()->delivered()->create(['items_total' => '510.00', 'discount_type' => 'amount', 'discount_value' => '10', 'discount_amount' => '10.00', 'discount_reason' => 'عميل دائم', 'order_total' => '500.00']);
+    OrderItem::factory()->for($order)->create(['quantity' => 6, 'unit_price' => '85.00']);
+
+    expect(app(ReturnsQuery::class)->returnable($order)[0]['unit_price'])->toBe('83.33');
+});
+
 test('the dashboard list holds every order of the tenant, newest first, with the customer', function (): void {
     $old = Order::factory()->create(['placed_at' => now()->subDay()]);
     $new = Order::factory()->create();

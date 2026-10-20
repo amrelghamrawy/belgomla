@@ -272,4 +272,50 @@ describe("NewOrderPage", () => {
       expect(callsTo(fetchMock, "GET /api/dashboard/customers")[0]?.url.searchParams.get("status")).toBe("active"),
     );
   });
+  it("D85 discounts a line and the order on the form, shows the total after them and sends them", async () => {
+    const fetchMock = stubForm(orderQuote(), {
+      "POST /api/dashboard/orders": json(201, { data: { number: 1042 } }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<NewOrderPage />);
+
+    await screen.findByLabelText("عنوان التوصيل");
+    await pickProduct(user);
+    await user.clear(screen.getByLabelText("كمية الأضواء علوم"));
+    await user.type(screen.getByLabelText("كمية الأضواء علوم"), "12");
+    await waitFor(() =>
+      expect(within(screen.getByTestId("line-3")).getAllByText("1,020.00 ج.م").length).toBeGreaterThan(0),
+    );
+
+    await user.type(screen.getByLabelText("خصم الأضواء علوم"), "10");
+    await user.type(screen.getByLabelText("خصم خصم على إجمالي الطلب"), "18");
+    await user.selectOptions(screen.getByLabelText("نوع الخصم: خصم على إجمالي الطلب"), "amount");
+
+    expect(screen.getByTestId("line-3")).toHaveTextContent("76.50 ج.م");
+    expect(screen.getByTestId("discounted-total")).toHaveTextContent("900.00 ج.م");
+    expect(screen.getByRole("button", { name: "تسجيل الطلب" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText("سبب خصم الطلب"), "طلب بالتليفون");
+    await waitFor(() => expect(screen.getByRole("button", { name: "تسجيل الطلب" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "تسجيل الطلب" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "POST /api/dashboard/orders")[0]?.body).toMatchObject({
+        lines: [{ sku_id: 3, quantity: 12, discount: { type: "percent", value: "10" } }],
+        discount: { type: "amount", value: "18", reason: "طلب بالتليفون" },
+      }),
+    );
+  });
+
+  it("D85 a role without orders.discount gets no discount controls", async () => {
+    stubForm();
+    const user = userEvent.setup();
+    renderWithQuery(<NewOrderPage />, signedInAs("warehouse"));
+
+    await screen.findByLabelText("عنوان التوصيل");
+    await pickProduct(user);
+
+    expect(screen.queryByLabelText("خصم الأضواء علوم")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-order-discounts")).not.toBeInTheDocument();
+  });
 });

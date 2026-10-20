@@ -11,8 +11,11 @@ use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
+use App\Modules\Orders\Actions\ApplyOrderDiscount;
 use App\Modules\Orders\Actions\RecordReturn;
 use App\Modules\Orders\Actions\TransitionOrder;
+use App\Modules\Orders\Data\DiscountData;
+use App\Modules\Orders\Data\LineDiscountData;
 use App\Modules\Orders\Data\ReturnData;
 use App\Modules\Orders\Data\ReturnLineData;
 use App\Modules\Orders\Data\TransitionData;
@@ -26,6 +29,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
@@ -55,6 +59,16 @@ beforeEach(function (): void {
     );
     $this->collect = fn (string $amount): CashCollection => app(RecordCollection::class)->handle($this->order, new CollectionData($amount), $this->owner->id);
     $this->onHand = fn ($sku): int => SkuInventory::query()->findOrFail($sku->id)->on_hand;
+    // D85: a second order of 6 A (540.00) and 10 B (850.00), items total 1390.00, discounted (A's line and the order) before delivery.
+    $this->discountedOrder = function (?DiscountType $lineType, ?string $lineValue, array $orderDiscount): Order {
+        $order = $this->placeOrder($this->customer, [$this->a->id => 6, $this->b->id => 10]);
+        app(TenantContext::class)->set($this->tenant);
+        $lineA = OrderItem::query()->where('order_id', $order->id)->orderBy('id')->firstOrFail();
+        app(ApplyOrderDiscount::class)->handle($order, new DiscountData([new LineDiscountData($lineA->id, $lineType, $lineValue)], ...$orderDiscount), $this->owner->id);
+        app(TransitionOrder::class)->handle($order, new TransitionData(OrderStatus::Delivered), $this->owner->id);
+
+        return $order->refresh();
+    };
 });
 
 test('BR-R01 only a delivered order takes a return', function (OrderStatus $status): void {
@@ -243,4 +257,30 @@ test('a failing return leaves the order, the stock and the audit trail untouched
         ->and($this->order->refresh()->returned_total)->toBe('0.00')
         ->and(($this->onHand)($this->a))->toBe(280)
         ->and(AuditLog::query()->count())->toBe(0);
+});
+
+test('D85 a return is priced at the discounted line price less the order discount share', function (): void {
+    $order = ($this->discountedOrder)(DiscountType::Percent, '10', [DiscountType::Amount, '50', 'عميل دائم']);
+    $lineA = OrderItem::query()->where('order_id', $order->id)->orderBy('id')->firstOrFail();
+
+    $return = app(RecordReturn::class)->handle($order, new ReturnData('مرتجع', [new ReturnLineData($lineA->id, 1)]), $this->owner->id);
+
+    expect($return->total)->toBe('77.97')
+        ->and($return->items->sole()->only(['unit_price', 'line_total']))->toBe(['unit_price' => '77.97', 'line_total' => '77.97'])
+        ->and($order->refresh()->only(['order_total', 'returned_total']))->toBe(['order_total' => '1286.00', 'returned_total' => '77.97']);
+});
+
+test('D85 returning every line of a discounted order gives back exactly the order total, the last return absorbing the rounding', function (): void {
+    $order = ($this->discountedOrder)(null, null, [DiscountType::Amount, '1', 'هدية']);
+    [$lineA, $lineB] = OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get()->all();
+    $return = fn (array $lines): OrderReturn => app(RecordReturn::class)->handle($order, new ReturnData('مرتجع', $lines), $this->owner->id);
+
+    $first = $return([new ReturnLineData($lineA->id, 3)]);
+    $second = $return([new ReturnLineData($lineA->id, 3)]);
+    $last = $return([new ReturnLineData($lineB->id, 10)]);
+
+    expect([$first->total, $second->total, $last->total])->toBe(['269.81', '269.81', '849.38']) // 849.39 on its own
+        ->and($last->items->sole()->line_total)->toBe('849.38')
+        ->and($order->refresh()->only(['order_total', 'returned_total']))->toBe(['order_total' => '1389.00', 'returned_total' => '1389.00'])
+        ->and($order->netTotal())->toBe('0.00');
 });

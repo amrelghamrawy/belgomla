@@ -9,6 +9,7 @@ use App\Modules\Orders\Exceptions\AddressLocked;
 use App\Modules\Orders\Exceptions\CannotCancel;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
 use App\Modules\Orders\Exceptions\CustomerCannotOrder;
+use App\Modules\Orders\Exceptions\DiscountRefused;
 use App\Modules\Orders\Exceptions\InvalidOrderTransition;
 use App\Modules\Orders\Exceptions\OrderHasCollections;
 use App\Modules\Orders\Exceptions\RefundRequired;
@@ -41,6 +42,13 @@ test('every orders exception fixes its status, code and arabic message', functio
     'refund required' => [RefundRequired::amount('180.00'), 422, 'refund_required', 'تم تحصيل أكثر من قيمة الطلب بعد المرتجع، يجب رد 180.00 للعميل'],
     'return has refund' => [ReturnHasRefund::amount('180.00'), 409, 'return_has_refund', 'تم رد 180.00 للعميل عن هذا المرتجع، ألغِ الرد من التحصيلات أولًا'],
     'return already voided' => [ReturnAlreadyVoided::at(CarbonImmutable::parse('2026-10-10 09:00:00', 'UTC')), 409, 'already_voided', 'تم إلغاء هذا المرتجع من قبل'],
+    'prices locked' => [DiscountRefused::locked(OrderStatus::Preparing), 409, 'order_locked', 'لا يمكن تعديل أسعار طلب حالته «قيد التجهيز»'],
+    'below collected' => [DiscountRefused::belowCollected('300.00', '250.00'), 409, 'below_collected', 'تم تحصيل 300.00 من هذا الطلب، ولا يمكن أن يقل إجماليه عن ذلك'],
+    'unknown line' => [DiscountRefused::unknownLine(1), 422, 'validation_failed', 'البند غير موجود في هذا الطلب'],
+    'sales without a cap' => [DiscountRefused::overLimit(null), 403, 'discount_over_limit', 'غير مسموح لك بإعطاء خصم'],
+    'sales above the cap' => [DiscountRefused::overLimit('10.00'), 403, 'discount_over_limit', 'أقصى خصم مسموح لك هو 10.00% على البند، ولا يمكنك إعطاء خصم على إجمالي الطلب'],
+    'unit discount too large' => [App\Modules\Pricing\Exceptions\DiscountTooLarge::unit('90.00'), 422, 'discount_too_large', 'الخصم أكبر من سعر الوحدة (90.00)'],
+    'order discount too large' => [App\Modules\Pricing\Exceptions\DiscountTooLarge::order('1390.00'), 422, 'discount_too_large', 'خصم الطلب أكبر من إجمالي البنود (1390.00)'],
 ]);
 
 test('BR-PR06 checkout failures list every problem in items and the minimum order value in details', function (): void {

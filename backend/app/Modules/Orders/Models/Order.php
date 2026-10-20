@@ -9,6 +9,7 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
@@ -29,6 +30,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $customer_id
  * @property OrderStatus $status
  * @property string $items_total
+ * @property DiscountType|null $discount_type the manual order discount (BR-PR08, D85)
+ * @property string|null $discount_value EGP off or % off the items total
+ * @property string $discount_amount what the order discount takes off: order_total = items_total − discount_amount (BR-O08)
+ * @property string|null $discount_reason
  * @property string $order_total
  * @property string $returned_total Σ live returns (BR-R05)
  * @property string $collected_amount
@@ -61,6 +66,7 @@ final class Order extends Model
     use HasFactory;
 
     protected $attributes = [
+        'discount_amount' => '0.00',
         'returned_total' => '0.00',
         'collected_amount' => '0.00',
         'collection_status' => 'unpaid',
@@ -128,6 +134,9 @@ final class Order extends Model
             'number' => 'integer',
             'status' => OrderStatus::class,
             'items_total' => 'decimal:2',
+            'discount_type' => DiscountType::class,
+            'discount_value' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'order_total' => 'decimal:2',
             'returned_total' => 'decimal:2',
             'collected_amount' => 'decimal:2',

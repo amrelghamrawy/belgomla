@@ -10,8 +10,10 @@ use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Models\CustomerCredit;
 use App\Modules\Collections\Queries\CustomerLedgerQuery;
 use App\Modules\Collections\Queries\OutstandingByCustomerQuery;
+use App\Modules\Orders\Actions\ApplyOrderDiscount;
 use App\Modules\Orders\Actions\RecordReturn;
 use App\Modules\Orders\Actions\TransitionOrder;
+use App\Modules\Orders\Data\DiscountData;
 use App\Modules\Orders\Data\ReturnData;
 use App\Modules\Orders\Data\ReturnLineData;
 use App\Modules\Orders\Data\TransitionData;
@@ -19,6 +21,7 @@ use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Enums\RefundMethod;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\TenantContext;
 use App\Support\BusinessCalendar;
 use Carbon\CarbonImmutable;
@@ -63,6 +66,16 @@ test('BR-C08 a delivered order is a debit, a payment a credit, with the running 
         ['order', '540.00', '0.00', '540.00'],
         ['payment', '0.00', '200.00', '340.00'],
     ]);
+});
+
+test('D85 BR-C08 a discounted order is a debit of its total after the discount', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+    app(ApplyOrderDiscount::class)->handle($order, new DiscountData([], DiscountType::Amount, '40', 'عميل دائم'), $this->owner->id);
+    app(TransitionOrder::class)->handle($order, new TransitionData(OrderStatus::Delivered), $this->owner->id);
+
+    expect(($this->ledger)())->toBe([['order', '500.00', '0.00', '500.00']])
+        ->and(app(OutstandingByCustomerQuery::class)->forCustomers([$this->customer->id]))->toEqual([$this->customer->id => '500.00']);
 });
 
 test('BR-C08 BR-R04 a return is a credit and its cash refund a debit', function (): void {

@@ -36,7 +36,7 @@ import {
   orderMessagesBody,
   unknownOrderPlaceholders,
 } from "@/lib/dashboard/order-status-message";
-import { toPiasters } from "@/lib/dashboard/price-math";
+import { toBasisPoints, toPiasters } from "@/lib/dashboard/price-math";
 import { applyServerErrors } from "@/lib/forms/server-errors";
 
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
@@ -85,13 +85,20 @@ const schema = z
       .string()
       .trim()
       .refine((value) => value === "" || toPiasters(value) !== null, ar.dashboard.productForm.invalidMoney),
-    order_notify_statuses: z.array(z.enum(["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"])),
+    max_discount_percent_sales: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || toBasisPoints(value) !== null, copy.salesDiscountRange),
+    order_notify_statuses: z.array(
+      z.enum(["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled", "discount"]),
+    ),
     order_status_messages: z.object({
       confirmed: orderMessage,
       preparing: orderMessage,
       out_for_delivery: orderMessage,
       delivered: orderMessage,
       cancelled: orderMessage,
+      discount: orderMessage,
     }),
   })
   .superRefine((values, context) => {
@@ -150,12 +157,14 @@ const SERVER_FIELDS = [
   "invitation_message",
   "default_payment_terms_days",
   "default_credit_limit",
+  "max_discount_percent_sales",
   "order_notify_statuses",
   "order_status_messages.confirmed",
   "order_status_messages.preparing",
   "order_status_messages.out_for_delivery",
   "order_status_messages.delivered",
   "order_status_messages.cancelled",
+  "order_status_messages.discount",
 ] as const;
 
 function messageDefaults(settings: DashboardSettings): Record<NotifiableStatus, string> {
@@ -199,6 +208,7 @@ function defaults(settings: DashboardSettings): Values {
     default_payment_terms_days:
       settings.default_payment_terms_days === null ? "" : String(settings.default_payment_terms_days),
     default_credit_limit: settings.default_credit_limit ?? "",
+    max_discount_percent_sales: settings.max_discount_percent_sales ?? "",
     order_notify_statuses: settings.order_notify_statuses,
     order_status_messages: messageTexts(settings),
   };
@@ -267,6 +277,7 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         default_payment_terms_days:
           values.default_payment_terms_days === "" ? null : Number(values.default_payment_terms_days),
         default_credit_limit: empty(values.default_credit_limit),
+        max_discount_percent_sales: empty(values.max_discount_percent_sales),
         order_notify_statuses: values.order_notify_statuses,
         // BR-O11: the `placed` wording (merchant orders) has no editor here yet; send it back so a save keeps it.
         order_status_messages: {
@@ -505,6 +516,18 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
             />
           </div>
           <p className="text-muted-foreground text-xs">{copy.defaultCreditHint}</p>
+          <div className="flex flex-col gap-1">
+            <TextField
+              id="settings-sales-discount"
+              label={copy.salesDiscount}
+              dir="ltr"
+              inputMode="decimal"
+              className="max-w-24"
+              registration={form.register("max_discount_percent_sales")}
+              error={errors.max_discount_percent_sales}
+            />
+            <p className="text-muted-foreground text-xs">{copy.salesDiscountHint}</p>
+          </div>
         </CardContent>
       </Card>
       <InvitationCard
@@ -526,6 +549,7 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
           out_for_delivery: errors.order_status_messages?.out_for_delivery?.message,
           delivered: errors.order_status_messages?.delivered?.message,
           cancelled: errors.order_status_messages?.cancelled?.message,
+          discount: errors.order_status_messages?.discount?.message,
         }}
         onStatuses={(next) => form.setValue("order_notify_statuses", next, { shouldDirty: true })}
         onText={(status, text) =>

@@ -103,7 +103,14 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                       <TableCell className="whitespace-nowrap">
                         {ar.orders.quantityOf(item.quantity, item.unit)}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{formatMoney(item.unit_price)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {item.manual_discount !== null && (
+                          <s className="text-muted-foreground me-1 text-xs" aria-label={copy.listPrice}>
+                            {formatMoney(item.list_unit_price)}
+                          </s>
+                        )}
+                        {formatMoney(item.unit_price)}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{formatMoney(item.line_total)}</TableCell>
                     </TableRow>
                   ))}
@@ -112,6 +119,15 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
               <dl className="mt-4 grid grid-cols-2 gap-1 text-sm sm:max-w-xs">
                 <dt className="text-muted-foreground">{copy.itemsTotal}</dt>
                 <dd>{formatMoney(order.items_total)}</dd>
+                {order.discount !== null && (
+                  <>
+                    <dt className="text-muted-foreground">{copy.discountTotal}</dt>
+                    <dd data-testid="order-discount">
+                      −{formatMoney(order.discount.amount)}{" "}
+                      <span className="text-muted-foreground text-xs">{order.discount.reason}</span>
+                    </dd>
+                  </>
+                )}
                 <dt className="text-muted-foreground">{copy.orderTotal}</dt>
                 <dd className="font-bold">{formatMoney(order.order_total)}</dd>
                 {order.returned_total !== "0.00" && (

@@ -193,3 +193,44 @@ test('BR-O11 placement data knows whether a merchant placed the order', function
     expect(new App\Modules\Orders\Data\OrderPlacementData($customer, 1, [], App\Modules\Audit\Enums\ActorType::TenantUser, 5)->byMerchant())->toBeTrue()
         ->and(new App\Modules\Orders\Data\OrderPlacementData($customer, 1, [], App\Modules\Audit\Enums\ActorType::Customer, 5)->byMerchant())->toBeFalse();
 });
+
+test('D85 discount data: the lines with their type and value as money, the order discount and its trimmed reason', function (): void {
+    $request = validatedOrdersRequest(App\Modules\Orders\Http\Requests\ApplyOrderDiscountRequest::class, [
+        'items' => [['order_item_id' => '7', 'type' => 'percent', 'value' => 10], ['order_item_id' => 8, 'type' => null, 'value' => null], ['order_item_id' => 9]],
+        'order' => ['type' => 'amount', 'value' => '50.5', 'reason' => '  عميل دائم  '],
+    ], 'PUT');
+
+    expect(App\Modules\Orders\Data\DiscountData::fromRequest($request))->toEqual(new App\Modules\Orders\Data\DiscountData(
+        [
+            new App\Modules\Orders\Data\LineDiscountData(7, App\Modules\Pricing\Enums\DiscountType::Percent, '10.00'),
+            new App\Modules\Orders\Data\LineDiscountData(8),
+            new App\Modules\Orders\Data\LineDiscountData(9),
+        ],
+        App\Modules\Pricing\Enums\DiscountType::Amount,
+        '50.50',
+        'عميل دائم',
+    ));
+});
+
+test('D85 discount data without an order discount has no type, value or reason', function (): void {
+    $request = validatedOrdersRequest(App\Modules\Orders\Http\Requests\ApplyOrderDiscountRequest::class, ['items' => [], 'order' => null], 'PUT');
+
+    expect(App\Modules\Orders\Data\DiscountData::fromRequest($request))->toEqual(new App\Modules\Orders\Data\DiscountData())
+        ->and($request->actorId())->toBe(0);
+});
+
+test('D85 merchant order data carries the line discounts by sku and the order discount', function (): void {
+    $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, [
+        'customer_id' => 7, 'address_id' => 9,
+        'lines' => [['sku_id' => '3', 'quantity' => 12, 'discount' => ['type' => 'amount', 'value' => '2']], ['sku_id' => 4, 'quantity' => 1, 'discount' => null]],
+        'discount' => ['type' => 'percent', 'value' => '5', 'reason' => ' بالتليفون '],
+    ]);
+
+    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(
+        7, 9, [['sku_id' => 3, 'quantity' => 12], ['sku_id' => 4, 'quantity' => 1]],
+        lineDiscounts: [3 => ['type' => App\Modules\Pricing\Enums\DiscountType::Amount, 'value' => '2.00']],
+        discountType: App\Modules\Pricing\Enums\DiscountType::Percent,
+        discountValue: '5.00',
+        discountReason: 'بالتليفون',
+    ));
+});

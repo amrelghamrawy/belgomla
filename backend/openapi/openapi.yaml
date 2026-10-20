@@ -2401,6 +2401,31 @@ paths:
         '409': { description: address_locked, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
         '422': { $ref: '#/components/responses/Error' }
 
+  /api/dashboard/orders/{order}/discount:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    put:
+      operationId: dashboardApplyOrderDiscount
+      tags: [dashboard-orders]
+      summary: Sets the manual discounts of a pending or confirmed order, per line and on the whole order (BR-PR08, D85)
+      description: >-
+        The body is the whole discount state: a line left out of `items`, or a null `order`, has no discount. Owners and
+        managers give any discount; a sales user gives line discounts only, each at most `max_discount_percent_sales`
+        % off the list price (null = none). The history gets the note «خصم»; `order.discount_changed` is audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderDiscountRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/DashboardOrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { description: 'forbidden (no orders.discount) or discount_over_limit (details.max_percent)', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: 'order_locked (preparing or later) or below_collected (the new total is under what was collected)', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { description: 'discount_too_large (a unit or the order below 0.01) or validation_failed', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
   /api/dashboard/orders/{order}/returns:
     parameters:
       - $ref: '#/components/parameters/OrderNumber'
@@ -3117,6 +3142,7 @@ components:
       enum:
         - address_locked
         - already_voided
+        - below_collected
         - blocked
         - cannot_disable_self
         - cart_empty
@@ -3129,6 +3155,8 @@ components:
         - csrf_token_mismatch
         - customer_blocked
         - customer_not_active
+        - discount_over_limit
+        - discount_too_large
         - duplicate_code
         - duplicate_key
         - duplicate_label
@@ -3161,6 +3189,7 @@ components:
         - last_owner
         - not_found
         - order_cancelled
+        - order_locked
         - otp_attempts_exceeded
         - otp_expired
         - otp_invalid
@@ -3651,8 +3680,9 @@ components:
 
     OrderItem:
       type: object
-      required: [sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, unit_price, discount_percent, tier_min_quantity, line_total]
+      required: [id, sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, line_total]
       properties:
+        id: { type: integer, description: 'The order line, as PUT …/discount names it (D85)' }
         sku_id: { type: integer }
         product_name: { type: string }
         sku_code: { type: string }
@@ -3664,13 +3694,76 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
-        unit_price: { $ref: '#/components/schemas/Money' }
+        list_unit_price: { $ref: '#/components/schemas/Money', description: 'The price before the manual discount (D85)' }
+        manual_discount:
+          description: 'The merchant''s discount per unit (D85), null for none'
+          oneOf:
+            - $ref: '#/components/schemas/DiscountValue'
+            - type: 'null'
+        unit_price: { $ref: '#/components/schemas/Money', description: 'The price charged per unit, after the manual discount' }
         discount_percent:
+          description: 'Display only: the tier margin off the cover price (BR-PR10)'
           oneOf:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
         tier_min_quantity: { type: [integer, 'null'] }
         line_total: { $ref: '#/components/schemas/Money' }
+
+    DiscountType:
+      type: string
+      enum: [amount, percent]
+      description: 'D85: EGP off, or % off (below 100)'
+
+    DiscountValue:
+      type: object
+      required: [type, value]
+      properties:
+        type: { $ref: '#/components/schemas/DiscountType' }
+        value: { $ref: '#/components/schemas/Money' }
+
+    OrderDiscount:
+      description: 'The order discount (D85): what was given and the amount it takes off items_total'
+      allOf:
+        - $ref: '#/components/schemas/DiscountValue'
+        - type: object
+          required: [amount]
+          properties:
+            amount: { $ref: '#/components/schemas/Money' }
+
+    DiscountInput:
+      type: object
+      description: 'D85: null or a missing type = no discount'
+      properties:
+        type:
+          oneOf:
+            - $ref: '#/components/schemas/DiscountType'
+            - type: 'null'
+        value: { type: [string, number, 'null'], description: 'Above 0, two decimals at most; a percent below 100' }
+
+    OrderDiscountRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          description: Each line of the order once; a line left out has no discount
+          items:
+            allOf:
+              - $ref: '#/components/schemas/DiscountInput'
+              - type: object
+                required: [order_item_id]
+                properties:
+                  order_item_id: { type: integer, minimum: 1 }
+        order:
+          description: The discount on the whole order; a reason is required with one
+          oneOf:
+            - allOf:
+                - $ref: '#/components/schemas/DiscountInput'
+                - type: object
+                  properties:
+                    reason: { type: [string, 'null'], maxLength: 300 }
+            - type: 'null'
 
     OrderHistoryEntry:
       type: object
@@ -3688,14 +3781,19 @@ components:
 
     Order:
       type: object
-      required: [number, status, status_label, placed_at, items_total, order_total, returned_total, net_total, collection_status, collected_amount, delivery, customer_note, cancel_reason, cancelled_by]
+      required: [number, status, status_label, placed_at, items_total, discount, order_total, returned_total, net_total, collection_status, collected_amount, delivery, customer_note, cancel_reason, cancelled_by]
       properties:
         number: { type: integer }
         status: { $ref: '#/components/schemas/OrderStatus' }
         status_label: { type: string }
         placed_at: { type: string, format: date-time }
         items_total: { $ref: '#/components/schemas/Money' }
-        order_total: { $ref: '#/components/schemas/Money' }
+        discount:
+          description: 'The order discount (D85), null for none; the dashboard adds the reason'
+          oneOf:
+            - $ref: '#/components/schemas/OrderDiscount'
+            - type: 'null'
+        order_total: { $ref: '#/components/schemas/Money', description: 'items_total − the order discount (BR-O08)' }
         returned_total: { $ref: '#/components/schemas/Money', description: 'Σ live returns (BR-R05)' }
         net_total: { $ref: '#/components/schemas/Money', description: 'order_total − returned_total (BR-O08)' }
         collection_status:
@@ -3789,7 +3887,7 @@ components:
 
     Permission:
       type: string
-      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.create, orders.override_mov, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
+      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.create, orders.override_mov, orders.discount, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
 
     # ---- Dashboard schemas (Task 10) ----
 
@@ -3797,12 +3895,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/TenantSettings'
         - type: object
-          required: [stale_pending_hours, invitation_message, invitation_message_default, default_payment_terms_days, default_credit_limit, order_notify_statuses, order_status_messages, order_status_message_defaults, pending_expiry_hours]
+          required: [stale_pending_hours, invitation_message, invitation_message_default, default_payment_terms_days, default_credit_limit, order_notify_statuses, order_status_messages, order_status_message_defaults, pending_expiry_hours, max_discount_percent_sales]
           properties:
             order_notify_statuses:
               type: array
-              description: BR-N03 the statuses customers are told about
-              items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled] }
+              description: 'BR-N03 the statuses customers are told about, plus `discount` (D85)'
+              items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled, discount] }
             order_status_messages:
               type: object
               description: 'BR-N03 status => the store wording; a missing status uses order_status_message_defaults'
@@ -3818,6 +3916,11 @@ components:
                 - type: 'null'
             stale_pending_hours: { type: integer, description: 'Hours before a pending order is stale (D10)' }
             pending_expiry_hours: { type: [integer, 'null'], description: 'BR-INV07 hours before an unconfirmed order cancels itself; null = off (D81)' }
+            max_discount_percent_sales:
+              description: 'D85 the most a sales user may take off an order line, in %; null = sales users cannot discount'
+              oneOf:
+                - $ref: '#/components/schemas/Money'
+                - type: 'null'
             invitation_message: { type: [string, 'null'], description: 'BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line' }
             invitation_message_default: { type: string }
 
@@ -3861,7 +3964,8 @@ components:
         default_credit_limit: { type: [string, 'null'] }
         order_notify_statuses:
           type: array
-          items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled] }
+          items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled, discount] }
+        max_discount_percent_sales: { type: [string, number, 'null'], description: 'D85 above 0 and below 100, two decimals at most; null = sales users cannot discount' }
         order_status_messages:
           type: object
           description: 'status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); `placed` words the message of an order a merchant places for the customer (BR-O11); null or the default text = the default'
@@ -4410,9 +4514,19 @@ components:
 
     DashboardOrderFields:
       type: object
-      required: [id, placed_by, placed_by_id, confirmed_at, delivered_at, cancelled_at, is_stale, expires_at]
+      required: [id, discount, placed_by, placed_by_id, confirmed_at, delivered_at, cancelled_at, is_stale, expires_at]
       properties:
         id: { type: integer }
+        discount:
+          description: 'The order discount with the merchant''s reason (D85), null for none'
+          oneOf:
+            - allOf:
+                - $ref: '#/components/schemas/OrderDiscount'
+                - type: object
+                  required: [reason]
+                  properties:
+                    reason: { type: string }
+            - type: 'null'
         placed_by:
           type: string
           enum: [customer, tenant_user]
@@ -4458,6 +4572,25 @@ components:
             note: { type: [string, 'null'], maxLength: 1000, description: 'Kept as the order note; the customer sees it' }
             notify_customer: { type: boolean, description: 'Send the `placed` WhatsApp message (default false)' }
             override_mov: { type: boolean, description: 'D84 waive the minimum order value for this order; needs orders.override_mov' }
+            lines:
+              type: array
+              description: 'As in the quote, plus an optional discount per line (D85; needs orders.discount)'
+              items:
+                type: object
+                properties:
+                  discount:
+                    oneOf:
+                      - $ref: '#/components/schemas/DiscountInput'
+                      - type: 'null'
+            discount:
+              description: 'D85 the order discount, applied after the checks at list prices; needs orders.discount and a reason'
+              oneOf:
+                - allOf:
+                    - $ref: '#/components/schemas/DiscountInput'
+                    - type: object
+                      properties:
+                        reason: { type: [string, 'null'], maxLength: 300 }
+                - type: 'null'
 
     OrderQuoteLine:
       type: object
@@ -4633,7 +4766,7 @@ components:
         product_name: { type: string }
         sku_code: { type: string }
         unit: { type: string }
-        unit_price: { $ref: '#/components/schemas/Money' }
+        unit_price: { $ref: '#/components/schemas/Money', description: 'What one unit returns at: the line price less the order discount share (D85)' }
         ordered: { type: integer }
         returned: { type: integer, description: Brought back by live returns }
         returnable: { type: integer }

@@ -53,6 +53,12 @@ enum OrderStatus: string
         return in_array($this, [self::Pending, self::Confirmed, self::Preparing], true);
     }
 
+    /** BR-PR08, D85: a manual discount is given (or changed) only before the order is being prepared. */
+    public function allowsPriceChange(): bool
+    {
+        return in_array($this, [self::Pending, self::Confirmed], true);
+    }
+
     /**
      * @return array<string, string>
      */

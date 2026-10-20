@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Log;
  * Nothing is sent when the store does not notify this status or the customer opted out. The message is handed to
  * Messenger only **after commit**, so a rolled-back transition sends nothing; a customer over their per-phone limit
  * (D79) is logged, never fails the transition. Called at the end of TransitionOrder and of a merchant's or the
- * system's CancelOrder, and by PlaceOrderForCustomer (`placed`) when the merchant asks.
+ * system's CancelOrder, by PlaceOrderForCustomer (`placed`) when the merchant asks, and by ApplyOrderDiscount (`discount`).
  */
 final readonly class NotifyCustomerOfStatus
 {
@@ -50,6 +50,19 @@ final readonly class NotifyCustomerOfStatus
     public function placed(Order $order): void
     {
         $this->send($order, 'placed', $order->status->label(), $this->settings->orderNotifications());
+    }
+
+    /**
+     * D85: the merchant changed the order's discounts (ApplyOrderDiscount). Sent only when the store notifies
+     * `discount` (off by default), with the new total.
+     */
+    public function discounted(Order $order): void
+    {
+        $notifications = $this->settings->orderNotifications();
+
+        if (in_array('discount', $notifications['statuses'], true)) {
+            $this->send($order, 'discount', $order->status->label(), $notifications);
+        }
     }
 
     /**

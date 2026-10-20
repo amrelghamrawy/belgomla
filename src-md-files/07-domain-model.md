@@ -77,6 +77,7 @@ erDiagram
 | order_notify_statuses          | jsonb         | V2: list of statuses customers are told about; default `["confirmed","out_for_delivery","delivered","cancelled"]` (BR-N03) |
 | order_status_messages          | jsonb         | V2: nullable map status → merchant wording; a missing entry = platform default (BR-N03) |
 | pending_expiry_hours           | smallint      | V2: nullable = off; CHECK 1–720; unconfirmed orders cancel themselves after it (BR-INV07, D81) |
+| max_discount_percent_sales     | numeric(5,2)  | V2 Task 08: nullable = sales users cannot discount; CHECK > 0 and < 100 (BR-PR08, D85) |
 
 ### `tenant_users`
 
@@ -372,7 +373,11 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | customer_id                                         | FK            |                                                                                   |
 | status                                              | enum          | `pending`, `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled` |
 | items_total                                         | numeric(12,2) | Σ line_total                                                                      |
-| order_total                                         | numeric(12,2) | = items_total in V1 (BR-O08)                                                      |
+| discount_type                                       | varchar(8)    | V2 Task 08: `amount` or `percent`, null = no order discount (BR-PR08, D85)        |
+| discount_value                                      | numeric(12,2) | nullable; EGP off or % off the items total; set with the type                     |
+| discount_amount                                     | numeric(12,2) | default 0; what the order discount takes off; **check 0 ≤ discount_amount ≤ items_total**, 0 without a type |
+| discount_reason                                     | varchar(300)  | nullable; required with an order discount (dashboard only)                         |
+| order_total                                         | numeric(12,2) | = items_total − discount_amount, **CHECK** (BR-O08; = items_total in V1)          |
 | returned_total                                      | numeric(12,2) | V2: Σ live returns, default 0, **check 0 ≤ returned_total ≤ order_total** (BR-R04) |
 | collected_amount                                    | numeric(12,2) | denormalized Σ non-voided collections, default 0                                  |
 | collection_status                                   | enum          | `unpaid`, `partially_collected`, `collected` (derived, BR-C03)                    |
@@ -410,8 +415,11 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | quantity          | int           | selling units, **check ≥ 1**           |
 | quantity_base     | int           | = quantity × conversion_factor         |
 | cover_price       | numeric(12,2) | snapshot, nullable                     |
-| unit_price        | numeric(12,2) | applied price                          |
-| discount_percent  | numeric(5,2)  | nullable, display                      |
+| list_unit_price   | numeric(12,2) | V2 Task 08: the price before the manual discount (backfilled from unit_price) |
+| manual_discount_type | varchar(8) | V2 Task 08: `amount` or `percent` per unit, null = none (BR-PR08) |
+| manual_discount_value | numeric(12,2) | nullable, > 0, set with the type    |
+| unit_price        | numeric(12,2) | applied price = list_unit_price less the manual discount; **check 0.01 ≤ unit_price ≤ list_unit_price**, = list_unit_price without a discount |
+| discount_percent  | numeric(5,2)  | nullable, **display only**: the tier margin off the cover price (BR-PR10), not the manual discount |
 | tier_min_quantity | int           | nullable; which tier applied           |
 | line_total        | numeric(12,2) | = quantity × unit_price                |
 
@@ -439,7 +447,7 @@ No status: a return is live or voided. Model `Orders\Models\OrderReturn`.
 
 ### `order_return_items`
 
-`id, tenant_id, order_return_id FK, order_item_id FK, quantity int (check ≥ 1), quantity_base int, unit_price numeric(12,2) (the line's snapshot, D74), line_total numeric(12,2)`. `quantity_base = quantity × order_items.conversion_factor` is kept by `RecordReturn`, since the factor lives on the order line. Model `OrderReturnItem`.
+`id, tenant_id, order_return_id FK, order_item_id FK, quantity int (check ≥ 1), quantity_base int, unit_price numeric(12,2) (the line's snapshot, D74, less the order discount's share, D85), line_total numeric(12,2)` (the last return of an order absorbs the rounding). `quantity_base = quantity × order_items.conversion_factor` is kept by `RecordReturn`, since the factor lives on the order line. Model `OrderReturnItem`.
 
 ---
 

@@ -30,8 +30,8 @@ final class OrderFactory extends Factory
             'number' => fake()->unique()->numberBetween(1, 9_999_999),
             'customer_id' => CustomerFactory::new(),
             'status' => OrderStatus::Pending,
-            'items_total' => '0.00',
             'order_total' => '0.00',
+            'items_total' => fn (array $attributes): string => is_scalar($attributes['order_total']) ? (string) $attributes['order_total'] : '0.00', // no discount: the totals agree (BR-O08)
             'delivery_name' => fake()->name(),
             'delivery_phone' => '+2010'.fake()->numerify('########'),
             'delivery_address' => [

@@ -70,6 +70,123 @@ export function percentFromPrice(cover: string, price: string): string | null {
   return fromPiasters(divideHalfUp((coverPiasters - pricePiasters) * 10000n, coverPiasters));
 }
 
+/**
+ * A manual discount being typed (BR-PR08, D85): EGP off or % off. An empty value means no discount; the server
+ * takes the same `{ type, value }` and stays the authority on the prices.
+ */
+export type DiscountDraft = { type: "amount" | "percent"; value: string };
+
+export const NO_DISCOUNT: DiscountDraft = { type: "percent", value: "" };
+
+/** Whether the draft holds a discount at all (anything typed). */
+export function hasDiscount(draft: DiscountDraft | undefined): draft is DiscountDraft {
+  return draft !== undefined && draft.value.trim() !== "";
+}
+
+/** The amount (piasters) or basis points a draft stands for; null when it is not a valid discount. */
+function discountPoints(draft: DiscountDraft): bigint | null {
+  const value = draft.type === "percent" ? toBasisPoints(draft.value) : toPiasters(draft.value);
+
+  return value === null || value <= 0n ? null : value;
+}
+
+/**
+ * The unit price after a line discount, half-up to the piaster (D27); null when the draft is not valid or would
+ * leave less than 0.01 (the server's `discount_too_large`). Without a discount the list price.
+ */
+export function unitAfterDiscount(listPrice: string, draft: DiscountDraft | undefined): string | null {
+  const list = toPiasters(listPrice);
+
+  if (list === null) {
+    return null;
+  }
+
+  if (!hasDiscount(draft)) {
+    return fromPiasters(list);
+  }
+
+  const points = discountPoints(draft);
+
+  if (points === null) {
+    return null;
+  }
+
+  const unit = draft.type === "percent" ? divideHalfUp(list * (10000n - points), 10000n) : list - points;
+
+  return unit >= 1n ? fromPiasters(unit) : null;
+}
+
+/**
+ * What an order discount takes off the items total ("0.00" without one); null when the draft is not valid or would
+ * leave the order below 0.01.
+ */
+export function orderDiscountAmount(itemsTotal: string, draft: DiscountDraft | undefined): string | null {
+  const total = toPiasters(itemsTotal);
+
+  if (total === null) {
+    return null;
+  }
+
+  if (!hasDiscount(draft)) {
+    return "0.00";
+  }
+
+  const points = discountPoints(draft);
+
+  if (points === null) {
+    return null;
+  }
+
+  const amount = draft.type === "percent" ? divideHalfUp(total * points, 10000n) : points;
+
+  return total - amount >= 1n ? fromPiasters(amount) : null;
+}
+
+export type DiscountLine = { list_unit_price: string; quantity: number; discount?: DiscountDraft };
+
+export type DiscountTotals = {
+  /** Per line: the unit price after its discount and the line total, null where the discount is not valid. */
+  lines: ({ unit_price: string; line_total: string } | null)[];
+  items_total: string | null;
+  discount_amount: string | null;
+  order_total: string | null;
+};
+
+/** BR-O08: the totals the server will compute, so the dialog and the new-order form show them live. */
+export function discountTotals(lines: readonly DiscountLine[], order: DiscountDraft | undefined): DiscountTotals {
+  const priced = lines.map((line) => {
+    const unit = unitAfterDiscount(line.list_unit_price, line.discount);
+
+    return unit === null
+      ? null
+      : { unit_price: unit, line_total: fromPiasters((toPiasters(unit) ?? 0n) * BigInt(line.quantity)) };
+  });
+
+  if (priced.some((line) => line === null)) {
+    return { lines: priced, items_total: null, discount_amount: null, order_total: null };
+  }
+
+  const items = priced.reduce((sum, line) => sum + (toPiasters(line?.line_total ?? "0") ?? 0n), 0n);
+  const amount = orderDiscountAmount(fromPiasters(items), order);
+
+  return {
+    lines: priced,
+    items_total: fromPiasters(items),
+    discount_amount: amount,
+    order_total: amount === null ? null : fromPiasters(items - (toPiasters(amount) ?? 0n)),
+  };
+}
+
+/** The API body of one discount: `{ type, value }`, or null for none. */
+export function discountBody(draft: DiscountDraft | undefined): { type: "amount" | "percent"; value: string } | null {
+  return hasDiscount(draft) ? { type: draft.type, value: draft.value.trim() } : null;
+}
+
+/** A stored discount (`{ type, value }` or null from the API) as a draft for the form. */
+export function draftOf(discount: { type: "amount" | "percent"; value: string } | null | undefined): DiscountDraft {
+  return discount ? { type: discount.type, value: discount.value } : NO_DISCOUNT;
+}
+
 /** One row of the tiers editor: a threshold and either a unit price or a percentage off the cover price. */
 export type TierDraft = { min_quantity: string; mode: "price" | "percent"; value: string };
 

@@ -24,6 +24,7 @@ const ORDER_MESSAGE_DEFAULTS = {
   out_for_delivery: "أهلًا {اسم_العميل}، طلبك رقم {رقم_الطلب} من {اسم_المتجر} خرج للتوصيل وفي الطريق إليك.",
   delivered: "أهلًا {اسم_العميل}، تم توصيل طلبك رقم {رقم_الطلب} من {اسم_المتجر}. شكرًا لتعاملك معنا.",
   cancelled: "أهلًا {اسم_العميل}، تم إلغاء طلبك رقم {رقم_الطلب} من {اسم_المتجر}. السبب: {سبب_الإلغاء}",
+  discount: "أهلًا {اسم_العميل}، تم تطبيق خصم على طلبك رقم {رقم_الطلب} من {اسم_المتجر}، والإجمالي الآن {الإجمالي}.",
 };
 
 function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings {
@@ -38,6 +39,7 @@ function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings
     order_status_messages: {},
     order_status_message_defaults: ORDER_MESSAGE_DEFAULTS,
     pending_expiry_hours: null,
+    max_discount_percent_sales: null,
     ...overrides,
   };
 }
@@ -164,6 +166,51 @@ describe("SettingsForm", () => {
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
     await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(2));
     expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[1]?.body).toMatchObject({ pending_expiry_hours: null });
+  });
+
+  it("D85 sets the sales discount cap, clears it when emptied, and refuses 100 or more", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings({ max_discount_percent_sales: "10.00" })} />);
+    const field = screen.getByLabelText("أقصى خصم لمستخدم المبيعات على الصنف (%)");
+
+    expect(field).toHaveValue("10.00");
+    await user.clear(field);
+    await user.type(field, "100");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+    expect(await screen.findByText("نسبة أكبر من 0 وأقل من 100، برقمين عشريين على الأكثر")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(0);
+
+    await user.clear(field);
+    await user.type(field, "12.5");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+      max_discount_percent_sales: "12.5",
+    });
+
+    await user.clear(field);
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(2));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[1]?.body).toMatchObject({
+      max_discount_percent_sales: null,
+    });
+  });
+
+  it("D85 BR-N03 a store may message customers about discounts, off by default", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<SettingsForm settings={settings()} />);
+    const toggle = screen.getByLabelText("أرسل رسالة عند: خصم على الطلب");
+
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+      order_notify_statuses: ["confirmed", "out_for_delivery", "delivered", "cancelled", "discount"],
+    });
   });
 
   it("BR-INV07 refuses an expiry shorter than the stale hours", async () => {

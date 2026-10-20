@@ -162,6 +162,7 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
     status_label: "قيد الانتظار",
     placed_at: "2026-10-10T08:00:00Z",
     items_total: "540.00",
+    discount: null,
     order_total: "540.00",
     returned_total: "0.00",
     net_total: "540.00",
@@ -183,6 +184,7 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
     cancelled_by: null,
     items: [
       {
+        id: 61,
         sku_id: 501,
         product_name: "الأضواء علوم أولى إعدادي",
         sku_code: "BK-001",
@@ -191,6 +193,8 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
         conversion_factor: 20,
         quantity: 6,
         cover_price: "120.00",
+        list_unit_price: "90.00",
+        manual_discount: null,
         unit_price: "90.00",
         discount_percent: "25.00",
         tier_min_quantity: null,

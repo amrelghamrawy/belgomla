@@ -1,6 +1,6 @@
 # V2 Task 08 — Manual order and item discounts
 
-Status: **planned**. Requires V2 Tasks 01, 05, 07. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-20, commit: see log). Line and order discounts (`PUT /api/dashboard/orders/{number}/discount`, `orders.discount`, sales capped by `max_discount_percent_sales`), discounts on the new-order form, return proration with the last return absorbing the rounding, the discount dialog, crossed list prices on the dashboard and storefront, the `discount` WhatsApp text (off by default); D85. There is no printed invoice in the app yet: the order pages carry the crossed price and the discount line. Requires V2 Tasks 01, 05, 07. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 

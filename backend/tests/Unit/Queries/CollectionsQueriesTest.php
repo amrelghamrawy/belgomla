@@ -99,6 +99,16 @@ test('D59 BR-R05 what customers owe is net of returns', function (): void {
         ->and(app(OutstandingByCustomerQuery::class)->builder()->sole()->total)->toBe('380.00');
 });
 
+test('D59 D85 what customers owe is the order total after its discount', function (): void {
+    Order::factory()->delivered()->create([
+        'customer_id' => $this->customer->id, 'items_total' => '540.00', 'discount_type' => 'amount', 'discount_value' => '40', 'discount_amount' => '40.00',
+        'discount_reason' => 'عميل دائم', 'order_total' => '500.00', 'collected_amount' => '100.00', 'collection_status' => CollectionStatus::PartiallyCollected,
+    ]);
+
+    expect(app(OutstandingByCustomerQuery::class)->forCustomers([$this->customer->id]))->toEqual([$this->customer->id => '400.00'])
+        ->and(app(OutstandingByCustomerQuery::class)->total())->toBe('400.00');
+});
+
 test('D59 customers who owe nothing are missing from the balances', function (): void {
     ($this->order)('400.00', '400.00');
 

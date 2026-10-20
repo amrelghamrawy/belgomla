@@ -21,7 +21,7 @@ final class UpdateSettingsRequest extends FormRequest
         'name', 'primary_color', 'secondary_color', 'phone', 'whatsapp', 'address', 'description',
         'working_hours', 'mov_enabled', 'mov_amount', 'require_login_for_prices', 'require_customer_approval',
         'stale_pending_hours', 'invitation_message', 'default_payment_terms_days', 'default_credit_limit',
-        'order_notify_statuses', 'order_status_messages', 'pending_expiry_hours',
+        'order_notify_statuses', 'order_status_messages', 'pending_expiry_hours', 'max_discount_percent_sales',
     ];
 
     /**
@@ -54,6 +54,7 @@ final class UpdateSettingsRequest extends FormRequest
             'order_status_messages' => ['sometimes', 'array:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
             'order_status_messages.*' => ['nullable', 'string', 'max:'.OrderStatusMessage::MAX_LENGTH, new OrderStatusTemplate],
             'pending_expiry_hours' => ['sometimes', 'nullable', 'integer', 'between:1,720'],
+            'max_discount_percent_sales' => ['sometimes', 'nullable', 'decimal:0,2', 'gt:0', 'lt:100'],
         ];
     }
 

@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { ar } from "@/lib/copy/ar";
 import {
+  discountBody,
+  discountTotals,
+  draftOf,
+  NO_DISCOUNT,
+  orderDiscountAmount,
   percentFromPrice,
   priceFromPercent,
   type TierDraft,
@@ -9,6 +14,7 @@ import {
   tiersBody,
   toBasisPoints,
   toPiasters,
+  unitAfterDiscount,
 } from "@/lib/dashboard/price-math";
 
 const messages = {
@@ -105,5 +111,76 @@ describe("tiersBody", () => {
       { min_quantity: 10, unit_price: "85.00" },
       { min_quantity: 50, discount_percent: "30" },
     ]);
+  });
+});
+
+describe("manual discounts (BR-PR08, D85)", () => {
+  it("D27 prices a line discount like the server: amount off, or % off rounded half-up", () => {
+    expect(unitAfterDiscount("90.00", { type: "amount", value: "5" })).toBe("85.00");
+    expect(unitAfterDiscount("90.00", { type: "percent", value: "10" })).toBe("81.00");
+    expect(unitAfterDiscount("10.10", { type: "percent", value: "25" })).toBe("7.58");
+  });
+
+  it("keeps the list price without a discount and refuses a unit below 0.01 or an invalid value", () => {
+    expect(unitAfterDiscount("90.00", undefined)).toBe("90.00");
+    expect(unitAfterDiscount("90.00", { type: "amount", value: " " })).toBe("90.00");
+    expect(unitAfterDiscount("90.00", { type: "amount", value: "89.99" })).toBe("0.01");
+    expect(unitAfterDiscount("90.00", { type: "amount", value: "90" })).toBeNull();
+    expect(unitAfterDiscount("90.00", { type: "percent", value: "100" })).toBeNull();
+    expect(unitAfterDiscount("90.00", { type: "amount", value: "0" })).toBeNull();
+    expect(unitAfterDiscount("90.00", { type: "amount", value: "abc" })).toBeNull();
+    expect(unitAfterDiscount("x", undefined)).toBeNull();
+  });
+
+  it("takes an order discount off the items total, never down to zero", () => {
+    expect(orderDiscountAmount("1390.00", { type: "percent", value: "10" })).toBe("139.00");
+    expect(orderDiscountAmount("6.70", { type: "percent", value: "5" })).toBe("0.34");
+    expect(orderDiscountAmount("1390.00", { type: "amount", value: "50" })).toBe("50.00");
+    expect(orderDiscountAmount("1390.00", undefined)).toBe("0.00");
+    expect(orderDiscountAmount("1390.00", { type: "amount", value: "1390" })).toBeNull();
+    expect(orderDiscountAmount("1390.00", { type: "percent", value: "1.234" })).toBeNull();
+    expect(orderDiscountAmount("", undefined)).toBeNull();
+  });
+
+  it("BR-O08 totals the lines after their discounts, then the order discount", () => {
+    expect(
+      discountTotals(
+        [
+          { list_unit_price: "90.00", quantity: 6, discount: { type: "percent", value: "10" } },
+          { list_unit_price: "85.00", quantity: 10, discount: { type: "amount", value: "5" } },
+        ],
+        { type: "amount", value: "50" },
+      ),
+    ).toEqual({
+      lines: [
+        { unit_price: "81.00", line_total: "486.00" },
+        { unit_price: "80.00", line_total: "800.00" },
+      ],
+      items_total: "1286.00",
+      discount_amount: "50.00",
+      order_total: "1236.00",
+    });
+  });
+
+  it("has no totals while a line or the order discount is not valid", () => {
+    expect(
+      discountTotals([{ list_unit_price: "90.00", quantity: 1, discount: { type: "amount", value: "95" } }], undefined),
+    ).toEqual({
+      lines: [null],
+      items_total: null,
+      discount_amount: null,
+      order_total: null,
+    });
+    expect(
+      discountTotals([{ list_unit_price: "90.00", quantity: 1 }], { type: "amount", value: "90" }).order_total,
+    ).toBeNull();
+  });
+
+  it("builds the api body and reads a stored discount back into a draft", () => {
+    expect(discountBody({ type: "amount", value: " 5 " })).toEqual({ type: "amount", value: "5" });
+    expect(discountBody({ type: "percent", value: "" })).toBeNull();
+    expect(discountBody(undefined)).toBeNull();
+    expect(draftOf({ type: "percent", value: "10.00" })).toEqual({ type: "percent", value: "10.00" });
+    expect(draftOf(null)).toEqual(NO_DISCOUNT);
   });
 });

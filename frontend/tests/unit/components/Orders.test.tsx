@@ -53,6 +53,39 @@ describe("OrderDetailView", () => {
     expect(screen.getByText("12 شارع عباس العقاد، مدينة نصر، القاهرة")).toBeInTheDocument();
   });
 
+  it("D85 shows a discounted line's crossed list price and the order discount in the totals", async () => {
+    const detail = order();
+    stubOrder(
+      order({
+        items_total: "486.00",
+        discount: { type: "amount", value: "6.00", amount: "6.00" },
+        order_total: "480.00",
+        net_total: "480.00",
+        items: detail.items.map((item) => ({
+          ...item,
+          manual_discount: { type: "percent", value: "10.00" },
+          unit_price: "81.00",
+          line_total: "486.00",
+        })),
+      }),
+    );
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("list-price")).toHaveTextContent("90.00 ج.م");
+    expect(screen.getByText(/6 كرتونة ×/)).toHaveTextContent("81.00 ج.م");
+    expect(screen.getByTestId("order-discount")).toHaveTextContent("−6.00 ج.م");
+    expect(screen.getByText("إجمالي الأصناف").nextSibling).toHaveTextContent("486.00 ج.م");
+  });
+
+  it("an order without discounts shows no crossed price and no discount line", async () => {
+    stubOrder();
+    renderWithQuery(<OrderDetailView />);
+
+    await screen.findByRole("heading", { level: 1, name: "طلب رقم 1001" });
+    expect(screen.queryByTestId("list-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("order-discount")).not.toBeInTheDocument();
+  });
+
   it("BR-R05 shows the returns of a delivered order and the net total", async () => {
     stubOrder(
       order({

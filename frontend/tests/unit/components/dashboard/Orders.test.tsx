@@ -91,6 +91,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
     status_label: "مؤكد",
     placed_at: "2026-10-02T08:00:00Z",
     items_total: "450.00",
+    discount: null,
     order_total: "450.00",
     returned_total: "0.00",
     net_total: "450.00",
@@ -120,6 +121,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
     placed_by_id: 9,
     items: [
       {
+        id: 61,
         sku_id: 5,
         product_name: "الأضواء علوم",
         sku_code: "ADW-SCI-1",
@@ -128,6 +130,8 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
         conversion_factor: 20,
         quantity: 5,
         cover_price: "120.00",
+        list_unit_price: "90.00",
+        manual_discount: null,
         unit_price: "90.00",
         discount_percent: "25.00",
         tier_min_quantity: null,
@@ -380,6 +384,130 @@ describe("OrderDetail actions", () => {
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم إلغاء التحصيل"));
     expect(callsTo(fetchMock, "POST /api/dashboard/collections/31/void")[0]?.body).toEqual({ reason: "خطأ في المبلغ" });
+  });
+});
+
+describe("OrderDetail discounts (BR-PR08, D85)", () => {
+  const discounted = (): DashboardOrderDetail =>
+    order({
+      items_total: "405.00",
+      discount: { type: "amount", value: "5.00", amount: "5.00", reason: "عميل دائم" },
+      order_total: "400.00",
+      net_total: "400.00",
+      items: [
+        {
+          id: 61,
+          sku_id: 5,
+          product_name: "الأضواء علوم",
+          sku_code: "ADW-SCI-1",
+          sku_name: "الأضواء علوم",
+          unit: "كرتونة",
+          conversion_factor: 20,
+          quantity: 5,
+          cover_price: "120.00",
+          list_unit_price: "90.00",
+          manual_discount: { type: "percent", value: "10.00" },
+          unit_price: "81.00",
+          discount_percent: "25.00",
+          tier_min_quantity: null,
+          line_total: "405.00",
+        },
+      ],
+    });
+
+  it("offers a discount on a pending or confirmed order to who may discount, not once it is being prepared", () => {
+    stubApi({});
+    const { rerender } = renderWithQuery(<OrderDetail order={order({ status: "pending" })} />);
+
+    expect(screen.getByRole("button", { name: "خصم" })).toBeInTheDocument();
+
+    rerender(<OrderDetail order={order({ status: "preparing" })} />);
+    expect(screen.queryByRole("button", { name: "خصم" })).not.toBeInTheDocument();
+  });
+
+  it("D82 the warehouse and the accountant cannot discount", () => {
+    stubApi({});
+    const { unmount } = renderWithQuery(<OrderDetail order={order()} />, signedInAs("accountant"));
+
+    expect(screen.queryByRole("button", { name: "خصم" })).not.toBeInTheDocument();
+    unmount();
+
+    renderWithQuery(<OrderDetail order={order()} />, signedInAs("warehouse"));
+    expect(screen.queryByRole("button", { name: "خصم" })).not.toBeInTheDocument();
+  });
+
+  it("shows the crossed list price of a discounted line and the order discount with its reason", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={discounted()} />);
+
+    expect(screen.getByLabelText("قبل الخصم")).toHaveTextContent("90.00 ج.م");
+    expect(screen.getByTestId("order-discount")).toHaveTextContent("−5.00 ج.م");
+    expect(screen.getByTestId("order-discount")).toHaveTextContent("عميل دائم");
+  });
+
+  it("shows the totals live and saves the line and order discounts with an Idempotency-Key", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/orders/1001/discount": json(200, { data: discounted() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order()} />);
+
+    await user.click(screen.getByRole("button", { name: "خصم" }));
+    await user.type(screen.getByLabelText("خصم الأضواء علوم"), "10");
+    await user.type(screen.getByLabelText("خصم خصم على إجمالي الطلب"), "5");
+    await user.selectOptions(screen.getByLabelText("نوع الخصم: خصم على إجمالي الطلب"), "amount");
+
+    expect(screen.getByTestId("discount-order-total")).toHaveTextContent("400.00 ج.م");
+
+    await user.click(screen.getByRole("button", { name: "حفظ الخصم" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("اكتب سبب الخصم على الطلب");
+
+    await user.type(screen.getByLabelText("سبب خصم الطلب"), "عميل دائم");
+    await user.click(screen.getByRole("button", { name: "حفظ الخصم" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم حفظ الخصم"));
+    const call = callsTo(fetchMock, "PUT /api/dashboard/orders/1001/discount")[0];
+    expect(call?.body).toEqual({
+      items: [{ order_item_id: 61, type: "percent", value: "10" }],
+      order: { type: "amount", value: "5", reason: "عميل دائم" },
+    });
+    expect(call?.headers["Idempotency-Key"]).toMatch(/^discount-1001-[0-9a-f]{32}$/);
+  });
+
+  it("starts from the order's discounts and removes them all when cleared", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/orders/1001/discount": json(200, { data: order() }) });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={discounted()} />);
+
+    await user.click(screen.getByRole("button", { name: "خصم" }));
+    expect(screen.getByLabelText("خصم الأضواء علوم")).toHaveValue("10.00");
+
+    await user.clear(screen.getByLabelText("خصم الأضواء علوم"));
+    await user.clear(screen.getByLabelText("خصم خصم على إجمالي الطلب"));
+    await user.click(screen.getByRole("button", { name: "حفظ الخصم" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/orders/1001/discount")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/orders/1001/discount")[0]?.body).toEqual({ items: [], order: null });
+  });
+
+  it("refuses a discount above the price before sending, and shows the server's refusal", async () => {
+    const fetchMock = stubApi({
+      "PUT /api/dashboard/orders/1001/discount": envelopeError(403, "discount_over_limit", "غير مسموح لك بإعطاء خصم"),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order()} />, signedInAs("sales"));
+
+    await user.click(screen.getByRole("button", { name: "خصم" }));
+    await user.selectOptions(screen.getByLabelText("نوع الخصم: الأضواء علوم"), "amount");
+    await user.type(screen.getByLabelText("خصم الأضواء علوم"), "95");
+    await user.click(screen.getByRole("button", { name: "حفظ الخصم" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("خصم غير صالح أو أكبر من السعر");
+    expect(callsTo(fetchMock, "PUT /api/dashboard/orders/1001/discount")).toHaveLength(0);
+
+    await user.clear(screen.getByLabelText("خصم الأضواء علوم"));
+    await user.type(screen.getByLabelText("خصم الأضواء علوم"), "1");
+    await user.click(screen.getByRole("button", { name: "حفظ الخصم" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("غير مسموح لك بإعطاء خصم"));
   });
 });
 

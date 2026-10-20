@@ -239,3 +239,20 @@ test('BR-O09 merchant orders and storefront orders share one number sequence', f
 
     expect([$first->number, $second->number])->toBe([1, 2]);
 });
+
+test('D85 discounts from the form apply to the matching lines by sku, audited once, without their own message', function (): void {
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['order_notify_statuses' => json_encode(['discount'])]);
+    $other = $this->orderableSku(['code' => 'OTHER-1'], name: 'كتاب آخر');
+
+    $order = ($this->place)([['sku_id' => $this->sku->id, 'quantity' => 12], ['sku_id' => $other->id, 'quantity' => 6]], [
+        'lineDiscounts' => [$other->id => ['type' => App\Modules\Pricing\Enums\DiscountType::Amount, 'value' => '10.00']],
+        'discountType' => App\Modules\Pricing\Enums\DiscountType::Percent,
+        'discountValue' => '5.00',
+        'discountReason' => 'بالتليفون',
+    ]);
+
+    expect(OrderItem::query()->where('order_id', $order->id)->orderBy('id')->pluck('unit_price')->all())->toBe(['85.00', '80.00'])
+        ->and($order->refresh()->only(['items_total', 'discount_amount', 'order_total']))->toBe(['items_total' => '1500.00', 'discount_amount' => '75.00', 'order_total' => '1425.00'])
+        ->and(AuditLog::query()->where('action', 'order.discount_changed')->count())->toBe(1)
+        ->and(($this->message)())->toBeNull();
+});

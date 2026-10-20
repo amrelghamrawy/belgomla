@@ -29,6 +29,7 @@ test('BR-PR07 the item snapshot keeps names, unit, conversion and the applied pr
         'quantity' => 12,
         'quantity_base' => 240,
         'cover_price' => '120.00',
+        'list_unit_price' => '85.00',
         'unit_price' => '85.00',
         'discount_percent' => '29.17',
         'tier_min_quantity' => 10,

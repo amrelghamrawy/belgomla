@@ -96,7 +96,27 @@ test('settings validation', function (array $body, string $field): void {
     'expiry not a number' => [['pending_expiry_hours' => 'soon'], 'pending_expiry_hours'],
     'expiry below the stale hours sent with it' => [['stale_pending_hours' => 48, 'pending_expiry_hours' => 24], 'pending_expiry_hours'],
     'expiry below the stored stale hours' => [['pending_expiry_hours' => 23], 'pending_expiry_hours'],
+    'sales discount cap zero' => [['max_discount_percent_sales' => 0], 'max_discount_percent_sales'],
+    'sales discount cap of 100' => [['max_discount_percent_sales' => 100], 'max_discount_percent_sales'],
+    'sales discount cap three decimals' => [['max_discount_percent_sales' => '5.125'], 'max_discount_percent_sales'],
+    'sales discount cap not a number' => [['max_discount_percent_sales' => 'some'], 'max_discount_percent_sales'],
+    'unknown notify event' => [['order_notify_statuses' => ['discounted']], 'order_notify_statuses.0'],
+    'reason in the discount message' => [['order_status_messages' => ['discount' => '{سبب_الإلغاء}']], 'order_status_messages.discount'],
 ]);
+
+test('D85 an owner sets and clears the sales discount cap; it starts unset', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/settings')->assertOk()->assertJsonPath('data.max_discount_percent_sales', null);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['max_discount_percent_sales' => 12.5])->assertOk()->assertJsonPath('data.max_discount_percent_sales', '12.50');
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['max_discount_percent_sales' => null])->assertOk()->assertJsonPath('data.max_discount_percent_sales', null);
+});
+
+test('D85 BR-N03 a store may tell customers about discounts and word the message', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['order_notify_statuses' => ['discount', 'confirmed'], 'order_status_messages' => ['discount' => 'خصم على {رقم_الطلب}']])
+        ->assertOk()
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'discount'])
+        ->assertJsonPath('data.order_status_messages.discount', 'خصم على {رقم_الطلب}');
+});
 
 test('BR-INV07 D81 an owner turns the automatic expiry on and off; it starts off', function (): void {
     $this->tenantJson('GET', '/api/dashboard/settings')->assertOk()->assertJsonPath('data.pending_expiry_hours', null);

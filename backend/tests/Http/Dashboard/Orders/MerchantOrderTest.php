@@ -101,7 +101,40 @@ test('merchant order validation', function (array $body, string $field): void {
     'note too long' => [['note' => str_repeat('ن', 1001)], 'note'],
     'notify not boolean' => [['notify_customer' => 'yes'], 'notify_customer'],
     'override not boolean' => [['override_mov' => 'maybe'], 'override_mov'],
+    'line discount with an unknown key' => [['lines' => [['sku_id' => 1, 'quantity' => 5, 'discount' => ['type' => 'amount', 'value' => '1', 'reason' => 'x']]]], 'lines.0.discount'],
+    'line discount type unknown' => [['lines' => [['sku_id' => 1, 'quantity' => 5, 'discount' => ['type' => 'gift', 'value' => '1']]]], 'lines.0.discount.type'],
+    'line discount without a value' => [['lines' => [['sku_id' => 1, 'quantity' => 5, 'discount' => ['type' => 'amount']]]], 'lines.0.discount.value'],
+    'line discount of 100%' => [['lines' => [['sku_id' => 1, 'quantity' => 5, 'discount' => ['type' => 'percent', 'value' => '100']]]], 'lines.0.discount.value'],
+    'order discount without a reason' => [['discount' => ['type' => 'amount', 'value' => '5']], 'discount.reason'],
+    'order discount of 100%' => [['discount' => ['type' => 'percent', 'value' => '100', 'reason' => 'هدية']], 'discount.value'],
 ]);
+
+test('D85 discounts given on the form apply to the new order, after the checks at list prices', function (): void {
+    ($this->mov)('1000.00');
+
+    $response = ($this->place)([
+        'lines' => [['sku_id' => $this->sku->id, 'quantity' => 12, 'discount' => ['type' => 'percent', 'value' => '10']]],
+        'discount' => ['type' => 'amount', 'value' => '18', 'reason' => 'طلب بالتليفون'],
+    ])->assertCreated();
+
+    $response->assertJsonPath('data.items.0.list_unit_price', '85.00')
+        ->assertJsonPath('data.items.0.unit_price', '76.50')
+        ->assertJsonPath('data.items_total', '918.00')
+        ->assertJsonPath('data.discount', ['type' => 'amount', 'value' => '18.00', 'amount' => '18.00', 'reason' => 'طلب بالتليفون'])
+        ->assertJsonPath('data.order_total', '900.00');
+    expect(AuditLog::withoutTenantScope()->where('action', 'order.discount_changed')->count())->toBe(1);
+});
+
+test('D85 a sales user without a cap cannot give a discount on the form, and no order is placed', function (): void {
+    $this->actingAsOwner($this->makeOwner(attributes: ['role' => TenantUserRole::Sales]));
+
+    ($this->place)(['lines' => [['sku_id' => $this->sku->id, 'quantity' => 12, 'discount' => ['type' => 'amount', 'value' => '1']]]])
+        ->assertForbidden()
+        ->assertJsonPath('error.code', 'discount_over_limit');
+
+    expect($this->inTenant(fn (): int => Order::query()->count()))->toBe(0)
+        ->and($this->inTenant(fn (): int => SkuInventory::query()->findOrFail($this->sku->id)->reserved))->toBe(0);
+});
 
 test('BR-O11 an unknown sku is a field error on its line', function (): void {
     ($this->place)(['lines' => [['sku_id' => $this->sku->id, 'quantity' => 5], ['sku_id' => 999999, 'quantity' => 5]]])

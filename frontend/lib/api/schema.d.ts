@@ -1654,6 +1654,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/orders/{order}/discount": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sets the manual discounts of a pending or confirmed order, per line and on the whole order (BR-PR08, D85)
+         * @description The body is the whole discount state: a line left out of `items`, or a null `order`, has no discount. Owners and managers give any discount; a sales user gives line discounts only, each at most `max_discount_percent_sales` % off the list price (null = none). The history gets the note «خصم»; `order.discount_changed` is audited.
+         */
+        put: operations["dashboardApplyOrderDiscount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/orders/{order}/returns": {
         parameters: {
             query?: never;
@@ -1898,7 +1924,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2200,6 +2226,8 @@ export interface components {
         /** @enum {string} */
         OrderStatus: "pending" | "confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
         OrderItem: {
+            /** @description The order line, as PUT …/discount names it (D85) */
+            id: number;
             sku_id: number;
             product_name: string;
             sku_code: string;
@@ -2208,10 +2236,45 @@ export interface components {
             conversion_factor: number;
             quantity: number;
             cover_price: components["schemas"]["Money"] | null;
+            /** @description The price before the manual discount (D85) */
+            list_unit_price: components["schemas"]["Money"];
+            /** @description The merchant's discount per unit (D85), null for none */
+            manual_discount: components["schemas"]["DiscountValue"] | null;
+            /** @description The price charged per unit, after the manual discount */
             unit_price: components["schemas"]["Money"];
+            /** @description Display only: the tier margin off the cover price (BR-PR10) */
             discount_percent: components["schemas"]["Money"] | null;
             tier_min_quantity: number | null;
             line_total: components["schemas"]["Money"];
+        };
+        /**
+         * @description D85: EGP off, or % off (below 100)
+         * @enum {string}
+         */
+        DiscountType: "amount" | "percent";
+        DiscountValue: {
+            type: components["schemas"]["DiscountType"];
+            value: components["schemas"]["Money"];
+        };
+        /** @description The order discount (D85): what was given and the amount it takes off items_total */
+        OrderDiscount: components["schemas"]["DiscountValue"] & {
+            amount: components["schemas"]["Money"];
+        };
+        /** @description D85: null or a missing type = no discount */
+        DiscountInput: {
+            type?: components["schemas"]["DiscountType"] | null;
+            /** @description Above 0, two decimals at most; a percent below 100 */
+            value?: string | number | null;
+        };
+        OrderDiscountRequest: {
+            /** @description Each line of the order once; a line left out has no discount */
+            items: (components["schemas"]["DiscountInput"] & {
+                order_item_id: number;
+            })[];
+            /** @description The discount on the whole order; a reason is required with one */
+            order?: (components["schemas"]["DiscountInput"] & {
+                reason?: string | null;
+            }) | null;
         };
         OrderHistoryEntry: {
             from: components["schemas"]["OrderStatus"] | null;
@@ -2228,6 +2291,9 @@ export interface components {
             /** Format: date-time */
             placed_at: string;
             items_total: components["schemas"]["Money"];
+            /** @description The order discount (D85), null for none; the dashboard adds the reason */
+            discount: components["schemas"]["OrderDiscount"] | null;
+            /** @description items_total − the order discount (BR-O08) */
             order_total: components["schemas"]["Money"];
             /** @description Σ live returns (BR-R05) */
             returned_total: components["schemas"]["Money"];
@@ -2292,10 +2358,10 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
         };
         /** @enum {string} */
-        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
+        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
-            /** @description BR-N03 the statuses customers are told about */
-            order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
+            /** @description BR-N03 the statuses customers are told about, plus `discount` (D85) */
+            order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount")[];
             /** @description BR-N03 status => the store wording; a missing status uses order_status_message_defaults */
             order_status_messages: {
                 [key: string]: string;
@@ -2311,6 +2377,8 @@ export interface components {
             stale_pending_hours: number;
             /** @description BR-INV07 hours before an unconfirmed order cancels itself; null = off (D81) */
             pending_expiry_hours: number | null;
+            /** @description D85 the most a sales user may take off an order line, in %; null = sales users cannot discount */
+            max_discount_percent_sales: components["schemas"]["Money"] | null;
             /** @description BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line */
             invitation_message: string | null;
             invitation_message_default: string;
@@ -2354,7 +2422,9 @@ export interface components {
             invitation_message?: string | null;
             default_payment_terms_days?: number | null;
             default_credit_limit?: string | null;
-            order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
+            order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount")[];
+            /** @description D85 above 0 and below 100, two decimals at most; null = sales users cannot discount */
+            max_discount_percent_sales?: string | number | null;
             /** @description status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); `placed` words the message of an order a merchant places for the customer (BR-O11); null or the default text = the default */
             order_status_messages?: {
                 [key: string]: string | null;
@@ -2719,6 +2789,10 @@ export interface components {
         CollectionStatus: "unpaid" | "partially_collected" | "collected";
         DashboardOrderFields: {
             id: number;
+            /** @description The order discount with the merchant's reason (D85), null for none */
+            discount: (components["schemas"]["OrderDiscount"] & {
+                reason: string;
+            }) | null;
             /**
              * @description BR-O11 who placed the order: the customer at checkout, or a dashboard user on their behalf
              * @enum {string}
@@ -2762,6 +2836,14 @@ export interface components {
             notify_customer?: boolean;
             /** @description D84 waive the minimum order value for this order; needs orders.override_mov */
             override_mov?: boolean;
+            /** @description As in the quote, plus an optional discount per line (D85; needs orders.discount) */
+            lines?: {
+                discount?: components["schemas"]["DiscountInput"] | null;
+            }[];
+            /** @description D85 the order discount, applied after the checks at list prices; needs orders.discount and a reason */
+            discount?: (components["schemas"]["DiscountInput"] & {
+                reason?: string | null;
+            }) | null;
         };
         OrderQuoteLine: {
             sku_id: number;
@@ -2875,6 +2957,7 @@ export interface components {
             product_name: string;
             sku_code: string;
             unit: string;
+            /** @description What one unit returns at: the line price less the order discount share (D85) */
             unit_price: components["schemas"]["Money"];
             ordered: number;
             /** @description Brought back by live returns */
@@ -6382,6 +6465,57 @@ export interface operations {
                 };
             };
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardApplyOrderDiscount: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderDiscountRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardOrderDetail"];
+            401: components["responses"]["Error"];
+            /** @description forbidden (no orders.discount) or discount_over_limit (details.max_percent) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            404: components["responses"]["Error"];
+            /** @description order_locked (preparing or later) or below_collected (the new total is under what was collected) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description discount_too_large (a unit or the order below 0.01) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardOrderReturns: {

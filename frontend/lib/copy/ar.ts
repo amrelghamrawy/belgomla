@@ -12,6 +12,7 @@ import { dashboard } from "@/lib/copy/ar-dashboard";
 const errors: Record<ApiErrorCode, string> = {
   address_locked: "لا يمكن تعديل العنوان بعد تأكيد الطلب",
   already_voided: "تم إلغاء هذا التحصيل من قبل",
+  below_collected: "لا يمكن أن يقل إجمالي الطلب عن المبلغ المحصل منه",
   blocked: "تم إيقاف حسابك، تواصل مع المتجر",
   cannot_disable_self: "لا يمكنك إيقاف حسابك بنفسك",
   cart_empty: "السلة فارغة",
@@ -24,6 +25,8 @@ const errors: Record<ApiErrorCode, string> = {
   csrf_token_mismatch: "انتهت صلاحية الجلسة، أعد تحميل الصفحة",
   customer_blocked: "هذا العميل محظور، ألغِ الحظر أولًا",
   customer_not_active: "هذا العميل لم يفعّل حسابه بعد",
+  discount_over_limit: "الخصم أكبر من المسموح لك",
+  discount_too_large: "الخصم أكبر من السعر",
   duplicate_code: "الكود مستخدم من قبل",
   duplicate_key: "المفتاح مستخدم من قبل",
   duplicate_label: "الاسم مستخدم من قبل",
@@ -57,6 +60,7 @@ const errors: Record<ApiErrorCode, string> = {
   network_error: "تعذر الاتصال، تأكد من الإنترنت وحاول مرة أخرى",
   not_found: "العنصر غير موجود",
   order_cancelled: "الطلب ملغي",
+  order_locked: "لا يمكن تعديل الأسعار بعد بدء تجهيز الطلب",
   otp_attempts_exceeded: "تجاوزت عدد المحاولات، اطلب كودًا جديدًا",
   otp_expired: "انتهت صلاحية الكود، اطلب كودًا جديدًا",
   otp_invalid: "الكود غير صحيح",
@@ -489,6 +493,10 @@ export const ar = {
     returnedTotal: "قيمة المرتجع",
     netTotal: "الصافي بعد المرتجع",
     refunded: (amount: string) => `تم رد ${amount} لك`,
+    // BR-PR08, D85: the merchant's discounts, shown as a crossed list price and a line in the totals.
+    itemsTotal: "إجمالي الأصناف",
+    orderDiscount: "خصم",
+    listPrice: "السعر قبل الخصم",
   },
   statement: {
     title: "كشف الحساب",

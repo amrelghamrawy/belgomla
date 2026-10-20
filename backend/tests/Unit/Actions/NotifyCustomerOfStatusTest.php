@@ -134,3 +134,14 @@ test('BR-O11 the placed message respects the customer\'s opt-out', function (): 
 
     expect(($this->message)())->toBeNull();
 });
+
+test('D85 a discount is told only when the store notifies discounts', function (): void {
+    app(NotifyCustomerOfStatus::class)->discounted($this->order->refresh());
+
+    expect(($this->message)())->toBeNull();
+
+    App\Modules\Tenancy\Models\TenantSetting::query()->whereKey($this->tenant->id)->update(['order_notify_statuses' => json_encode(['discount'])]);
+    app(NotifyCustomerOfStatus::class)->discounted($this->order->refresh());
+
+    expect(($this->message)()?->body)->toContain('تم تطبيق خصم على طلبك');
+});

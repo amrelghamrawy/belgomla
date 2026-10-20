@@ -171,3 +171,11 @@ test('BR-O11 the cart sku query finds several skus keyed by id, leaving out unkn
     expect($found->keys()->sort()->values()->all())->toBe(collect([$a->id, $b->id])->sort()->values()->all())
         ->and(array_keys($found->get($a->id)?->getRelations() ?? []))->toBe(['product', 'sellingUnit', 'tiers', 'inventory']);
 });
+
+test('D85 the sales discount cap of the store, null until the owner sets one', function (): void {
+    expect(app(CurrentTenantSettingsQuery::class)->maxDiscountPercentSales())->toBeNull();
+
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['max_discount_percent_sales' => '12.5']);
+
+    expect(app(CurrentTenantSettingsQuery::class)->maxDiscountPercentSales())->toBe('12.50');
+});

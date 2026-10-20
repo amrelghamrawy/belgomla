@@ -342,7 +342,7 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | Method | Path                           | Notes                                       |
 | ------ | ------------------------------ | ------------------------------------------- |
 | GET    | `/api/dashboard/settings`      |                                             |
-| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default`. V2 Task 03: `order_notify_statuses` (list of `confirmed|preparing|out_for_delivery|delivered|cancelled`, each once) and `order_status_messages` (object status → text ≤ 500 with the BR-N03 placeholders, `{سبب_الإلغاء}` only in `cancelled`; null/empty/default text = default); the dashboard response adds both plus `order_status_message_defaults`. V2 Task 04: `pending_expiry_hours` (null/empty = off, 1–720, never below `stale_pending_hours`, compared with the stored value when only one is sent; dashboard only) |
+| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default`. V2 Task 03: `order_notify_statuses` (list of `confirmed|preparing|out_for_delivery|delivered|cancelled`, each once) and `order_status_messages` (object status → text ≤ 500 with the BR-N03 placeholders, `{سبب_الإلغاء}` only in `cancelled`; null/empty/default text = default); the dashboard response adds both plus `order_status_message_defaults`. V2 Task 04: `pending_expiry_hours` (null/empty = off, 1–720, never below `stale_pending_hours`, compared with the stored value when only one is sent; dashboard only). V2 Task 08: `max_discount_percent_sales` (null = sales cannot discount, else > 0 and < 100; dashboard only) and `discount` in `order_notify_statuses` / `order_status_messages` (D85) |
 | POST   | `/api/dashboard/settings/logo` | multipart; also `/favicon`                  |
 | GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
@@ -536,6 +536,7 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by
 | POST   | `/api/dashboard/orders/{number}/transition`       | `{ "to": "confirmed                                                                                                  | preparing | out_for_delivery | delivered", "note"?, "collect_full_amount"?: true }` |
 | POST   | `/api/dashboard/orders/{number}/cancel`           | `{ "reason" }`; any non-terminal; `409` if `collected_amount > 0` (BR-O03)                                           |
 | PUT    | `/api/dashboard/orders/{number}/delivery-address` | allowed before `out_for_delivery` (D9); audited                                                                      |
+| PUT    | `/api/dashboard/orders/{number}/discount` | V2 Task 08: manual discounts while `pending`/`confirmed` (BR-PR08, D85); `orders.discount`, `idempotent`; audited |
 
 `transition` rules (BR-O01): target must be forward of current; `delivered` triggers inventory deduction and, with `collect_full_amount: true`, creates one collection for the remaining balance in the same transaction (BR-C04). Invalid → `409 invalid_transition` with `{ "details": { "from": "preparing", "to": "confirmed" } }`.
 
@@ -544,6 +545,18 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 V2 Task 04: every dashboard order adds `expires_at` (when a pending order cancels itself; null when it is not pending or the store has no `pending_expiry_hours`), and `cancelled_by` can be `system` (D81).
 
 V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about the order, oldest first: `{ purpose, purpose_label, channel, status, sent_at }` (fallback copies included). A transition to a status in `order_notify_statuses`, and a merchant cancel, send the customer a message after commit (BR-N03).
+
+### Manual discounts (V2 Task 08, BR-PR08, D85)
+
+`PUT /api/dashboard/orders/{number}/discount` with `{ items: [{ order_item_id, type, value }], order: { type, value, reason } | null }` is the whole discount state of the order: a line left out has none, `order: null` (or no type) removes the order discount. `type` is `amount` (EGP off per unit / off the order) or `percent` (> 0 and < 100); `value` > 0 with at most 2 decimals; a line once, ≤ 200 lines; `reason` (≤ 300) is required with an order discount. Answers the dashboard order detail.
+
+- `409 order_locked` from `preparing` on; `422 discount_too_large` when a unit or the order would go below 0.01 (`details.list_unit_price` / `details.items_total`); `409 below_collected` when the new total is under the collected amount (`details.collected_amount`, `details.order_total`); a line of another order → `422 validation_failed` on `items.N.order_item_id`.
+- A sales user: line discounts only, each ≤ `max_discount_percent_sales` % off the list price, else `403 discount_over_limit` (`details.max_percent`, null when the store set no cap). Removing a discount is always allowed.
+- Every order line (store and dashboard) adds `list_unit_price` and `manual_discount` (`{ type, value }` or null); `unit_price` and `line_total` are the charged prices. Every order adds `discount` (`{ type, value, amount }` or null; the dashboard adds `reason`); `order_total = items_total − discount.amount`.
+- The history gets a note «خصم»; audit `order.discount_changed` with the old and new values of the changed lines and the order totals. The customer gets the `discount` WhatsApp text only when `order_notify_statuses` holds `discount`.
+- `POST /api/dashboard/orders` (below) accepts `lines[].discount { type, value }` and `discount { type, value, reason }`, applied after the order is placed at list prices (same rules, one `order.discount_changed`, no `discount` message).
+- Returns: `returnable[].unit_price` and the return lines are priced at the line price less the order discount's share; the last return absorbs the rounding (D85).
+- Settings: `max_discount_percent_sales` (null or > 0 and < 100, 2 decimals; dashboard only); `order_notify_statuses` accepts `discount` and `order_status_messages` a `discount` text.
 
 ### Merchant-placed orders (V2 Task 07, BR-O11, D84)
 

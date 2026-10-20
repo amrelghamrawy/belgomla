@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   addLine,
+  discountedQuote,
   type DraftLine,
+  orderLinesBody,
   quoteBody,
   quotedLine,
   quotePasses,
   removeLine,
   setQuantity,
 } from "@/lib/dashboard/new-order";
+
+import { NO_DISCOUNT } from "@/lib/dashboard/price-math";
 
 import { orderQuote as quote, orderQuoteLine as quoteLine } from "../../dashboard-fixtures";
 
@@ -76,5 +80,35 @@ describe("quotePasses (BR-PR06, D84)", () => {
     expect(quotedLine(quote(), 3)?.unit_price).toBe("85.00");
     expect(quotedLine(quote(), 4)).toBeUndefined();
     expect(quotedLine(undefined, 3)).toBeUndefined();
+  });
+});
+
+describe("discounts on the form (D85)", () => {
+  const lines = [
+    { sku_id: 3, quantity: 12, name: "الأضواء علوم", code: "ADW-SCI" },
+    { sku_id: 4, quantity: 5, name: "سلاح التلميذ", code: "SLH" },
+  ];
+
+  it("sends a line's discount only when it has one", () => {
+    expect(orderLinesBody(lines, { 3: { type: "percent", value: " 10 " }, 4: { type: "amount", value: "" } })).toEqual([
+      { sku_id: 3, quantity: 12, discount: { type: "percent", value: "10" } },
+      { sku_id: 4, quantity: 5 },
+    ]);
+  });
+
+  it("prices the discounts from the quoted prices, and has nothing to show before every line is quoted", () => {
+    const quoted = quote({
+      lines: [quoteLine(), quoteLine({ sku_id: 4, quantity: 5, unit_price: "20.00", line_total: "100.00" })],
+    });
+
+    expect(
+      discountedQuote(quoted, lines, { 3: { type: "percent", value: "10" } }, { type: "amount", value: "18" }),
+    ).toMatchObject({
+      items_total: "1018.00",
+      discount_amount: "18.00",
+      order_total: "1000.00",
+    });
+    expect(discountedQuote(quote(), lines, {}, NO_DISCOUNT)).toBeNull();
+    expect(discountedQuote(undefined, lines, {}, NO_DISCOUNT)).toBeNull();
   });
 });

@@ -36,3 +36,9 @@ test('BR-N03 unknown placeholders are listed once, in order, and the reason is u
 test('BR-N03 every default fits the 500-character limit', function (): void {
     expect(array_filter(OrderStatusMessage::DEFAULTS, fn (string $text): bool => mb_strlen($text) > OrderStatusMessage::MAX_LENGTH))->toBe([]);
 });
+
+test('D85 discount is an event a store may notify, told with the new total', function (): void {
+    expect(OrderStatusMessage::NOTIFIABLE)->toContain('discount')
+        ->and(OrderStatusMessage::render('discount', null, ['customer' => 'محمود', 'store' => 'مكتبة النور', 'number' => 7, 'status' => 'مؤكد', 'total' => '900.00', 'reason' => null]))
+        ->toBe('أهلًا محمود، تم تطبيق خصم على طلبك رقم 7 من مكتبة النور، والإجمالي الآن 900.00.');
+});

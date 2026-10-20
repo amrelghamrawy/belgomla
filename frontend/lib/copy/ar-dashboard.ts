@@ -493,6 +493,10 @@ export const dashboard = {
       overrideMovHint: "لهذا الطلب فقط، ويُسجَّل في سجل العمليات",
       submit: "تسجيل الطلب",
       submitting: "جارٍ التسجيل…",
+      // D85: discounts given while placing the order, applied after the checks at list prices.
+      discounts: "الخصومات",
+      discountsHint: "تُطبق بعد التحقق من الحد الأدنى وحد الائتمان بأسعار القائمة",
+      totalAfterDiscount: "الإجمالي بعد الخصم",
       placed: (n: number) => `تم تسجيل الطلب #${n}`,
     },
     all: "الكل",
@@ -579,6 +583,29 @@ export const dashboard = {
     creditApplied: "تم الخصم من رصيد العميل",
     dueAt: "تاريخ الاستحقاق",
     overdue: "متأخر السداد",
+    // BR-PR08, D85: manual discounts while the order is pending or confirmed.
+    discount: {
+      button: "خصم",
+      title: "خصم على الطلب",
+      hint: "خصم على سعر الوحدة لكل صنف، و/أو خصم على إجمالي الطلب. متاح قبل بدء التجهيز، ويُسجَّل في سجل العمليات.",
+      line: (name: string) => `خصم ${name}`,
+      type: (name: string) => `نوع الخصم: ${name}`,
+      amount: "ج.م",
+      percent: "%",
+      order: "خصم على إجمالي الطلب",
+      orderValue: "قيمة خصم الطلب",
+      orderType: "نوع خصم الطلب",
+      reason: "سبب خصم الطلب",
+      reasonRequired: "اكتب سبب الخصم على الطلب",
+      invalid: "خصم غير صالح أو أكبر من السعر",
+      orderInvalid: "خصم الطلب غير صالح أو أكبر من الإجمالي",
+      save: "حفظ الخصم",
+      saved: "تم حفظ الخصم",
+      salesCap: (percent: string) => `أقصى خصم مسموح لك ${percent}% على الصنف، بدون خصم على الإجمالي`,
+      totals: "الإجمالي بعد الخصم",
+    },
+    discountTotal: "خصم الطلب",
+    listPrice: "قبل الخصم",
   },
 
   returns: {
@@ -730,6 +757,11 @@ export const dashboard = {
     expiryHint:
       "اتركه فارغًا لإيقافه. الطلب الملغي تلقائيًا تعود كميته المحجوزة للمخزون، ويُبلَّغ العميل إن كانت رسالة الإلغاء مفعلة.",
     expiryRange: "من 1 إلى 720 ساعة",
+    // D85: how far a sales user may discount an order line.
+    salesDiscount: "أقصى خصم لمستخدم المبيعات على الصنف (%)",
+    salesDiscountHint:
+      "اتركه فارغًا ليمنع المبيعات من الخصم. المالك والمدير يعطيان أي خصم، والخصم على إجمالي الطلب لهما فقط.",
+    salesDiscountRange: "نسبة أكبر من 0 وأقل من 100، برقمين عشريين على الأكثر",
     expiryBelowStale: (stale: number) => `يجب ألا تقل عن مدة اعتبار الطلب متأخرًا (${stale} ساعة)`,
     defaultTerms: "مهلة السداد الافتراضية (يوم)",
     defaultLimit: "حد الائتمان الافتراضي",
@@ -754,6 +786,8 @@ export const dashboard = {
       title: "رسائل حالة الطلب",
       hint: "تصل للعميل على واتساب (من رقم متجرك إن كان مربوطًا) عند تغيير حالة طلبه. لا تُرسل SMS، ويستطيع العميل إيقافها من حسابه.",
       notify: (status: string) => `أرسل رسالة عند: ${status}`,
+      // D85: not a status, the merchant changed the order's discounts (off by default).
+      discountEvent: "خصم على الطلب",
       label: (status: string) => `نص رسالة «${status}»`,
       insert: "أضف إلى النص:",
       placeholders: {

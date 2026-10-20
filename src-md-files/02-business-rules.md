@@ -62,6 +62,7 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 | `orders.manage` (transition, cancel, address) | ✓ | ✓ | ✓ | ✓ (preparing / out for delivery only, no cancel) | |
 | `orders.create` (place an order for a customer, V2 Task 07, BR-O11) | ✓ | ✓ | ✓ | | |
 | `orders.override_mov` (waive the minimum order value of one such order, D84) | ✓ | ✓ | | | |
+| `orders.discount` (manual discounts, V2 Task 08, BR-PR08; sales: line discounts up to the store's cap only, D85) | ✓ | ✓ | ✓ | | |
 | `orders.returns` | ✓ | ✓ | | ✓ | |
 | `customers.manage` | ✓ | ✓ | ✓ | | |
 | `customers.credit` (limits, terms) | ✓ | ✓ | | | ✓ |
@@ -428,10 +429,17 @@ A merchant with hundreds of books sets prices per publisher or per grade, not pe
 
 Products without `cover_price` are skipped and reported.
 
-### BR-PR08 — No Manual Discount in V1
+### BR-PR08 — Manual Discounts (V2 Task 08, D85)
 
-Manual order/item discounts are explicitly postponed to V2.
+V1 had none. From V2 the merchant may lower the price of an order that is still `pending` or `confirmed`:
 
+- **Line discount**: per unit, an amount in EGP or a % off the line's list price (the price the order was placed at, `list_unit_price`). The line's `unit_price` becomes the discounted price, never below 0.01, and `line_total = unit_price × quantity` as before.
+- **Order discount**: an amount or a % of the items total (after the line discounts), with a required reason; the order total never goes below 0.01.
+- Percentages are rounded half-up to the piaster (D27). Removing a discount restores the list price.
+- Who: `orders.discount` (owner, manager, sales). A sales user gives line discounts only, each at most the store's `max_discount_percent_sales` % (none by default = no discounts by sales).
+- The new total can never be below what was already collected. The collection status is derived again.
+- Every change is audited (`order.discount_changed`, old and new values) and noted in the order history («خصم»). The customer sees the discounted prices and the order discount (not the reason), and gets a WhatsApp message only if the store notifies `discount` (BR-N03).
+- A line's `discount_percent` (shown next to a tier price) is unrelated: it is the display margin off the cover price (BR-PR10).
 ### BR-PR09 — Taxes
 
 Prices entered by the merchant are final customer prices. V1 has no tax engine and does not add VAT on top.
@@ -588,6 +596,8 @@ The merchant is responsible for delivery in V1.
 
 `order_total = Σ line_total`. No fees, discounts or taxes in V1.
 
+V2 (Task 08): `items_total = Σ line_total` (line totals after their line discounts) and `order_total = items_total − discount_amount`, the order discount (BR-PR08). A CHECK holds it.
+
 V2 (Task 01): `net_total = order_total − returned_total`, where `returned_total` is the sum of the order's live returns (BR-R04). Everything the customer owes is computed on the net total.
 
 ### BR-O09 — Order Number
@@ -630,7 +640,7 @@ Per order line, the returnable quantity is the delivered quantity minus what liv
 
 ### BR-R04 — Return Price and Refund
 
-A returned line is priced at the order line's snapshot `unit_price` (D74), never re-priced by tier. The order's `returned_total` rises by the return's total and its **net total** (`order_total − returned_total`, BR-O08) drops. If the order was already collected beyond the new net total, the difference goes back to the customer in cash: the merchant must confirm it (`refund: true`, otherwise `422 refund_required` with the amount and nothing is saved), and it is recorded as a `refund` collection tied to the return. Keeping it as customer credit instead is Task 02.
+A returned line is priced at the order line's snapshot `unit_price` (D74), never re-priced by tier. When the order has an order discount (BR-PR08), the line returns at that price less the discount's share (`× order_total / items_total`), rounded half-up per return line; the return that brings the last units of the order back takes exactly what is left of the order total, so returns never add up to more than it (D85). The order's `returned_total` rises by the return's total and its **net total** (`order_total − returned_total`, BR-O08) drops. If the order was already collected beyond the new net total, the difference goes back to the customer in cash: the merchant must confirm it (`refund: true`, otherwise `422 refund_required` with the amount and nothing is saved), and it is recorded as a `refund` collection tied to the return. Keeping it as customer credit instead is Task 02.
 
 ### BR-R05 — Returns in Totals and Reports
 
@@ -807,7 +817,7 @@ Customers get no in-app notifications; they see the status on "my orders" and re
 
 ### BR-N03 — Order Status Messages (V2 Task 03)
 
-- When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`; a new store starts with all but `preparing`.
+- When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`, and from V2 Task 08 `discount` (the merchant changed the order's discounts; the message gives the new total, D85); a new store starts with all but `preparing` and `discount`.
 - The merchant words each status in settings (`order_status_messages`), up to 500 characters, with the placeholders `{اسم_العميل}`, `{اسم_المتجر}`, `{رقم_الطلب}`, `{حالة_الطلب}`, `{الإجمالي}`, plus `{سبب_الإلغاء}` in the cancelled text only. Any other `{…}` is rejected. No wording (or the default sent back) = the platform default text.
 - A cancel tells the customer only when the merchant cancels; a customer cancelling their own order gets nothing.
 - The message is sent after the change commits: a change that rolls back sends nothing. A customer over their order-message limit (D79) is skipped and logged, and the change still succeeds.
@@ -864,6 +874,7 @@ Tenant settings include, at minimum:
 - `default_payment_terms_days`, `default_credit_limit`: the credit terms a new customer starts with (null = none; BR-C05, BR-C06).
 - `order_notify_statuses`: the order statuses customers are told about by WhatsApp (default confirmed, out for delivery, delivered, cancelled; BR-N03).
 - `order_status_messages`: the merchant's wording per status (a missing entry = platform default; BR-N03).
+- `max_discount_percent_sales`: the most a sales user may take off an order line, in % (null = sales users cannot discount, the default; BR-PR08, D85).
 - Store WhatsApp number linked by QR (D70; kept in `whatsapp_connections`, not in the settings row).
 
 ---

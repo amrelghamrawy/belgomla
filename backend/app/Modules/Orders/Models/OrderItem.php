@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Models;
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\OrderItemFactory;
@@ -29,7 +30,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $quantity selling units
  * @property int $quantity_base base units, what the order reserves (BR-INV03)
  * @property string|null $cover_price
- * @property string $unit_price
+ * @property string $list_unit_price the price before the manual discount (BR-PR08, D85)
+ * @property DiscountType|null $manual_discount_type
+ * @property string|null $manual_discount_value per unit: EGP off or % off the list price
+ * @property string $unit_price the price charged per unit, after the manual discount
  * @property string|null $discount_percent
  * @property int|null $tier_min_quantity
  * @property string $line_total
@@ -78,6 +82,9 @@ final class OrderItem extends Model
             'quantity' => 'integer',
             'quantity_base' => 'integer',
             'cover_price' => 'decimal:2',
+            'list_unit_price' => 'decimal:2',
+            'manual_discount_type' => DiscountType::class,
+            'manual_discount_value' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'discount_percent' => 'decimal:2',
             'tier_min_quantity' => 'integer',

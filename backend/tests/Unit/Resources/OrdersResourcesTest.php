@@ -18,6 +18,7 @@ use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\TenantContext;
 
 beforeEach(function (): void {
@@ -34,6 +35,7 @@ beforeEach(function (): void {
         'status_label' => 'قيد الانتظار',
         'placed_at' => now()->toIso8601String(),
         'items_total' => '170.00',
+        'discount' => null,
         'order_total' => '170.00',
         'returned_total' => '0.00',
         'net_total' => '170.00',
@@ -59,12 +61,30 @@ test('the store order detail adds the lines and the history', function (): void 
     expect(rendered(new OrderResource($order), storeRequest('/api/store/orders/1024')))->toBe([
         ...($this->expectedBase)($order),
         'items' => [[
-            'sku_id' => $item->sku_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
-            'unit' => $item->unit_name, 'conversion_factor' => 1, 'quantity' => 2, 'cover_price' => null, 'unit_price' => '85.00',
-            'discount_percent' => null, 'tier_min_quantity' => null, 'line_total' => '170.00',
+            'id' => $item->id, 'sku_id' => $item->sku_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
+            'unit' => $item->unit_name, 'conversion_factor' => 1, 'quantity' => 2, 'cover_price' => null, 'list_unit_price' => '85.00',
+            'manual_discount' => null, 'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => null, 'line_total' => '170.00',
         ]],
         'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
     ]);
+});
+
+test('D85 a discounted line shows its list price, the discount and the price charged', function (): void {
+    $item = OrderItem::query()->firstOrFail();
+    $item->forceFill(['manual_discount_type' => DiscountType::Percent, 'manual_discount_value' => '10', 'unit_price' => '76.50', 'line_total' => '153.00'])->save();
+
+    expect(rendered(new OrderItemResource($item), storeRequest()))->toMatchArray([
+        'list_unit_price' => '85.00', 'manual_discount' => ['type' => 'percent', 'value' => '10.00'], 'unit_price' => '76.50', 'line_total' => '153.00',
+    ]);
+});
+
+test('D85 the store shows the order discount without the merchant\'s reason, the dashboard with it', function (): void {
+    $this->order->forceFill(['discount_type' => DiscountType::Amount, 'discount_value' => '20', 'discount_amount' => '20', 'discount_reason' => 'عميل دائم', 'order_total' => '150.00'])->save();
+    $order = Order::query()->findOrFail($this->order->id);
+
+    expect(rendered(new OrderResource($order), storeRequest('/api/store/orders'))['discount'])->toBe(['type' => 'amount', 'value' => '20.00', 'amount' => '20.00'])
+        ->and(rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders'))['discount'])
+        ->toBe(['type' => 'amount', 'value' => '20.00', 'amount' => '20.00', 'reason' => 'عميل دائم']);
 });
 
 test('a cancelled order shows the reason and who cancelled', function (): void {
@@ -77,8 +97,8 @@ test('the order item resource is the line snapshot', function (): void {
     $item = OrderItem::query()->firstOrFail();
 
     expect(array_keys(rendered(new OrderItemResource($item), storeRequest())))->toBe([
-        'sku_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'unit_price',
-        'discount_percent', 'tier_min_quantity', 'line_total',
+        'id', 'sku_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'list_unit_price',
+        'manual_discount', 'unit_price', 'discount_percent', 'tier_min_quantity', 'line_total',
     ]);
 });
 

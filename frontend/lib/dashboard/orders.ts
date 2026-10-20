@@ -121,6 +121,33 @@ export function useUpdateDeliveryAddress(number: number) {
   });
 }
 
+export type OrderDiscountInput = {
+  items: { order_item_id: number; type: "amount" | "percent"; value: string }[];
+  order: { type: "amount" | "percent"; value: string; reason: string } | null;
+};
+
+/**
+ * BR-PR08, D85: the whole discount state of a pending or confirmed order (a line left out has none), retry-safe
+ * (D55). The answer is the order with its new totals; lists and reports follow its total.
+ */
+export function useApplyDiscount(number: number) {
+  const store = useStoreOrder();
+  const idempotency = useIdempotencyKey(`discount-${number}`);
+
+  return useMutation({
+    mutationFn: (body: OrderDiscountInput) =>
+      apiFetch<DashboardOrderDetail>(`/api/dashboard/orders/${number}/discount`, {
+        method: "PUT",
+        body,
+        headers: { "Idempotency-Key": idempotency.keyFor(body) },
+      }),
+    onSuccess: (order) => {
+      idempotency.reset();
+      store(order);
+    },
+  });
+}
+
 /** Records a cash collection; the order is refetched for its new collected amount and status. */
 export function useRecordCollection(number: number) {
   const queryClient = useQueryClient();

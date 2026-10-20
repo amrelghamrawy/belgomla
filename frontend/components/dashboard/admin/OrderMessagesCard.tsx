@@ -82,7 +82,7 @@ type StatusMessageProps = {
 
 function StatusMessage({ status, storeName, enabled, text, fallback, error, onToggle, onText }: StatusMessageProps) {
   const box = useRef<HTMLTextAreaElement | null>(null);
-  const label = ar.orders.statuses[status];
+  const label = status === "discount" ? copy.discountEvent : ar.orders.statuses[status];
   const id = `order-message-${status}`;
 
   const insert = (token: string) => {

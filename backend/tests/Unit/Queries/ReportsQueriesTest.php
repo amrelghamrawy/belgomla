@@ -55,6 +55,17 @@ test('D5 the sales report sums delivered orders per business day, empty days as 
     ]);
 });
 
+test('D85 the sales report counts a discounted order at its total after the discount', function (): void {
+    Order::factory()->delivered()->create([
+        'customer_id' => $this->customer->id, 'items_total' => '540.00', 'discount_type' => 'percent', 'discount_value' => '10', 'discount_amount' => '54.00',
+        'discount_reason' => 'عميل دائم', 'order_total' => '486.00', 'delivered_at' => CarbonImmutable::parse('2026-10-10 09:00:00', 'UTC'),
+    ]);
+
+    expect(($this->sales)('2026-10-10', '2026-10-10', SalesGrouping::Day)['buckets'])->toBe([
+        ['period_start' => '2026-10-10', 'orders' => 1, 'gross' => '486.00', 'returns' => '0.00', 'net' => '486.00'],
+    ]);
+});
+
 test('D60 an order delivered after midnight in cairo counts on the next day', function (): void {
     ($this->delivered)('2026-10-08 21:30:00');
 

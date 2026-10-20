@@ -49,3 +49,8 @@ export function allowsAddressEdit(status: OrderStatus): boolean {
 export function canCollect(status: OrderStatus): boolean {
   return status !== "cancelled";
 }
+
+/** BR-PR08, D85: discounts are given while the order is pending or confirmed (409 order_locked after). */
+export function allowsPriceChange(status: OrderStatus): boolean {
+  return status === "pending" || status === "confirmed";
+}

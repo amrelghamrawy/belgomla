@@ -12,6 +12,7 @@ use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Orders\Models\Scopes\Open;
 use App\Modules\Orders\Models\Scopes\Stale;
+use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -27,18 +28,21 @@ test('to array', function (): void {
         'id', 'tenant_id', 'number', 'customer_id', 'status', 'items_total', 'order_total', 'collected_amount', 'collection_status',
         'delivery_name', 'delivery_phone', 'delivery_address', 'customer_note', 'cancel_reason', 'cancelled_by_type',
         'placed_at', 'confirmed_at', 'delivered_at', 'cancelled_at', 'created_at', 'updated_at', 'returned_total', 'due_at',
-        'placed_by_type', 'placed_by_id',
+        'placed_by_type', 'placed_by_id', 'discount_type', 'discount_value', 'discount_amount', 'discount_reason',
     ]);
 });
 
 test('casts: enums, money strings, the address array and immutable timestamps', function (): void {
-    $order = Order::factory()->cancelled(CancelledBy::Customer)->create(['items_total' => 1020, 'order_total' => '1020.5'])->fresh();
+    $order = Order::factory()->cancelled(CancelledBy::Customer)->create(['items_total' => 1020, 'discount_type' => 'amount', 'discount_value' => 19.5, 'discount_amount' => '19.5', 'discount_reason' => 'عميل دائم', 'order_total' => '1000.5'])->fresh();
 
     expect($order?->status)->toBe(OrderStatus::Cancelled)
         ->and($order?->collection_status)->toBe(CollectionStatus::Unpaid)
         ->and($order?->cancelled_by_type)->toBe(CancelledBy::Customer)
         ->and($order?->items_total)->toBe('1020.00')
-        ->and($order?->order_total)->toBe('1020.50')
+        ->and($order?->discount_type)->toBe(DiscountType::Amount)
+        ->and($order?->discount_value)->toBe('19.50')
+        ->and($order?->discount_amount)->toBe('19.50')
+        ->and($order?->order_total)->toBe('1000.50')
         ->and($order?->collected_amount)->toBe('0.00')
         ->and($order?->delivery_address)->toBeArray()->toHaveKey('city', 'مدينة نصر')
         ->and($order?->placed_at)->toBeInstanceOf(CarbonImmutable::class)
@@ -97,3 +101,12 @@ test('the open scope leaves out delivered and cancelled orders', function (): vo
 
     expect(Order::query()->tap(new Open)->orderBy('id')->pluck('id')->all())->toBe($open);
 });
+
+test('BR-O08 D85 the database keeps order_total = items_total − discount_amount and a discount complete', function (array $attributes): void {
+    expect(fn () => Order::factory()->create(['items_total' => '100.00', 'order_total' => '100.00', ...$attributes]))->toThrow(QueryException::class);
+})->with([
+    'total not after the discount' => [['discount_type' => 'amount', 'discount_value' => '10', 'discount_amount' => '10.00', 'discount_reason' => 'x']],
+    'a discount without a reason' => [['discount_type' => 'amount', 'discount_value' => '10', 'discount_amount' => '10.00', 'order_total' => '90.00']],
+    'an amount without a discount' => [['discount_amount' => '10.00', 'order_total' => '90.00']],
+    'more than the items' => [['discount_type' => 'amount', 'discount_value' => '110', 'discount_amount' => '110.00', 'discount_reason' => 'x', 'order_total' => '-10.00']],
+]);

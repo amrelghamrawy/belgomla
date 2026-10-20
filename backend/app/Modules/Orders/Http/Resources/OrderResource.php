@@ -14,7 +14,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * An order as the customer sees it (08-api-contract.md §3). The list leaves out `items`, `history` and `returns`; the
  * detail loads them (OrderDetailQuery; the customer sees live returns only, without the merchant's reason, BR-R05).
- * `net_total` = order_total − returned_total (BR-O08). DashboardOrderResource builds on this shape.
+ * `net_total` = order_total − returned_total, `order_total` = items_total − the order discount (`discount`, null for
+ * none, without the merchant's reason, D85) (BR-O08). DashboardOrderResource builds on this shape.
  *
  * @property-read Order $resource
  */
@@ -33,6 +34,7 @@ final class OrderResource extends JsonResource
             'status_label' => $order->status->label(),
             'placed_at' => $order->placed_at->toIso8601String(),
             'items_total' => $order->items_total,
+            'discount' => $order->discount_type === null ? null : ['type' => $order->discount_type->value, 'value' => $order->discount_value, 'amount' => $order->discount_amount],
             'order_total' => $order->order_total,
             'returned_total' => $order->returned_total,
             'net_total' => $order->netTotal(),
