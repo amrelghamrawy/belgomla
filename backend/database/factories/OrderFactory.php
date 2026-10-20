@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
@@ -41,6 +42,8 @@ final class OrderFactory extends Factory
                 'landmark' => null,
             ],
             'customer_note' => null,
+            'placed_by_type' => ActorType::Customer,
+            'placed_by_id' => null,
             'placed_at' => now(),
         ];
     }
@@ -99,6 +102,12 @@ final class OrderFactory extends Factory
     public function stale(int $hours = 25): static
     {
         return $this->state(['status' => OrderStatus::Pending, 'placed_at' => now()->subHours($hours)]);
+    }
+
+    /** BR-O11: placed from the dashboard by a store user on the customer's behalf. */
+    public function placedByMerchant(int $tenantUserId = 1): static
+    {
+        return $this->state(['placed_by_type' => ActorType::TenantUser, 'placed_by_id' => $tenantUserId]);
     }
 
     /** Some of the order collected already (BR-O03), as Collections (Task 7) would leave it. */

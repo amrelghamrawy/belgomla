@@ -22,6 +22,8 @@ const errors: Record<ApiErrorCode, string> = {
   credit_voided: "تم إلغاء هذا الرصيد",
   cover_price_required: "أدخل السعر المرجعي (الغلاف أو القطاعي) أولًا لاستخدام النسبة",
   csrf_token_mismatch: "انتهت صلاحية الجلسة، أعد تحميل الصفحة",
+  customer_blocked: "هذا العميل محظور، ألغِ الحظر أولًا",
+  customer_not_active: "هذا العميل لم يفعّل حسابه بعد",
   duplicate_code: "الكود مستخدم من قبل",
   duplicate_key: "المفتاح مستخدم من قبل",
   duplicate_label: "الاسم مستخدم من قبل",

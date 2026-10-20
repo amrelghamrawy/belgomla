@@ -175,11 +175,12 @@ export const FIELD_TYPES: readonly FieldType[] = ["text", "number", "select", "b
 /** The list keys a products URL understands (facets `f[key]` are always read). */
 export const PRODUCT_LIST_KEYS = ["q", "category", "status", "low_stock", "sort", "page"] as const;
 
-export function useDashboardProducts(query: ListQuery) {
+export function useDashboardProducts(query: ListQuery, enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardProductsList(query),
     queryFn: () => apiFetchPage<DashboardProduct>(withQuery("/api/dashboard/products", query)),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

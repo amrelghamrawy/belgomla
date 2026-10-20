@@ -51,6 +51,17 @@ export function ExpiryBadge({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+/** BR-O11: the order was placed from the dashboard on the customer's behalf. */
+export function PlacedByMerchantBadge() {
+  return (
+    <Hint text={ar.dashboard.orders.placedByMerchantHint}>
+      <Badge variant="outline" tabIndex={0} data-testid="placed-by-merchant">
+        {ar.dashboard.orders.placedByMerchant}
+      </Badge>
+    </Hint>
+  );
+}
+
 export function StaleBadge() {
   return (
     <Hint text={ar.dashboard.orders.staleHint}>

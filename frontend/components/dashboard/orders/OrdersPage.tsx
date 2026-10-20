@@ -1,5 +1,6 @@
 "use client";
 
+import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 
@@ -13,6 +14,7 @@ import type { CollectionStatus, OrderStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
 import { ORDER_LIST_KEYS, useOrders } from "@/lib/dashboard/orders";
+import { useCan } from "@/lib/dashboard/permissions";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -22,7 +24,7 @@ import { CustomerPicker } from "../common/CustomerPicker";
 import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
-import { CollectionStatusBadge, ExpiryBadge, OrderStatusBadge, StaleBadge } from "./OrderBadges";
+import { CollectionStatusBadge, ExpiryBadge, OrderStatusBadge, PlacedByMerchantBadge, StaleBadge } from "./OrderBadges";
 
 const copy = ar.dashboard.orders;
 const STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
@@ -33,6 +35,7 @@ export function OrdersPage() {
   const [query, setQuery] = useListQuery(ORDER_LIST_KEYS);
   const orders = useOrders(query);
   const [q, setQ] = useState(query.q ?? "");
+  const allowed = useCan();
 
   const search = (event: FormEvent) => {
     event.preventDefault();
@@ -41,7 +44,19 @@ export function OrdersPage() {
 
   return (
     <>
-      <PageHeader title={copy.title} />
+      <PageHeader
+        title={copy.title}
+        actions={
+          allowed("orders.create") ? (
+            <Button asChild>
+              <Link href="/dashboard/orders/new">
+                <PlusIcon />
+                {copy.newOrder}
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
       <nav aria-label={copy.status} className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
         {[undefined, ...STATUSES].map((status) => {
           const active = query.status === status;
@@ -163,6 +178,7 @@ export function OrdersPage() {
                       <OrderStatusBadge status={order.status} />
                       {order.is_stale && <StaleBadge />}
                       {order.expires_at !== null && <ExpiryBadge expiresAt={order.expires_at} />}
+                      {order.placed_by === "tenant_user" && <PlacedByMerchantBadge />}
                     </span>
                   </TableCell>
                   <TableCell>

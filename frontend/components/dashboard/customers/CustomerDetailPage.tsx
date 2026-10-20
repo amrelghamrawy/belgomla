@@ -1,21 +1,16 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronRightIcon, PencilIcon, TrashIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { LedgerTable } from "@/components/shared/LedgerTable";
-import { TextField } from "@/components/shared/TextField";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FieldError, FieldLabel } from "@/components/ui/field";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,7 +30,6 @@ import {
 import { pageOf } from "@/lib/dashboard/list-query";
 import { toPiasters } from "@/lib/dashboard/price-math";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
-import { addressSchema, type AddressFormValues } from "@/lib/forms/address";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
@@ -45,6 +39,7 @@ import { useCan } from "@/lib/dashboard/permissions";
 import { Pager } from "../common/Pager";
 import { ReasonDialog } from "../common/ReasonDialog";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { AddressDialog, addressInput } from "./AddressDialog";
 import { CustomerStatusBadge, inviteMessage } from "./CustomerStatusBadge";
 
 const copy = ar.dashboard.customers;
@@ -98,7 +93,16 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
             )}
           </span>
         }
-        actions={allowed("customers.manage") ? <CustomerActions customer={customer} /> : undefined}
+        actions={
+          <>
+            {allowed("orders.create") && customer.status === "active" && (
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/orders/new?customer=${customer.id}`}>{copy.newOrderFor}</Link>
+              </Button>
+            )}
+            {allowed("customers.manage") && <CustomerActions customer={customer} />}
+          </>
+        }
       />
       {customer.status === "blocked" && customer.blocked_reason !== null && (
         <Alert variant="destructive">
@@ -200,19 +204,6 @@ export function creditTerms(
   return {
     credit_limit: cleanLimit === "" ? null : cleanLimit,
     payment_terms_days: cleanTerms === "" ? null : Number(cleanTerms),
-  };
-}
-
-function addressInput(address: NonNullable<DashboardCustomer["addresses"]>[number]): CustomerAddressInput {
-  return {
-    id: address.id,
-    label: address.label,
-    governorate: address.governorate,
-    city: address.city,
-    address_line: address.address_line,
-    landmark: address.landmark,
-    phone: address.phone,
-    is_default: address.is_default,
   };
 }
 
@@ -368,109 +359,6 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
         />
       )}
     </div>
-  );
-}
-
-function AddressDialog({
-  address,
-  onClose,
-  onSave,
-}: {
-  address: CustomerAddressInput | null;
-  onClose: () => void;
-  onSave: (address: CustomerAddressInput) => void;
-}) {
-  const form = useForm<AddressFormValues>({
-    resolver: zodResolver(addressSchema),
-    defaultValues: {
-      label: address?.label ?? "",
-      governorate: address?.governorate ?? "",
-      city: address?.city ?? "",
-      address_line: address?.address_line ?? "",
-      landmark: address?.landmark ?? "",
-      phone: "",
-      is_default: address?.is_default ?? false,
-    },
-  });
-  const errors = form.formState.errors;
-
-  const submit = form.handleSubmit((values) =>
-    onSave({
-      id: address?.id,
-      ...values,
-      landmark: values.landmark === "" ? null : values.landmark,
-      phone: values.phone === "" ? (address?.phone ?? null) : values.phone,
-    }),
-  );
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{address === null ? ar.addresses.add : ar.addresses.edit}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-          <TextField
-            id="address-label"
-            label={ar.addresses.label}
-            registration={form.register("label")}
-            error={errors.label}
-          />
-          <TextField
-            id="address-governorate"
-            label={ar.addresses.governorate}
-            registration={form.register("governorate")}
-            error={errors.governorate}
-          />
-          <TextField
-            id="address-city"
-            label={ar.addresses.city}
-            registration={form.register("city")}
-            error={errors.city}
-          />
-          <TextField
-            id="address-line"
-            label={ar.addresses.addressLine}
-            registration={form.register("address_line")}
-            error={errors.address_line}
-          />
-          <TextField
-            id="address-landmark"
-            label={ar.addresses.landmark}
-            registration={form.register("landmark")}
-            error={errors.landmark}
-          />
-          <TextField
-            id="address-phone"
-            label={ar.addresses.phone}
-            dir="ltr"
-            inputMode="tel"
-            registration={form.register("phone")}
-            error={errors.phone}
-          />
-          <Controller
-            control={form.control}
-            name="is_default"
-            render={({ field }) => (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="address-default"
-                  checked={field.value}
-                  onCheckedChange={(checked) => field.onChange(checked === true)}
-                />
-                <FieldLabel htmlFor="address-default">{ar.addresses.makeDefault}</FieldLabel>
-              </div>
-            )}
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              {ar.cancel}
-            </Button>
-            <Button type="submit">{ar.dashboard.confirm}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

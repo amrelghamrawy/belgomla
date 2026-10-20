@@ -236,6 +236,7 @@ test("no dashboard screen scrolls sideways, on a phone or a desktop (rules/03 §
   const screens = [
     "/dashboard",
     "/dashboard/orders",
+    "/dashboard/orders/new",
     "/dashboard/collections",
     "/dashboard/returns",
     "/dashboard/customers",

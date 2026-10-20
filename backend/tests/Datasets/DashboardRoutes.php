@@ -74,6 +74,8 @@ dataset('dashboard authenticated routes', [
     'customers unblock' => ['POST', '/api/dashboard/customers/1/unblock'],
     'orders list' => ['GET', '/api/dashboard/orders'],
     'orders show' => ['GET', '/api/dashboard/orders/1'],
+    'orders create' => ['POST', '/api/dashboard/orders'],
+    'orders quote' => ['POST', '/api/dashboard/orders/quote'],
     'orders transition' => ['POST', '/api/dashboard/orders/1/transition'],
     'orders cancel' => ['POST', '/api/dashboard/orders/1/cancel'],
     'orders delivery address' => ['PUT', '/api/dashboard/orders/1/delivery-address'],

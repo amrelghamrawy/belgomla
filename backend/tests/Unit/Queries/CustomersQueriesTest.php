@@ -159,3 +159,15 @@ test('BR-CU08 the settings query reads the store invitation text, null by defaul
 
     expect(app(CurrentTenantSettingsQuery::class)->invitationMessage())->toBe('أهلًا {اسم_العميل}');
 });
+
+test('BR-O11 the cart sku query finds several skus keyed by id, leaving out unknown and other tenants\' ones', function (): void {
+    $a = Product::factory()->withSku()->create()->sku()->sole();
+    $b = Product::factory()->withSku()->create()->sku()->sole();
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->sku()->sole(), $this->otherTenant());
+    app(TenantContext::class)->set($this->tenant);
+
+    $found = app(CartSkuQuery::class)->findMany([$b->id, $a->id, $foreign->id, 999999]);
+
+    expect($found->keys()->sort()->values()->all())->toBe(collect([$a->id, $b->id])->sort()->values()->all())
+        ->and(array_keys($found->get($a->id)?->getRelations() ?? []))->toBe(['product', 'sellingUnit', 'tiers', 'inventory']);
+});

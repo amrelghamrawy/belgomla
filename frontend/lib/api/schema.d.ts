@@ -1544,7 +1544,25 @@ export interface paths {
         };
         get: operations["dashboardOrders"];
         put?: never;
-        post?: never;
+        /** Places an order for an active customer with the checkout checks (BR-O11); retry-safe with Idempotency-Key (D55) */
+        post: operations["dashboardPlaceOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prices and checks the merchant's order form like checkout, without saving anything (BR-O11) */
+        post: operations["dashboardQuoteOrder"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1880,7 +1898,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2274,7 +2292,7 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
         };
         /** @enum {string} */
-        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
+        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description BR-N03 the statuses customers are told about */
             order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
@@ -2337,7 +2355,7 @@ export interface components {
             default_payment_terms_days?: number | null;
             default_credit_limit?: string | null;
             order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled")[];
-            /** @description status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); null or the default text = the default */
+            /** @description status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); `placed` words the message of an order a merchant places for the customer (BR-O11); null or the default text = the default */
             order_status_messages?: {
                 [key: string]: string | null;
             };
@@ -2701,6 +2719,13 @@ export interface components {
         CollectionStatus: "unpaid" | "partially_collected" | "collected";
         DashboardOrderFields: {
             id: number;
+            /**
+             * @description BR-O11 who placed the order: the customer at checkout, or a dashboard user on their behalf
+             * @enum {string}
+             */
+            placed_by: "customer" | "tenant_user";
+            /** @description The customer or dashboard user id, by placed_by */
+            placed_by_id: number | null;
             customer?: {
                 id: number;
                 name: string;
@@ -2719,6 +2744,68 @@ export interface components {
              * @description When a pending order cancels itself; null when not pending or expiry is off (D81)
              */
             expires_at: string | null;
+        };
+        OrderQuoteRequest: {
+            customer_id: number;
+            /** @description Each SKU once; quantity in selling units */
+            lines: {
+                sku_id: number;
+                quantity: number;
+            }[];
+        };
+        MerchantOrderRequest: components["schemas"]["OrderQuoteRequest"] & {
+            /** @description One of the customer's active addresses */
+            address_id: number;
+            /** @description Kept as the order note; the customer sees it */
+            note?: string | null;
+            /** @description Send the `placed` WhatsApp message (default false) */
+            notify_customer?: boolean;
+            /** @description D84 waive the minimum order value for this order; needs orders.override_mov */
+            override_mov?: boolean;
+        };
+        OrderQuoteLine: {
+            sku_id: number;
+            product_name: string;
+            sku_code: string;
+            sku_name: string;
+            unit: string;
+            conversion_factor: number;
+            quantity: number;
+            moq: number;
+            /** @description Selling units left now (not locked) */
+            available: number;
+            cover_price: components["schemas"]["Money"] | null;
+            unit_price: components["schemas"]["Money"];
+            discount_percent: string | null;
+            tier_min_quantity: number | null;
+            line_total: components["schemas"]["Money"];
+            tiers: {
+                min_quantity: number;
+                unit_price: components["schemas"]["Money"] | null;
+            }[];
+            /** @description The checkout_failed entry of this SKU without sku_id, or null */
+            problem: {
+                /** @enum {string} */
+                reason: "insufficient_stock" | "below_moq" | "product_inactive";
+                requested?: number;
+                available?: number;
+                moq?: number;
+            } | null;
+        };
+        OrderQuote: {
+            lines: components["schemas"]["OrderQuoteLine"][];
+            items_total: components["schemas"]["Money"];
+            mov: {
+                enabled: boolean;
+                amount: components["schemas"]["Money"] | null;
+                satisfied: boolean;
+            };
+            /** @description BR-C05 set when the order would pass the credit limit */
+            credit: {
+                limit: components["schemas"]["Money"];
+                exposure: components["schemas"]["Money"];
+                order_total: components["schemas"]["Money"];
+            } | null;
         };
         DashboardOrder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"];
         DashboardOrderHistoryEntry: {
@@ -6072,6 +6159,100 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardPlaceOrder: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MerchantOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Placed; the order page shape. No new_order notification; the customer gets the `placed` message when notify_customer is true. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardOrderDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            /** @description forbidden (no orders.create, or override_mov without orders.override_mov, D84) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description customer_blocked or customer_not_active with details.status; idempotency_in_progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description checkout_failed as at checkout (items, details.mov unless override_mov, details.credit); validation_failed on customer_id, address_id or lines.N.sku_id when they are not this store's; idempotency_key_reused / invalid_idempotency_key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardQuoteOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderQuote"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description validation_failed (also on customer_id or lines.N.sku_id that are not this store's) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardOrder: {

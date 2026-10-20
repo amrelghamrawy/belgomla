@@ -15,7 +15,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
- * An order on the dashboard (08-api-contract.md §9): the customer's shape plus the order id, the customer, the
+ * An order on the dashboard (08-api-contract.md §9): the customer's shape plus the order id, the customer, who placed
+ * it (`placed_by` customer | tenant_user with `placed_by_id`, BR-O11), the
  * status timestamps, `is_stale` (pending past `stale_pending_hours`, BR-INV07), `expires_at` (when a pending order
  * cancels itself, null while expiry is off, D81), history with the actor id and
  * note, `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()) and every
@@ -59,6 +60,8 @@ final class DashboardOrderResource extends JsonResource
                 'name' => $order->customer->name,
                 'phone' => $order->customer->phone,
             ]),
+            'placed_by' => $order->placed_by_type->value,
+            'placed_by_id' => $order->placed_by_id,
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),
             'delivered_at' => $order->delivered_at?->toIso8601String(),
             'cancelled_at' => $order->cancelled_at?->toIso8601String(),

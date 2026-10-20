@@ -60,6 +60,8 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 | `inventory.adjust` | ✓ | ✓ | | ✓ | |
 | `orders.view` (also reading the catalog and stock) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `orders.manage` (transition, cancel, address) | ✓ | ✓ | ✓ | ✓ (preparing / out for delivery only, no cancel) | |
+| `orders.create` (place an order for a customer, V2 Task 07, BR-O11) | ✓ | ✓ | ✓ | | |
+| `orders.override_mov` (waive the minimum order value of one such order, D84) | ✓ | ✓ | | | |
 | `orders.returns` | ✓ | ✓ | | ✓ | |
 | `customers.manage` | ✓ | ✓ | ✓ | | |
 | `customers.credit` (limits, terms) | ✓ | ✓ | | | ✓ |
@@ -558,6 +560,8 @@ Only forward transitions along this path are allowed. Skipping a step is allowed
 - Customer: only while the order is `Pending`.
 - Merchant: from any status except `Delivered`.
 
+Orders are placed by the customer at checkout, or by the merchant on the customer's behalf (V2, BR-O11).
+
 Cancellation requires a reason (free text) and releases the reservation (BR-INV04).
 
 ### BR-O03 — Cancellation and Collection
@@ -595,6 +599,18 @@ Each tenant has its own sequential order number starting at 1 (e.g. `#1024`). Or
 The order stores a snapshot of the chosen delivery address and the customer phone at creation time.
 
 The customer cannot change it afterwards. The merchant may edit the address snapshot while the order is before `Out for Delivery` (audited). Pending confirmation, see `06-open-decisions.md` (D9).
+
+### BR-O11 — Merchant-Placed Orders (V2 Task 07, D84)
+
+Many wholesale orders arrive by phone or WhatsApp. A dashboard user with `orders.create` (owner, manager, sales) places the order for an existing **active** customer and one of their addresses. It goes through exactly the checkout checks of BR-PR06 (current prices and tiers, product active, MOQ, stock, minimum order value, credit limit BR-C05), reserves stock and takes the next order number of the store (BR-O09), and from then on lives like any other order. Differences:
+
+- The actor of the history entry and of the `order.created` audit is the dashboard user; the order records `placed_by` (customer | tenant_user) and the dashboard shows «أنشأه التاجر».
+- No `new_order` notification (the merchant made it).
+- The owner or a manager (`orders.override_mov`) may waive the minimum order value for one order; it is audited. MOQ, stock and the credit limit are never waived.
+- The customer gets a WhatsApp «تم تسجيل طلبك» message only when the merchant asks for it (and they did not opt out, BR-N03).
+- Before placing, the form asks for a **quote**: the same checks as a dry run, nothing saved.
+
+A blocked customer cannot be ordered for (`409 customer_blocked`), nor one who has not activated their account (`409 customer_not_active`).
 
 ---
 

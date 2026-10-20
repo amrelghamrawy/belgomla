@@ -7,6 +7,7 @@ use App\Modules\Orders\Http\Controllers\Dashboard\NotificationReadController;
 use App\Modules\Orders\Http\Controllers\Dashboard\OrderCancelController;
 use App\Modules\Orders\Http\Controllers\Dashboard\OrderController;
 use App\Modules\Orders\Http\Controllers\Dashboard\OrderDeliveryAddressController;
+use App\Modules\Orders\Http\Controllers\Dashboard\OrderQuoteController;
 use App\Modules\Orders\Http\Controllers\Dashboard\OrderReturnController;
 use App\Modules\Orders\Http\Controllers\Dashboard\OrderTransitionController;
 use App\Modules\Orders\Http\Controllers\Dashboard\ReturnController;
@@ -16,11 +17,13 @@ use Illuminate\Support\Facades\Route;
 /*
 | Dashboard orders, returns and notifications (08-api-contract.md §9, §12). Orders are addressed by their per-tenant
 | number (BR-O09), returns by their tenant-scoped id (another tenant's is 404, BR-T04); the `POST` state changes
-| honor `Idempotency-Key` (§0).
+| honor `Idempotency-Key` (§0). V2 Task 07: a merchant places an order for a customer, after quoting it (BR-O11).
 */
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
     Route::get('orders', [OrderController::class, 'index'])->middleware('permission:orders.view')->name('orders.index');
+    Route::post('orders', [OrderController::class, 'store'])->middleware('idempotent')->middleware('permission:orders.create')->name('orders.store');
+    Route::post('orders/quote', [OrderQuoteController::class, 'store'])->middleware('permission:orders.create')->name('orders.quote');
     Route::get('orders/{order}', [OrderController::class, 'show'])->whereNumber('order')->middleware('permission:orders.view')->name('orders.show');
     Route::post('orders/{order}/transition', [OrderTransitionController::class, 'store'])->whereNumber('order')->middleware('idempotent')->middleware('permission:orders.manage')->name('orders.transition');
     Route::post('orders/{order}/cancel', [OrderCancelController::class, 'store'])->whereNumber('order')->middleware('idempotent')->middleware('permission:orders.manage')->name('orders.cancel');

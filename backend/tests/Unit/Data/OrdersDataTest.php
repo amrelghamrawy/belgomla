@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Orders\Data\CancelData;
 use App\Modules\Orders\Data\CheckoutData;
 use App\Modules\Orders\Data\DeliveryAddressData;
+use App\Modules\Orders\Data\MerchantOrderData;
 use App\Modules\Orders\Data\OrderFiltersData;
 use App\Modules\Orders\Data\ReturnData;
 use App\Modules\Orders\Data\ReturnFiltersData;
@@ -19,7 +20,9 @@ use App\Modules\Orders\Http\Requests\ListNotificationsRequest;
 use App\Modules\Orders\Http\Requests\ListOrdersRequest;
 use App\Modules\Orders\Http\Requests\ListReturnsRequest;
 use App\Modules\Orders\Http\Requests\MarkNotificationsReadRequest;
+use App\Modules\Orders\Http\Requests\QuoteOrderRequest;
 use App\Modules\Orders\Http\Requests\RecordReturnRequest;
+use App\Modules\Orders\Http\Requests\StoreMerchantOrderRequest;
 use App\Modules\Orders\Http\Requests\TransitionOrderRequest;
 use App\Modules\Orders\Http\Requests\UpdateDeliveryAddressRequest;
 use Carbon\CarbonImmutable;
@@ -161,4 +164,32 @@ test('BR-C07 return data keeps the refund as credit when asked, cash otherwise',
 
     expect($credit->refundTo)->toBe(App\Modules\Orders\Enums\RefundMethod::Credit)
         ->and($cash->refundTo)->toBe(App\Modules\Orders\Enums\RefundMethod::Cash);
+});
+
+test('BR-O11 merchant order data: integer ids and lines, the trimmed note and both flags', function (): void {
+    $this->actingAsOwner(); // override_mov needs orders.override_mov (D84)
+    $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, [
+        'customer_id' => '7', 'address_id' => '9', 'lines' => [['sku_id' => '3', 'quantity' => '12']], 'note' => '  بالتليفون  ', 'notify_customer' => true, 'override_mov' => '1',
+    ]);
+
+    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(7, 9, [['sku_id' => 3, 'quantity' => 12]], 'بالتليفون', true, true));
+});
+
+test('BR-O11 merchant order data without note or flags: no note, no message, no override', function (): void {
+    $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, ['customer_id' => 7, 'address_id' => 9, 'lines' => [['sku_id' => 3, 'quantity' => 1]], 'note' => '  ']);
+
+    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(7, 9, [['sku_id' => 3, 'quantity' => 1]]));
+});
+
+test('BR-O11 the quote request gives the customer and the lines as integers', function (): void {
+    $request = validatedOrdersRequest(QuoteOrderRequest::class, ['customer_id' => '7', 'lines' => [['sku_id' => '3', 'quantity' => '5'], ['sku_id' => 4, 'quantity' => 1]]]);
+
+    expect([$request->customerId(), $request->lines()])->toBe([7, [['sku_id' => 3, 'quantity' => 5], ['sku_id' => 4, 'quantity' => 1]]]);
+});
+
+test('BR-O11 placement data knows whether a merchant placed the order', function (): void {
+    $customer = new App\Modules\Customers\Models\Customer;
+
+    expect(new App\Modules\Orders\Data\OrderPlacementData($customer, 1, [], App\Modules\Audit\Enums\ActorType::TenantUser, 5)->byMerchant())->toBeTrue()
+        ->and(new App\Modules\Orders\Data\OrderPlacementData($customer, 1, [], App\Modules\Audit\Enums\ActorType::Customer, 5)->byMerchant())->toBeFalse();
 });

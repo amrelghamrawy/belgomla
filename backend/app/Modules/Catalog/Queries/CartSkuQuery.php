@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Queries;
 
 use App\Modules\Catalog\Models\Sku;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * A SKU by id with what the cart needs to check and price a line (BR-CU06, BR-PR06): its product (status,
@@ -18,5 +19,16 @@ final readonly class CartSkuQuery
     public function find(int $skuId): Sku
     {
         return Sku::query()->with(self::RELATIONS)->findOrFail($skuId);
+    }
+
+    /**
+     * Several SKUs at once (a merchant's order form, BR-O11), keyed by id; unknown and other tenants' ids are left out.
+     *
+     * @param  list<int>  $skuIds
+     * @return Collection<int, Sku>
+     */
+    public function findMany(array $skuIds): Collection
+    {
+        return Sku::query()->with(self::RELATIONS)->whereIn('id', $skuIds)->get()->keyBy('id');
     }
 }

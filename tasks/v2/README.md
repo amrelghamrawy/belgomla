@@ -11,7 +11,7 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | 04 | [Pending order auto-expiry](04-pending-expiry.md)      | Orders, Tenancy settings                   | done    | 1e888a1 |
 | 05 | [Staff accounts, roles & permissions](05-staff-roles.md) | Tenancy, every dashboard route, frontend | done    | ef9907c |
 | 06 | [Catalog import/export](06-import-export.md)           | Catalog, Pricing, Inventory                | done    | see log |
-| 07 | [Merchant-placed orders](07-merchant-orders.md)        | Orders, Customers                          | planned |        |
+| 07 | [Merchant-placed orders](07-merchant-orders.md)        | Orders, Customers                          | done    | see log |
 | 08 | [Manual discounts](08-discounts.md)                    | Orders, Pricing, Collections               | planned |        |
 | 09 | [Order editing & partial fulfilment](09-order-editing.md) | Orders, Inventory                       | planned |        |
 | 10 | [Pre-orders on Coming Soon](10-pre-orders.md)          | Orders, Catalog, Customers (cart)          | planned |        |

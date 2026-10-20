@@ -8,6 +8,7 @@ use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Exceptions\AddressLocked;
 use App\Modules\Orders\Exceptions\CannotCancel;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
+use App\Modules\Orders\Exceptions\CustomerCannotOrder;
 use App\Modules\Orders\Exceptions\InvalidOrderTransition;
 use App\Modules\Orders\Exceptions\OrderHasCollections;
 use App\Modules\Orders\Exceptions\RefundRequired;
@@ -26,6 +27,10 @@ test('every orders exception fixes its status, code and arabic message', functio
     'address unavailable' => [CheckoutFailed::addressUnavailable(), 422, 'validation_failed', 'عنوان التوصيل غير موجود'],
     'store unavailable' => [CheckoutFailed::storeUnavailable(), 503, 'store_unavailable', 'المتجر غير متاح حاليًا'],
     'customer not active' => [CheckoutFailed::customerNotActive(CustomerStatus::Blocked), 403, 'blocked', 'لا يمكن إتمام الطلب، حالة حسابك «محظور»'],
+    'customer of a merchant order unknown' => [CheckoutFailed::customerUnavailable(), 422, 'validation_failed', 'العميل غير موجود'],
+    'sku of a merchant order unknown' => [CheckoutFailed::skuUnavailable(2), 422, 'validation_failed', 'المنتج غير موجود'],
+    'merchant order for a blocked customer' => [CustomerCannotOrder::because(CustomerStatus::Blocked), 409, 'customer_blocked', 'هذا العميل محظور، ألغِ الحظر أولًا لتسجيل طلب له'],
+    'merchant order for an invited customer' => [CustomerCannotOrder::because(CustomerStatus::Invited), 409, 'customer_not_active', 'لا يمكن تسجيل طلب لعميل حالته «مدعو»'],
     'invalid transition' => [InvalidOrderTransition::from(OrderStatus::Preparing, OrderStatus::Confirmed), 409, 'invalid_transition', 'لا يمكن نقل الطلب من «قيد التجهيز» إلى «مؤكد»'],
     'customer cancel after confirmation' => [CannotCancel::byCustomer(OrderStatus::Confirmed), 409, 'invalid_transition', 'لا يمكن إلغاء الطلب بعد تأكيده، تواصل مع المتجر'],
     'cancel a terminal order' => [CannotCancel::terminal(OrderStatus::Delivered), 409, 'invalid_transition', 'لا يمكن إلغاء طلب حالته «تم التوصيل»'],
@@ -65,4 +70,10 @@ test('BR-R04 BR-R06 the refund and void failures carry their figures', function 
 
 test('D57 a missing address is reported on the address_id field', function (): void {
     expect(CheckoutFailed::addressUnavailable()->details)->toBe(['address_id' => ['عنوان التوصيل غير موجود']]);
+});
+
+test('BR-O11 the field errors of a merchant order name the field', function (): void {
+    expect(CheckoutFailed::customerUnavailable()->details)->toBe(['customer_id' => ['العميل غير موجود']])
+        ->and(CheckoutFailed::skuUnavailable(2)->details)->toBe(['lines.2.sku_id' => ['المنتج غير موجود']])
+        ->and(CustomerCannotOrder::because(CustomerStatus::PendingApproval)->details)->toBe(['status' => 'pending_approval']);
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Models;
 
+use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
@@ -38,6 +39,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $customer_note
  * @property string|null $cancel_reason
  * @property CancelledBy|null $cancelled_by_type
+ * @property ActorType $placed_by_type the customer at checkout, or a dashboard user on their behalf (BR-O11)
+ * @property int|null $placed_by_id customers.id or tenant_users.id, by placed_by_type
  * @property CarbonImmutable $placed_at
  * @property CarbonImmutable|null $confirmed_at
  * @property CarbonImmutable|null $delivered_at
@@ -61,6 +64,7 @@ final class Order extends Model
         'returned_total' => '0.00',
         'collected_amount' => '0.00',
         'collection_status' => 'unpaid',
+        'placed_by_type' => 'customer',
     ];
 
     public function getRouteKeyName(): string
@@ -130,6 +134,8 @@ final class Order extends Model
             'collection_status' => CollectionStatus::class,
             'delivery_address' => 'array',
             'cancelled_by_type' => CancelledBy::class,
+            'placed_by_type' => ActorType::class,
+            'placed_by_id' => 'integer',
             'placed_at' => 'datetime',
             'confirmed_at' => 'datetime',
             'delivered_at' => 'datetime',

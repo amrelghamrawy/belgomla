@@ -58,4 +58,20 @@ final class CheckoutFailed extends ApiException
 
         return new self(422, 'validation_failed', $message, ['address_id' => [$message]]);
     }
+
+    /** BR-O11: the customer of a merchant's order is not one of this store's; reported like a field error. */
+    public static function customerUnavailable(): self
+    {
+        $message = 'العميل غير موجود';
+
+        return new self(422, 'validation_failed', $message, ['customer_id' => [$message]]);
+    }
+
+    /** BR-O11: a line of a merchant's order names a SKU this store does not have (`lines.{index}.sku_id`). */
+    public static function skuUnavailable(int $index): self
+    {
+        $message = 'المنتج غير موجود';
+
+        return new self(422, 'validation_failed', $message, ["lines.{$index}.sku_id" => [$message]]);
+    }
 }

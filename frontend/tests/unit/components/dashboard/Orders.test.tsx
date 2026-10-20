@@ -116,6 +116,8 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
     cancelled_at: null,
     is_stale: false,
     expires_at: null,
+    placed_by: "customer",
+    placed_by_id: 9,
     items: [
       {
         sku_id: 5,
@@ -405,6 +407,13 @@ describe("OrderDetail delivery address", () => {
     expect(screen.getByTestId("delivery")).toHaveTextContent("لا يمكن تعديل العنوان بعد خروج الطلب للتوصيل.");
   });
 
+  it("BR-O11 marks an order the merchant placed", () => {
+    stubApi({});
+    renderWithQuery(<OrderDetail order={order({ placed_by: "tenant_user", placed_by_id: 1 })} />);
+
+    expect(screen.getByTestId("placed-by-merchant")).toHaveTextContent("أنشأه التاجر");
+  });
+
   it("shows the timeline with who moved the order and their note", () => {
     stubApi({});
     renderWithQuery(<OrderDetail order={order()} />);
@@ -475,6 +484,38 @@ describe("OrdersPage", () => {
     await user.click(screen.getByRole("button", { name: "خرج للتوصيل" }));
 
     expect(router.replace).toHaveBeenCalledWith("/?status=out_for_delivery", { scroll: false });
+  });
+
+  it("BR-O11 offers a new order to who may create orders and marks the orders the merchant placed", async () => {
+    stubApi({
+      "GET /api/dashboard/orders": json(
+        200,
+        page([
+          {
+            ...order({ placed_by: "tenant_user", placed_by_id: 1 }),
+            items: undefined,
+            history: undefined,
+            collections: undefined,
+          },
+          { ...order({ number: 1002 }), items: undefined, history: undefined, collections: undefined },
+        ]),
+      ),
+    });
+    renderWithQuery(<OrdersPage />);
+
+    expect(screen.getByRole("link", { name: "طلب جديد" })).toHaveAttribute("href", "/dashboard/orders/new");
+    expect(within(await screen.findByTestId("order-1001")).getByTestId("placed-by-merchant")).toHaveTextContent(
+      "أنشأه التاجر",
+    );
+    expect(within(screen.getByTestId("order-1002")).queryByTestId("placed-by-merchant")).toBeNull();
+  });
+
+  it("D82 the warehouse gets no new-order button", async () => {
+    stubApi({ "GET /api/dashboard/orders": json(200, page([])) });
+    renderWithQuery(<OrdersPage />, signedInAs("warehouse"));
+
+    expect(await screen.findByText("لا توجد طلبات")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "طلب جديد" })).toBeNull();
   });
 
   it("D81 shows how long a pending order has before it cancels itself", async () => {

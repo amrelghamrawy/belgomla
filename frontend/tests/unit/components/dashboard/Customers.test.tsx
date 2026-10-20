@@ -161,6 +161,27 @@ describe("CreateCustomerDialog", () => {
 });
 
 describe("CustomerDetail", () => {
+  it("BR-O11 offers a new order for an active customer to who may create orders", () => {
+    stubApi({});
+    const { rerender } = renderWithQuery(<CustomerDetail customer={dashboardCustomer()} />);
+
+    expect(screen.getByRole("link", { name: "طلب جديد لهذا العميل" })).toHaveAttribute(
+      "href",
+      "/dashboard/orders/new?customer=7",
+    );
+
+    rerender(<CustomerDetail customer={dashboardCustomer({ status: "blocked", blocked_reason: "لم يسدد" })} />);
+
+    expect(screen.queryByRole("link", { name: "طلب جديد لهذا العميل" })).toBeNull();
+  });
+
+  it("D82 the accountant gets no new-order shortcut", () => {
+    stubApi({});
+    renderWithQuery(<CustomerDetail customer={dashboardCustomer()} />, signedInAs("accountant"));
+
+    expect(screen.queryByRole("link", { name: "طلب جديد لهذا العميل" })).toBeNull();
+  });
+
   it("offers the invitation only to an invited customer and approval only while pending", () => {
     stubApi({});
     const { rerender } = renderWithQuery(<CustomerDetail customer={dashboardCustomer({ status: "invited" })} />);

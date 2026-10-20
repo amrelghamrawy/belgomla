@@ -85,6 +85,8 @@ test('settings validation', function (array $body, string $field): void {
     'unknown notify status' => [['order_notify_statuses' => ['pending']], 'order_notify_statuses.0'],
     'notify statuses not a list' => [['order_notify_statuses' => 'confirmed'], 'order_notify_statuses'],
     'duplicate notify status' => [['order_notify_statuses' => ['confirmed', 'confirmed']], 'order_notify_statuses.0'],
+    'placed is no notify status (BR-O11)' => [['order_notify_statuses' => ['placed']], 'order_notify_statuses.0'],
+    'reason in the placed message' => [['order_status_messages' => ['placed' => '{سبب_الإلغاء}']], 'order_status_messages.placed'],
     'message for an unknown status' => [['order_status_messages' => ['pending' => 'x']], 'order_status_messages'],
     'message too long' => [['order_status_messages' => ['confirmed' => str_repeat('ا', 501)]], 'order_status_messages.confirmed'],
     'message unknown placeholder' => [['order_status_messages' => ['confirmed' => 'أهلًا {name}']], 'order_status_messages.confirmed'],
@@ -223,4 +225,11 @@ test('branding uploads reject non-images and unknown kinds', function (): void {
 
     $this->tenantJson('POST', '/api/dashboard/settings/banner', ['file' => UploadedFile::fake()->image('x.png')])
         ->assertNotFound();
+});
+
+test('BR-O11 the store words the placed message of merchant orders like the status messages', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['order_status_messages' => ['placed' => 'سجلنا طلبك {رقم_الطلب}']])
+        ->assertOk()
+        ->assertJsonPath('data.order_status_messages', ['placed' => 'سجلنا طلبك {رقم_الطلب}'])
+        ->assertJsonPath('data.order_status_message_defaults.placed', OrderStatusMessage::DEFAULTS['placed']);
 });

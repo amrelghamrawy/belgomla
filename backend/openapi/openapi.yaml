@@ -2257,6 +2257,61 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardPlaceOrder
+      tags: [dashboard-orders]
+      summary: Places an order for an active customer with the checkout checks (BR-O11); retry-safe with Idempotency-Key (D55)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MerchantOrderRequest' }
+      responses:
+        '201':
+          description: Placed; the order page shape. No new_order notification; the customer gets the `placed` message when notify_customer is true.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/DashboardOrderDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { description: 'forbidden (no orders.create, or override_mov without orders.override_mov, D84)', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '409': { description: 'customer_blocked or customer_not_active with details.status; idempotency_in_progress', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422':
+          description: >
+            checkout_failed as at checkout (items, details.mov unless override_mov, details.credit); validation_failed on
+            customer_id, address_id or lines.N.sku_id when they are not this store's; idempotency_key_reused / invalid_idempotency_key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /api/dashboard/orders/quote:
+    post:
+      operationId: dashboardQuoteOrder
+      tags: [dashboard-orders]
+      summary: Prices and checks the merchant's order form like checkout, without saving anything (BR-O11)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderQuoteRequest' }
+      responses:
+        '200':
+          description: The quote
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/OrderQuote' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { description: "validation_failed (also on customer_id or lines.N.sku_id that are not this store's)", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
 
   /api/dashboard/orders/{order}:
     parameters:
@@ -3072,6 +3127,8 @@ components:
         - credit_applied
         - credit_voided
         - csrf_token_mismatch
+        - customer_blocked
+        - customer_not_active
         - duplicate_code
         - duplicate_key
         - duplicate_label
@@ -3732,7 +3789,7 @@ components:
 
     Permission:
       type: string
-      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
+      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.create, orders.override_mov, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
 
     # ---- Dashboard schemas (Task 10) ----
 
@@ -3807,7 +3864,7 @@ components:
           items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled] }
         order_status_messages:
           type: object
-          description: 'status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); null or the default text = the default'
+          description: 'status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); `placed` words the message of an order a merchant places for the customer (BR-O11); null or the default text = the default'
           additionalProperties: { type: [string, 'null'] }
 
     IdName:
@@ -4353,9 +4410,14 @@ components:
 
     DashboardOrderFields:
       type: object
-      required: [id, confirmed_at, delivered_at, cancelled_at, is_stale, expires_at]
+      required: [id, placed_by, placed_by_id, confirmed_at, delivered_at, cancelled_at, is_stale, expires_at]
       properties:
         id: { type: integer }
+        placed_by:
+          type: string
+          enum: [customer, tenant_user]
+          description: 'BR-O11 who placed the order: the customer at checkout, or a dashboard user on their behalf'
+        placed_by_id: { type: [integer, 'null'], description: 'The customer or dashboard user id, by placed_by' }
         customer:
           type: object
           required: [id, name, phone]
@@ -4368,6 +4430,109 @@ components:
         cancelled_at: { type: [string, 'null'], format: date-time }
         is_stale: { type: boolean, description: 'Pending for longer than stale_pending_hours (D10)' }
         expires_at: { type: [string, 'null'], format: date-time, description: 'When a pending order cancels itself; null when not pending or expiry is off (D81)' }
+
+    OrderQuoteRequest:
+      type: object
+      required: [customer_id, lines]
+      properties:
+        customer_id: { type: integer, minimum: 1 }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          description: Each SKU once; quantity in selling units
+          items:
+            type: object
+            required: [sku_id, quantity]
+            properties:
+              sku_id: { type: integer, minimum: 1 }
+              quantity: { type: integer, minimum: 1, maximum: 1000000 }
+
+    MerchantOrderRequest:
+      allOf:
+        - $ref: '#/components/schemas/OrderQuoteRequest'
+        - type: object
+          required: [address_id]
+          properties:
+            address_id: { type: integer, minimum: 1, description: "One of the customer's active addresses" }
+            note: { type: [string, 'null'], maxLength: 1000, description: 'Kept as the order note; the customer sees it' }
+            notify_customer: { type: boolean, description: 'Send the `placed` WhatsApp message (default false)' }
+            override_mov: { type: boolean, description: 'D84 waive the minimum order value for this order; needs orders.override_mov' }
+
+    OrderQuoteLine:
+      type: object
+      required: [sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, line_total, tiers, problem]
+      properties:
+        sku_id: { type: integer }
+        product_name: { type: string }
+        sku_code: { type: string }
+        sku_name: { type: string }
+        unit: { type: string }
+        conversion_factor: { type: integer }
+        quantity: { type: integer }
+        moq: { type: integer }
+        available: { type: integer, description: 'Selling units left now (not locked)' }
+        cover_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        unit_price: { $ref: '#/components/schemas/Money' }
+        discount_percent: { type: [string, 'null'] }
+        tier_min_quantity: { type: [integer, 'null'] }
+        line_total: { $ref: '#/components/schemas/Money' }
+        tiers:
+          type: array
+          items:
+            type: object
+            required: [min_quantity, unit_price]
+            properties:
+              min_quantity: { type: integer }
+              unit_price:
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
+        problem:
+          description: 'The checkout_failed entry of this SKU without sku_id, or null'
+          oneOf:
+            - type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum: [insufficient_stock, below_moq, product_inactive]
+                requested: { type: integer }
+                available: { type: integer }
+                moq: { type: integer }
+            - type: 'null'
+
+    OrderQuote:
+      type: object
+      required: [lines, items_total, mov, credit]
+      properties:
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/OrderQuoteLine' }
+        items_total: { $ref: '#/components/schemas/Money' }
+        mov:
+          type: object
+          required: [enabled, amount, satisfied]
+          properties:
+            enabled: { type: boolean }
+            amount:
+              oneOf:
+                - $ref: '#/components/schemas/Money'
+                - type: 'null'
+            satisfied: { type: boolean }
+        credit:
+          description: 'BR-C05 set when the order would pass the credit limit'
+          oneOf:
+            - type: object
+              required: [limit, exposure, order_total]
+              properties:
+                limit: { $ref: '#/components/schemas/Money' }
+                exposure: { $ref: '#/components/schemas/Money' }
+                order_total: { $ref: '#/components/schemas/Money' }
+            - type: 'null'
 
     DashboardOrder:
       allOf:

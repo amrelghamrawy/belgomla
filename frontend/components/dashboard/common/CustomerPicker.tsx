@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { CustomerStatus } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { useCustomer, useCustomers } from "@/lib/dashboard/customers";
 import { formatPhone } from "@/lib/format/phone";
@@ -18,17 +19,24 @@ type Props = {
   /** The customer id as the URL holds it ("" or undefined for none). */
   value: string | undefined;
   onChange: (value: string | null) => void;
+  /** Only customers of this status (the new-order form offers active ones, BR-O11). */
+  status?: CustomerStatus;
+  /** What the button says while nobody is chosen; a list filter says "every customer". */
+  placeholder?: string;
 };
 
-/** A searchable customer combobox for list filters: searches by name or phone on the backend (08 §8 `q`). */
-export function CustomerPicker({ value, onChange }: Props) {
+/** A searchable customer combobox (list filters, the new-order form): searches by name or phone on the backend (08 §8 `q`). */
+export function CustomerPicker({ value, onChange, status, placeholder = copy.all }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [term, setTerm] = useState("");
   const listId = useId();
   const id = Number(value);
   const selected = useCustomer(id, open || (Number.isInteger(id) && id > 0));
-  const customers = useCustomers(term === "" ? {} : { q: term }, open);
+  const customers = useCustomers(
+    { ...(term === "" ? {} : { q: term }), ...(status === undefined ? {} : { status }) },
+    open,
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setTerm(query.trim()), SEARCH_DELAY_MS);
@@ -70,7 +78,7 @@ export function CustomerPicker({ value, onChange }: Props) {
                 label === undefined ? "text-muted-foreground flex-1 truncate text-start" : "flex-1 truncate text-start"
               }
             >
-              {label ?? copy.all}
+              {label ?? placeholder}
             </span>
             <ChevronDownIcon className="text-muted-foreground size-4 shrink-0" />
           </button>

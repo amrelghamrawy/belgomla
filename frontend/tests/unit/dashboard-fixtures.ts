@@ -5,6 +5,8 @@ import type {
   DashboardSku,
   FieldDefinition,
   MerchantNotification,
+  OrderQuote,
+  OrderQuoteLine,
   OverviewReport,
   StoreWhatsApp,
   TenantUser,
@@ -40,6 +42,8 @@ export const ROLE_PERMISSIONS: Record<TenantUser["role"], DashboardMe["permissio
     "inventory.adjust",
     "orders.view",
     "orders.manage",
+    "orders.create",
+    "orders.override_mov",
     "orders.returns",
     "customers.manage",
     "customers.credit",
@@ -55,6 +59,8 @@ export const ROLE_PERMISSIONS: Record<TenantUser["role"], DashboardMe["permissio
     "inventory.adjust",
     "orders.view",
     "orders.manage",
+    "orders.create",
+    "orders.override_mov",
     "orders.returns",
     "customers.manage",
     "customers.credit",
@@ -62,7 +68,7 @@ export const ROLE_PERMISSIONS: Record<TenantUser["role"], DashboardMe["permissio
     "reports.view",
     "audit.view",
   ],
-  sales: ["orders.view", "orders.manage", "customers.manage"],
+  sales: ["orders.view", "orders.manage", "orders.create", "customers.manage"],
   warehouse: ["inventory.adjust", "orders.view", "orders.manage", "orders.returns"],
   accountant: ["orders.view", "customers.credit", "collections.manage", "reports.view"],
 };
@@ -214,6 +220,39 @@ export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): Das
     relations: [],
     created_at: "2026-10-01T08:00:00Z",
     updated_at: "2026-10-01T08:00:00Z",
+    ...overrides,
+  };
+}
+
+/** A quoted line of the merchant's order form (BR-O11): 12 cartons of the orderable SKU at the 10+ tier. */
+export function orderQuoteLine(overrides: Partial<OrderQuoteLine> = {}): OrderQuoteLine {
+  return {
+    sku_id: 3,
+    product_name: "الأضواء علوم",
+    sku_code: "ADW-SCI",
+    sku_name: "الأضواء علوم",
+    unit: "كرتونة",
+    conversion_factor: 20,
+    quantity: 12,
+    moq: 5,
+    available: 20,
+    cover_price: null,
+    unit_price: "85.00",
+    discount_percent: null,
+    tier_min_quantity: 10,
+    line_total: "1020.00",
+    tiers: [{ min_quantity: 10, unit_price: "85.00" }],
+    problem: null,
+    ...overrides,
+  };
+}
+
+export function orderQuote(overrides: Partial<OrderQuote> = {}): OrderQuote {
+  return {
+    lines: [orderQuoteLine()],
+    items_total: "1020.00",
+    mov: { enabled: false, amount: null, satisfied: true },
+    credit: null,
     ...overrides,
   };
 }

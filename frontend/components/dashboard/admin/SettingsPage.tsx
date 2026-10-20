@@ -268,7 +268,11 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
           values.default_payment_terms_days === "" ? null : Number(values.default_payment_terms_days),
         default_credit_limit: empty(values.default_credit_limit),
         order_notify_statuses: values.order_notify_statuses,
-        order_status_messages: orderMessagesBody(values.order_status_messages, statusDefaults),
+        // BR-O11: the `placed` wording (merchant orders) has no editor here yet; send it back so a save keeps it.
+        order_status_messages: {
+          placed: settings.order_status_messages.placed ?? null,
+          ...orderMessagesBody(values.order_status_messages, statusDefaults),
+        },
       },
       {
         onSuccess: () => toast.success(copy.saved),

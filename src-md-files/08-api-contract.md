@@ -545,6 +545,18 @@ V2 Task 04: every dashboard order adds `expires_at` (when a pending order cancel
 
 V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about the order, oldest first: `{ purpose, purpose_label, channel, status, sent_at }` (fallback copies included). A transition to a status in `order_notify_statuses`, and a merchant cancel, send the customer a message after commit (BR-N03).
 
+### Merchant-placed orders (V2 Task 07, BR-O11, D84)
+
+| Method | Path                           | Body / Notes |
+| ------ | ------------------------------ | ------------ |
+| POST   | `/api/dashboard/orders/quote`  | `{ customer_id, lines: [{ sku_id, quantity }] }` → the quote; nothing saved. `orders.create` |
+| POST   | `/api/dashboard/orders`        | `{ customer_id, address_id, lines: [{ sku_id, quantity }], note?, notify_customer?, override_mov? }` → `201` the dashboard order detail. `orders.create`, `idempotent` |
+
+- `lines` 1..200, each SKU once, `quantity` 1..1,000,000 selling units; `note` ≤ 1000 (stored as the order's `customer_note`); `notify_customer` and `override_mov` default false.
+- **Quote** shape: `{ lines: [{ sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, line_total, tiers: [{ min_quantity, unit_price }], problem }], items_total, mov: { enabled, amount, satisfied }, credit }`. `available` is selling units now (not locked); `problem` is the `checkout_failed` entry without `sku_id`, or null; `credit` is `{ limit, exposure, order_total }` past the limit, else null.
+- **Place**: the same failures as checkout (`422 checkout_failed` with `items`, `details.mov` unless `override_mov`, `details.credit`); `override_mov: true` without `orders.override_mov` → `403 forbidden`; blocked customer → `409 customer_blocked`, invited / pending approval → `409 customer_not_active` (both `details.status`); a customer, address or SKU not of this store → `422 validation_failed` on `customer_id`, `address_id` or `lines.N.sku_id`. No `new_order` notification; `notify_customer: true` sends the `placed` WhatsApp message after commit (D84). Audit: `order.created` with `placed_by { type, id }` and `mov_overridden { required, current }` when the MOV was waived.
+- Every dashboard order adds `placed_by` (`customer` | `tenant_user`) and `placed_by_id`. `order_status_messages` in the settings accepts `placed` too (not in `order_notify_statuses`).
+
 ### Returns (V2 Task 01, BR-R01..R06)
 
 | Method | Path                                          | Body / Notes                                                                 |
@@ -680,9 +692,9 @@ php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their 
 | Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        15 |
-| Dashboard      |        84 |
+| Dashboard      |        86 |
 | Webhooks       |         2 |
-| **Total**      |   **118** |
+| **Total**      |   **120** |
 
 ---
 

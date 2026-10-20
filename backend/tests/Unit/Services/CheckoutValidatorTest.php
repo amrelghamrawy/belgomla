@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Queries\CartQuery;
 use App\Modules\Inventory\Models\SkuInventory;
+use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Data\CheckoutLine;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
 use App\Modules\Orders\Services\CheckoutValidator;
@@ -23,7 +24,9 @@ beforeEach(function (): void {
         $lines = app(CartQuery::class)->linesOf($this->customer);
         $stock = SkuInventory::query()->whereIn('sku_id', $lines->pluck('sku_id'))->get()->keyBy('sku_id');
 
-        return app(CheckoutValidator::class)->validate($lines, $stock, $this->customer->refresh());
+        $inputs = array_values($lines->map(fn ($line): CartLineInput => new CartLineInput($line->sku, $line->quantity))->all());
+
+        return app(CheckoutValidator::class)->validate($inputs, $stock, $this->customer->refresh());
     };
     $this->failure = function (): CheckoutFailed {
         try {

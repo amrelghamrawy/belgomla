@@ -317,6 +317,22 @@ describe("order status messages", () => {
     });
   });
 
+  it("BR-O11 a save keeps the store's wording of the placed message, which has no editor here", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(
+      <SettingsForm settings={settings({ order_status_messages: { placed: "سجلنا طلبك {رقم_الطلب}" } })} />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+        order_status_messages: { placed: "سجلنا طلبك {رقم_الطلب}", confirmed: null },
+      }),
+    );
+  });
+
   it("BR-N03 starts from the store's saved words and restores the default", async () => {
     stubApi({});
     const user = userEvent.setup();

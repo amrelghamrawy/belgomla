@@ -27,6 +27,7 @@ test('to array', function (): void {
         'id', 'tenant_id', 'number', 'customer_id', 'status', 'items_total', 'order_total', 'collected_amount', 'collection_status',
         'delivery_name', 'delivery_phone', 'delivery_address', 'customer_note', 'cancel_reason', 'cancelled_by_type',
         'placed_at', 'confirmed_at', 'delivered_at', 'cancelled_at', 'created_at', 'updated_at', 'returned_total', 'due_at',
+        'placed_by_type', 'placed_by_id',
     ]);
 });
 

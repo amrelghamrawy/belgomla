@@ -97,6 +97,8 @@ test('the dashboard list entry adds the id, customer, timestamps and staleness',
         'id' => $order->id,
         ...($this->expectedBase)($order),
         'customer' => ['id' => $this->customer->id, 'name' => 'مكتبة الأمل', 'phone' => '+201012345678'],
+        'placed_by' => 'customer',
+        'placed_by_id' => null,
         'confirmed_at' => null,
         'delivered_at' => null,
         'cancelled_at' => null,
@@ -207,5 +209,29 @@ test('BR-N02 the notification resource', function (): void {
         'details' => ['order_number' => 1024],
         'read_at' => null,
         'created_at' => now()->toIso8601String(),
+    ]);
+});
+
+test('BR-O11 an order placed from the dashboard names the user who placed it', function (): void {
+    $order = Order::factory()->placedByMerchant(42)->create();
+
+    expect(rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest()))->toMatchArray(['placed_by' => 'tenant_user', 'placed_by_id' => 42]);
+});
+
+test('BR-O11 the quote resource renders every line with its tiers and problem, the total, the mov and the credit', function (): void {
+    $sku = $this->orderableSku(['code' => 'Q-1'], onHand: 60, name: 'كراسة');
+    app(TenantContext::class)->set($this->tenant);
+    $quote = app(App\Modules\Orders\Services\OrderQuoter::class)->quote($this->customer->id, [['sku_id' => $sku->id, 'quantity' => 10]]);
+
+    expect(rendered(new App\Modules\Orders\Http\Resources\OrderQuoteResource($quote), dashboardRequest('/api/dashboard/orders/quote')))->toBe([
+        'lines' => [[
+            'sku_id' => $sku->id, 'product_name' => 'كراسة', 'sku_code' => 'Q-1', 'sku_name' => 'كراسة', 'unit' => 'كرتونة', 'conversion_factor' => 20,
+            'quantity' => 10, 'moq' => 5, 'available' => 3, 'cover_price' => null, 'unit_price' => '85.00', 'discount_percent' => null,
+            'tier_min_quantity' => 10, 'line_total' => '850.00', 'tiers' => [['min_quantity' => 10, 'unit_price' => '85.00']],
+            'problem' => ['reason' => 'insufficient_stock', 'requested' => 10, 'available' => 3],
+        ]],
+        'items_total' => '850.00',
+        'mov' => ['enabled' => false, 'amount' => null, 'satisfied' => true],
+        'credit' => null,
     ]);
 });

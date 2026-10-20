@@ -268,11 +268,16 @@ arch('orders only touch the catalog sku and product of an order line')
         App\Modules\Catalog\Models\ProductFieldOption::class,
         'App\Modules\Catalog\Models\Scopes',
         'App\Modules\Catalog\Actions',
-        'App\Modules\Catalog\Queries',
         'App\Modules\Catalog\Services',
         'App\Modules\Catalog\Exceptions',
         'App\Modules\Catalog\Http',
     ]);
+
+// V2 Task 07: the merchant's order form finds the SKUs of its lines the way the cart does (BR-O11).
+arch('orders find skus only through the cart sku query')
+    ->expect('App\Modules\Catalog\Queries')
+    ->not->toBeUsedIn('App\Modules\Orders')
+    ->ignoring(App\Modules\Catalog\Queries\CartSkuQuery::class);
 
 arch('orders move stock only through the StockLedger')
     ->expect('App\Modules\Orders')

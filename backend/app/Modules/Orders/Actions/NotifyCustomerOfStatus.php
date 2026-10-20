@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Log;
  * Nothing is sent when the store does not notify this status or the customer opted out. The message is handed to
  * Messenger only **after commit**, so a rolled-back transition sends nothing; a customer over their per-phone limit
  * (D79) is logged, never fails the transition. Called at the end of TransitionOrder and of a merchant's or the
- * system's CancelOrder.
+ * system's CancelOrder, and by PlaceOrderForCustomer (`placed`) when the merchant asks.
  */
 final readonly class NotifyCustomerOfStatus
 {
@@ -40,17 +40,34 @@ final readonly class NotifyCustomerOfStatus
             return;
         }
 
+        $this->send($order, $status->value, $status->label(), $notifications);
+    }
+
+    /**
+     * BR-O11: a merchant placed the order for the customer and asked to tell them (the `placed` text). The store's
+     * notified statuses do not apply, the customer's opt-out does.
+     */
+    public function placed(Order $order): void
+    {
+        $this->send($order, 'placed', $order->status->label(), $this->settings->orderNotifications());
+    }
+
+    /**
+     * @param  array{statuses: list<string>, messages: array<string, string|null>, store: string}  $notifications
+     */
+    private function send(Order $order, string $message, string $statusLabel, array $notifications): void
+    {
         $customer = Customer::query()->findOrFail($order->customer_id);
 
         if ($customer->order_notifications_opt_out) {
             return;
         }
 
-        $text = OrderStatusMessage::render($status->value, $notifications['messages'][$status->value] ?? null, [
+        $text = OrderStatusMessage::render($message, $notifications['messages'][$message] ?? null, [
             'customer' => $customer->name,
             'store' => $notifications['store'],
             'number' => $order->number,
-            'status' => $status->label(),
+            'status' => $statusLabel,
             'total' => $order->netTotal(),
             'reason' => $order->cancel_reason,
         ]);

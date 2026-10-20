@@ -1,6 +1,6 @@
 # V2 Task 07 — Merchant places an order on behalf of a customer
 
-Status: **planned**. Requires V2 Tasks 03, 05. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (commit: see `git log`, "V2 Task 07"). `Checkout` now loads the cart and calls the shared step `PlaceOrder`; `PlaceOrderForCustomer` + `OrderQuoter` place and quote merchant orders (`POST /api/dashboard/orders`, `/orders/quote`) with the checkout's checks, `orders.create` / `orders.override_mov`, `orders.placed_by_type/id`, the `placed` WhatsApp text; dashboard `/dashboard/orders/new` with live quote, «أنشأه التاجر» badge and the customer-page shortcut. Decisions D84 (a–g); D56 resolved. Requires V2 Tasks 03, 05. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 

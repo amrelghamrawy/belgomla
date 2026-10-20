@@ -50,7 +50,7 @@ final class UpdateSettingsRequest extends FormRequest
             'default_payment_terms_days' => ['sometimes', 'nullable', 'integer', 'between:0,365'],
             'default_credit_limit' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'order_notify_statuses' => ['sometimes', 'array'],
-            'order_notify_statuses.*' => ['string', 'distinct', 'in:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
+            'order_notify_statuses.*' => ['string', 'distinct', 'in:'.implode(',', OrderStatusMessage::NOTIFIABLE)],
             'order_status_messages' => ['sometimes', 'array:'.implode(',', array_keys(OrderStatusMessage::DEFAULTS))],
             'order_status_messages.*' => ['nullable', 'string', 'max:'.OrderStatusMessage::MAX_LENGTH, new OrderStatusTemplate],
             'pending_expiry_hours' => ['sometimes', 'nullable', 'integer', 'between:1,720'],
@@ -161,7 +161,7 @@ final class UpdateSettingsRequest extends FormRequest
 
         $sent = array_map(strval(...), array_filter($this->array('order_notify_statuses'), is_string(...)));
 
-        return array_values(array_intersect(array_keys(OrderStatusMessage::DEFAULTS), $sent));
+        return array_values(array_intersect(OrderStatusMessage::NOTIFIABLE, $sent));
     }
 
     /**

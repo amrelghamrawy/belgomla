@@ -1,0 +1,96 @@
+"use client";
+
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { apiFetch } from "@/lib/api/client";
+import { useIdempotencyKey } from "@/lib/api/idempotency";
+import { queryKeys } from "@/lib/api/keys";
+import type { DashboardOrderDetail, MerchantOrderRequest, OrderQuote, OrderQuoteLine } from "@/lib/api/types";
+
+// BR-O11, D84: the merchant places an order for a customer (POST /api/dashboard/orders), quoting it first
+// (POST /api/dashboard/orders/quote) so the form shows the checkout's prices, stock and problems as it is filled.
+
+/** A line of the form, before the quote prices it. Quantity in selling units. */
+export type DraftLine = { sku_id: number; quantity: number; name: string; code: string };
+
+/** How long the form waits after a change before asking for a new quote. */
+export const QUOTE_DELAY_MS = 300;
+
+/** Adds a product to the lines at its MOQ, or does nothing when it is already there. */
+export function addLine(lines: DraftLine[], line: DraftLine): DraftLine[] {
+  return lines.some((current) => current.sku_id === line.sku_id) ? lines : [...lines, line];
+}
+
+/** Sets a line's quantity; anything that is not a whole number of at least 1 (an emptied field) becomes 0. */
+export function setQuantity(lines: DraftLine[], skuId: number, quantity: number): DraftLine[] {
+  const clean = Number.isInteger(quantity) && quantity >= 1 ? quantity : 0;
+
+  return lines.map((line) => (line.sku_id === skuId ? { ...line, quantity: clean } : line));
+}
+
+export function removeLine(lines: DraftLine[], skuId: number): DraftLine[] {
+  return lines.filter((line) => line.sku_id !== skuId);
+}
+
+/** The quote body for the form, or null while there is nothing (valid) to quote: no customer, no line, an empty quantity. */
+export function quoteBody(customerId: number | null, lines: DraftLine[]) {
+  if (customerId === null || lines.length === 0 || lines.some((line) => line.quantity < 1)) {
+    return null;
+  }
+
+  return { customer_id: customerId, lines: lines.map(({ sku_id, quantity }) => ({ sku_id, quantity })) };
+}
+
+/**
+ * Whether the quoted order would be accepted: no line problem, within the credit limit, and the minimum order value
+ * reached or waived (D84: only by a user who may, and never the MOQ, stock or credit).
+ */
+export function quotePasses(quote: OrderQuote, overrideMov: boolean): boolean {
+  return (
+    quote.lines.every((line) => line.problem === null) && quote.credit === null && (quote.mov.satisfied || overrideMov)
+  );
+}
+
+/** The quoted line of a SKU, if the quote has it. */
+export function quotedLine(quote: OrderQuote | undefined, skuId: number): OrderQuoteLine | undefined {
+  return quote?.lines.find((line) => line.sku_id === skuId);
+}
+
+/** The live quote of the form; the previous one stays on screen while the next loads. */
+export function useOrderQuote(body: ReturnType<typeof quoteBody>) {
+  return useQuery({
+    queryKey: queryKeys.dashboardOrderQuote(body ?? {}),
+    queryFn: () => apiFetch<OrderQuote>("/api/dashboard/orders/quote", { method: "POST", body }),
+    enabled: body !== null,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
+/** Places the order (retry-safe, D55) and refreshes everything a new order moves: lists, stock, the customer. */
+export function usePlaceOrder() {
+  const queryClient = useQueryClient();
+  const idempotency = useIdempotencyKey("merchant-order");
+
+  return useMutation({
+    mutationFn: (body: MerchantOrderRequest) =>
+      apiFetch<DashboardOrderDetail>("/api/dashboard/orders", {
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotency.keyFor(body) },
+      }),
+    onSuccess: (order) => {
+      idempotency.reset();
+      queryClient.setQueryData(queryKeys.dashboardOrder(order.number), order);
+      for (const key of [
+        queryKeys.dashboardOrdersLists,
+        queryKeys.dashboardOverview,
+        ["dashboard", "inventory"],
+        ["dashboard", "customers"],
+        ["dashboard", "reports"],
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}

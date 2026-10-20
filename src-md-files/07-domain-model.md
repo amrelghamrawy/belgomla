@@ -384,6 +384,8 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | cancelled_by_type                                   | enum          | `customer`, `tenant_user`, `system` (V2 expiry, D81), nullable                    |
 | placed_at, confirmed_at, delivered_at, cancelled_at | timestamptz   | nullable except placed_at                                                         |
 | due_at                                              | timestamptz   | V2: set on delivery = delivered_at + the customer's terms (BR-C06)                |
+| placed_by_type                                      | varchar(12)   | V2 Task 07: `customer` (default) or `tenant_user` (BR-O11); CHECK on the two values |
+| placed_by_id                                        | bigint        | nullable; the customer or dashboard user id, by `placed_by_type` (backfilled with `customer_id`) |
 
 ### `tenant_order_counters` (`tenant_id` PK, `next_number int`)
 
@@ -618,6 +620,8 @@ COMMIT
 ```
 
 Any assertion failure rolls back and returns a 422 listing the offending SKU(s).
+
+V2 Task 07: everything after loading the cart is `Orders\Actions\PlaceOrder`, shared with the merchant-placed order (BR-O11): the lines come from the merchant's form instead of the cart, the actor is the dashboard user, the MOV step may be waived (D84), the cart is not touched and no `new_order` notification is written. `POST /api/dashboard/orders/quote` runs the same checks on unlocked stock and writes nothing.
 
 ---
 

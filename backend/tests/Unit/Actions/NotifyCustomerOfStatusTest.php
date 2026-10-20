@@ -118,3 +118,19 @@ test('BR-N03 an order of another tenant is never visible here', function (): voi
 
     expect(fn () => app(NotifyCustomerOfStatus::class)->handle($theirs, OrderStatus::Confirmed))->toThrow(Illuminate\Database\Eloquent\ModelNotFoundException::class);
 });
+
+test('BR-O11 the placed message is sent whatever statuses the store notifies, in the store\'s words when it has them', function (): void {
+    $this->tenant->settings->update(['order_notify_statuses' => [], 'order_status_messages' => ['placed' => 'سجلنا طلبك {رقم_الطلب} يا {اسم_العميل} ({حالة_الطلب})']]);
+
+    app(NotifyCustomerOfStatus::class)->placed($this->order->refresh());
+
+    expect(($this->message)()?->body)->toBe("سجلنا طلبك {$this->order->number} يا محمود (قيد الانتظار)");
+});
+
+test('BR-O11 the placed message respects the customer\'s opt-out', function (): void {
+    $this->customer->forceFill(['order_notifications_opt_out' => true])->save();
+
+    app(NotifyCustomerOfStatus::class)->placed($this->order->refresh());
+
+    expect(($this->message)())->toBeNull();
+});
