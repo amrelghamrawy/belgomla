@@ -51,6 +51,7 @@ describe("order status messages (mirrors App\\Support\\OrderStatusMessage)", () 
       delivered: "د",
       cancelled: "هـ",
       discount: "و",
+      edited: "ز",
     };
 
     expect(
@@ -62,6 +63,7 @@ describe("order status messages (mirrors App\\Support\\OrderStatusMessage)", () 
       delivered: "وصل",
       cancelled: null,
       discount: null,
+      edited: null,
     });
   });
 });

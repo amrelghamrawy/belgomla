@@ -150,10 +150,10 @@ test('BR-N03 an owner picks the statuses customers hear about and words a status
         ->assertJsonPath('data.order_status_message_defaults.cancelled', OrderStatusMessage::DEFAULTS['cancelled']);
 });
 
-test('BR-N03 by default the four main statuses notify in the platform words', function (): void {
+test('BR-N03 D87 by default the four main statuses and line edits notify in the platform words', function (): void {
     $this->tenantJson('GET', '/api/dashboard/settings')
         ->assertOk()
-        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'out_for_delivery', 'delivered', 'cancelled'])
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'out_for_delivery', 'delivered', 'cancelled', 'edited'])
         ->assertJsonPath('data.order_status_messages', []);
 });
 

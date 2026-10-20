@@ -606,6 +606,53 @@ export const dashboard = {
     },
     discountTotal: "خصم الطلب",
     listPrice: "قبل الخصم",
+    // BR-O12, D87: editing the lines of a pending or confirmed order.
+    edit: {
+      button: "تعديل الأصناف",
+      title: "تعديل أصناف الطلب",
+      hint: "أضف أو احذف أصنافًا أو غيّر الكميات قبل بدء التجهيز. تُسعَّر الأصناف المعدلة بالأسعار الحالية، ويبقى سعر الباقي كما هو، ويُبلَّغ العميل بالإجمالي الجديد.",
+      changes: "ما سيتغير",
+      addedMark: "جديد",
+      noChanges: "لم تغيّر شيئًا بعد",
+      added: (name: string, quantity: number) => `إضافة ${name} (${quantity})`,
+      removed: (name: string, quantity: number) => `حذف ${name} (${quantity})`,
+      quantity: (name: string, from: number, to: number) => `${name}: من ${from} إلى ${to}`,
+      newTotal: "إجمالي الأصناف بعد التعديل (تقريبي)",
+      note: "ملاحظة للسجل (اختياري)",
+      save: "حفظ التعديل",
+      saving: "جاري الحفظ…",
+      saved: "تم تعديل أصناف الطلب",
+      belowMov: (required: string, current: string) =>
+        `تم الحفظ، لكن إجمالي الطلب ${current} أقل من الحد الأدنى للطلب ${required}`,
+      emptyLines: "لا يمكن حذف كل الأصناف، ألغِ الطلب بدلًا من ذلك",
+    },
+    // BR-O13, D86: what was actually delivered.
+    deliver: {
+      title: "تأكيد التسليم",
+      body: "يُخصم المسلَّم من المخزون ويُسجَّل الطلب كمسلَّم.",
+      partial: "تسليم جزئي؟",
+      partialHint:
+        "حدد ما سُلِّم فعلًا من كل صنف. يعود الباقي للمخزون، ويُحاسَب العميل على المسلَّم فقط، ولا يُنشأ طلب للباقي.",
+      deliveredOf: (name: string) => `الكمية المسلَّمة من ${name}`,
+      ordered: (quantity: number, unit: string) => `المطلوب ${quantity} ${unit}`,
+      total: (amount: string) => `إجمالي المسلَّم قبل خصم الطلب: ${amount}`,
+      confirm: "تأكيد التسليم",
+      confirmCollect: "تسليم وتحصيل",
+      nothing: "لم يتم تسليم أي صنف، ألغِ الطلب بدلًا من ذلك",
+    },
+    // BR-O12, BR-O13: the line changes after the order was placed.
+    changes: {
+      title: "تعديلات الأصناف",
+      added: (name: string, quantity: number | null) => `أُضيف ${name} (${quantity ?? 0})`,
+      removed: (name: string, quantity: number | null) => `حُذف ${name} (${quantity ?? 0})`,
+      quantity: (name: string, from: number | null, to: number | null) => `${name}: من ${from ?? 0} إلى ${to ?? 0}`,
+      delivered_short: (name: string, ordered: number | null, delivered: number | null) =>
+        `${name}: سُلِّم ${delivered ?? 0} من ${ordered ?? 0}`,
+      unknownLine: "صنف",
+    },
+    removedBadge: "محذوف",
+    changedBadge: "معدَّل",
+    deliveredOf: (delivered: number, ordered: number) => `سُلِّم ${delivered} من ${ordered}`,
   },
 
   returns: {
@@ -788,6 +835,8 @@ export const dashboard = {
       notify: (status: string) => `أرسل رسالة عند: ${status}`,
       // D85: not a status, the merchant changed the order's discounts (off by default).
       discountEvent: "خصم على الطلب",
+      // D87: not a status, the merchant changed the order's lines (on by default).
+      editedEvent: "تعديل أصناف الطلب",
       label: (status: string) => `نص رسالة «${status}»`,
       insert: "أضف إلى النص:",
       placeholders: {

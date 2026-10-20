@@ -109,6 +109,8 @@ arch('inventory models are written only by the StockLedger and read by inventory
         'App\Modules\Inventory\Http\Resources',
         App\Modules\Inventory\Actions\AdjustStock::class, // reads the movement the ledger returns, for the audit record
         App\Modules\Orders\Services\CheckoutValidator::class, // reads the stock rows checkout locked through the ledger
+        App\Modules\Orders\Actions\EditOrderLines::class, // V2 Task 09: checks on copies of the locked rows, the order's own reservation counted as available
+        App\Modules\Orders\Services\OrderQuoter::class, // V2 Task 09: the same copies for the quote of an edit
         App\Modules\Catalog\Models\Sku::class,
         'Database\Factories',
         'Database\Seeders', // demo data: writes through actions, reads the models they return (rules/02 §1)

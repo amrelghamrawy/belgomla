@@ -54,6 +54,19 @@ final readonly class DiscountCalculator
     }
 
     /**
+     * D86: what an order discount takes off goods already delivered: as orderAmount(), but when it no longer fits it is
+     * capped so the order still costs 0.01, never refused (the delivery happened).
+     */
+    public function cappedOrderAmount(string $itemsTotal, DiscountType $type, string $value): string
+    {
+        try {
+            return $this->orderAmount($itemsTotal, $type, $value);
+        } catch (DiscountTooLarge) {
+            return bcsub($this->numeric($itemsTotal), '0.01', 2);
+        }
+    }
+
+    /**
      * @return numeric-string
      */
     private function numeric(string $amount): string

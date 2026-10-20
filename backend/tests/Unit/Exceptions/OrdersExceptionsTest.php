@@ -49,6 +49,13 @@ test('every orders exception fixes its status, code and arabic message', functio
     'sales above the cap' => [DiscountRefused::overLimit('10.00'), 403, 'discount_over_limit', 'أقصى خصم مسموح لك هو 10.00% على البند، ولا يمكنك إعطاء خصم على إجمالي الطلب'],
     'unit discount too large' => [App\Modules\Pricing\Exceptions\DiscountTooLarge::unit('90.00'), 422, 'discount_too_large', 'الخصم أكبر من سعر الوحدة (90.00)'],
     'order discount too large' => [App\Modules\Pricing\Exceptions\DiscountTooLarge::order('1390.00'), 422, 'discount_too_large', 'خصم الطلب أكبر من إجمالي البنود (1390.00)'],
+    'lines locked' => [App\Modules\Orders\Exceptions\OrderEditRefused::locked(OrderStatus::Preparing), 409, 'order_locked', 'لا يمكن تعديل أصناف طلب حالته «قيد التجهيز»'],
+    'edit below collected' => [App\Modules\Orders\Exceptions\OrderEditRefused::belowCollected('300.00', '250.00'), 409, 'below_collected', 'تم تحصيل 300.00 من هذا الطلب، ولا يمكن أن يقل إجماليه عن ذلك'],
+    'edit unknown line' => [App\Modules\Orders\Exceptions\OrderEditRefused::unknownLine('lines', 0), 422, 'validation_failed', 'البند غير موجود في هذا الطلب'],
+    'edit changes a sku' => [App\Modules\Orders\Exceptions\OrderEditRefused::skuChanged(0), 422, 'validation_failed', 'لا يمكن تغيير صنف بند موجود، احذفه وأضف الصنف الآخر'],
+    'delivered above ordered' => [App\Modules\Orders\Exceptions\OrderEditRefused::deliveredAboveOrdered(0, 6), 422, 'validation_failed', 'الكمية المسلّمة أكبر من المطلوبة (6)'],
+    'nothing delivered' => [App\Modules\Orders\Exceptions\OrderEditRefused::nothingDelivered(), 422, 'validation_failed', 'لم يتم تسليم أي صنف، ألغِ الطلب بدلًا من ذلك'],
+    'quoted order unknown' => [CheckoutFailed::orderUnavailable(), 422, 'validation_failed', 'الطلب غير موجود'],
 ]);
 
 test('BR-PR06 checkout failures list every problem in items and the minimum order value in details', function (): void {

@@ -116,7 +116,7 @@ test('BR-R02 the returnable lines show what was ordered, what came back by live 
 
     expect(app(ReturnsQuery::class)->returnable($order))->toBe([[
         'order_item_id' => $line->id, 'product_name' => $line->product_name, 'sku_code' => $line->sku_code, 'unit' => $line->unit_name,
-        'unit_price' => '85.00', 'ordered' => 6, 'returned' => 2, 'returnable' => 4,
+        'unit_price' => '85.00', 'ordered' => 6, 'delivered' => 6, 'returned' => 2, 'returnable' => 4,
     ]]);
 });
 

@@ -25,6 +25,8 @@ const ORDER_MESSAGE_DEFAULTS = {
   delivered: "أهلًا {اسم_العميل}، تم توصيل طلبك رقم {رقم_الطلب} من {اسم_المتجر}. شكرًا لتعاملك معنا.",
   cancelled: "أهلًا {اسم_العميل}، تم إلغاء طلبك رقم {رقم_الطلب} من {اسم_المتجر}. السبب: {سبب_الإلغاء}",
   discount: "أهلًا {اسم_العميل}، تم تطبيق خصم على طلبك رقم {رقم_الطلب} من {اسم_المتجر}، والإجمالي الآن {الإجمالي}.",
+  edited:
+    "أهلًا {اسم_العميل}، تم تعديل أصناف طلبك رقم {رقم_الطلب} من {اسم_المتجر}، والإجمالي الآن {الإجمالي}. التفاصيل في صفحة الطلب.",
 };
 
 function settings(overrides: Partial<DashboardSettings> = {}): DashboardSettings {
@@ -210,6 +212,29 @@ describe("SettingsForm", () => {
     await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
     expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
       order_notify_statuses: ["confirmed", "out_for_delivery", "delivered", "cancelled", "discount"],
+    });
+  });
+
+  it("D87 a store may stop messaging customers about line edits, on by default", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/settings": json(200, { data: settings() }) });
+    const user = userEvent.setup();
+    renderWithQuery(
+      <SettingsForm
+        settings={settings({
+          order_notify_statuses: ["confirmed", "out_for_delivery", "delivered", "cancelled", "edited"],
+        })}
+      />,
+    );
+    const toggle = screen.getByLabelText("أرسل رسالة عند: تعديل أصناف الطلب");
+
+    expect(toggle).toBeChecked();
+    expect(screen.getByLabelText("نص رسالة «تعديل أصناف الطلب»")).toHaveValue(ORDER_MESSAGE_DEFAULTS.edited);
+    await user.click(toggle);
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/settings")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/settings")[0]?.body).toMatchObject({
+      order_notify_statuses: ["confirmed", "out_for_delivery", "delivered", "cancelled"],
     });
   });
 

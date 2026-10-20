@@ -64,6 +64,7 @@ test('the store order detail adds the lines and the history', function (): void 
             'id' => $item->id, 'sku_id' => $item->sku_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
             'unit' => $item->unit_name, 'conversion_factor' => 1, 'quantity' => 2, 'cover_price' => null, 'list_unit_price' => '85.00',
             'manual_discount' => null, 'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => null, 'line_total' => '170.00',
+            'delivered_quantity' => null, 'removed_at' => null,
         ]],
         'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
     ]);
@@ -98,7 +99,7 @@ test('the order item resource is the line snapshot', function (): void {
 
     expect(array_keys(rendered(new OrderItemResource($item), storeRequest())))->toBe([
         'id', 'sku_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'list_unit_price',
-        'manual_discount', 'unit_price', 'discount_percent', 'tier_min_quantity', 'line_total',
+        'manual_discount', 'unit_price', 'discount_percent', 'tier_min_quantity', 'line_total', 'delivered_quantity', 'removed_at',
     ]);
 });
 
@@ -254,4 +255,33 @@ test('BR-O11 the quote resource renders every line with its tiers and problem, t
         'mov' => ['enabled' => false, 'amount' => null, 'satisfied' => true],
         'credit' => null,
     ]);
+});
+
+test('BR-O12 BR-O13 a line shows what was delivered and when it was removed', function (): void {
+    $item = OrderItem::query()->firstOrFail();
+    $item->forceFill(['delivered_quantity' => 1, 'line_total' => '85.00'])->save();
+    $removed = OrderItem::factory()->for($this->order)->removed()->create();
+
+    expect(rendered(new OrderItemResource($item), storeRequest()))->toMatchArray(['quantity' => 2, 'delivered_quantity' => 1, 'line_total' => '85.00', 'removed_at' => null])
+        ->and(rendered(new OrderItemResource($removed), storeRequest())['removed_at'])->toBe(now()->toIso8601String());
+});
+
+test('BR-O12 the order details list the line changes; the dashboard adds who made each', function (): void {
+    $item = OrderItem::query()->firstOrFail();
+    App\Modules\Orders\Models\OrderItemChange::factory()->create(['order_item_id' => $item->id, 'old_quantity' => 3, 'new_quantity' => 2, 'unit_price_before' => '90.00', 'unit_price_after' => '85.00', 'actor_id' => null]);
+    $order = Order::query()->with(['items', 'itemChanges.orderItem', 'history'])->findOrFail($this->order->id);
+    $change = [
+        'order_item_id' => $item->id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'change' => 'quantity',
+        'old_quantity' => 3, 'new_quantity' => 2, 'unit_price_before' => '90.00', 'unit_price_after' => '85.00', 'at' => now()->toIso8601String(),
+    ];
+
+    expect(rendered(new OrderResource($order), storeRequest('/api/store/orders/1024'))['changes'])->toBe([$change])
+        ->and(rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders/1024'))['changes'])->toBe([[...$change, 'actor_id' => null]]);
+});
+
+test('BR-O12 the lists leave the changes out', function (): void {
+    $order = Order::query()->findOrFail($this->order->id);
+
+    expect(rendered(new OrderResource($order), storeRequest('/api/store/orders')))->not->toHaveKey('changes')
+        ->and(rendered(new DashboardOrderResource($order, new PendingClockData(now()->subDay(), null)), dashboardRequest('/api/dashboard/orders')))->not->toHaveKey('changes');
 });

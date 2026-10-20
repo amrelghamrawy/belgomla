@@ -558,6 +558,21 @@ V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about th
 - Returns: `returnable[].unit_price` and the return lines are priced at the line price less the order discount's share; the last return absorbs the rounding (D85).
 - Settings: `max_discount_percent_sales` (null or > 0 and < 100, 2 decimals; dashboard only); `order_notify_statuses` accepts `discount` and `order_status_messages` a `discount` text.
 
+### Order editing and partial delivery (V2 Task 09, BR-O12, BR-O13, D86, D87)
+
+| Method | Path                                    | Body / Notes |
+| ------ | --------------------------------------- | ------------ |
+| PUT    | `/api/dashboard/orders/{number}/lines`  | `{ lines: [{ order_item_id?, sku_id, quantity }], note? }` → the dashboard order detail + `meta.below_mov`. `orders.edit` (owner, manager, sales), `idempotent` |
+
+- **Lines** are every line the order should have: an existing live line by `order_item_id` with its own `sku_id`, a new one without. 1..200, each SKU once, `quantity` 1..1,000,000 selling units; `note` ≤ 250 (history «تعديل الطلب: note»).
+- `409 order_locked` from `preparing` on (`details.status`); `409 below_collected`; `422 checkout_failed` with `items` for the added or changed lines (stock counts what the order holds), `details.credit` when a higher total passes the credit limit; `422 discount_too_large` when an EGP order discount no longer fits; `422 validation_failed` on `lines.N.order_item_id` (not a live line of the order), `lines.N.sku_id` (changed, or not this store's). `meta.below_mov` is `{ required, current }` when the new total is under the minimum order value (allowed), else null.
+- Audit `order.lines_changed` (old/new totals, the changes, the note). The customer gets the `edited` WhatsApp text when `order_notify_statuses` holds `edited` (default on, D87).
+- `POST …/transition` with `to: delivered` accepts `delivered_quantities: [{ order_item_id, quantity }]` (0..ordered, each line once, a line left out went out in full; ignored for other targets). `422 validation_failed` on `delivered_quantities.N.quantity` above the ordered quantity, `delivered_quantities.N.order_item_id` not a live line, or `delivered_quantities` when nothing at all is delivered; `409 below_collected`. `order.status_changed` adds `delivered_short [{ order_item_id, ordered, delivered }]` and `order_total`.
+- Every order line (store and dashboard) adds `delivered_quantity` (null until delivered) and `removed_at` (null unless removed); the details list every line, removed ones too, and `changes[]` `{ order_item_id, product_name, sku_code, change, old_quantity, new_quantity, unit_price_before, unit_price_after, at }` (the dashboard adds `actor_id`).
+- `POST /api/dashboard/orders/quote` accepts `order` (an order number of the customer) to quote an edit: what the order holds counts as available and its total is not counted twice against the credit limit; another customer's or store's order → `422 validation_failed` on `order`.
+- `returnable[]` adds `delivered`; `returnable = delivered − returned`.
+- Settings: `order_notify_statuses` accepts `edited` and `order_status_messages` an `edited` text.
+
 ### Merchant-placed orders (V2 Task 07, BR-O11, D84)
 
 | Method | Path                           | Body / Notes |
@@ -705,9 +720,9 @@ php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their 
 | Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        15 |
-| Dashboard      |        86 |
+| Dashboard      |        88 |
 | Webhooks       |         2 |
-| **Total**      |   **120** |
+| **Total**      |   **122** |
 
 ---
 

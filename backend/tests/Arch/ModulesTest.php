@@ -57,6 +57,7 @@ arch('data classes are final readonly value objects')
         App\Modules\Orders\Data\OrderQuote::class,
         App\Modules\Orders\Data\CartLineInput::class, // V2 Task 07: a line to order, from the cart or the merchant's form
         App\Modules\Orders\Data\TransitionPlan::class,
+        App\Modules\Orders\Data\EditedOrder::class, // V2 Task 09: what EditOrderLines leaves, not request input
         App\Modules\Catalog\Data\CatalogLookups::class, // V2 Task 06 read models of the catalog import, not request input
         App\Modules\Catalog\Data\ImportRowResult::class,
         App\Modules\Catalog\Data\ImportPreview::class,

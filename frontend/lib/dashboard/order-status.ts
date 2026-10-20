@@ -54,3 +54,8 @@ export function canCollect(status: OrderStatus): boolean {
 export function allowsPriceChange(status: OrderStatus): boolean {
   return status === "pending" || status === "confirmed";
 }
+
+/** BR-O12, D87: the lines are edited while the order is pending or confirmed (409 order_locked after). */
+export function allowsLineEdit(status: OrderStatus): boolean {
+  return status === "pending" || status === "confirmed";
+}

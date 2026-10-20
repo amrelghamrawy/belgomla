@@ -145,3 +145,20 @@ test('D85 a discount is told only when the store notifies discounts', function (
 
     expect(($this->message)()?->body)->toContain('تم تطبيق خصم على طلبك');
 });
+
+test('D87 a line edit is told by default, with the new total', function (): void {
+    app(NotifyCustomerOfStatus::class)->edited($this->order->refresh());
+
+    expect(($this->message)()?->body)->toBe("أهلًا محمود، تم تعديل أصناف طلبك رقم {$this->order->number} من {$this->tenant->name}، والإجمالي الآن 540.00. التفاصيل في صفحة الطلب.");
+});
+
+test('D87 a line edit is not told when the store leaves edited out, nor to a customer who opted out', function (): void {
+    App\Modules\Tenancy\Models\TenantSetting::query()->whereKey($this->tenant->id)->update(['order_notify_statuses' => json_encode(['confirmed'])]);
+    app(NotifyCustomerOfStatus::class)->edited($this->order->refresh());
+
+    App\Modules\Tenancy\Models\TenantSetting::query()->whereKey($this->tenant->id)->update(['order_notify_statuses' => json_encode(['edited'])]);
+    $this->customer->forceFill(['order_notifications_opt_out' => true])->save();
+    app(NotifyCustomerOfStatus::class)->edited($this->order->refresh());
+
+    expect(($this->message)())->toBeNull();
+});

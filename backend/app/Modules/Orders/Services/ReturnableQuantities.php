@@ -7,11 +7,12 @@ namespace App\Modules\Orders\Services;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderReturnItem;
+use App\Modules\Orders\Models\Scopes\Live;
 
 /**
- * BR-R02: how many selling units of each line can still come back = delivered − returned by live returns. A
- * delivered order delivered every line in full (BR-O06), so delivered is the line's quantity; a voided return
- * gives its quantity back.
+ * BR-R02: how many selling units of each line can still come back = delivered − returned by live returns. A line
+ * delivered short counts what went out (`delivered_quantity`, BR-O13), a removed line nothing (BR-O12); a voided
+ * return gives its quantity back.
  */
 final readonly class ReturnableQuantities
 {
@@ -23,8 +24,8 @@ final readonly class ReturnableQuantities
         $returned = $this->returned($order);
         $returnable = [];
 
-        foreach (OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get(['id', 'quantity']) as $item) {
-            $returnable[$item->id] = $item->quantity - ($returned[$item->id] ?? 0);
+        foreach (OrderItem::query()->where('order_id', $order->id)->tap(new Live)->orderBy('id')->get(['id', 'quantity', 'delivered_quantity']) as $item) {
+            $returnable[$item->id] = ($item->delivered_quantity ?? $item->quantity) - ($returned[$item->id] ?? 0);
         }
 
         return $returnable;

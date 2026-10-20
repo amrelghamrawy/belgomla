@@ -2311,7 +2311,7 @@ paths:
                   data: { $ref: '#/components/schemas/OrderQuote' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
-        '422': { description: "validation_failed (also on customer_id or lines.N.sku_id that are not this store's)", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { description: "validation_failed (also on customer_id or lines.N.sku_id that are not this store's, or order that is not one of the customer's)", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
 
   /api/dashboard/orders/{order}:
     parameters:
@@ -2332,7 +2332,7 @@ paths:
     post:
       operationId: dashboardTransitionOrder
       tags: [dashboard-orders]
-      summary: Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04)
+      summary: Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04), with delivered_quantities a partial delivery (BR-O13)
       requestBody:
         required: true
         content:
@@ -2346,13 +2346,26 @@ paths:
                   enum: [confirmed, preparing, out_for_delivery, delivered]
                 note: { type: [string, 'null'], maxLength: 300 }
                 collect_full_amount: { type: boolean }
+                delivered_quantities:
+                  type: [array, 'null']
+                  maxItems: 200
+                  description: >-
+                    BR-O13, D86: with to=delivered, what each line actually delivered (selling units, 0..ordered); a line
+                    left out went out in full. The rest is released and the order is charged for what was delivered.
+                    Ignored for other targets.
+                  items:
+                    type: object
+                    required: [order_item_id, quantity]
+                    properties:
+                      order_item_id: { type: integer, minimum: 1 }
+                      quantity: { type: integer, minimum: 0, maximum: 1000000 }
       responses:
         '200': { $ref: '#/components/responses/DashboardOrderDetail' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
-        '409': { description: invalid_transition with details.from and details.to, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
-        '422': { $ref: '#/components/responses/Error' }
+        '409': { description: 'invalid_transition with details.from and details.to; below_collected when a partial delivery leaves the total under what was collected', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { description: 'validation_failed (also delivered_quantities.N.quantity above the ordered quantity, a line not of this order, or nothing delivered at all)', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
 
   /api/dashboard/orders/{order}/cancel:
     parameters:
@@ -2425,6 +2438,60 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '409': { description: 'order_locked (preparing or later) or below_collected (the new total is under what was collected)', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
         '422': { description: 'discount_too_large (a unit or the order below 0.01) or validation_failed', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
+  /api/dashboard/orders/{order}/lines:
+    parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    put:
+      operationId: dashboardEditOrderLines
+      tags: [dashboard-orders]
+      summary: Changes the lines of a pending or confirmed order (BR-O12, D87)
+      description: >-
+        The body is every line the order should have: an existing line by its `order_item_id` (same SKU), a new one
+        without. A live line left out is removed (kept for history), a quantity change re-prices the line at the current
+        tiers keeping its manual discount, a new line is priced like checkout; unchanged lines keep their snapshot. Stock
+        is checked like checkout with what the order holds counted as available. The history gets «تعديل الطلب»,
+        `order.lines_changed` is audited and the customer gets the `edited` text when the store notifies it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderLinesRequest' }
+      responses:
+        '200':
+          description: The order, and the minimum order value shortfall of its new total (allowed, BR-MOV02)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/DashboardOrderDetail' }
+                  meta:
+                    type: object
+                    required: [below_mov]
+                    properties:
+                      below_mov:
+                        oneOf:
+                          - type: object
+                            required: [required, current]
+                            properties:
+                              required: { $ref: '#/components/schemas/Money' }
+                              current: { $ref: '#/components/schemas/Money' }
+                          - type: 'null'
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: 'order_locked (preparing or later) or below_collected (the new total is under what was collected)', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422':
+          description: >-
+            checkout_failed (items for the added or changed lines; details.credit when a higher total passes the credit
+            limit); discount_too_large when an EGP order discount no longer fits; validation_failed (also
+            lines.N.order_item_id not a live line of the order, lines.N.sku_id changed or not this store's)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   /api/dashboard/orders/{order}/returns:
     parameters:
@@ -3680,7 +3747,7 @@ components:
 
     OrderItem:
       type: object
-      required: [id, sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, line_total]
+      required: [id, sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, line_total, delivered_quantity, removed_at]
       properties:
         id: { type: integer, description: 'The order line, as PUT …/discount names it (D85)' }
         sku_id: { type: integer }
@@ -3707,7 +3774,9 @@ components:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
         tier_min_quantity: { type: [integer, 'null'] }
-        line_total: { $ref: '#/components/schemas/Money' }
+        line_total: { $ref: '#/components/schemas/Money', description: 'unit_price × the quantity charged: delivered_quantity once delivered, else quantity' }
+        delivered_quantity: { type: [integer, 'null'], description: 'Selling units that went out, set on delivery; less than quantity when delivered short (BR-O13)' }
+        removed_at: { type: [string, 'null'], format: date-time, description: 'The merchant removed the line (BR-O12): kept for history, out of every total' }
 
     DiscountType:
       type: string
@@ -3826,11 +3895,15 @@ components:
       allOf:
         - $ref: '#/components/schemas/Order'
         - type: object
-          required: [items, history, returns]
+          required: [items, changes, history, returns]
           properties:
             items:
               type: array
+              description: Every line, removed ones too (removed_at)
               items: { $ref: '#/components/schemas/OrderItem' }
+            changes:
+              type: array
+              items: { $ref: '#/components/schemas/OrderItemChange' }
             history:
               type: array
               items: { $ref: '#/components/schemas/OrderHistoryEntry' }
@@ -3887,7 +3960,7 @@ components:
 
     Permission:
       type: string
-      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.create, orders.override_mov, orders.discount, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
+      enum: [catalog.manage, pricing.manage, inventory.adjust, orders.view, orders.manage, orders.create, orders.override_mov, orders.edit, orders.discount, orders.returns, customers.manage, customers.credit, collections.manage, reports.view, settings.manage, users.manage, audit.view]
 
     # ---- Dashboard schemas (Task 10) ----
 
@@ -3899,8 +3972,8 @@ components:
           properties:
             order_notify_statuses:
               type: array
-              description: 'BR-N03 the statuses customers are told about, plus `discount` (D85)'
-              items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled, discount] }
+              description: 'BR-N03 the statuses customers are told about, plus `discount` (D85) and `edited` (D87, on by default)'
+              items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled, discount, edited] }
             order_status_messages:
               type: object
               description: 'BR-N03 status => the store wording; a missing status uses order_status_message_defaults'
@@ -3964,7 +4037,7 @@ components:
         default_credit_limit: { type: [string, 'null'] }
         order_notify_statuses:
           type: array
-          items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled, discount] }
+          items: { type: string, enum: [confirmed, preparing, out_for_delivery, delivered, cancelled, discount, edited] }
         max_discount_percent_sales: { type: [string, number, 'null'], description: 'D85 above 0 and below 100, two decimals at most; null = sales users cannot discount' }
         order_status_messages:
           type: object
@@ -4545,11 +4618,59 @@ components:
         is_stale: { type: boolean, description: 'Pending for longer than stale_pending_hours (D10)' }
         expires_at: { type: [string, 'null'], format: date-time, description: 'When a pending order cancels itself; null when not pending or expiry is off (D81)' }
 
+    OrderLinesRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          description: Every line the order should have; each SKU once, quantity in selling units
+          items:
+            type: object
+            required: [sku_id, quantity]
+            properties:
+              order_item_id: { type: [integer, 'null'], minimum: 1, description: 'An existing live line; omitted or null for a new one' }
+              sku_id: { type: integer, minimum: 1 }
+              quantity: { type: integer, minimum: 1, maximum: 1000000 }
+        note: { type: [string, 'null'], maxLength: 250, description: 'Goes to the history after «تعديل الطلب»' }
+
+    OrderItemChange:
+      type: object
+      description: 'A line change after placement (BR-O12, BR-O13): added (new only), removed (old only), quantity (both), delivered_short (ordered → delivered)'
+      required: [order_item_id, product_name, sku_code, change, old_quantity, new_quantity, unit_price_before, unit_price_after, at]
+      properties:
+        order_item_id: { type: [integer, 'null'] }
+        product_name: { type: [string, 'null'] }
+        sku_code: { type: [string, 'null'] }
+        change: { type: string, enum: [added, removed, quantity, delivered_short] }
+        old_quantity: { type: [integer, 'null'] }
+        new_quantity: { type: [integer, 'null'] }
+        unit_price_before:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        unit_price_after:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        at: { type: string, format: date-time }
+
+    DashboardOrderItemChange:
+      allOf:
+        - $ref: '#/components/schemas/OrderItemChange'
+        - type: object
+          required: [actor_id]
+          properties:
+            actor_id: { type: [integer, 'null'], description: 'The dashboard user; null = system' }
+
     OrderQuoteRequest:
       type: object
       required: [customer_id, lines]
       properties:
         customer_id: { type: integer, minimum: 1 }
+        order: { type: [integer, 'null'], minimum: 1, description: "BR-O12: quote an edit of this order of the customer (its number): what it holds counts as available and its total is not counted twice against the credit limit" }
         lines:
           type: array
           minItems: 1
@@ -4691,11 +4812,15 @@ components:
         - $ref: '#/components/schemas/Order'
         - $ref: '#/components/schemas/DashboardOrderFields'
         - type: object
-          required: [items, history, collections, returns, messages]
+          required: [items, changes, history, collections, returns, messages]
           properties:
             items:
               type: array
+              description: Every line, removed ones too (removed_at)
               items: { $ref: '#/components/schemas/OrderItem' }
+            changes:
+              type: array
+              items: { $ref: '#/components/schemas/DashboardOrderItemChange' }
             history:
               type: array
               items: { $ref: '#/components/schemas/DashboardOrderHistoryEntry' }
@@ -4760,7 +4885,7 @@ components:
 
     ReturnableLine:
       type: object
-      required: [order_item_id, product_name, sku_code, unit, unit_price, ordered, returned, returnable]
+      required: [order_item_id, product_name, sku_code, unit, unit_price, ordered, delivered, returned, returnable]
       properties:
         order_item_id: { type: integer }
         product_name: { type: string }
@@ -4768,6 +4893,7 @@ components:
         unit: { type: string }
         unit_price: { $ref: '#/components/schemas/Money', description: 'What one unit returns at: the line price less the order discount share (D85)' }
         ordered: { type: integer }
+        delivered: { type: integer, description: 'What went out (BR-O13); returnable = delivered − returned' }
         returned: { type: integer, description: Brought back by live returns }
         returnable: { type: integer }
 

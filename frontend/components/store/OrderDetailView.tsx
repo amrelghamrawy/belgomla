@@ -26,6 +26,7 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
+import { changedLineIds, liveItems } from "@/lib/store/order-lines";
 import { useCancelOrder, useOrder } from "@/lib/store/orders";
 import { useRouteParam } from "@/lib/store/route";
 
@@ -72,6 +73,8 @@ export function OrderDetailView() {
 }
 
 function OrderDetailBody({ order }: { order: OrderDetail }) {
+  const changed = changedLineIds(order);
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -101,13 +104,39 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
 
       <section aria-labelledby="order-items" className="flex flex-col gap-2">
         <h2 id="order-items" className="font-bold">
-          {ar.orders.items} ({ar.orders.itemsCount(order.items.length)})
+          {ar.orders.items} ({ar.orders.itemsCount(liveItems(order).length)})
         </h2>
         <ul className="flex flex-col divide-y rounded-xl border">
           {order.items.map((item) => (
-            <li key={item.sku_id} className="flex items-start justify-between gap-3 p-3 text-sm">
+            <li
+              key={item.id}
+              data-testid={`order-line-${item.id}`}
+              className={
+                item.removed_at === null
+                  ? "flex items-start justify-between gap-3 p-3 text-sm"
+                  : "text-muted-foreground flex items-start justify-between gap-3 p-3 text-sm line-through"
+              }
+            >
               <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{item.product_name}</span>
+                <span className="font-medium">
+                  {item.product_name}
+                  {item.removed_at !== null ? (
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {ar.orders.lineRemoved}
+                    </Badge>
+                  ) : (
+                    changed.has(item.id) && (
+                      <Badge variant="secondary" className="ms-2 text-xs">
+                        {ar.orders.lineChanged}
+                      </Badge>
+                    )
+                  )}
+                </span>
+                {item.delivered_quantity !== null && item.delivered_quantity < item.quantity && (
+                  <span className="text-destructive text-xs" data-testid={`delivered-${item.id}`}>
+                    {ar.orders.deliveredOf(item.delivered_quantity, item.quantity, item.unit)}
+                  </span>
+                )}
                 <span className="text-muted-foreground">
                   {ar.orders.quantityOf(item.quantity, item.unit)} ×{" "}
                   {item.manual_discount !== null && (

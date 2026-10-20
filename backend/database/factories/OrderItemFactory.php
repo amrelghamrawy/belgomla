@@ -44,6 +44,18 @@ final class OrderItemFactory extends Factory
         ];
     }
 
+    /** BR-O12: the merchant removed the line. */
+    public function removed(): self
+    {
+        return $this->state(['removed_at' => now()]);
+    }
+
+    /** BR-O13: the line went out with this many selling units (all of it unless given). */
+    public function delivered(?int $quantity = null): self
+    {
+        return $this->state(fn (array $attributes): array => ['delivered_quantity' => $quantity ?? $attributes['quantity']]);
+    }
+
     /**
      * @param  array<array-key, mixed>  $attributes
      */

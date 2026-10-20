@@ -20,7 +20,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * it (`placed_by` customer | tenant_user with `placed_by_id`, BR-O11), the
  * status timestamps, `is_stale` (pending past `stale_pending_hours`, BR-INV07), `expires_at` (when a pending order
  * cancels itself, null while expiry is off, D81), history with the actor id and
- * note, `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()) and every
+ * note, `changes` with the actor id (BR-O12, BR-O13), `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()) and every
  * return of the order, voided ones included, in the returns list shape without `order` (BR-R06).
  *
  * @property-read Order $resource
@@ -77,6 +77,7 @@ final class DashboardOrderResource extends JsonResource
                 'actor_id' => $entry->actor_id,
                 'note' => $entry->note,
             ])->values()->all()),
+            'changes' => $this->whenLoaded('itemChanges', fn (): array => OrderResource::changes($order, withActor: true)),
             'collections' => $this->when($detail, $this->collections),
             'messages' => $this->when($detail, $this->messages),
             'returns' => $this->whenLoaded('returns', fn (): array => $order->returns->map(fn (OrderReturn $return): array => new OrderReturnResource($return)->resolve($request))->values()->all()),

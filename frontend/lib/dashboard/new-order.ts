@@ -1,11 +1,18 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api/client";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { queryKeys } from "@/lib/api/keys";
-import type { DashboardOrderDetail, MerchantOrderRequest, OrderQuote, OrderQuoteLine } from "@/lib/api/types";
+import type {
+  DashboardOrderDetail,
+  MerchantOrderRequest,
+  OrderQuote,
+  OrderQuoteLine,
+  OrderQuoteRequest,
+} from "@/lib/api/types";
 
 import { type DiscountDraft, discountBody, discountTotals } from "./price-math";
 
@@ -19,18 +26,18 @@ export type DraftLine = { sku_id: number; quantity: number; name: string; code: 
 export const QUOTE_DELAY_MS = 300;
 
 /** Adds a product to the lines at its MOQ, or does nothing when it is already there. */
-export function addLine(lines: DraftLine[], line: DraftLine): DraftLine[] {
+export function addLine<T extends DraftLine>(lines: T[], line: T): T[] {
   return lines.some((current) => current.sku_id === line.sku_id) ? lines : [...lines, line];
 }
 
 /** Sets a line's quantity; anything that is not a whole number of at least 1 (an emptied field) becomes 0. */
-export function setQuantity(lines: DraftLine[], skuId: number, quantity: number): DraftLine[] {
+export function setQuantity<T extends DraftLine>(lines: T[], skuId: number, quantity: number): T[] {
   const clean = Number.isInteger(quantity) && quantity >= 1 ? quantity : 0;
 
   return lines.map((line) => (line.sku_id === skuId ? { ...line, quantity: clean } : line));
 }
 
-export function removeLine(lines: DraftLine[], skuId: number): DraftLine[] {
+export function removeLine<T extends DraftLine>(lines: T[], skuId: number): T[] {
   return lines.filter((line) => line.sku_id !== skuId);
 }
 
@@ -58,8 +65,21 @@ export function quotedLine(quote: OrderQuote | undefined, skuId: number): OrderQ
   return quote?.lines.find((line) => line.sku_id === skuId);
 }
 
-/** The live quote of the form; the previous one stays on screen while the next loads. */
-export function useOrderQuote(body: ReturnType<typeof quoteBody>) {
+/** The value after a pause in changes, so the quote is not asked for on every keystroke. */
+export function useSettled<T>(value: T): T {
+  const [settled, setSettled] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), QUOTE_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [value]);
+
+  return settled;
+}
+
+/** The live quote of the form (a new order, or an edit with `order`, BR-O12); the previous one stays on screen while the next loads. */
+export function useOrderQuote(body: OrderQuoteRequest | null) {
   return useQuery({
     queryKey: queryKeys.dashboardOrderQuote(body ?? {}),
     queryFn: () => apiFetch<OrderQuote>("/api/dashboard/orders/quote", { method: "POST", body }),

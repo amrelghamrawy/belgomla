@@ -22,7 +22,8 @@ use Illuminate\Support\Facades\Log;
  * Nothing is sent when the store does not notify this status or the customer opted out. The message is handed to
  * Messenger only **after commit**, so a rolled-back transition sends nothing; a customer over their per-phone limit
  * (D79) is logged, never fails the transition. Called at the end of TransitionOrder and of a merchant's or the
- * system's CancelOrder, by PlaceOrderForCustomer (`placed`) when the merchant asks, and by ApplyOrderDiscount (`discount`).
+ * system's CancelOrder, by PlaceOrderForCustomer (`placed`) when the merchant asks, by ApplyOrderDiscount (`discount`) and by EditOrderLines
+ * (`edited`).
  */
 final readonly class NotifyCustomerOfStatus
 {
@@ -58,10 +59,25 @@ final readonly class NotifyCustomerOfStatus
      */
     public function discounted(Order $order): void
     {
+        $this->event($order, 'discount');
+    }
+
+    /**
+     * D87: the merchant changed the order's lines (EditOrderLines). Sent when the store notifies `edited` (on by
+     * default), with the new total.
+     */
+    public function edited(Order $order): void
+    {
+        $this->event($order, 'edited');
+    }
+
+    /** An order event other than a status, sent only when the store notifies it. */
+    private function event(Order $order, string $event): void
+    {
         $notifications = $this->settings->orderNotifications();
 
-        if (in_array('discount', $notifications['statuses'], true)) {
-            $this->send($order, 'discount', $order->status->label(), $notifications);
+        if (in_array($event, $notifications['statuses'], true)) {
+            $this->send($order, $event, $order->status->label(), $notifications);
         }
     }
 

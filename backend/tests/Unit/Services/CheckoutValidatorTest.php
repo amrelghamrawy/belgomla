@@ -193,3 +193,34 @@ test('BR-C05 BR-MOV02 the credit limit is reported together with the other probl
     expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'below_moq', 'moq' => 5]])
         ->and($e->details)->toBe(['mov' => ['required' => '1000.00', 'current' => '360.00'], 'credit' => ['limit' => '100.00', 'exposure' => '0.00', 'order_total' => '360.00']]);
 });
+
+test('BR-O12 the line checks alone report the lines and their problems, without the minimum or the credit limit', function (): void {
+    ($this->mov)('5000.00');
+    $this->customer->forceFill(['credit_limit' => '1.00'])->save();
+    $stock = SkuInventory::query()->whereKey($this->sku->id)->get()->keyBy('sku_id');
+
+    $report = app(CheckoutValidator::class)->checkLines([new CartLineInput($this->sku->load(['product', 'sellingUnit', 'tiers']), 3)], $stock);
+
+    expect($report->total)->toBe('270.00')
+        ->and($report->problemFor($this->sku->id)?->reason)->toBe('below_moq')
+        ->and([$report->movAmount, $report->mov, $report->credit])->toBe([null, null, null]);
+});
+
+test('BR-C05 BR-O12 an amount already counted in the exposure is taken out of it', function (): void {
+    $this->customer->forceFill(['credit_limit' => '1000.00'])->save();
+    App\Modules\Orders\Models\Order::factory()->for($this->customer)->create(['items_total' => '700.00', 'order_total' => '700.00']);
+
+    $validator = app(CheckoutValidator::class);
+
+    expect($validator->creditShortfall($this->customer, '900.00', '700.00'))->toBeNull()
+        ->and($validator->creditShortfall($this->customer, '1000.01', '700.00'))->toBe(['limit' => '1000.00', 'exposure' => '0.00', 'order_total' => '1000.01'])
+        ->and($validator->creditShortfall($this->customer, '900.00'))->toBe(['limit' => '1000.00', 'exposure' => '700.00', 'order_total' => '900.00']);
+});
+
+test('BR-MOV02 the shortfall of a total against the minimum order value', function (?string $amount, string $total, ?array $expected): void {
+    expect(app(CheckoutValidator::class)->movShortfall($amount, $total))->toBe($expected);
+})->with([
+    'no minimum' => [null, '10.00', null],
+    'exactly the minimum' => ['500.00', '500.00', null],
+    'one piaster short' => ['500.00', '499.99', ['required' => '500.00', 'current' => '499.99']],
+]);

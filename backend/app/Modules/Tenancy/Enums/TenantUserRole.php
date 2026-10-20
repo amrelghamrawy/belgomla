@@ -38,7 +38,7 @@ enum TenantUserRole: string
                 Permission::cases(),
                 fn (Permission $permission): bool => ! in_array($permission, [Permission::SettingsManage, Permission::UsersManage], true),
             )),
-            self::Sales => [Permission::OrdersView, Permission::OrdersManage, Permission::OrdersCreate, Permission::OrdersDiscount, Permission::CustomersManage], // discounts up to the store's cap (D85)
+            self::Sales => [Permission::OrdersView, Permission::OrdersManage, Permission::OrdersCreate, Permission::OrdersEdit, Permission::OrdersDiscount, Permission::CustomersManage], // discounts up to the store's cap (D85)
             self::Warehouse => [Permission::InventoryAdjust, Permission::OrdersView, Permission::OrdersManage, Permission::OrdersReturns],
             self::Accountant => [Permission::OrdersView, Permission::CustomersCredit, Permission::CollectionsManage, Permission::ReportsView],
         };

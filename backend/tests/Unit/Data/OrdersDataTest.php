@@ -234,3 +234,37 @@ test('D85 merchant order data carries the line discounts by sku and the order di
         discountReason: 'بالتليفون',
     ));
 });
+
+test('BR-O13 delivering carries the delivered quantities by order line, as integers', function (): void {
+    $request = validatedOrdersRequest(TransitionOrderRequest::class, ['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => '7', 'quantity' => '4'], ['order_item_id' => 9, 'quantity' => 0]]]);
+
+    expect(TransitionData::fromRequest($request))->toEqual(new TransitionData(OrderStatus::Delivered, null, false, [7 => 4, 9 => 0]));
+});
+
+test('BR-O13 delivered quantities only count when delivering, and none sent means everything was delivered', function (string $to, array $input): void {
+    $request = validatedOrdersRequest(TransitionOrderRequest::class, ['to' => $to, ...$input]);
+
+    expect(TransitionData::fromRequest($request)->deliveredQuantities)->toBeNull();
+})->with([
+    'another target' => ['out_for_delivery', ['delivered_quantities' => [['order_item_id' => 7, 'quantity' => 4]]]],
+    'not sent' => ['delivered', []],
+]);
+
+test('BR-O12 order edit data: every line with its id or none, integers, and the trimmed note', function (): void {
+    $data = App\Modules\Orders\Data\OrderEditData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\EditOrderLinesRequest::class, [
+        'lines' => [['order_item_id' => '7', 'sku_id' => '3', 'quantity' => '12'], ['sku_id' => 5, 'quantity' => 6], ['order_item_id' => null, 'sku_id' => 8, 'quantity' => 5]],
+        'note' => '  نفد الكتاب ',
+    ], 'PUT'));
+
+    expect($data)->toEqual(new App\Modules\Orders\Data\OrderEditData([
+        new App\Modules\Orders\Data\OrderEditLineData(7, 3, 12),
+        new App\Modules\Orders\Data\OrderEditLineData(null, 5, 6),
+        new App\Modules\Orders\Data\OrderEditLineData(null, 8, 5),
+    ], 'نفد الكتاب'));
+});
+
+test('BR-O12 an empty note is no note', function (): void {
+    $data = App\Modules\Orders\Data\OrderEditData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\EditOrderLinesRequest::class, ['lines' => [['sku_id' => 5, 'quantity' => 6]], 'note' => '  '], 'PUT'));
+
+    expect($data->note)->toBeNull();
+});

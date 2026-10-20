@@ -62,6 +62,7 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 | `orders.manage` (transition, cancel, address) | ✓ | ✓ | ✓ | ✓ (preparing / out for delivery only, no cancel) | |
 | `orders.create` (place an order for a customer, V2 Task 07, BR-O11) | ✓ | ✓ | ✓ | | |
 | `orders.override_mov` (waive the minimum order value of one such order, D84) | ✓ | ✓ | | | |
+| `orders.edit` (change the lines of a pending or confirmed order, V2 Task 09, BR-O12) | ✓ | ✓ | ✓ | | |
 | `orders.discount` (manual discounts, V2 Task 08, BR-PR08; sales: line discounts up to the store's cap only, D85) | ✓ | ✓ | ✓ | | |
 | `orders.returns` | ✓ | ✓ | | ✓ | |
 | `customers.manage` | ✓ | ✓ | ✓ | | |
@@ -518,6 +519,8 @@ When the order becomes `Delivered`:
 
 `Reserved -= reserved quantity`
 
+V2 (Task 09, BR-O13): when a line is delivered short, only the delivered units leave On Hand (`sale` movement of `delivered × conversion_factor`) and the rest of its reservation is released. A line the merchant removed (BR-O12) already gave its reservation back and is neither deducted nor released.
+
 ### BR-INV06 — Inventory Movements
 
 Every change to On Hand is recorded as an inventory movement with type:
@@ -584,9 +587,14 @@ Every status change is recorded in order status history with actor, timestamp an
 
 Order totals and item prices are snapshots and must remain stable even if catalog pricing changes later.
 
-### BR-O06 — Orders Are Immutable After Creation
+### BR-O06 — When Order Lines Change
 
-Order items (SKUs, quantities, prices) cannot be edited after creation in V1. The merchant cancels and the customer re-orders. Partial fulfilment is V2. Goods brought back after delivery are returns (§H2), which leave the items as they were.
+V1 orders were immutable. From V2 (Task 09) the lines of an order change in exactly two ways:
+
+- While it is `pending` or `confirmed`, the merchant edits them (add a SKU, remove a line, change a quantity, BR-O12) instead of cancelling and asking the customer to re-order.
+- On delivery, the merchant records what each line actually delivered when it is less than ordered (partial delivery, BR-O13).
+
+From `preparing` on, nothing but a short delivery changes the lines. The customer never edits an order. Goods brought back after delivery are returns (§H2), which leave the lines as they were.
 
 ### BR-O07 — Merchant Delivery
 
@@ -622,6 +630,29 @@ Many wholesale orders arrive by phone or WhatsApp. A dashboard user with `orders
 
 A blocked customer cannot be ordered for (`409 customer_blocked`), nor one who has not activated their account (`409 customer_not_active`).
 
+### BR-O12 — Editing an Order's Lines (V2 Task 09, D87)
+
+A dashboard user with `orders.edit` (owner, manager, sales) changes the lines of a `pending` or `confirmed` order (`409 order_locked` from `preparing` on). The request is the full list of lines the order should have:
+
+- A line kept with another quantity is re-priced at the current tiers (BR-PR04) and keeps its manual discount (BR-PR08) on the new list price. Its reservation follows: the difference is reserved or released.
+- A new SKU is checked and snapshotted like checkout (BR-PR06, BR-PR07) and reserved.
+- A line left out is removed: its reservation is released, and the line is kept for history (`removed_at`), out of every total, stock move and return.
+- An unchanged line keeps its snapshot price even when the catalog price changed (BR-O05). A line's SKU never changes (remove it and add the other).
+- The added and changed lines go through the checkout line checks (product active, MOQ, stock); what the order already holds of a SKU counts as available to it. Any failure refuses the whole edit like checkout (`422 checkout_failed`) and nothing changes.
+- Totals are recomputed (BR-O08): a % order discount is taken off the new items total; an EGP one that no longer fits refuses the edit (`422 discount_too_large`). The total can never be below what was collected (`409 below_collected`); the collection status is derived again.
+- A higher total must fit the customer's credit limit (BR-C05), counting the order's old total once. The minimum order value (BR-MOV02) is not enforced: going below it is allowed and the merchant is warned.
+- Every change is recorded as a line change (`added`, `removed`, `quantity`, with the quantities, the prices before and after and the user), the history gets the note «تعديل الطلب» (plus the merchant's note), and `order.lines_changed` is audited. Sending the lines the order already has changes nothing.
+- The customer gets the `edited` WhatsApp text with the new total (on by default, BR-N03) and sees the changed and removed lines on the order page.
+
+### BR-O13 — Partial Delivery (V2 Task 09, D86)
+
+When moving an order to `delivered`, the merchant may record what each line actually delivered (0 up to the ordered quantity, selling units); a line not mentioned went out in full. Delivering nothing at all is refused: the order is cancelled instead.
+
+- Only the delivered units are deducted (BR-INV05); the remainder is released to stock. There is no back-order or second shipment; the merchant places a new order for the rest (BR-O11).
+- Each line keeps its `delivered_quantity` and is charged for it (`line_total = unit_price × delivered_quantity`); the order totals are recomputed (BR-O08). A % order discount follows the new items total; an EGP one is capped so the order still costs 0.01.
+- What was already collected must still fit (`409 below_collected`); "collect the full amount" collects the new total.
+- Each short line is recorded as a `delivered_short` line change; the history note defaults to «تسليم جزئي»; the audit lists the short lines.
+- Returns count the delivered quantity (BR-R02).
 ---
 
 ## H2. Returns (المرتجع) — V2 Task 01 (D20)
@@ -632,7 +663,7 @@ A return records goods the customer brings back **after delivery**. Before deliv
 
 ### BR-R02 — Never More Than Delivered
 
-Per order line, the returnable quantity is the delivered quantity minus what live returns already brought back (selling units). A return line above it is rejected (`422 return_exceeds_delivered`, each offending line listed). A line appears once per return. Two returns recorded at the same time queue on the order row lock, so the last unit is never returned twice.
+Per order line, the returnable quantity is the delivered quantity (`delivered_quantity`: less than ordered after a partial delivery, BR-O13; a removed line has none, BR-O12) minus what live returns already brought back (selling units). A return line above it is rejected (`422 return_exceeds_delivered`, each offending line listed). A line appears once per return. Two returns recorded at the same time queue on the order row lock, so the last unit is never returned twice.
 
 ### BR-R03 — Returned Goods Go Back Into Stock
 
@@ -817,7 +848,7 @@ Customers get no in-app notifications; they see the status on "my orders" and re
 
 ### BR-N03 — Order Status Messages (V2 Task 03)
 
-- When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`, and from V2 Task 08 `discount` (the merchant changed the order's discounts; the message gives the new total, D85); a new store starts with all but `preparing` and `discount`.
+- When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`, from V2 Task 08 `discount` (the merchant changed the order's discounts; the message gives the new total, D85), and from V2 Task 09 `edited` (the merchant changed the order's lines, with the new total, D87); a new store starts with all but `preparing` and `discount`. `edited` was also added to every store that already notified something.
 - The merchant words each status in settings (`order_status_messages`), up to 500 characters, with the placeholders `{اسم_العميل}`, `{اسم_المتجر}`, `{رقم_الطلب}`, `{حالة_الطلب}`, `{الإجمالي}`, plus `{سبب_الإلغاء}` in the cancelled text only. Any other `{…}` is rejected. No wording (or the default sent back) = the platform default text.
 - A cancel tells the customer only when the merchant cancels; a customer cancelling their own order gets nothing.
 - The message is sent after the change commits: a change that rolls back sends nothing. A customer over their order-message limit (D79) is skipped and logged, and the change still succeeds.

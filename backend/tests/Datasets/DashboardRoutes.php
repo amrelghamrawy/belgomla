@@ -80,6 +80,7 @@ dataset('dashboard authenticated routes', [
     'orders cancel' => ['POST', '/api/dashboard/orders/1/cancel'],
     'orders delivery address' => ['PUT', '/api/dashboard/orders/1/delivery-address'],
     'orders discount' => ['PUT', '/api/dashboard/orders/1/discount'],
+    'orders lines' => ['PUT', '/api/dashboard/orders/1/lines'],
     'order returns list' => ['GET', '/api/dashboard/orders/1/returns'],
     'order returns record' => ['POST', '/api/dashboard/orders/1/returns'],
     'returns list' => ['GET', '/api/dashboard/returns'],

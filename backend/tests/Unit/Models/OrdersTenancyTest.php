@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderItemChange;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 dataset('orders models', [
     'order' => [Order::class],
     'order item' => [OrderItem::class],
+    'order item change' => [OrderItemChange::class],
     'status history' => [OrderStatusHistory::class],
     'order counter' => [TenantOrderCounter::class],
     'notification' => [MerchantNotification::class],

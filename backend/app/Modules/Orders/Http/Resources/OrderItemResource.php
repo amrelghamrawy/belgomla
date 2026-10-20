@@ -11,7 +11,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One order line exactly as snapshotted at checkout (BR-PR07): quantity in selling units, prices as strings; the
  * price before a manual discount (`list_unit_price`), the discount itself (`manual_discount`, null for none) and the
- * price charged (`unit_price`, D85).
+ * price charged (`unit_price`, D85). `delivered_quantity` is set on delivery (less than `quantity` when delivered short,
+ * BR-O13; `line_total` charges it) and `removed_at` when the merchant removed the line (BR-O12, out of every total).
  *
  * @property-read OrderItem $resource
  */
@@ -40,6 +41,8 @@ final class OrderItemResource extends JsonResource
             'discount_percent' => $item->discount_percent,
             'tier_min_quantity' => $item->tier_min_quantity,
             'line_total' => $item->line_total,
+            'delivered_quantity' => $item->delivered_quantity,
+            'removed_at' => $item->removed_at?->toIso8601String(),
         ];
     }
 }

@@ -11,6 +11,7 @@ use App\Modules\Orders\Data\LineDiscountData;
 use App\Modules\Orders\Exceptions\DiscountRefused;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Pricing\Services\DiscountCalculator;
 use App\Modules\Pricing\Services\PercentPricing;
 use App\Modules\Tenancy\Enums\TenantUserRole;
@@ -55,7 +56,7 @@ final readonly class ApplyOrderDiscount
             }
 
             /** @var array<int, OrderItem> $items */
-            $items = OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get()->keyBy('id')->all();
+            $items = OrderItem::query()->where('order_id', $order->id)->tap(new Live)->orderBy('id')->get()->keyBy('id')->all(); // a removed line takes no discount (BR-O12)
             $discounts = $this->lineDiscounts($items, $data->items);
             $oldItems = array_map($this->itemSnapshot(...), $items);
             $oldOrder = $this->orderSnapshot($order);

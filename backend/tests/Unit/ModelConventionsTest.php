@@ -28,6 +28,7 @@ use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderItemChange;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
@@ -100,6 +101,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         MerchantNotification::class,
         Order::class,
         OrderItem::class,
+        OrderItemChange::class,
         OrderReturn::class,
         OrderReturnItem::class,
         OrderStatusHistory::class,

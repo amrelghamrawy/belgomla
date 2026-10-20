@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One line of an order with the price actually applied (BR-PR07). Every display column is a snapshot; `sku_id`
- * and `product_id` are references only and never used to re-price (BR-O05).
+ * and `product_id` are references only and never used to re-price (BR-O05), except when the merchant edits the
+ * quantity of a pending or confirmed order (BR-O12).
  *
  * @property int $id
  * @property int $tenant_id
@@ -36,7 +37,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $unit_price the price charged per unit, after the manual discount
  * @property string|null $discount_percent
  * @property int|null $tier_min_quantity
- * @property string $line_total
+ * @property string $line_total = unit_price × the quantity charged: delivered_quantity once delivered (BR-O13), else quantity
+ * @property int|null $delivered_quantity selling units that went out, set on delivery (BR-O13, D86)
+ * @property CarbonImmutable|null $removed_at the merchant removed the line (BR-O12): kept for history, out of every total
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Order $order
@@ -89,6 +92,8 @@ final class OrderItem extends Model
             'discount_percent' => 'decimal:2',
             'tier_min_quantity' => 'integer',
             'line_total' => 'decimal:2',
+            'delivered_quantity' => 'integer',
+            'removed_at' => 'datetime',
         ];
     }
 }

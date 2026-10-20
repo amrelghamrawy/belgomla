@@ -19,6 +19,7 @@ const ROLE_TABLE = [
     'orders.manage' => [true, true, true, true, false],
     'orders.create' => [true, true, true, false, false],
     'orders.override_mov' => [true, true, false, false, false],
+    'orders.edit' => [true, true, true, false, false], // V2 Task 09: the lines of a pending or confirmed order
     'orders.discount' => [true, true, true, false, false], // sales only up to the store's cap (D85)
     'orders.returns' => [true, true, false, true, false],
     'customers.manage' => [true, true, true, false, false],
@@ -58,5 +59,5 @@ test('BR-T06 the five roles and their Arabic labels', function (): void {
 
 test('every permission has an Arabic label', function (): void {
     expect(array_filter(Permission::toArray(), fn (string $label): bool => $label === ''))->toBe([])
-        ->and(Permission::toArray())->toHaveCount(16);
+        ->and(Permission::toArray())->toHaveCount(17);
 });

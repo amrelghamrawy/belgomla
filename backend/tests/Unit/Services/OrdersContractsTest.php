@@ -53,6 +53,14 @@ test('BR-INV08 delivered and cancelled orders hold nothing, nor do orders of oth
     expect(app(OrdersHoldingSku::class)->ordersHolding($this->sku))->toBe([]);
 })->with(['delivered' => [OrderStatus::Delivered], 'cancelled' => [OrderStatus::Cancelled]]);
 
+test('BR-O12 BR-INV08 a removed line holds nothing', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+    App\Modules\Orders\Models\OrderItem::query()->where('order_id', $order->id)->update(['removed_at' => now()]);
+
+    expect(app(OrdersHoldingSku::class)->ordersHolding($this->sku))->toBe([]);
+});
+
 test('the recent orders of a customer are the latest five, newest first, in the contract shape', function (): void {
     app(TenantContext::class)->set($this->tenant);
     $orders = collect(range(1, 6))->map(fn (int $day): Order => Order::factory()->for($this->customer)->create(['order_total' => '100.00', 'placed_at' => now()->subDays(7 - $day)]));

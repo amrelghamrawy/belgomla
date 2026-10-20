@@ -84,6 +84,7 @@ const DASHBOARD_ROUTES = [
     'orders cancel' => ['POST', '/api/dashboard/orders/1/cancel', 'orders.manage'],
     'orders delivery address' => ['PUT', '/api/dashboard/orders/1/delivery-address', 'orders.manage'],
     'orders discount' => ['PUT', '/api/dashboard/orders/1/discount', 'orders.discount'],
+    'orders lines' => ['PUT', '/api/dashboard/orders/1/lines', 'orders.edit'],
     'order returns list' => ['GET', '/api/dashboard/orders/1/returns', 'orders.view'],
     'order returns record' => ['POST', '/api/dashboard/orders/1/returns', 'orders.returns'],
     'returns list' => ['GET', '/api/dashboard/returns', 'orders.view'],

@@ -19,6 +19,7 @@ test('to array', function (): void {
         'id', 'tenant_id', 'order_id', 'sku_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name',
         'conversion_factor', 'quantity', 'quantity_base', 'cover_price', 'unit_price', 'discount_percent',
         'tier_min_quantity', 'line_total', 'created_at', 'updated_at', 'list_unit_price', 'manual_discount_type', 'manual_discount_value',
+        'delivered_quantity', 'removed_at',
     ]);
 });
 
@@ -61,3 +62,27 @@ test('D85 the database keeps a line price within its list price and a discount c
     'cheaper without a discount' => [['list_unit_price' => '90.00', 'unit_price' => '80.00']],
     'a type without a value' => [['list_unit_price' => '90.00', 'unit_price' => '80.00', 'manual_discount_type' => 'amount']],
 ]);
+
+test('BR-O12 BR-O13 a line keeps what was delivered and when it was removed', function (): void {
+    $item = OrderItem::factory()->create(['quantity' => 6, 'delivered_quantity' => '4', 'removed_at' => null])->fresh();
+    $removed = OrderItem::factory()->removed()->create()->fresh();
+
+    expect($item?->delivered_quantity)->toBe(4)
+        ->and($removed?->removed_at)->toBeInstanceOf(Carbon\CarbonImmutable::class);
+});
+
+test('BR-O13 the database keeps a delivered quantity within what was ordered, and a removed line undelivered', function (array $attributes): void {
+    expect(fn () => OrderItem::factory()->create(['quantity' => 6, ...$attributes]))->toThrow(QueryException::class);
+})->with([
+    'more than ordered' => [['delivered_quantity' => 7]],
+    'negative' => [['delivered_quantity' => -1]],
+    'removed and delivered' => [['delivered_quantity' => 6, 'removed_at' => '2026-10-20 10:00:00']],
+]);
+
+test('BR-O12 the live scope leaves removed lines out', function (): void {
+    $order = Order::factory()->create();
+    $live = OrderItem::factory()->for($order)->create();
+    OrderItem::factory()->for($order)->removed()->create();
+
+    expect(OrderItem::query()->tap(new App\Modules\Orders\Models\Scopes\Live)->pluck('id')->all())->toBe([$live->id]);
+});

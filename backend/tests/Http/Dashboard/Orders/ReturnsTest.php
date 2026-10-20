@@ -141,7 +141,7 @@ test('BR-R02 the order\'s returns list them oldest first with what each line can
         ->assertJsonPath('data.1.is_voided', true)
         ->assertJsonPath('returnable', [[
             'order_item_id' => $this->line->id, 'product_name' => $this->line->product_name, 'sku_code' => $this->line->sku_code,
-            'unit' => 'كرتونة', 'unit_price' => '90.00', 'ordered' => 6, 'returned' => 2, 'returnable' => 4,
+            'unit' => 'كرتونة', 'unit_price' => '90.00', 'ordered' => 6, 'delivered' => 6, 'returned' => 2, 'returnable' => 4,
         ]])
         ->assertJsonMissingPath('data.0.order');
 

@@ -74,7 +74,7 @@ erDiagram
 | invitation_message             | text          | nullable; null = default text (BR-CU08, D72) |
 | default_payment_terms_days     | smallint      | V2: nullable, 0–365, given to new customers (BR-C06) |
 | default_credit_limit           | numeric(12,2) | V2: nullable, ≥ 0, given to new customers (BR-C05) |
-| order_notify_statuses          | jsonb         | V2: list of statuses customers are told about; default `["confirmed","out_for_delivery","delivered","cancelled"]` (BR-N03) |
+| order_notify_statuses          | jsonb         | V2: list of statuses customers are told about, plus `discount` (D85) and `edited` (D87); default `["confirmed","out_for_delivery","delivered","cancelled","edited"]` (BR-N03) |
 | order_status_messages          | jsonb         | V2: nullable map status → merchant wording; a missing entry = platform default (BR-N03) |
 | pending_expiry_hours           | smallint      | V2: nullable = off; CHECK 1–720; unconfirmed orders cancel themselves after it (BR-INV07, D81) |
 | max_discount_percent_sales     | numeric(5,2)  | V2 Task 08: nullable = sales users cannot discount; CHECK > 0 and < 100 (BR-PR08, D85) |
@@ -421,11 +421,17 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | unit_price        | numeric(12,2) | applied price = list_unit_price less the manual discount; **check 0.01 ≤ unit_price ≤ list_unit_price**, = list_unit_price without a discount |
 | discount_percent  | numeric(5,2)  | nullable, **display only**: the tier margin off the cover price (BR-PR10), not the manual discount |
 | tier_min_quantity | int           | nullable; which tier applied           |
-| line_total        | numeric(12,2) | = quantity × unit_price                |
+| line_total        | numeric(12,2) | = quantity × unit_price; once delivered = delivered_quantity × unit_price (BR-O13) |
+| delivered_quantity | int          | V2 Task 09: selling units that went out, set on delivery (backfilled = quantity for orders delivered before); **check 0 ≤ delivered_quantity ≤ quantity**; null until delivered (BR-O13) |
+| removed_at        | timestamp     | V2 Task 09: the merchant removed the line (BR-O12); kept for history, out of totals, stock moves and returns; **check** a removed line has no delivered_quantity |
 
 ### `order_status_history` (BR-O04)
 
 `id, tenant_id, order_id, from_status, to_status, actor_type (customer|tenant_user|system), actor_id, note, created_at`.
+
+### `order_item_changes` (V2 Task 09, BR-O12, BR-O13)
+
+`id, tenant_id, order_id FK, order_item_id FK nullable, change varchar(16) (added | removed | quantity | delivered_short, CHECK), old_quantity int nullable, new_quantity int nullable, unit_price_before numeric(12,2) nullable, unit_price_after numeric(12,2) nullable, actor_id FK tenant_users nullable (null = system), created_at`. Append-only, index `(order_id, id)`. `added` has only the new quantity and price, `removed` only the old ones, `quantity` both, `delivered_short` the ordered (old) and delivered (new) quantities at the line's price. Written by `EditOrderLines` and `ApplyTransition`; model `Orders\Models\OrderItemChange`. Shown as `changes[]` on both order details (the dashboard adds `actor_id`).
 
 ### `order_returns` (V2 Task 01, BR-R01..R06)
 

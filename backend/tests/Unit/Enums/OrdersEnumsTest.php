@@ -6,6 +6,7 @@ use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Orders\Enums\CancelledBy;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\NotificationType;
+use App\Modules\Orders\Enums\OrderItemChangeType;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Enums\RefundMethod;
 
@@ -14,7 +15,7 @@ test('every orders enum exposes labels for all cases', function (string $enum): 
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class, RefundMethod::class]);
+})->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class, RefundMethod::class, OrderItemChangeType::class]);
 
 test('BR-C07 a refund goes back in cash or as customer credit', function (): void {
     expect(RefundMethod::toArray())->toBe(['cash' => 'رد نقدي', 'credit' => 'رصيد للعميل']);
@@ -119,3 +120,18 @@ test('BR-PR08 D85 prices change only before the order is being prepared', functi
     'delivered' => [OrderStatus::Delivered, false],
     'cancelled' => [OrderStatus::Cancelled, false],
 ]);
+
+test('BR-O12 the lines are edited only while pending or confirmed', function (OrderStatus $status, bool $open): void {
+    expect($status->allowsLineEdit())->toBe($open);
+})->with([
+    'pending' => [OrderStatus::Pending, true],
+    'confirmed' => [OrderStatus::Confirmed, true],
+    'preparing' => [OrderStatus::Preparing, false],
+    'out for delivery' => [OrderStatus::OutForDelivery, false],
+    'delivered' => [OrderStatus::Delivered, false],
+    'cancelled' => [OrderStatus::Cancelled, false],
+]);
+
+test('BR-O12 BR-O13 the line change kinds match the domain model', function (): void {
+    expect(OrderItemChangeType::toArray())->toBe(['added' => 'صنف مضاف', 'removed' => 'صنف محذوف', 'quantity' => 'تعديل الكمية', 'delivered_short' => 'تسليم جزئي']);
+});

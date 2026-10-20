@@ -11,7 +11,7 @@ test('BR-N03 every notifiable status has a default text that fills its placehold
 
     expect($text)->toContain('محمود')->toContain('1024')->toContain('مكتبة النور')->not->toContain('{')
         ->and(OrderStatusMessage::unknownPlaceholders(OrderStatusMessage::DEFAULTS[$status], $status))->toBe([]);
-})->with(['placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled']);
+})->with(['placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled', 'discount', 'edited']);
 
 test('BR-O11 placed is a text of its own, not a status a store can choose to notify', function (): void {
     expect(array_keys(OrderStatusMessage::DEFAULTS))->toBe(['placed', ...OrderStatusMessage::NOTIFIABLE])
@@ -41,4 +41,10 @@ test('D85 discount is an event a store may notify, told with the new total', fun
     expect(OrderStatusMessage::NOTIFIABLE)->toContain('discount')
         ->and(OrderStatusMessage::render('discount', null, ['customer' => 'محمود', 'store' => 'مكتبة النور', 'number' => 7, 'status' => 'مؤكد', 'total' => '900.00', 'reason' => null]))
         ->toBe('أهلًا محمود، تم تطبيق خصم على طلبك رقم 7 من مكتبة النور، والإجمالي الآن 900.00.');
+});
+
+test('D87 edited is an event a store may notify, told with the new total', function (): void {
+    expect(OrderStatusMessage::NOTIFIABLE)->toContain('edited')
+        ->and(OrderStatusMessage::render('edited', null, ['customer' => 'محمود', 'store' => 'مكتبة النور', 'number' => 7, 'status' => 'مؤكد', 'total' => '900.00', 'reason' => null]))
+        ->toBe('أهلًا محمود، تم تعديل أصناف طلبك رقم 7 من مكتبة النور، والإجمالي الآن 900.00. التفاصيل في صفحة الطلب.');
 });

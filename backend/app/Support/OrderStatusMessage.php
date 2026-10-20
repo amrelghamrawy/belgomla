@@ -29,7 +29,8 @@ final class OrderStatusMessage
     /**
      * The platform's wording per message: one per status a store may notify, plus `placed`, sent when a merchant
      * places an order for the customer and ticks "send a message" (BR-O11), and `discount`, sent when a merchant changes
-     * the order's discounts and the store notifies it (D85; off by default).
+     * the order's discounts and the store notifies it (D85; off by default), and `edited`, sent when a merchant changes the
+     * order's lines (D87; on by default).
      *
      * @var array<string, string>
      */
@@ -41,10 +42,11 @@ final class OrderStatusMessage
         'delivered' => 'أهلًا {اسم_العميل}، تم توصيل طلبك رقم {رقم_الطلب} من {اسم_المتجر}. شكرًا لتعاملك معنا.',
         'cancelled' => 'أهلًا {اسم_العميل}، تم إلغاء طلبك رقم {رقم_الطلب} من {اسم_المتجر}. السبب: {سبب_الإلغاء}',
         'discount' => 'أهلًا {اسم_العميل}، تم تطبيق خصم على طلبك رقم {رقم_الطلب} من {اسم_المتجر}، والإجمالي الآن {الإجمالي}.',
+        'edited' => 'أهلًا {اسم_العميل}، تم تعديل أصناف طلبك رقم {رقم_الطلب} من {اسم_المتجر}، والإجمالي الآن {الإجمالي}. التفاصيل في صفحة الطلب.',
     ];
 
-    /** @var list<string> the events a store may choose to notify (order_notify_statuses): statuses, then `discount` (D85); `placed` is per order */
-    public const array NOTIFIABLE = ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled', 'discount'];
+    /** @var list<string> the events a store may choose to notify (order_notify_statuses): statuses, then `discount` (D85) and `edited` (D87); `placed` is per order */
+    public const array NOTIFIABLE = ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled', 'discount', 'edited'];
 
     /** @var list<string> */
     public const array PLACEHOLDERS = [self::CUSTOMER, self::STORE, self::NUMBER, self::STATUS, self::TOTAL, self::REASON];

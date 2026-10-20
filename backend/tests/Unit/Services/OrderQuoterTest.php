@@ -81,3 +81,43 @@ test('a sku without a stock row quotes as nothing available', function (): void 
 
     expect($report->problemFor($this->sku->id)?->toArray())->toBe(['sku_id' => $this->sku->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]);
 });
+
+test('BR-O12 quoting an edit counts what the order holds as available', function (): void {
+    $tight = $this->orderableSku(['code' => 'T-1'], onHand: 240);
+    $order = $this->placeOrder($this->customer, [$tight->id => 10]);
+    app(TenantContext::class)->set($this->tenant);
+
+    $edit = $this->quoter->quote($this->customer->id, [['sku_id' => $tight->id, 'quantity' => 12]], $order->number)->report;
+    $fresh = $this->quoter->quote($this->customer->id, [['sku_id' => $tight->id, 'quantity' => 12]])->report;
+
+    expect($edit->problems)->toBe([])
+        ->and($edit->lines[0]->sku->inventory?->available)->toBe(240)
+        ->and($fresh->problemFor($tight->id)?->toArray())->toBe(['sku_id' => $tight->id, 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 2]);
+});
+
+test('BR-C05 BR-O12 quoting an edit does not count the order twice against the credit limit', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+    $this->customer->forceFill(['credit_limit' => '720.00'])->save();
+
+    expect($this->quoter->quote($this->customer->id, [['sku_id' => $this->sku->id, 'quantity' => 8]], $order->number)->report->credit)->toBeNull()
+        ->and($this->quoter->quote($this->customer->id, [['sku_id' => $this->sku->id, 'quantity' => 8]])->report->credit)->toBe(['limit' => '720.00', 'exposure' => '540.00', 'order_total' => '720.00']);
+});
+
+test('BR-O12 an order past editing holds nothing for the quote', function (): void {
+    $tight = $this->orderableSku(['code' => 'T-1'], onHand: 240);
+    $order = $this->placeOrder($this->customer, [$tight->id => 10]);
+    app(TenantContext::class)->set($this->tenant);
+    $order->forceFill(['status' => App\Modules\Orders\Enums\OrderStatus::Preparing])->save();
+
+    expect($this->quoter->quote($this->customer->id, [['sku_id' => $tight->id, 'quantity' => 12]], $order->number)->report->problemFor($tight->id)?->reason)->toBe('insufficient_stock');
+});
+
+test('BR-O12 an order of another customer is a validation error on order', function (): void {
+    $order = $this->placeOrder($this->makeCustomer(['phone' => '+201099999999']), [$this->sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(fn () => $this->quoter->quote($this->customer->id, [['sku_id' => $this->sku->id, 'quantity' => 6]], $order->number))->toThrow(function (CheckoutFailed $e): void {
+        expect([$e->status, $e->details])->toBe([422, ['order' => ['الطلب غير موجود']]]);
+    });
+});

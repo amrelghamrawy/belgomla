@@ -77,6 +77,53 @@ describe("OrderDetailView", () => {
     expect(screen.getByText("إجمالي الأصناف").nextSibling).toHaveTextContent("486.00 ج.م");
   });
 
+  it("BR-O12 BR-O13 marks the lines the store removed, changed or delivered short", async () => {
+    const [line] = order().items;
+    const at = "2026-10-20T08:00:00Z";
+    stubOrder(
+      order({
+        status: "delivered",
+        status_label: "تم التوصيل",
+        items: [
+          { ...line!, id: 61, quantity: 6, delivered_quantity: 4, line_total: "360.00" },
+          { ...line!, id: 62, sku_id: 502, product_name: "كتاب ب", delivered_quantity: 6 },
+          { ...line!, id: 63, sku_id: 503, product_name: "كتاب ج", removed_at: at },
+        ],
+        changes: [
+          {
+            order_item_id: 62,
+            product_name: "كتاب ب",
+            sku_code: "B-1",
+            change: "added",
+            old_quantity: null,
+            new_quantity: 6,
+            unit_price_before: null,
+            unit_price_after: "90.00",
+            at,
+          },
+          {
+            order_item_id: 63,
+            product_name: "كتاب ج",
+            sku_code: "C-1",
+            change: "removed",
+            old_quantity: 6,
+            new_quantity: null,
+            unit_price_before: "90.00",
+            unit_price_after: null,
+            at,
+          },
+        ],
+      }),
+    );
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("delivered-61")).toHaveTextContent("تم تسليم 4 من 6 كرتونة");
+    expect(screen.getByTestId("order-line-62")).toHaveTextContent("عدّله المتجر");
+    expect(screen.getByTestId("order-line-63")).toHaveTextContent("حذفه المتجر");
+    expect(screen.getByTestId("order-line-63")).toHaveClass("line-through");
+    expect(screen.getByRole("heading", { name: /الأصناف/ })).toHaveTextContent("(2 صنف)");
+  });
+
   it("an order without discounts shows no crossed price and no discount line", async () => {
     stubOrder();
     renderWithQuery(<OrderDetailView />);

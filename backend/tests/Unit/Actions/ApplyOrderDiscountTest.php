@@ -268,3 +268,11 @@ test('D85 a discount given on the order form is not messaged on its own', functi
 
     expect(OutboundMessage::query()->count())->toBe(0);
 });
+
+test('BR-O12 a removed line takes no discount: it is not a line of the order any more', function (): void {
+    $this->lineB->forceFill(['removed_at' => now()])->save();
+
+    expect(fn (): Order => ($this->apply)([[$this->lineB, DiscountType::Amount, '5']]))->toThrow(function (DiscountRefused $e): void {
+        expect($e->details)->toBe(['items.0.order_item_id' => ['البند غير موجود في هذا الطلب']]);
+    });
+});

@@ -1603,7 +1603,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04) */
+        /** Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04), with delivered_quantities a partial delivery (BR-O13) */
         post: operations["dashboardTransitionOrder"];
         delete?: never;
         options?: never;
@@ -1673,6 +1673,32 @@ export interface paths {
          * @description The body is the whole discount state: a line left out of `items`, or a null `order`, has no discount. Owners and managers give any discount; a sales user gives line discounts only, each at most `max_discount_percent_sales` % off the list price (null = none). The history gets the note «خصم»; `order.discount_changed` is audited.
          */
         put: operations["dashboardApplyOrderDiscount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/lines": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Changes the lines of a pending or confirmed order (BR-O12, D87)
+         * @description The body is every line the order should have: an existing line by its `order_item_id` (same SKU), a new one without. A live line left out is removed (kept for history), a quantity change re-prices the line at the current tiers keeping its manual discount, a new line is priced like checkout; unchanged lines keep their snapshot. Stock is checked like checkout with what the order holds counted as available. The history gets «تعديل الطلب», `order.lines_changed` is audited and the customer gets the `edited` text when the store notifies it.
+         */
+        put: operations["dashboardEditOrderLines"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2245,7 +2271,15 @@ export interface components {
             /** @description Display only: the tier margin off the cover price (BR-PR10) */
             discount_percent: components["schemas"]["Money"] | null;
             tier_min_quantity: number | null;
+            /** @description unit_price × the quantity charged: delivered_quantity once delivered, else quantity */
             line_total: components["schemas"]["Money"];
+            /** @description Selling units that went out, set on delivery; less than quantity when delivered short (BR-O13) */
+            delivered_quantity: number | null;
+            /**
+             * Format: date-time
+             * @description The merchant removed the line (BR-O12): kept for history, out of every total
+             */
+            removed_at: string | null;
         };
         /**
          * @description D85: EGP off, or % off (below 100)
@@ -2322,7 +2356,9 @@ export interface components {
             cancelled_by: "customer" | "tenant_user" | "system" | null;
         };
         OrderDetail: components["schemas"]["Order"] & {
+            /** @description Every line, removed ones too (removed_at) */
             items: components["schemas"]["OrderItem"][];
+            changes: components["schemas"]["OrderItemChange"][];
             history: components["schemas"]["OrderHistoryEntry"][];
             returns: components["schemas"]["StoreOrderReturn"][];
         };
@@ -2358,10 +2394,10 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
         };
         /** @enum {string} */
-        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
+        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.edit" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
-            /** @description BR-N03 the statuses customers are told about, plus `discount` (D85) */
-            order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount")[];
+            /** @description BR-N03 the statuses customers are told about, plus `discount` (D85) and `edited` (D87, on by default) */
+            order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount" | "edited")[];
             /** @description BR-N03 status => the store wording; a missing status uses order_status_message_defaults */
             order_status_messages: {
                 [key: string]: string;
@@ -2422,7 +2458,7 @@ export interface components {
             invitation_message?: string | null;
             default_payment_terms_days?: number | null;
             default_credit_limit?: string | null;
-            order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount")[];
+            order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount" | "edited")[];
             /** @description D85 above 0 and below 100, two decimals at most; null = sales users cannot discount */
             max_discount_percent_sales?: string | number | null;
             /** @description status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); `placed` words the message of an order a merchant places for the customer (BR-O11); null or the default text = the default */
@@ -2819,8 +2855,39 @@ export interface components {
              */
             expires_at: string | null;
         };
+        OrderLinesRequest: {
+            /** @description Every line the order should have; each SKU once, quantity in selling units */
+            lines: {
+                /** @description An existing live line; omitted or null for a new one */
+                order_item_id?: number | null;
+                sku_id: number;
+                quantity: number;
+            }[];
+            /** @description Goes to the history after «تعديل الطلب» */
+            note?: string | null;
+        };
+        /** @description A line change after placement (BR-O12, BR-O13): added (new only), removed (old only), quantity (both), delivered_short (ordered → delivered) */
+        OrderItemChange: {
+            order_item_id: number | null;
+            product_name: string | null;
+            sku_code: string | null;
+            /** @enum {string} */
+            change: "added" | "removed" | "quantity" | "delivered_short";
+            old_quantity: number | null;
+            new_quantity: number | null;
+            unit_price_before: components["schemas"]["Money"] | null;
+            unit_price_after: components["schemas"]["Money"] | null;
+            /** Format: date-time */
+            at: string;
+        };
+        DashboardOrderItemChange: components["schemas"]["OrderItemChange"] & {
+            /** @description The dashboard user; null = system */
+            actor_id: number | null;
+        };
         OrderQuoteRequest: {
             customer_id: number;
+            /** @description BR-O12: quote an edit of this order of the customer (its number): what it holds counts as available and its total is not counted twice against the credit limit */
+            order?: number | null;
             /** @description Each SKU once; quantity in selling units */
             lines: {
                 sku_id: number;
@@ -2900,7 +2967,9 @@ export interface components {
             note: string | null;
         };
         DashboardOrderDetail: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"] & {
+            /** @description Every line, removed ones too (removed_at) */
             items: components["schemas"]["OrderItem"][];
+            changes: components["schemas"]["DashboardOrderItemChange"][];
             history: components["schemas"]["DashboardOrderHistoryEntry"][];
             collections: components["schemas"]["Collection"][];
             /** @description Every return, voided included, without `order` (BR-R06) */
@@ -2960,6 +3029,8 @@ export interface components {
             /** @description What one unit returns at: the line price less the order discount share (D85) */
             unit_price: components["schemas"]["Money"];
             ordered: number;
+            /** @description What went out (BR-O13); returnable = delivered − returned */
+            delivered: number;
             /** @description Brought back by live returns */
             returned: number;
             returnable: number;
@@ -6327,7 +6398,7 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
-            /** @description validation_failed (also on customer_id or lines.N.sku_id that are not this store's) */
+            /** @description validation_failed (also on customer_id or lines.N.sku_id that are not this store's, or order that is not one of the customer's) */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6376,6 +6447,11 @@ export interface operations {
                     to: "confirmed" | "preparing" | "out_for_delivery" | "delivered";
                     note?: string | null;
                     collect_full_amount?: boolean;
+                    /** @description BR-O13, D86: with to=delivered, what each line actually delivered (selling units, 0..ordered); a line left out went out in full. The rest is released and the order is charged for what was delivered. Ignored for other targets. */
+                    delivered_quantities?: {
+                        order_item_id: number;
+                        quantity: number;
+                    }[] | null;
                 };
             };
         };
@@ -6384,7 +6460,7 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
-            /** @description invalid_transition with details.from and details.to */
+            /** @description invalid_transition with details.from and details.to; below_collected when a partial delivery leaves the total under what was collected */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6393,7 +6469,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            422: components["responses"]["Error"];
+            /** @description validation_failed (also delivered_quantities.N.quantity above the ordered quantity, a line not of this order, or nothing delivered at all) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardCancelOrder: {
@@ -6508,6 +6592,65 @@ export interface operations {
                 };
             };
             /** @description discount_too_large (a unit or the order below 0.01) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardEditOrderLines: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description The order, and the minimum order value shortfall of its new total (allowed, BR-MOV02) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardOrderDetail"];
+                        meta: {
+                            below_mov: {
+                                required: components["schemas"]["Money"];
+                                current: components["schemas"]["Money"];
+                            } | null;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description order_locked (preparing or later) or below_collected (the new total is under what was collected) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description checkout_failed (items for the added or changed lines; details.credit when a higher total passes the credit limit); discount_too_large when an EGP order discount no longer fits; validation_failed (also lines.N.order_item_id not a live line of the order, lines.N.sku_id changed or not this store's) */
             422: {
                 headers: {
                     [name: string]: unknown;

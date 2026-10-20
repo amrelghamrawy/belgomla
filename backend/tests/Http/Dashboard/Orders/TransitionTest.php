@@ -87,7 +87,60 @@ test('transition validation', function (array $body, string $field): void {
     'unknown target' => [['to' => 'lost'], 'to'],
     'note too long' => [['to' => 'confirmed', 'note' => str_repeat('ن', 301)], 'note'],
     'collect flag not boolean' => [['to' => 'delivered', 'collect_full_amount' => 'yes'], 'collect_full_amount'],
+    'delivered quantities not a list' => [['to' => 'delivered', 'delivered_quantities' => 'some'], 'delivered_quantities'],
+    'a delivered line without its id' => [['to' => 'delivered', 'delivered_quantities' => [['quantity' => 1]]], 'delivered_quantities.0.order_item_id'],
+    'a delivered line twice' => [['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => 1, 'quantity' => 1], ['order_item_id' => 1, 'quantity' => 2]]], 'delivered_quantities.0.order_item_id'],
+    'a negative delivered quantity' => [['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => 1, 'quantity' => -1]]], 'delivered_quantities.0.quantity'],
+    'an unknown delivered line key' => [['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => 1, 'quantity' => 1, 'price' => 1]]], 'delivered_quantities.0'],
 ]);
+
+test('BR-O13 a partial delivery deducts what was delivered, releases the rest and charges for it', function (): void {
+    $line = $this->inTenant(fn () => App\Modules\Orders\Models\OrderItem::query()->where('order_id', $this->order->id)->sole());
+
+    $response = ($this->transition)(['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => $line->id, 'quantity' => 4]]])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'delivered')
+        ->assertJsonPath('data.items.0.quantity', 6)
+        ->assertJsonPath('data.items.0.delivered_quantity', 4)
+        ->assertJsonPath('data.items.0.line_total', '360.00')
+        ->assertJsonPath('data.order_total', '360.00')
+        ->assertJsonPath('data.changes.0.change', 'delivered_short')
+        ->assertJsonPath('data.history.1.note', 'تسليم جزئي');
+
+    expectDocumentedShape($response->json('data'), 'DashboardOrderDetail');
+    $this->assertDatabaseHas('sku_inventory', ['sku_id' => $this->sku->id, 'on_hand' => 320, 'reserved' => 0]);
+    $this->assertDatabaseHas('inventory_movements', ['order_id' => $this->order->id, 'type' => 'sale', 'quantity' => -80]);
+});
+
+test('BR-O13 delivering more than ordered is a validation error on the line', function (): void {
+    $line = $this->inTenant(fn () => App\Modules\Orders\Models\OrderItem::query()->where('order_id', $this->order->id)->sole());
+
+    ($this->transition)(['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => $line->id, 'quantity' => 7]]])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details', ['delivered_quantities.0.quantity' => ['الكمية المسلّمة أكبر من المطلوبة (6)']]);
+
+    $this->assertDatabaseHas('orders', ['id' => $this->order->id, 'status' => 'pending']);
+});
+
+test('BR-O13 a partial delivery is followed by a return of what was delivered only', function (): void {
+    $line = $this->inTenant(fn () => App\Modules\Orders\Models\OrderItem::query()->where('order_id', $this->order->id)->sole());
+    ($this->transition)(['to' => 'delivered', 'delivered_quantities' => [['order_item_id' => $line->id, 'quantity' => 4]]])->assertOk();
+
+    $this->tenantJson('GET', "/api/dashboard/orders/{$this->order->number}/returns")
+        ->assertOk()
+        ->assertJsonPath('returnable.0.ordered', 6)
+        ->assertJsonPath('returnable.0.delivered', 4)
+        ->assertJsonPath('returnable.0.returnable', 4);
+
+    $this->tenantJson('POST', "/api/dashboard/orders/{$this->order->number}/returns", ['reason' => 'تالف', 'items' => [['order_item_id' => $line->id, 'quantity' => 5]]])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'return_exceeds_delivered');
+
+    $this->tenantJson('POST', "/api/dashboard/orders/{$this->order->number}/returns", ['reason' => 'تالف', 'items' => [['order_item_id' => $line->id, 'quantity' => 4]]])
+        ->assertCreated()
+        ->assertJsonPath('data.total', '360.00')
+        ->assertJsonPath('data.order.net_total', '0.00');
+});
 
 test('D55 the same Idempotency-Key twice moves the order once', function (): void {
     ($this->transition)(['to' => 'delivered'], ['Idempotency-Key' => 'deliver-1'])->assertOk();

@@ -50,8 +50,24 @@ final readonly class CheckoutValidator
     /**
      * @param  list<CartLineInput>  $lines
      * @param  Collection<int, SkuInventory>  $stock  rows keyed by sku_id
+     * @param  string  $alreadyExposed  an order of these lines already counted in the customer's exposure (an edit's quote, BR-O12)
      */
-    public function check(array $lines, Collection $stock, Customer $customer): CheckoutReport
+    public function check(array $lines, Collection $stock, Customer $customer, string $alreadyExposed = '0.00'): CheckoutReport
+    {
+        $report = $this->checkLines($lines, $stock);
+        $mov = $this->settings->minimumOrderValue();
+
+        return new CheckoutReport($report->lines, $report->problems, $report->total, $mov['amount'], $this->movShortfall($mov['amount'], $report->total), $this->creditShortfall($customer, $report->total, $alreadyExposed));
+    }
+
+    /**
+     * The per-line checks only (BR-PR06 steps 2–5), without the order-level minimum and credit limit: EditOrderLines
+     * checks the lines it adds or changes this way and the order's totals itself (BR-O12).
+     *
+     * @param  list<CartLineInput>  $lines
+     * @param  Collection<int, SkuInventory>  $stock  rows keyed by sku_id
+     */
+    public function checkLines(array $lines, Collection $stock): CheckoutReport
     {
         $priced = [];
         $problems = [];
@@ -71,9 +87,7 @@ final readonly class CheckoutValidator
             }
         }
 
-        $mov = $this->settings->minimumOrderValue();
-
-        return new CheckoutReport($priced, $problems, $total, $mov['amount'], $this->movShortfall($mov['amount'], $total), $this->creditShortfall($customer, $total));
+        return new CheckoutReport($priced, $problems, $total, null, null, null);
     }
 
     private function problem(CartLineInput $line, int $available): ?CheckoutProblem
@@ -97,16 +111,18 @@ final readonly class CheckoutValidator
 
     /**
      * BR-C05: exposure + this order may reach the limit but not pass it; no limit, or no exposure figure, never refuses.
+     * `$exclude` takes an amount already counted in the exposure out of it: the old total of an order being edited (BR-O12).
      *
      * @return array{limit: string, exposure: string, order_total: string}|null
      */
-    private function creditShortfall(Customer $customer, string $total): ?array
+    public function creditShortfall(Customer $customer, string $total, string $exclude = '0.00'): ?array
     {
         if ($customer->credit_limit === null) {
             return null;
         }
 
         $exposure = $this->exposure->of($customer);
+        $exposure = $exposure === null ? null : Money::subtract($exposure, $exclude);
 
         if ($exposure === null || Money::compare(Money::add($exposure, $total), $customer->credit_limit) <= 0) {
             return null;
@@ -120,7 +136,7 @@ final readonly class CheckoutValidator
      *
      * @return array{required: string, current: string}|null
      */
-    private function movShortfall(?string $amount, string $total): ?array
+    public function movShortfall(?string $amount, string $total): ?array
     {
         if ($amount === null || Money::compare($total, $amount) >= 0) {
             return null;

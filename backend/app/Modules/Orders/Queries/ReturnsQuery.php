@@ -8,6 +8,7 @@ use App\Modules\Orders\Data\ReturnFiltersData;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderReturn;
+use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Orders\Services\ReturnableQuantities;
 use App\Modules\Orders\Services\ReturnPricing;
 use Carbon\CarbonImmutable;
@@ -49,23 +50,25 @@ final readonly class ReturnsQuery
     }
 
     /**
-     * Every line of the order with what was ordered, brought back by live returns and can still come back.
+     * Every live line of the order with what was ordered, delivered (BR-O13), brought back by live returns and can still
+     * come back.
      *
-     * @return list<array{order_item_id: int, product_name: string, sku_code: string, unit: string, unit_price: string, ordered: int, returned: int, returnable: int}>
+     * @return list<array{order_item_id: int, product_name: string, sku_code: string, unit: string, unit_price: string, ordered: int, delivered: int, returned: int, returnable: int}>
      */
     public function returnable(Order $order): array
     {
         $returned = $this->returnable->returned($order);
 
-        return array_values(OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get()->map(fn (OrderItem $item): array => [
+        return array_values(OrderItem::query()->where('order_id', $order->id)->tap(new Live)->orderBy('id')->get()->map(fn (OrderItem $item): array => [
             'order_item_id' => $item->id,
             'product_name' => $item->product_name,
             'sku_code' => $item->sku_code,
             'unit' => $item->unit_name,
             'unit_price' => $this->pricing->prorated($order, $item->unit_price), // what a unit returns at (D85)
             'ordered' => $item->quantity,
+            'delivered' => $item->delivered_quantity ?? $item->quantity,
             'returned' => $returned[$item->id] ?? 0,
-            'returnable' => $item->quantity - ($returned[$item->id] ?? 0),
+            'returnable' => ($item->delivered_quantity ?? $item->quantity) - ($returned[$item->id] ?? 0),
         ])->all());
     }
 

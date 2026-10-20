@@ -110,3 +110,20 @@ test('BR-O08 D85 the database keeps order_total = items_total − discount_amoun
     'an amount without a discount' => [['discount_amount' => '10.00', 'order_total' => '90.00']],
     'more than the items' => [['discount_type' => 'amount', 'discount_value' => '110', 'discount_amount' => '110.00', 'discount_reason' => 'x', 'order_total' => '-10.00']],
 ]);
+
+test('BR-O12 the live lines leave the removed ones out, the lines keep them', function (): void {
+    $order = Order::factory()->create();
+    $live = OrderItem::factory()->for($order)->create();
+    $removed = OrderItem::factory()->for($order)->removed()->create();
+
+    expect($order->liveItems->pluck('id')->all())->toBe([$live->id])
+        ->and($order->items->pluck('id')->all())->toBe([$live->id, $removed->id]);
+});
+
+test('BR-O12 BR-O13 an order lists its line changes oldest first', function (): void {
+    $item = OrderItem::factory()->create();
+    $first = App\Modules\Orders\Models\OrderItemChange::factory()->create(['order_item_id' => $item->id]);
+    $second = App\Modules\Orders\Models\OrderItemChange::factory()->removed()->create(['order_item_id' => $item->id]);
+
+    expect($item->order->itemChanges->pluck('id')->all())->toBe([$first->id, $second->id]);
+});

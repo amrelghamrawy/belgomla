@@ -62,3 +62,11 @@ test('a discount must be above zero', function (string $value): void {
 test('the order discount needs a positive value and a numeric total', function (string $total, string $value): void {
     app(DiscountCalculator::class)->orderAmount($total, DiscountType::Percent, $value);
 })->with(['zero value' => ['100.00', '0'], 'not a total' => ['abc', '5']])->throws(InvalidArgumentException::class);
+
+test('D86 an order discount on what was delivered is capped to leave 0.01 instead of refused', function (DiscountType $type, string $value, string $expected): void {
+    expect(app(DiscountCalculator::class)->cappedOrderAmount('90.00', $type, $value))->toBe($expected);
+})->with([
+    'fits' => [DiscountType::Amount, '40', '40.00'],
+    'a percent that fits' => [DiscountType::Percent, '10', '9.00'],
+    'more than the total' => [DiscountType::Amount, '1000', '89.99'],
+]);

@@ -9,7 +9,7 @@ import { OrderDetail } from "@/components/dashboard/orders/OrderDetailPage";
 import { OrdersPage } from "@/components/dashboard/orders/OrdersPage";
 import type { Collection, DashboardCustomer, DashboardOrderDetail, OrderReturn } from "@/lib/api/types";
 
-import { signedInAs } from "../../dashboard-fixtures";
+import { orderQuote, orderQuoteLine, signedInAs } from "../../dashboard-fixtures";
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderWithQuery as renderBare, router, searchParams } from "../../render";
@@ -136,8 +136,11 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
         discount_percent: "25.00",
         tier_min_quantity: null,
         line_total: "450.00",
+        delivered_quantity: null,
+        removed_at: null,
       },
     ],
+    changes: [],
     history: [
       { from: null, to: "pending", at: "2026-10-02T08:00:00Z", by: "customer", actor_id: 7, note: null },
       {
@@ -315,6 +318,7 @@ describe("OrderDetail actions", () => {
     renderWithQuery(<OrderDetail order={order({ status: "out_for_delivery" })} />);
 
     await user.click(screen.getByRole("button", { name: "تسليم وتحصيل كامل" }));
+    await user.click(await screen.findByRole("button", { name: "تسليم وتحصيل" }));
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم التسليم وتحصيل المبلغ كاملًا"));
     expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")[0]?.body).toEqual({
@@ -411,6 +415,8 @@ describe("OrderDetail discounts (BR-PR08, D85)", () => {
           discount_percent: "25.00",
           tier_min_quantity: null,
           line_total: "405.00",
+          delivered_quantity: null,
+          removed_at: null,
         },
       ],
     });
@@ -508,6 +514,293 @@ describe("OrderDetail discounts (BR-PR08, D85)", () => {
     await user.click(screen.getByRole("button", { name: "حفظ الخصم" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("غير مسموح لك بإعطاء خصم"));
+  });
+});
+
+describe("OrderDetail line editing (BR-O12, D87)", () => {
+  const twoLines = (): DashboardOrderDetail => {
+    const base = order({ status: "pending" });
+    const [line] = base.items;
+
+    return {
+      ...base,
+      items_total: "1300.00",
+      order_total: "1300.00",
+      net_total: "1300.00",
+      items: [
+        line!,
+        {
+          ...line!,
+          id: 62,
+          sku_id: 6,
+          product_name: "كتاب ب",
+          sku_code: "B-1",
+          quantity: 10,
+          unit_price: "85.00",
+          list_unit_price: "85.00",
+          line_total: "850.00",
+        },
+      ],
+    };
+  };
+  const quoteFor = (quantity: number) =>
+    orderQuote({
+      lines: [
+        orderQuoteLine({
+          sku_id: 5,
+          product_name: "الأضواء علوم",
+          quantity,
+          unit_price: "85.00",
+          line_total: `${85 * quantity}.00`,
+        }),
+      ],
+    });
+
+  it("offers the edit on a pending or confirmed order to who may edit, not to the warehouse nor once prepared", () => {
+    stubApi({});
+    const { rerender, unmount } = renderWithQuery(<OrderDetail order={order({ status: "confirmed" })} />);
+
+    expect(screen.getByRole("button", { name: "تعديل الأصناف" })).toBeInTheDocument();
+    rerender(<OrderDetail order={order({ status: "preparing" })} />);
+    expect(screen.queryByRole("button", { name: "تعديل الأصناف" })).not.toBeInTheDocument();
+    unmount();
+
+    renderWithQuery(<OrderDetail order={order({ status: "pending" })} />, signedInAs("warehouse"));
+    expect(screen.queryByRole("button", { name: "تعديل الأصناف" })).not.toBeInTheDocument();
+  });
+
+  it("shows the diff before saving and saves the whole list with an Idempotency-Key", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/orders/quote": json(200, { data: quoteFor(12) }),
+      "PUT /api/dashboard/orders/1001/lines": json(200, {
+        data: order({ status: "pending" }),
+        meta: { below_mov: null },
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={twoLines()} />);
+
+    await user.click(screen.getByRole("button", { name: "تعديل الأصناف" }));
+    expect(screen.getByTestId("edit-changes")).toHaveTextContent("لم تغيّر شيئًا بعد");
+    expect(screen.getByRole("button", { name: "حفظ التعديل" })).toBeDisabled();
+
+    await user.clear(screen.getByLabelText("كمية الأضواء علوم"));
+    await user.type(screen.getByLabelText("كمية الأضواء علوم"), "12");
+    await user.click(screen.getByRole("button", { name: "حذف الصنف: كتاب ب" }));
+
+    const changes = screen.getByTestId("edit-changes");
+    expect(changes).toHaveTextContent("حذف كتاب ب (10)");
+    expect(changes).toHaveTextContent("الأضواء علوم: من 5 إلى 12");
+    await waitFor(() => expect(screen.getByTestId("edit-total")).toHaveTextContent("1,020.00 ج.م"));
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "POST /api/dashboard/orders/quote").at(-1)?.body).toEqual({
+        customer_id: 7,
+        order: 1001,
+        lines: [{ sku_id: 5, quantity: 12 }],
+      }),
+    );
+
+    await user.type(screen.getByLabelText("ملاحظة للسجل (اختياري)"), "العميل اتصل");
+    await waitFor(() => expect(screen.getByRole("button", { name: "حفظ التعديل" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "حفظ التعديل" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم تعديل أصناف الطلب"));
+    const call = callsTo(fetchMock, "PUT /api/dashboard/orders/1001/lines")[0];
+    expect(call?.body).toEqual({ lines: [{ order_item_id: 61, sku_id: 5, quantity: 12 }], note: "العميل اتصل" });
+    expect(call?.headers["Idempotency-Key"]).toMatch(/^lines-1001-[0-9a-f]{32}$/);
+  });
+
+  it("BR-MOV02 warns when the edited order went below the minimum order value", async () => {
+    vi.spyOn(toast, "warning").mockImplementation(() => "t");
+    stubApi({
+      "POST /api/dashboard/orders/quote": json(200, { data: quoteFor(12) }),
+      "PUT /api/dashboard/orders/1001/lines": json(200, {
+        data: order({ status: "pending" }),
+        meta: { below_mov: { required: "2000.00", current: "1020.00" } },
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={twoLines()} />);
+
+    await user.click(screen.getByRole("button", { name: "تعديل الأصناف" }));
+    await user.click(screen.getByRole("button", { name: "حذف الصنف: كتاب ب" }));
+    await user.clear(screen.getByLabelText("كمية الأضواء علوم"));
+    await user.type(screen.getByLabelText("كمية الأضواء علوم"), "12");
+    await waitFor(() => expect(screen.getByRole("button", { name: "حفظ التعديل" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "حفظ التعديل" }));
+
+    await waitFor(() =>
+      expect(toast.warning).toHaveBeenCalledWith(
+        "تم الحفظ، لكن إجمالي الطلب 1,020.00 ج.م أقل من الحد الأدنى للطلب 2,000.00 ج.م",
+      ),
+    );
+  });
+
+  it("BR-PR06 a problem of a changed line blocks saving, and the server's refusal is shown", async () => {
+    stubApi({
+      "POST /api/dashboard/orders/quote": json(200, {
+        data: orderQuote({
+          lines: [
+            orderQuoteLine({
+              sku_id: 5,
+              quantity: 30,
+              problem: { reason: "insufficient_stock", requested: 30, available: 20 },
+            }),
+          ],
+        }),
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ status: "pending" })} />);
+
+    await user.click(screen.getByRole("button", { name: "تعديل الأصناف" }));
+    await user.clear(screen.getByLabelText("كمية الأضواء علوم"));
+    await user.type(screen.getByLabelText("كمية الأضواء علوم"), "30");
+
+    expect(await screen.findByTestId("problem-5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "حفظ التعديل" })).toBeDisabled();
+  });
+
+  it("shows the server's refusal", async () => {
+    stubApi({
+      "POST /api/dashboard/orders/quote": json(200, { data: quoteFor(6) }),
+      "PUT /api/dashboard/orders/1001/lines": envelopeError(
+        409,
+        "order_locked",
+        "لا يمكن تعديل أصناف طلب حالته «قيد التجهيز»",
+      ),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ status: "pending" })} />);
+
+    await user.click(screen.getByRole("button", { name: "تعديل الأصناف" }));
+    await user.clear(screen.getByLabelText("كمية الأضواء علوم"));
+    await user.type(screen.getByLabelText("كمية الأضواء علوم"), "6");
+    await waitFor(() => expect(screen.getByRole("button", { name: "حفظ التعديل" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "حفظ التعديل" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("لا يمكن تعديل أصناف طلب حالته «قيد التجهيز»");
+  });
+
+  it("marks removed, changed and short lines and lists the changes", () => {
+    stubApi({});
+    const base = order({ status: "delivered" });
+    const [line] = base.items;
+    const at = "2026-10-20T08:00:00Z";
+    renderWithQuery(
+      <OrderDetail
+        order={{
+          ...base,
+          items: [
+            { ...line!, delivered_quantity: 3, line_total: "270.00" },
+            { ...line!, id: 62, sku_id: 6, product_name: "كتاب ب", removed_at: at },
+          ],
+          changes: [
+            {
+              order_item_id: 61,
+              product_name: "الأضواء علوم",
+              sku_code: "ADW-SCI-1",
+              change: "quantity",
+              old_quantity: 4,
+              new_quantity: 5,
+              unit_price_before: "90.00",
+              unit_price_after: "90.00",
+              at,
+              actor_id: 1,
+            },
+            {
+              order_item_id: 62,
+              product_name: "كتاب ب",
+              sku_code: "B-1",
+              change: "removed",
+              old_quantity: 2,
+              new_quantity: null,
+              unit_price_before: "90.00",
+              unit_price_after: null,
+              at,
+              actor_id: 1,
+            },
+            {
+              order_item_id: 61,
+              product_name: "الأضواء علوم",
+              sku_code: "ADW-SCI-1",
+              change: "delivered_short",
+              old_quantity: 5,
+              new_quantity: 3,
+              unit_price_before: "90.00",
+              unit_price_after: "90.00",
+              at,
+              actor_id: 1,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("order-line-61")).toHaveTextContent("معدَّل");
+    expect(screen.getByTestId("delivered-61")).toHaveTextContent("سُلِّم 3 من 5");
+    expect(screen.getByTestId("order-line-62")).toHaveTextContent("محذوف");
+    const changes = screen.getByTestId("order-changes");
+    expect(changes).toHaveTextContent("الأضواء علوم: من 4 إلى 5");
+    expect(changes).toHaveTextContent("حُذف كتاب ب (2)");
+    expect(changes).toHaveTextContent("الأضواء علوم: سُلِّم 3 من 5");
+  });
+});
+
+describe("OrderDetail delivery (BR-O13, D86)", () => {
+  it("delivers in full after the confirmation, without delivered quantities", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/orders/1001/transition": json(200, { data: order({ status: "delivered" }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ status: "out_for_delivery" })} />);
+
+    await user.click(screen.getByRole("button", { name: "تم التسليم" }));
+    await user.click(await screen.findByRole("button", { name: "تأكيد التسليم" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("أصبحت حالة الطلب: تم التوصيل"));
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")[0]?.body).toEqual({ to: "delivered" });
+  });
+
+  it("records a partial delivery: the lines are collapsed until asked, then sent with what went out", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/orders/1001/transition": json(200, { data: order({ status: "delivered" }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ status: "out_for_delivery" })} />);
+
+    await user.click(screen.getByRole("button", { name: "تم التسليم" }));
+    expect(screen.queryByTestId("delivered-lines")).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("تسليم جزئي؟"));
+    const stepper = screen.getByLabelText("الكمية المسلَّمة من الأضواء علوم");
+    expect(stepper).toHaveValue(5);
+
+    await user.clear(stepper);
+    await user.type(stepper, "3");
+    expect(screen.getByTestId("delivered-total")).toHaveTextContent("270.00 ج.م");
+
+    await user.click(screen.getByRole("button", { name: "تأكيد التسليم" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")[0]?.body).toEqual({
+      to: "delivered",
+      delivered_quantities: [{ order_item_id: 61, quantity: 3 }],
+    });
+  });
+
+  it("D86 refuses to deliver nothing at all: the order is cancelled instead", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ status: "out_for_delivery" })} />);
+
+    await user.click(screen.getByRole("button", { name: "تم التسليم" }));
+    await user.click(screen.getByLabelText("تسليم جزئي؟"));
+    await user.clear(screen.getByLabelText("الكمية المسلَّمة من الأضواء علوم"));
+
+    expect(screen.getByText("لم يتم تسليم أي صنف، ألغِ الطلب بدلًا من ذلك")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "تأكيد التسليم" })).toBeDisabled();
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")).toHaveLength(0);
   });
 });
 

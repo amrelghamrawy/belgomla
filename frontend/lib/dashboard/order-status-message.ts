@@ -4,7 +4,10 @@ import type { DashboardSettings } from "@/lib/api/types";
 
 export type NotifiableStatus = DashboardSettings["order_notify_statuses"][number];
 
-/** The statuses a store can notify, in the platform's order, then `discount` (the merchant changed the discounts, D85). */
+/**
+ * The statuses a store can notify, in the platform's order, then `discount` (the merchant changed the discounts, D85)
+ * and `edited` (the merchant changed the lines, D87).
+ */
 export const NOTIFIABLE_STATUSES: readonly NotifiableStatus[] = [
   "confirmed",
   "preparing",
@@ -12,6 +15,7 @@ export const NOTIFIABLE_STATUSES: readonly NotifiableStatus[] = [
   "delivered",
   "cancelled",
   "discount",
+  "edited",
 ];
 
 export const ORDER_MESSAGE_MAX_LENGTH = 500;

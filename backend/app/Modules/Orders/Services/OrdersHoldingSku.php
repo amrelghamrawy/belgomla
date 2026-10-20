@@ -7,6 +7,7 @@ namespace App\Modules\Orders\Services;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Orders\Models\Scopes\Open;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -24,6 +25,7 @@ final readonly class OrdersHoldingSku implements ReservationHolders
         return array_values(OrderItem::query()
             ->with('order')
             ->where('sku_id', $sku->id)
+            ->tap(new Live) // a removed line gave its reservation back (BR-O12)
             ->whereHas('order', fn (Builder $order): Builder => $order->tap(new Open))
             ->orderBy('order_id')
             ->get()

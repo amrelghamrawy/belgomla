@@ -10,11 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Collection, DashboardOrderDetail, OrderReturn } from "@/lib/api/types";
+import type {
+  Collection,
+  DashboardOrderDetail,
+  DashboardOrderItemChange,
+  OrderItem,
+  OrderReturn,
+} from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { allowsAddressEdit } from "@/lib/dashboard/order-status";
 import { balanceOf, useOrder, useVoidCollection } from "@/lib/dashboard/orders";
 import { useVoidReturn } from "@/lib/dashboard/returns";
+import { changedLineIds } from "@/lib/store/order-lines";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
@@ -43,10 +50,14 @@ export function OrderDetailPage() {
   return <OrderDetail order={order.data} />;
 }
 
-/** One order: actions, items, totals, returns and collections, customer and delivery, and the status timeline. */
+/**
+ * One order: actions, items (removed lines struck through, changed and short ones marked, BR-O12, BR-O13), totals,
+ * line changes, returns and collections, customer and delivery, and the status timeline.
+ */
 export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
   const [editingAddress, setEditingAddress] = useState(false);
   const address = order.delivery.address;
+  const changed = changedLineIds(order);
 
   return (
     <>
@@ -95,13 +106,23 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                 </TableHeader>
                 <TableBody>
                   {order.items.map((item) => (
-                    <TableRow key={item.sku_id}>
+                    <TableRow
+                      key={item.id}
+                      data-testid={`order-line-${item.id}`}
+                      className={item.removed_at === null ? undefined : "text-muted-foreground line-through"}
+                    >
                       <TableCell>
                         <span className="font-medium">{item.product_name}</span>{" "}
                         <bdi className="text-muted-foreground text-xs">{item.sku_code}</bdi>
+                        <LineBadges item={item} changed={changed.has(item.id)} />
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {ar.orders.quantityOf(item.quantity, item.unit)}
+                        {item.delivered_quantity !== null && item.delivered_quantity < item.quantity && (
+                          <span className="text-destructive block text-xs" data-testid={`delivered-${item.id}`}>
+                            {copy.deliveredOf(item.delivered_quantity, item.quantity)}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {item.manual_discount !== null && (
@@ -147,6 +168,7 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
               </dl>
             </CardContent>
           </Card>
+          <ChangesCard changes={order.changes} />
           <ReturnsCard returns={order.returns} />
           <CollectionsCard collections={order.collections} />
         </div>
@@ -235,6 +257,62 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
       </div>
       {editingAddress && <DeliveryAddressDialog order={order} onClose={() => setEditingAddress(false)} />}
     </>
+  );
+}
+
+/** BR-O12, BR-O13: a removed line, or one added or changed after the order was placed. */
+function LineBadges({ item, changed }: { item: OrderItem; changed: boolean }) {
+  if (item.removed_at !== null) {
+    return (
+      <Badge variant="outline" className="ms-2 text-xs no-underline">
+        {copy.removedBadge}
+      </Badge>
+    );
+  }
+
+  return changed ? (
+    <Badge variant="secondary" className="ms-2 text-xs">
+      {copy.changedBadge}
+    </Badge>
+  ) : null;
+}
+
+/** BR-O12, BR-O13: the line changes after placement, oldest first; shown only when there are some. */
+function ChangesCard({ changes }: { changes: DashboardOrderItemChange[] }) {
+  const labels = copy.changes;
+
+  if (changes.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{labels.title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ol className="flex flex-col gap-2 border-s ps-4 text-sm" data-testid="order-changes">
+          {changes.map((change, index) => {
+            const name = change.product_name ?? labels.unknownLine;
+
+            return (
+              <li key={`${change.at}-${index}`} className="flex flex-col">
+                <span>
+                  {change.change === "added"
+                    ? labels.added(name, change.new_quantity)
+                    : change.change === "removed"
+                      ? labels.removed(name, change.old_quantity)
+                      : change.change === "quantity"
+                        ? labels.quantity(name, change.old_quantity, change.new_quantity)
+                        : labels.delivered_short(name, change.old_quantity, change.new_quantity)}
+                </span>
+                <span className="text-muted-foreground text-xs">{formatDateTime(change.at)}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </CardContent>
+    </Card>
   );
 }
 

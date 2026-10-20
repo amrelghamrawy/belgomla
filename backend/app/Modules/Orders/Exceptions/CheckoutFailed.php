@@ -74,4 +74,12 @@ final class CheckoutFailed extends ApiException
 
         return new self(422, 'validation_failed', $message, ["lines.{$index}.sku_id" => [$message]]);
     }
+
+    /** BR-O12: the order a quote edits is not one of this customer's orders in this store (`order`). */
+    public static function orderUnavailable(): self
+    {
+        $message = 'الطلب غير موجود';
+
+        return new self(422, 'validation_failed', $message, ['order' => [$message]]);
+    }
 }

@@ -90,7 +90,7 @@ const schema = z
       .trim()
       .refine((value) => value === "" || toBasisPoints(value) !== null, copy.salesDiscountRange),
     order_notify_statuses: z.array(
-      z.enum(["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled", "discount"]),
+      z.enum(["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled", "discount", "edited"]),
     ),
     order_status_messages: z.object({
       confirmed: orderMessage,
@@ -99,6 +99,7 @@ const schema = z
       delivered: orderMessage,
       cancelled: orderMessage,
       discount: orderMessage,
+      edited: orderMessage,
     }),
   })
   .superRefine((values, context) => {
@@ -165,6 +166,7 @@ const SERVER_FIELDS = [
   "order_status_messages.delivered",
   "order_status_messages.cancelled",
   "order_status_messages.discount",
+  "order_status_messages.edited",
 ] as const;
 
 function messageDefaults(settings: DashboardSettings): Record<NotifiableStatus, string> {
@@ -550,6 +552,7 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
           delivered: errors.order_status_messages?.delivered?.message,
           cancelled: errors.order_status_messages?.cancelled?.message,
           discount: errors.order_status_messages?.discount?.message,
+          edited: errors.order_status_messages?.edited?.message,
         }}
         onStatuses={(next) => form.setValue("order_notify_statuses", next, { shouldDirty: true })}
         onText={(status, text) =>

@@ -59,6 +59,12 @@ enum OrderStatus: string
         return in_array($this, [self::Pending, self::Confirmed], true);
     }
 
+    /** BR-O12: the merchant may change the lines (add, remove, quantity) only before the order is being prepared. */
+    public function allowsLineEdit(): bool
+    {
+        return in_array($this, [self::Pending, self::Confirmed], true);
+    }
+
     /**
      * @return array<string, string>
      */

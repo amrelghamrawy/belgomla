@@ -22,7 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A customer's order (07-domain-model.md §7). Its lines and delivery details are snapshots (BR-PR07, BR-O10),
- * its items never change after checkout (BR-O06); goods brought back are returns (BR-R01), which lower the net total. Routes address it by its per-tenant `number` (BR-O09).
+ * its lines change only while it is pending or confirmed (BR-O12) and on a short delivery (BR-O13), each change kept
+ * in `itemChanges`; goods brought back are returns (BR-R01), which lower the net total. Routes address it by its per-tenant `number` (BR-O09).
  *
  * @property int $id
  * @property int $tenant_id
@@ -54,7 +55,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Customer $customer
- * @property-read Collection<int, OrderItem> $items
+ * @property-read Collection<int, OrderItem> $items every line, removed ones included (BR-O12)
+ * @property-read Collection<int, OrderItem> $liveItems
+ * @property-read Collection<int, OrderItemChange> $itemChanges
  * @property-read Collection<int, OrderStatusHistory> $history
  * @property-read Collection<int, OrderReturn> $returns
  */
@@ -97,6 +100,26 @@ final class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class)->orderBy('id');
+    }
+
+    /**
+     * The lines the merchant did not remove (BR-O12): what the order charges, holds and delivers.
+     *
+     * @return HasMany<OrderItem, $this>
+     */
+    public function liveItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class)->whereNull('removed_at')->orderBy('id');
+    }
+
+    /**
+     * Line changes after placement, oldest first (BR-O12, BR-O13).
+     *
+     * @return HasMany<OrderItemChange, $this>
+     */
+    public function itemChanges(): HasMany
+    {
+        return $this->hasMany(OrderItemChange::class)->orderBy('id');
     }
 
     /**

@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Services;
 
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\CartSkuQuery;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Data\OrderQuote;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
+use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Pricing\Services\PriceResolver;
 
 /**
@@ -47,20 +52,62 @@ final readonly class OrderQuoter
     }
 
     /**
+     * `$orderNumber` quotes an edit of that order of the customer (BR-O12): the units it holds of a SKU count as
+     * available, and its net total is already part of the customer's exposure.
+     *
      * @param  list<array{sku_id: int, quantity: int}>  $lines
      */
-    public function quote(int $customerId, array $lines): OrderQuote
+    public function quote(int $customerId, array $lines, ?int $orderNumber = null): OrderQuote
     {
         $customer = $this->customer($customerId);
         $inputs = $this->lines($lines);
-        $stock = collect($inputs)->mapWithKeys(fn (CartLineInput $line): array => [$line->sku->id => $line->sku->inventory])->filter();
+        $order = $orderNumber === null ? null : $this->order($customer, $orderNumber);
+        $held = $order instanceof Order ? $this->held($order) : [];
 
         $tiers = [];
 
         foreach ($inputs as $line) {
             $tiers[$line->sku->id] = $this->prices->tiers($line->sku);
+            $this->countHeld($line->sku, $held[$line->sku->id] ?? 0);
         }
 
-        return new OrderQuote($this->validator->check($inputs, $stock, $customer), $tiers);
+        $stock = collect($inputs)->mapWithKeys(fn (CartLineInput $line): array => [$line->sku->id => $line->sku->inventory])->filter();
+
+        return new OrderQuote($this->validator->check($inputs, $stock, $customer, $order?->netTotal() ?? '0.00'), $tiers);
+    }
+
+    private function order(Customer $customer, int $number): Order
+    {
+        return Order::query()->where('customer_id', $customer->id)->where('number', $number)->first() ?? throw CheckoutFailed::orderUnavailable();
+    }
+
+    /**
+     * @return array<int, int> sku_id => base units the order's live lines hold
+     */
+    private function held(Order $order): array
+    {
+        if (! $order->status->allowsLineEdit()) {
+            return [];
+        }
+
+        $held = [];
+
+        foreach (OrderItem::query()->where('order_id', $order->id)->tap(new Live)->get(['sku_id', 'quantity_base']) as $item) {
+            $held[$item->sku_id] = $item->quantity_base;
+        }
+
+        return $held;
+    }
+
+    /** A copy of the SKU's stock row where what the order holds is available again; nothing is saved. */
+    private function countHeld(Sku $sku, int $held): void
+    {
+        if ($held === 0 || ! $sku->inventory instanceof SkuInventory) {
+            return;
+        }
+
+        $copy = clone $sku->inventory;
+        $copy->reserved -= $held;
+        $sku->setRelation('inventory', $copy);
     }
 }

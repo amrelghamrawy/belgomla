@@ -106,6 +106,7 @@ test("BR-INV08 a reserved quantity blocks the adjustment, then the order is conf
   await page.getByRole("button", { name: "تأكيد الطلب" }).click();
   await expect(page.getByTestId("order-status")).toHaveText("مؤكد");
   await page.getByRole("button", { name: "تسليم وتحصيل كامل" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "تسليم وتحصيل" }).click();
   await expect(page.getByTestId("order-status")).toHaveText("تم التوصيل");
   await expect(page.getByTestId("collection-status")).toHaveText("محصل");
   await expect(page.getByTestId("order-balance")).toHaveText("0.00 ج.م");
@@ -210,6 +211,7 @@ test("BR-R01 BR-R03 a delivered order takes a return of 2: the stock comes back 
   await page.getByRole("button", { name: "تأكيد الطلب" }).click();
   await expect(page.getByTestId("order-status")).toHaveText("مؤكد");
   await page.getByRole("button", { name: "تم التسليم", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "تأكيد التسليم" }).click();
   await expect(page.getByTestId("order-status")).toHaveText("تم التوصيل");
   const balanceBefore = await page.getByTestId("order-balance").textContent();
   const before = await stock();

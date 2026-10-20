@@ -17,6 +17,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import type { DashboardOrderDetail } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
+import { liveItems } from "@/lib/dashboard/edit-order";
 import { useApplyDiscount } from "@/lib/dashboard/orders";
 import {
   type DiscountDraft,
@@ -59,14 +60,15 @@ export function DiscountDialog({ order }: { order: DashboardOrderDetail }) {
  */
 function DiscountForm({ order, onDone }: { order: DashboardOrderDetail; onDone: () => void }) {
   const apply = useApplyDiscount(order.number);
+  const items = liveItems(order); // a removed line takes no discount (BR-O12)
   const [lines, setLines] = useState<Record<number, DiscountDraft>>(() =>
-    Object.fromEntries(order.items.map((item) => [item.id, draftOf(item.manual_discount)])),
+    Object.fromEntries(items.map((item) => [item.id, draftOf(item.manual_discount)])),
   );
   const [orderDraft, setOrderDraft] = useState<DiscountDraft>(() => draftOf(order.discount));
   const [reason, setReason] = useState(order.discount?.reason ?? "");
   const [error, setError] = useState<string | null>(null);
   const totals = discountTotals(
-    order.items.map((item) => ({
+    items.map((item) => ({
       list_unit_price: item.list_unit_price,
       quantity: item.quantity,
       discount: lines[item.id],
@@ -92,7 +94,7 @@ function DiscountForm({ order, onDone }: { order: DashboardOrderDetail; onDone: 
     setError(null);
     apply.mutate(
       {
-        items: order.items.flatMap((item) => {
+        items: items.flatMap((item) => {
           const body = discountBody(lines[item.id]);
 
           return body === null ? [] : [{ order_item_id: item.id, ...body }];
@@ -112,7 +114,7 @@ function DiscountForm({ order, onDone }: { order: DashboardOrderDetail; onDone: 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
       <ul className="flex flex-col divide-y rounded-md border" data-testid="discount-lines">
-        {order.items.map((item, index) => {
+        {items.map((item, index) => {
           const priced = totals.lines[index];
           const draft = lines[item.id] ?? NO_DISCOUNT;
 

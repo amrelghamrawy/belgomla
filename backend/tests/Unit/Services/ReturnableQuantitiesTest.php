@@ -40,3 +40,16 @@ test('returns of another order never count', function (): void {
 
     expect(app(ReturnableQuantities::class)->returned($this->order))->toBe([]);
 });
+
+test('BR-O13 a line delivered short brings back at most what was delivered', function (): void {
+    $this->first->forceFill(['delivered_quantity' => 4])->save();
+    OrderReturnItem::factory()->for(OrderReturn::factory()->for($this->order))->create(['order_item_id' => $this->first->id, 'quantity' => 1]);
+
+    expect(app(ReturnableQuantities::class)->for($this->order))->toBe([$this->first->id => 3, $this->second->id => 3]);
+});
+
+test('BR-O12 a removed line has nothing to bring back', function (): void {
+    $removed = OrderItem::factory()->for($this->order)->removed()->create(['quantity' => 2]);
+
+    expect(app(ReturnableQuantities::class)->for($this->order))->not->toHaveKey($removed->id);
+});

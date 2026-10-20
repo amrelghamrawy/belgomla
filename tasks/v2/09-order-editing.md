@@ -1,6 +1,6 @@
 # V2 Task 09 — Order editing and partial fulfilment
 
-Status: **planned**. Requires V2 Tasks 03, 05, 08. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-10-20, commit: see log). `EditOrderLines` (`PUT /api/dashboard/orders/{number}/lines`, `orders.edit` for owner/manager/sales, idempotent): the full line list, checked like checkout with the order's own reservation counted, changed lines re-priced keeping their manual discount, removed lines kept with `removed_at`, `meta.below_mov`, the credit limit on a higher total, `order_item_changes`, «تعديل الطلب», `order.lines_changed`, the `edited` WhatsApp text (on by default). Partial delivery through `delivered_quantities` on the transition (deduct the delivered, release the rest, charge what went out, EGP order discount capped, `delivered_short` changes); returns count `delivered_quantity`; the quote takes `order` to quote an edit. Frontend: «تعديل الأصناف» dialog on the Task 07 line editor with the diff, the delivery confirmation with «تسليم جزئي؟», the line-changes card, removed/changed/short lines marked on both order pages, the `edited` message in settings; e2e edit → deliver short → return. D86, D87. Requires V2 Tasks 03, 05, 08. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 

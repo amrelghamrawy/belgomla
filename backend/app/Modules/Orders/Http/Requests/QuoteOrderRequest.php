@@ -7,8 +7,9 @@ namespace App\Modules\Orders\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * POST /api/dashboard/orders/quote: `{ customer_id, lines: [{ sku_id, quantity }] }` (BR-O11). The merchant's order
- * form asks it after every change; nothing is saved.
+ * POST /api/dashboard/orders/quote: `{ customer_id, lines: [{ sku_id, quantity }], order? }` (BR-O11). The merchant's
+ * order form asks it after every change; nothing is saved. `order` (an order number) quotes an edit of that order
+ * (BR-O12): what it holds counts as available and its total is not counted twice against the credit limit.
  */
 final class QuoteOrderRequest extends FormRequest
 {
@@ -45,7 +46,12 @@ final class QuoteOrderRequest extends FormRequest
      */
     public function rules(): array
     {
-        return self::lineRules();
+        return [...self::lineRules(), 'order' => ['sometimes', 'nullable', 'integer', 'min:1']];
+    }
+
+    public function orderNumber(): ?int
+    {
+        return $this->filled('order') ? $this->integer('order') : null;
     }
 
     public function customerId(): int

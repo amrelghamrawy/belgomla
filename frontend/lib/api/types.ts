@@ -121,3 +121,8 @@ export type LedgerRow = Schemas["LedgerRow"];
 export type LedgerMeta = Schemas["LedgerMeta"];
 export type StoreStatementSummary = Schemas["StoreStatementSummary"];
 export type CustomerCredit = Schemas["CustomerCredit"];
+
+// V2 Task 09 — order editing and partial delivery
+export type OrderItemChange = Schemas["OrderItemChange"];
+export type DashboardOrderItemChange = Schemas["DashboardOrderItemChange"];
+export type OrderLinesRequest = Schemas["OrderLinesRequest"];

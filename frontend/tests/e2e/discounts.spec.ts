@@ -50,6 +50,7 @@ test("BR-PR08 the merchant discounts an order, then delivers and collects the di
   await page.getByRole("button", { name: "تأكيد الطلب" }).click();
   await expect(page.getByTestId("order-status")).toHaveText("مؤكد");
   await page.getByRole("button", { name: "تسليم وتحصيل كامل" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "تسليم وتحصيل" }).click();
   await expect(page.getByTestId("order-status")).toHaveText("تم التوصيل");
   await expect(page.getByTestId("collection-status")).toHaveText("محصل");
   await expect(page.getByTestId("order-balance")).toHaveText("0.00 ج.م");

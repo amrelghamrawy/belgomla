@@ -41,7 +41,7 @@ test('D82 /me lists what the role may do', function (App\Modules\Tenancy\Enums\T
         ->assertJsonPath('data.user.role', $role->value)
         ->assertJsonPath('data.permissions', $permissions);
 })->with([
-    'sales' => [App\Modules\Tenancy\Enums\TenantUserRole::Sales, ['orders.view', 'orders.manage', 'orders.create', 'orders.discount', 'customers.manage']],
+    'sales' => [App\Modules\Tenancy\Enums\TenantUserRole::Sales, ['orders.view', 'orders.manage', 'orders.create', 'orders.edit', 'orders.discount', 'customers.manage']],
     'accountant' => [App\Modules\Tenancy\Enums\TenantUserRole::Accountant, ['orders.view', 'customers.credit', 'collections.manage', 'reports.view']],
 ]);
 

@@ -20,6 +20,7 @@ function line(overrides: Partial<ReturnableLine> = {}): ReturnableLine {
     unit: "كرتونة",
     unit_price: "90.00",
     ordered: 6,
+    delivered: 6,
     returned: 4,
     returnable: 2,
     ...overrides,

@@ -2,10 +2,10 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiFetch, apiFetchPage, withQuery } from "@/lib/api/client";
+import { apiFetch, apiFetchPage, apiFetchWith, withQuery } from "@/lib/api/client";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { queryKeys } from "@/lib/api/keys";
-import type { Collection, DashboardOrder, DashboardOrderDetail } from "@/lib/api/types";
+import type { Collection, DashboardOrder, DashboardOrderDetail, OrderLinesRequest } from "@/lib/api/types";
 
 import type { ListQuery } from "./list-query";
 import type { ForwardStatus } from "./order-status";
@@ -60,9 +60,18 @@ function useStoreOrder() {
   };
 }
 
-export type TransitionInput = { to: ForwardStatus; note?: string | null; collect_full_amount?: boolean };
+export type TransitionInput = {
+  to: ForwardStatus;
+  note?: string | null;
+  collect_full_amount?: boolean;
+  /** BR-O13: the lines delivered short (a line left out went out in full). */
+  delivered_quantities?: { order_item_id: number; quantity: number }[];
+};
 
-/** BR-O01; `to: delivered` with `collect_full_amount` is the "deliver and collect in full" shortcut (BR-C04). */
+/**
+ * BR-O01; `to: delivered` with `collect_full_amount` is the "deliver and collect in full" shortcut (BR-C04), with
+ * `delivered_quantities` a partial delivery (BR-O13).
+ */
 export function useTransitionOrder(number: number) {
   const store = useStoreOrder();
   const idempotency = useIdempotencyKey(`transition-${number}`);
@@ -142,6 +151,33 @@ export function useApplyDiscount(number: number) {
         headers: { "Idempotency-Key": idempotency.keyFor(body) },
       }),
     onSuccess: (order) => {
+      idempotency.reset();
+      store(order);
+    },
+  });
+}
+
+/** The minimum order value shortfall an edit left (BR-MOV02): allowed, but the merchant is told. */
+export type BelowMov = { required: string; current: string } | null;
+
+/**
+ * BR-O12, D87: the order's new lines (the whole list), retry-safe (D55). The answer is the order with its changes and
+ * new totals, plus `below_mov`; lists, stock and reports follow it.
+ */
+export function useEditOrderLines(number: number) {
+  const store = useStoreOrder();
+  const idempotency = useIdempotencyKey(`lines-${number}`);
+
+  return useMutation({
+    mutationFn: async (body: OrderLinesRequest) => {
+      const answer = await apiFetchWith<DashboardOrderDetail, { meta: { below_mov: BelowMov } }>(
+        `/api/dashboard/orders/${number}/lines`,
+        { method: "PUT", body, headers: { "Idempotency-Key": idempotency.keyFor(body) } },
+      );
+
+      return { order: answer.data, belowMov: answer.meta.below_mov };
+    },
+    onSuccess: ({ order }) => {
       idempotency.reset();
       store(order);
     },

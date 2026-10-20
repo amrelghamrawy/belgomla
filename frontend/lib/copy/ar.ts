@@ -497,6 +497,10 @@ export const ar = {
     itemsTotal: "إجمالي الأصناف",
     orderDiscount: "خصم",
     listPrice: "السعر قبل الخصم",
+    // BR-O12, BR-O13 (D87): lines the store changed, removed or delivered short.
+    lineRemoved: "حذفه المتجر",
+    lineChanged: "عدّله المتجر",
+    deliveredOf: (delivered: number, ordered: number, unit: string) => `تم تسليم ${delivered} من ${ordered} ${unit}`,
   },
   statement: {
     title: "كشف الحساب",
