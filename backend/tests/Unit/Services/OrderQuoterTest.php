@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Modules\Customers\Enums\CustomerStatus;
+use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderQuoter;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 
@@ -129,4 +132,17 @@ test('D88 a pre-order cannot be quoted as an edit: it is not edited', function (
     expect(fn () => $this->quoter->quote($this->customer->id, [['sku_id' => $this->sku->id, 'quantity' => 6]], $preorder->number))->toThrow(function (CheckoutFailed $e): void {
         expect([$e->status, $e->details])->toBe([422, ['order' => ['الطلب غير موجود']]]);
     });
+});
+
+test('BR-O11 BR-PR14 the quote prices at the customer\'s group and lists only the tiers below it', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '10.00']);
+    Customer::query()->whereKey($this->customer->id)->update(['customer_group_id' => $group->id]);
+    $sku = $this->orderableSku(['code' => 'G-1'], name: 'مجموعة');
+    app(TenantContext::class)->set($this->tenant);
+
+    $quote = app(OrderQuoter::class)->quote($this->customer->id, [['sku_id' => $sku->id, 'quantity' => 5]]);
+
+    expect($quote->report->lines[0]->price->unitPrice)->toBe('81.00')
+        ->and($quote->report->lines[0]->price->source)->toBe(PriceSource::Group)
+        ->and($quote->tiers[$sku->id])->toBe([]);
 });

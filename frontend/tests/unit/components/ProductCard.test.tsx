@@ -272,3 +272,22 @@ describe("pre-orders on the card (BR-O14)", () => {
     expect(screen.getByRole("button", { name: "اكتمل الحجز" })).toBeDisabled();
   });
 });
+
+describe("the customer's own price on the card (BR-PR14)", () => {
+  it("marks a group or negotiated price «سعرك الخاص»", () => {
+    stubApi(guest);
+    renderWithQuery(
+      <ProductCard product={storeProduct({ sku: storeSku({ base_price: "85.00", price_source: "group" }) })} />,
+    );
+
+    expect(screen.getByText("85.00 ج.م")).toBeInTheDocument();
+    expect(screen.getByTestId("your-price")).toHaveTextContent("سعرك الخاص");
+  });
+
+  it("shows no badge for the store's normal price", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct()} />);
+
+    expect(screen.queryByTestId("your-price")).toBeNull();
+  });
+});

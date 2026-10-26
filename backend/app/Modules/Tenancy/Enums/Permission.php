@@ -13,6 +13,7 @@ enum Permission: string
 {
     case CatalogManage = 'catalog.manage';
     case PricingManage = 'pricing.manage';
+    case PricingCustomers = 'pricing.customers';
     case InventoryAdjust = 'inventory.adjust';
     case OrdersView = 'orders.view';
     case OrdersManage = 'orders.manage';
@@ -34,6 +35,7 @@ enum Permission: string
         return match ($this) {
             self::CatalogManage => 'إدارة المنتجات والتصنيفات',
             self::PricingManage => 'إدارة الأسعار',
+            self::PricingCustomers => 'مستويات العملاء وأسعارهم الخاصة',
             self::InventoryAdjust => 'تعديل المخزون',
             self::OrdersView => 'عرض الطلبات',
             self::OrdersManage => 'إدارة الطلبات',

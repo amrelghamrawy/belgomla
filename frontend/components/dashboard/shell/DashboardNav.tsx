@@ -2,6 +2,7 @@
 
 import {
   BarChart3Icon,
+  BadgePercentIcon,
   BoxesIcon,
   FolderTreeIcon,
   HistoryIcon,
@@ -55,6 +56,12 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         label: copy.customers,
         icon: UsersIcon,
         permissions: ["customers.manage", "customers.credit", "collections.manage"],
+      },
+      {
+        href: "/dashboard/customer-groups",
+        label: copy.customerGroups,
+        icon: BadgePercentIcon,
+        permissions: ["pricing.customers"],
       },
       { href: "/dashboard/reports", label: copy.reports, icon: BarChart3Icon, permissions: ["reports.view"] },
     ],

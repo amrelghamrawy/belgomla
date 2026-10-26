@@ -31,6 +31,7 @@ function item(overrides: Partial<OrderItem> = {}): OrderItem {
     unit_price: "90.00",
     discount_percent: null,
     tier_min_quantity: null,
+    price_source: "base",
     line_total: "540.00",
     delivered_quantity: null,
     removed_at: null,

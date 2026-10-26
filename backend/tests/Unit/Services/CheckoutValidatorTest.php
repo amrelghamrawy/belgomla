@@ -11,6 +11,8 @@ use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Data\CheckoutLine;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
 use App\Modules\Orders\Services\CheckoutValidator;
+use App\Modules\Pricing\Data\PricingContext;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 
@@ -26,7 +28,7 @@ beforeEach(function (): void {
 
         $inputs = array_values($lines->map(fn ($line): CartLineInput => new CartLineInput($line->sku, $line->quantity))->all());
 
-        return app(CheckoutValidator::class)->validate($inputs, $stock, $this->customer->refresh());
+        return app(CheckoutValidator::class)->validate($inputs, $stock, $this->customer->refresh(), null);
     };
     $this->failure = function (): CheckoutFailed {
         try {
@@ -199,7 +201,7 @@ test('BR-O12 the line checks alone report the lines and their problems, without 
     $this->customer->forceFill(['credit_limit' => '1.00'])->save();
     $stock = SkuInventory::query()->whereKey($this->sku->id)->get()->keyBy('sku_id');
 
-    $report = app(CheckoutValidator::class)->checkLines([new CartLineInput($this->sku->load(['product', 'sellingUnit', 'tiers']), 3)], $stock);
+    $report = app(CheckoutValidator::class)->checkLines([new CartLineInput($this->sku->load(['product', 'sellingUnit', 'tiers']), 3)], $stock, null);
 
     expect($report->total)->toBe('270.00')
         ->and($report->problemFor($this->sku->id)?->reason)->toBe('below_moq')
@@ -230,7 +232,7 @@ function preorderReport(Sku $sku, int $quantity, App\Modules\Customers\Models\Cu
 {
     $sku = Sku::query()->with(App\Modules\Catalog\Queries\CartSkuQuery::RELATIONS)->findOrFail($sku->id);
 
-    return app(CheckoutValidator::class)->checkPreorder([new CartLineInput($sku, $quantity)], $customer->refresh(), [$sku->id => $open]);
+    return app(CheckoutValidator::class)->checkPreorder([new CartLineInput($sku, $quantity)], $customer->refresh(), [$sku->id => $open], null);
 }
 
 test('BR-O14 a pre-order line needs no stock, is priced at the tiers and reports no minimum order value', function (): void {
@@ -284,4 +286,15 @@ test('D88 a conversion still refuses a line out of stock or no longer active', f
     expect(fn (): array => $report->assertConvertible())->toThrow(function (CheckoutFailed $e): void {
         expect($e->items)->toBe([['sku_id' => 7, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 2]]);
     });
+});
+
+test('BR-PR14 the validator prices every line at the context it is handed', function (): void {
+    $sku = $this->sku->load(['product', 'sellingUnit', 'tiers']);
+    $stock = collect([$sku->id => SkuInventory::query()->findOrFail($sku->id)]);
+
+    $report = app(CheckoutValidator::class)->checkLines([new CartLineInput($sku, 5)], $stock, new PricingContext(null, [$sku->id => '77.00']));
+
+    expect($report->lines[0]->price->unitPrice)->toBe('77.00')
+        ->and($report->lines[0]->price->source)->toBe(PriceSource::Customer)
+        ->and($report->total)->toBe('385.00');
 });

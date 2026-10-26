@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -34,11 +35,14 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property string|null $credit_limit null = no limit (BR-C05)
  * @property int|null $payment_terms_days null = due on delivery (BR-C06)
  * @property bool $order_notifications_opt_out the customer turned off order status messages (BR-N03)
+ * @property int|null $customer_group_id the customer's wholesale level (BR-PR12); kept when the group is archived
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Collection<int, CustomerAddress> $addresses
  * @property-read CustomerInvitation|null $invitation
  * @property-read Cart|null $cart
+ * @property-read CustomerGroup|null $group
+ * @property-read Collection<int, CustomerSkuPrice> $skuPrices
  */
 final class Customer extends Authenticatable
 {
@@ -81,6 +85,26 @@ final class Customer extends Authenticatable
     }
 
     /**
+     * BR-PR12: the customer's group, archived or not (PricingContextQuery ignores an archived one).
+     *
+     * @return BelongsTo<CustomerGroup, $this>
+     */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(CustomerGroup::class, 'customer_group_id');
+    }
+
+    /**
+     * BR-PR13: the prices negotiated with the customer, one per SKU.
+     *
+     * @return HasMany<CustomerSkuPrice, $this>
+     */
+    public function skuPrices(): HasMany
+    {
+        return $this->hasMany(CustomerSkuPrice::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -95,6 +119,7 @@ final class Customer extends Authenticatable
             'credit_limit' => 'decimal:2',
             'payment_terms_days' => 'integer',
             'order_notifications_opt_out' => 'boolean',
+            'customer_group_id' => 'integer',
         ];
     }
 }

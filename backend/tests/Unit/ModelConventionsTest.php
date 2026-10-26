@@ -18,8 +18,10 @@ use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Customers\Models\CustomerInvitation;
 use App\Modules\Customers\Models\CustomerOtp;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Models\OutboundMessage;
@@ -91,8 +93,10 @@ test('the module model list is explicit so new models are reviewed', function ()
         CartItem::class,
         Customer::class,
         CustomerAddress::class,
+        CustomerGroup::class,
         CustomerInvitation::class,
         CustomerOtp::class,
+        CustomerSkuPrice::class,
         InventoryMovement::class,
         SkuInventory::class,
         OutboundMessage::class,

@@ -8,6 +8,7 @@ use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Queries\CartSkuQuery;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Queries\PricingContextQuery;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Inventory\Services\StockLedger;
 use App\Modules\Orders\Data\CartLineInput;
@@ -25,6 +26,7 @@ use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Orders\Services\CheckoutValidator;
 use App\Modules\Orders\Services\OrderSnapshots;
 use App\Modules\Orders\Services\OrderTotals;
+use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Services\DiscountCalculator;
 use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Support\Money;
@@ -42,7 +44,7 @@ use Illuminate\Support\Facades\DB;
  * 4. check the added and changed lines like checkout (CheckoutValidator, BR-PR06: product active, MOQ, stock), with
  *    this order's own reservation of the SKU counted as available; any failure is `422 checkout_failed` like checkout;
  * 5. release what was removed or decreased, reserve what was added or increased (BR-INV03, BR-INV04);
- * 6. price the added and changed lines at the current tiers (BR-PR04); unchanged lines keep their snapshot (BR-O05);
+ * 6. price the added and changed lines at the current tiers and the customer's own prices (BR-PR04, BR-PR14); unchanged lines keep their snapshot (BR-O05);
  *    a line keeps its manual discount (D85) and a % order discount is taken off the new items total;
  * 7. totals (BR-O08); never below what was collected (`409 below_collected`); a higher total must fit the customer's
  *    credit limit (BR-C05, `422 checkout_failed` with `details.credit`); going under the minimum order value is allowed
@@ -60,6 +62,7 @@ final readonly class EditOrderLines
         private CartSkuQuery $skus,
         private StockLedger $ledger,
         private CheckoutValidator $validator,
+        private PricingContextQuery $pricing,
         private DiscountCalculator $calculator,
         private OrderSnapshots $snapshots,
         private OrderTotals $totals,
@@ -92,7 +95,8 @@ final readonly class EditOrderLines
             }
 
             $before = $this->totalsOf($order);
-            $priced = $this->check($live, $changed, $added, $removed);
+            $customer = Customer::query()->findOrFail($order->customer_id);
+            $priced = $this->check($live, $changed, $added, $removed, $this->pricing->for($customer));
             $changes = [
                 ...$this->remove($removed),
                 ...$this->change($live, $changed, $priced),
@@ -100,7 +104,7 @@ final readonly class EditOrderLines
             ];
 
             $this->totals->apply($order, OrderItem::query()->where('order_id', $order->id)->tap(new Live)->get());
-            $this->assertAffordable($order, $before);
+            $this->assertAffordable($order, $customer, $before);
             $order->save();
             $this->collected->handle($order, $order->collected_amount);
 
@@ -160,7 +164,7 @@ final readonly class EditOrderLines
      * @param  list<OrderItem>  $removed
      * @return array<int, CheckoutLine> sku_id => the line priced at its new quantity
      */
-    private function check(array $live, array $changed, array $added, array $removed): array
+    private function check(array $live, array $changed, array $added, array $removed, ?PricingContext $pricing): array
     {
         $skus = $this->skus->findMany([...array_map(fn (int $id): int => $live[$id]->sku_id, array_keys($changed)), ...array_values(array_map(fn (OrderEditLineData $line): int => $line->skuId, $added))]);
         $inputs = [];
@@ -181,7 +185,7 @@ final readonly class EditOrderLines
             ...array_map(fn (OrderItem $item): int => $item->sku_id, $removed),
         ]);
 
-        $report = $this->validator->checkLines($inputs, $this->withOwnReservation($stock, $own));
+        $report = $this->validator->checkLines($inputs, $this->withOwnReservation($stock, $own), $pricing);
 
         if ($report->problems !== []) {
             throw CheckoutFailed::with(array_values($report->problems));
@@ -273,6 +277,7 @@ final readonly class EditOrderLines
                 'unit_price' => $unit,
                 'discount_percent' => $line->price->discountPercent,
                 'tier_min_quantity' => $line->price->tierMinQuantity,
+                'price_source' => $line->price->source,
                 'line_total' => Money::times($unit, $quantity),
             ])->save();
 
@@ -309,7 +314,7 @@ final readonly class EditOrderLines
      *
      * @param  array{items_total: string, discount_amount: string, order_total: string}  $before
      */
-    private function assertAffordable(Order $order, array $before): void
+    private function assertAffordable(Order $order, Customer $customer, array $before): void
     {
         if (Money::compare($order->collected_amount, $order->netTotal()) > 0) {
             throw OrderEditRefused::belowCollected($order->collected_amount, $order->order_total);
@@ -319,7 +324,6 @@ final readonly class EditOrderLines
             return;
         }
 
-        $customer = Customer::query()->findOrFail($order->customer_id);
         $credit = $this->validator->creditShortfall($customer, $order->netTotal(), Money::subtract($before['order_total'], $order->returned_total));
 
         if ($credit !== null) {

@@ -7,7 +7,9 @@ use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Enums\CustomerStatus;
+use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\OutboundMessage;
@@ -20,6 +22,7 @@ use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Queue;
@@ -255,4 +258,13 @@ test('D85 discounts from the form apply to the matching lines by sku, audited on
         ->and($order->refresh()->only(['items_total', 'discount_amount', 'order_total']))->toBe(['items_total' => '1500.00', 'discount_amount' => '75.00', 'order_total' => '1425.00'])
         ->and(AuditLog::query()->where('action', 'order.discount_changed')->count())->toBe(1)
         ->and(($this->message)())->toBeNull();
+});
+
+test('BR-O11 BR-PR14 a merchant\'s order for a customer is priced at that customer\'s prices', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '50.00']);
+    Customer::query()->whereKey($this->customer->id)->update(['customer_group_id' => $group->id]);
+
+    ($this->place)();
+
+    expect(OrderItem::query()->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '45.00', 'price_source' => PriceSource::Group]);
 });

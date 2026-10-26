@@ -217,7 +217,7 @@ test('BR-O11 the quote prices every line with its tiers, stock and problem, and 
         ->assertJsonPath('data.lines.0', [
             'sku_id' => $this->sku->id, 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
             'conversion_factor' => 20, 'quantity' => 12, 'moq' => 5, 'available' => 20, 'cover_price' => null, 'unit_price' => '85.00',
-            'discount_percent' => null, 'tier_min_quantity' => 10, 'line_total' => '1020.00',
+            'discount_percent' => null, 'tier_min_quantity' => 10, 'price_source' => 'tier', 'line_total' => '1020.00',
             'tiers' => [['min_quantity' => 10, 'unit_price' => '85.00']], 'problem' => null,
         ])
         ->assertJsonPath('data.lines.1.problem', ['reason' => 'insufficient_stock', 'requested' => 5, 'available' => 3])

@@ -33,6 +33,7 @@ function customer(overrides: Partial<DashboardCustomer> = {}): DashboardCustomer
     blocked_reason: null,
     credit_limit: null,
     payment_terms_days: null,
+    group: null,
     addresses: [
       address({ id: 21, label: "المخزن", is_default: false }),
       address({ id: 22, label: "المحل", is_default: true }),

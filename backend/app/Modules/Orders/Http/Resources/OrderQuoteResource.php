@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * POST /api/dashboard/orders/quote (BR-O11): every line priced as checkout would price it now, with its MOQ, the stock
- * left in selling units, its tiers (the hint next to the quantity) and its `problem` (the checkout_failed entry without
+ * left in selling units, where its price came from (`price_source`, BR-PR14), its tiers (the hint next to the quantity) and its `problem` (the checkout_failed entry without
  * `sku_id`, or null); the items total; the store's minimum order value (BR-MOV02); and `credit` when the order would
  * pass the customer's credit limit (BR-C05), else null. Nothing was saved.
  *
@@ -58,6 +58,7 @@ final class OrderQuoteResource extends JsonResource
             'unit_price' => $line->price->unitPrice,
             'discount_percent' => $line->price->discountPercent,
             'tier_min_quantity' => $line->price->tierMinQuantity,
+            'price_source' => $line->price->source->value,
             'line_total' => $line->price->lineTotal,
             'tiers' => array_map(fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice], $this->resource->tiers[$sku->id] ?? []),
             'problem' => $problem === [] ? null : $problem,

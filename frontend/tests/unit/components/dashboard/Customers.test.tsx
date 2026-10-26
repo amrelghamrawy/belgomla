@@ -35,6 +35,7 @@ function dashboardCustomer(overrides: Partial<DashboardCustomer> = {}): Dashboar
     blocked_reason: null,
     credit_limit: null,
     payment_terms_days: null,
+    group: null,
     addresses: [address({ id: 21, label: "المحل", is_default: true })],
     recent_orders: [{ id: 1, number: 1001, status: "delivered", total: "450.00", placed_at: "2026-10-02T08:00:00Z" }],
     ...overrides,

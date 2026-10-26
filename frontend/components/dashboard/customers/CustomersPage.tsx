@@ -27,8 +27,10 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CustomerStatus } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
+import { assignmentFor, useAssignCustomers, useCustomerGroups } from "@/lib/dashboard/customer-pricing";
 import { CUSTOMER_LIST_KEYS, useCreateCustomer, useCustomers, useInviteCustomer } from "@/lib/dashboard/customers";
-import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
+import { activeFilters, hasFilters, type ListQuery } from "@/lib/dashboard/list-query";
+import { useCan } from "@/lib/dashboard/permissions";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { phoneField } from "@/lib/forms/phone";
 import { applyServerErrors } from "@/lib/forms/server-errors";
@@ -44,10 +46,21 @@ import { CustomerStatusBadge, inviteMessage } from "./CustomerStatusBadge";
 const copy = ar.dashboard.customers;
 const STATUSES: CustomerStatus[] = ["active", "invited", "pending_approval", "pending_verification", "blocked"];
 
-/** Customers with status and outstanding amount; search, status filter and "new customer". */
+/**
+ * Customers with status, group and outstanding amount; search, status and group filters and "new customer". With
+ * `pricing.customers` (V2 Task 11) rows can be ticked and moved into a group, or every customer of the filter at once.
+ */
 export function CustomersPage() {
   const [query, setQuery] = useListQuery(CUSTOMER_LIST_KEYS);
   const customers = useCustomers(query);
+  const allowed = useCan();
+  const groupsAllowed = allowed("pricing.customers");
+  const groups = useCustomerGroups(groupsAllowed);
+  const [selected, setSelected] = useState<number[]>([]);
+  const pageIds = customers.data?.data.map((customer) => customer.id) ?? [];
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+  const toggle = (id: number, on: boolean) =>
+    setSelected((current) => (on ? [...current, id] : current.filter((value) => value !== id)));
   const [q, setQ] = useState(query.q ?? "");
   const [creating, setCreating] = useState(false);
 
@@ -60,7 +73,7 @@ export function CustomersPage() {
     <>
       <PageHeader title={copy.title} actions={<Button onClick={() => setCreating(true)}>{copy.add}</Button>} />
       <FilterPanel
-        active={activeFilters(query, ["status"])}
+        active={activeFilters(query, ["status", "group"])}
         onClear={
           hasFilters(query)
             ? () => {
@@ -96,7 +109,29 @@ export function CustomersPage() {
             </option>
           ))}
         </NativeSelect>
+        {groupsAllowed && (
+          <NativeSelect
+            aria-label={copy.group}
+            value={query.group ?? ""}
+            onChange={(event) => setQuery({ group: event.target.value })}
+          >
+            <option value="">{copy.allGroups}</option>
+            {groups.data?.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </NativeSelect>
+        )}
       </FilterPanel>
+      {groupsAllowed && (
+        <AssignBar
+          groups={groups.data?.filter((group) => group.status === "active") ?? []}
+          selected={selected}
+          query={query}
+          onDone={() => setSelected([])}
+        />
+      )}
       {customers.isError && <ErrorBlock error={customers.error} onRetry={() => void customers.refetch()} />}
       {customers.isPending && <LoadingBlock />}
       {customers.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
@@ -105,9 +140,19 @@ export function CustomersPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                {groupsAllowed && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label={copy.selectAll}
+                      checked={allSelected}
+                      onCheckedChange={(checked) => setSelected(checked === true ? pageIds : [])}
+                    />
+                  </TableHead>
+                )}
                 <TableHead>{copy.name}</TableHead>
                 <TableHead>{copy.phone}</TableHead>
                 <TableHead>{copy.status}</TableHead>
+                <TableHead>{copy.group}</TableHead>
                 <TableHead>{copy.outstanding}</TableHead>
                 <TableHead>{copy.createdAt}</TableHead>
               </TableRow>
@@ -115,6 +160,15 @@ export function CustomersPage() {
             <TableBody>
               {customers.data.data.map((customer) => (
                 <TableRow key={customer.id} data-testid={`customer-${customer.id}`}>
+                  {groupsAllowed && (
+                    <TableCell>
+                      <Checkbox
+                        aria-label={copy.selectCustomer(customer.name)}
+                        checked={selected.includes(customer.id)}
+                        onCheckedChange={(checked) => toggle(customer.id, checked === true)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     <Link href={`/dashboard/customers/${customer.id}`} className="hover:underline">
                       {customer.name}
@@ -126,6 +180,7 @@ export function CustomersPage() {
                   <TableCell>
                     <CustomerStatusBadge status={customer.status} />
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">{customer.group?.name ?? ar.dashboard.none}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {customer.outstanding_amount === "0.00" ? (
                       ar.dashboard.none
@@ -143,6 +198,57 @@ export function CustomersPage() {
       <Pager meta={customers.data?.meta} onPage={(page) => setQuery({ page })} />
       {creating && <CreateCustomerDialog onClose={() => setCreating(false)} />}
     </>
+  );
+}
+
+/** BR-PR12: moves the ticked customers, or (none ticked) every customer of the current filter, into a group. */
+export function AssignBar({
+  groups,
+  selected,
+  query,
+  onDone,
+}: {
+  groups: { id: number; name: string }[];
+  selected: number[];
+  query: ListQuery;
+  onDone: () => void;
+}) {
+  const assign = useAssignCustomers();
+  const [groupId, setGroupId] = useState("");
+  const byFilter =
+    selected.length === 0 && (query.q !== undefined || query.status !== undefined || query.group !== undefined);
+
+  if (groups.length === 0 || (selected.length === 0 && !byFilter)) {
+    return null;
+  }
+
+  const run = () =>
+    assign.mutate(
+      { groupId: Number(groupId), ...assignmentFor(selected, query) },
+      {
+        onSuccess: (result) => {
+          toast.success(copy.assigned(result.assigned));
+          onDone();
+        },
+        onError: (failure) => toast.error(messageFor(failure)),
+      },
+    );
+
+  return (
+    <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-md border p-2" data-testid="assign-bar">
+      {selected.length > 0 && <span className="text-sm">{copy.selectedCount(selected.length)}</span>}
+      <NativeSelect aria-label={copy.assignTo} value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+        <option value="">{copy.pickGroup}</option>
+        {groups.map((group) => (
+          <option key={group.id} value={group.id}>
+            {group.name}
+          </option>
+        ))}
+      </NativeSelect>
+      <Button size="sm" disabled={groupId === "" || assign.isPending} onClick={run}>
+        {byFilter ? copy.assignFiltered : copy.assignSelected}
+      </Button>
+    </div>
   );
 }
 

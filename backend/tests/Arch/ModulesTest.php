@@ -45,6 +45,8 @@ arch('data classes are final readonly value objects')
     ->ignoring([
         App\Modules\Tenancy\Data\TenantUserChanges::class,
         App\Modules\Pricing\Data\ResolvedPrice::class,
+        App\Modules\Pricing\Data\ListedPrice::class, // V2 Task 11: what the storefront lists for a SKU and customer, not request input
+        App\Modules\Pricing\Data\PricingContext::class, // V2 Task 11: the customer's pricing inputs, read by PricingContextQuery
         App\Modules\Messaging\Data\MessagePayload::class, // names fixed by tasks/4-messaging.md
         App\Modules\Messaging\Data\DriverResult::class,
         App\Modules\Messaging\Data\FallbackRoute::class, // value returned by Fallback (D70), not request input

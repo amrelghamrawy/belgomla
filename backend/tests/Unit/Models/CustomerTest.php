@@ -22,7 +22,7 @@ test('to array never exposes the password or remember token', function (): void 
 
     expect(array_keys($customer?->toArray() ?? []))->toBe([
         'id', 'tenant_id', 'name', 'phone', 'status', 'phone_verified_at', 'created_by', 'approved_by',
-        'blocked_at', 'blocked_reason', 'status_before_block', 'created_at', 'updated_at', 'credit_limit', 'payment_terms_days', 'order_notifications_opt_out',
+        'blocked_at', 'blocked_reason', 'status_before_block', 'created_at', 'updated_at', 'credit_limit', 'payment_terms_days', 'order_notifications_opt_out', 'customer_group_id',
     ]);
 });
 

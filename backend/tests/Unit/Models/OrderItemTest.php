@@ -20,7 +20,7 @@ test('to array', function (): void {
         'id', 'tenant_id', 'order_id', 'sku_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name',
         'conversion_factor', 'quantity', 'quantity_base', 'cover_price', 'unit_price', 'discount_percent',
         'tier_min_quantity', 'line_total', 'created_at', 'updated_at', 'list_unit_price', 'manual_discount_type', 'manual_discount_value',
-        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity',
+        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity', 'price_source',
     ]);
 });
 

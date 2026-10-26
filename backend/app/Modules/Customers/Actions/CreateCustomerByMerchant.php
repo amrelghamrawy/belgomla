@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * BR-CU08: the merchant creates a customer with a name, a phone and optional addresses. The customer is
  * `invited` with no password until they use an invitation link; the merchant can refer to them meanwhile. Credit
- * terms not sent come from the store's defaults (BR-C05, BR-C06).
+ * terms not sent come from the store's defaults (BR-C05, BR-C06). A group sent goes through SetCustomerGroup (BR-PR12).
  * Audited as `customer.created` (BR-L). Owns its transaction.
  */
 final readonly class CreateCustomerByMerchant
@@ -23,6 +23,7 @@ final readonly class CreateCustomerByMerchant
     public function __construct(
         private CreateAddress $createAddress,
         private CurrentTenantSettingsQuery $settings,
+        private SetCustomerGroup $setGroup,
         private AuditLogger $audit,
     ) {}
 
@@ -55,6 +56,10 @@ final readonly class CreateCustomerByMerchant
                 'credit_limit' => $customer->credit_limit,
                 'payment_terms_days' => $customer->payment_terms_days,
             ]);
+
+            if ($data->groupSent) {
+                $this->setGroup->handle($customer, $data->groupId);
+            }
 
             return $customer;
         });

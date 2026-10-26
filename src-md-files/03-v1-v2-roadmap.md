@@ -163,8 +163,8 @@ V2 should focus on increasing merchant flexibility and operational capability af
 
 - Manual order discount.
 - Item-level discount.
-- Customer-specific pricing.
-- Negotiated customer pricing.
+- Customer-specific pricing. **Done (V2 Task 11, BR-PR12..PR14).**
+- Negotiated customer pricing. **Done (V2 Task 11, BR-PR13).**
 - Promotional pricing.
 - Taxes / VAT handling if required.
 
@@ -178,8 +178,8 @@ V2 should focus on increasing merchant flexibility and operational capability af
 
 ### Customer Management
 
-- Customer groups.
-- Wholesale customer levels.
+- Customer groups. **Done (V2 Task 11, BR-PR12).**
+- Wholesale customer levels. **Done (V2 Task 11: a group is a level with one % off the base price, D89).**
 - Credit limits and payment terms (آجل up to N days), as offered by Egyptian B2B platforms.
 - Customer account statement (كشف حساب).
 - Customer-specific catalogs.

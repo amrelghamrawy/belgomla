@@ -7,6 +7,7 @@ namespace App\Modules\Orders\Services;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\CartSkuQuery;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Queries\PricingContextQuery;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Data\OrderQuote;
@@ -20,7 +21,8 @@ use App\Modules\Pricing\Services\PriceResolver;
 /**
  * BR-O11: the merchant's order form. Finds the customer and the SKUs of the lines the merchant typed (PlaceOrderForCustomer
  * places them), and quotes them: the same checks as checkout (CheckoutValidator) on the stock as it is now, without
- * locking or writing anything, so the form shows the prices, tiers, stock and problems live.
+ * locking or writing anything, so the form shows the prices, tiers, stock and problems live, at the customer's own
+ * prices (BR-PR14): their tiers are the ones that still lower their price.
  */
 final readonly class OrderQuoter
 {
@@ -28,6 +30,7 @@ final readonly class OrderQuoter
         private CartSkuQuery $skus,
         private CheckoutValidator $validator,
         private PriceResolver $prices,
+        private PricingContextQuery $pricing,
     ) {}
 
     /** A customer of this store (tenant scope), whatever their status: PlaceOrder decides who may order. */
@@ -64,17 +67,18 @@ final readonly class OrderQuoter
         $inputs = $this->lines($lines);
         $order = $orderNumber === null ? null : $this->order($customer, $orderNumber);
         $held = $order instanceof Order ? $this->held($order) : [];
+        $pricing = $this->pricing->for($customer);
 
         $tiers = [];
 
         foreach ($inputs as $line) {
-            $tiers[$line->sku->id] = $this->prices->tiers($line->sku);
+            $tiers[$line->sku->id] = $this->prices->listed($line->sku, $pricing)->tiers;
             $this->countHeld($line->sku, $held[$line->sku->id] ?? 0);
         }
 
         $stock = collect($inputs)->mapWithKeys(fn (CartLineInput $line): array => [$line->sku->id => $line->sku->inventory])->filter();
 
-        return new OrderQuote($this->validator->check($inputs, $stock, $customer, $order?->netTotal() ?? '0.00'), $tiers);
+        return new OrderQuote($this->validator->check($inputs, $stock, $customer, $pricing, $order?->netTotal() ?? '0.00'), $tiers);
     }
 
     private function order(Customer $customer, int $number): Order

@@ -21,7 +21,7 @@ import type { ListQuery } from "./list-query";
 
 // Customers (08 §8) with their credit terms, their statement and credits (08 §10, BR-C05..C08).
 
-export const CUSTOMER_LIST_KEYS = ["q", "status"] as const;
+export const CUSTOMER_LIST_KEYS = ["q", "status", "group"] as const;
 
 export function useCustomers(query: ListQuery, enabled = true) {
   return useQuery({
@@ -58,13 +58,16 @@ export function useCreateCustomer() {
   const store = useStoreCustomer();
 
   return useMutation({
-    mutationFn: (body: { name: string; phone: string; addresses?: AddressRequest[] } & CreditTermsInput) =>
+    mutationFn: (body: { name: string; phone: string; addresses?: AddressRequest[] } & CreditTermsInput & GroupInput) =>
       apiFetch<DashboardCustomer>("/api/dashboard/customers", { method: "POST", body }),
     onSuccess: store,
   });
 }
 
 export type CustomerAddressInput = AddressRequest & { id?: number };
+
+/** BR-PR12 (V2 Task 11): left out = unchanged; null = no group; needs `pricing.customers`. */
+export type GroupInput = { customer_group_id?: number | null };
 
 /** BR-C05, BR-C06: a credit term left out keeps its value (store default on create); null clears it. */
 export type CreditTermsInput = { credit_limit?: string | null; payment_terms_days?: number | null };
@@ -74,7 +77,7 @@ export function useUpdateCustomer(id: number) {
   const store = useStoreCustomer();
 
   return useMutation({
-    mutationFn: (body: { name: string; addresses?: CustomerAddressInput[] } & CreditTermsInput) =>
+    mutationFn: (body: { name: string; addresses?: CustomerAddressInput[] } & CreditTermsInput & GroupInput) =>
       apiFetch<DashboardCustomer>(`/api/dashboard/customers/${id}`, { method: "PUT", body }),
     onSuccess: store,
   });

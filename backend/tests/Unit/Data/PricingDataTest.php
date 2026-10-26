@@ -64,3 +64,13 @@ test('bulk pricing data leaves the moq null and the tiers empty when not sent', 
     expect($data->moq)->toBeNull()
         ->and($data->tiers)->toBe([]);
 });
+
+test('BR-PR14 a pricing context looks up a negotiated price by sku and ignores a 0% group', function (): void {
+    $context = new App\Modules\Pricing\Data\PricingContext('0.00', [5 => '70.00']);
+
+    expect($context->customerPrice(5))->toBe('70.00')
+        ->and($context->customerPrice(6))->toBeNull()
+        ->and($context->groupDiscount())->toBeNull()
+        ->and(new App\Modules\Pricing\Data\PricingContext('12.50')->groupDiscount())->toBe('12.50')
+        ->and(new App\Modules\Pricing\Data\PricingContext()->groupDiscount())->toBeNull();
+});

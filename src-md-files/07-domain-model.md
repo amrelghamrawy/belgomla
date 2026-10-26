@@ -248,10 +248,35 @@ The uploaded file waits in `storage/app/private/imports/{tenant}/{uuid}.{xlsx|cs
 **Price resolution** (pure function, used by cart display and checkout):
 
 ```
-resolve(sku, qty):
+resolve(sku, qty, context = null):          # context: the customer's group % and negotiated prices (V2 Task 11)
+  if context has a negotiated price for sku: return it            (source customer, BR-PR13)
   tier = max(min_quantity) among tiers where min_quantity <= qty
-  return tier ? tier.unit_price : sku.base_price
+  normal = tier ? tier.unit_price : sku.base_price               (source tier | base, BR-PR04)
+  group = context.group% ? round_half_up(sku.base_price × (100 − group%) / 100) : null
+  return group < normal ? group : normal                         (source group, BR-PR12, BR-PR14)
 ```
+
+### `customer_groups` (V2 Task 11, BR-PR12, D89)
+
+| Column           | Type          | Notes                                            |
+| ---------------- | ------------- | ------------------------------------------------ |
+| id               | bigint PK     |                                                  |
+| tenant_id        | FK            | **unique (tenant_id, name)**                     |
+| name             | varchar(100)  |                                                  |
+| discount_percent | numeric(5,2)  | default 0, **check 0–90**; % off the base price  |
+| status           | varchar(10)   | `active` \| `archived` (check); archived = no discount, members keep it |
+| sort_order       | int           | default 0                                        |
+
+### `customer_sku_prices` (V2 Task 11, BR-PR13, D89)
+
+| Column      | Type          | Notes                                              |
+| ----------- | ------------- | -------------------------------------------------- |
+| id          | bigint PK     |                                                    |
+| tenant_id   | FK            | index (tenant_id, sku_id)                          |
+| customer_id | FK            | **unique (customer_id, sku_id)**                   |
+| sku_id      | FK            |                                                    |
+| unit_price  | numeric(12,2) | **check > 0**; in the selling unit, may be above the normal price |
+| note        | varchar(300)  | nullable                                           |
 
 ---
 
@@ -310,6 +335,7 @@ Reservation changes are **not** movements (BR-INV06).
 | credit_limit      | numeric(12,2)   | V2: nullable = no limit, check ≥ 0 (BR-C05)                                           |
 | payment_terms_days | smallint       | V2: nullable = due on delivery, check 0–365 (BR-C06)                                  |
 | order_notifications_opt_out | boolean | V2: default false; true = no order status messages (BR-N03)                     |
+| customer_group_id | FK customer_groups | V2 Task 11: nullable; the customer's wholesale level (BR-PR12), kept when the group is archived |
 
 ### `customer_addresses` (BR-CU03)
 
@@ -427,6 +453,7 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | unit_price        | numeric(12,2) | applied price = list_unit_price less the manual discount; **check 0.01 ≤ unit_price ≤ list_unit_price**, = list_unit_price without a discount |
 | discount_percent  | numeric(5,2)  | nullable, **display only**: the tier margin off the cover price (BR-PR10), not the manual discount |
 | tier_min_quantity | int           | nullable; which tier applied           |
+| price_source      | varchar(10)   | V2 Task 11: `base` \| `tier` \| `group` \| `customer` (check), where the list price came from (BR-PR14); backfilled `tier` / `base` |
 | line_total        | numeric(12,2) | = quantity × unit_price; once delivered = delivered_quantity × unit_price (BR-O13) |
 | delivered_quantity | int          | V2 Task 09: selling units that went out, set on delivery (backfilled = quantity for orders delivered before); **check 0 ≤ delivered_quantity ≤ quantity**; null until delivered (BR-O13) |
 | removed_at        | timestamp     | V2 Task 09: the merchant removed the line (BR-O12); kept for history, out of totals, stock moves and returns; **check** a removed line has no delivered_quantity |

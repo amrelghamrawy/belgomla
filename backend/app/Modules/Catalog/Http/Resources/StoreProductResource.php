@@ -15,6 +15,8 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Pricing\Data\ListedPrice;
+use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
@@ -31,8 +33,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * `preorder` is null unless the product is Coming Soon; then `{ enabled, expected_at, remaining }`, `remaining` being what
  * is left under the merchant's cap in selling units (null = no cap), from Orders through PreorderDemand (BR-O14, D88).
  *
- * `discount_percent` (off the cover price) and `tiers` come from Pricing's PriceResolver, read-only
- * (BR-PR03, BR-PR10). `available` is the SKU's stock in base units from Inventory (BR-INV02, BR-U03; no
+ * `base_price`, `discount_percent` (off the cover price) and `tiers` come from Pricing's PriceResolver, read-only
+ * (BR-PR03, BR-PR10), at the shopper's own prices (BR-PR14, V2 Task 11): a negotiated price as `base_price` with no tiers,
+ * a group price with only the tiers below it, and then `price_source` (`group` or `customer`) for the «سعرك الخاص» badge;
+ * guests and customers without either see the SKU as stored and no `price_source`. `available` is the SKU's stock in base units from Inventory (BR-INV02, BR-U03; no
  * stock row = 0); `in_stock` means at least one selling unit can be ordered (D37).
  *
  * @property-read Product $resource
@@ -46,6 +50,7 @@ final class StoreProductResource extends JsonResource
         Product $resource,
         private readonly Collection $fields,
         private readonly bool $pricesHidden,
+        private readonly ?PricingContext $pricing = null,
     ) {
         parent::__construct($resource);
     }
@@ -54,10 +59,10 @@ final class StoreProductResource extends JsonResource
      * @param  LengthAwarePaginator<int, Product>  $products
      * @param  Collection<string, ProductFieldDefinition>  $fields
      */
-    public static function page(LengthAwarePaginator $products, Collection $fields, bool $pricesHidden): AnonymousResourceCollection
+    public static function page(LengthAwarePaginator $products, Collection $fields, bool $pricesHidden, ?PricingContext $pricing = null): AnonymousResourceCollection
     {
         return new AnonymousResourceCollection(
-            $products->through(fn (Product $product): self => new self($product, $fields, $pricesHidden)),
+            $products->through(fn (Product $product): self => new self($product, $fields, $pricesHidden, $pricing)),
             self::class,
         );
     }
@@ -151,6 +156,7 @@ final class StoreProductResource extends JsonResource
         $unit = $sku->relationLoaded('sellingUnit') ? $sku->sellingUnit : null;
         $comingSoon = $this->resource->status === ProductStatus::ComingSoon;
         $available = $sku->relationLoaded('inventory') ? $sku->inventory->available ?? 0 : 0;
+        $listed = $sku->relationLoaded('tiers') ? app(PriceResolver::class)->listed($sku, $this->pricing) : null;
 
         return [
             'id' => $sku->id,
@@ -159,9 +165,10 @@ final class StoreProductResource extends JsonResource
             'conversion_factor' => $sku->conversion_factor,
             'moq' => $sku->moq,
             'cover_price' => $this->when(! $this->pricesHidden, $sku->cover_price),
-            'base_price' => $this->when(! $this->pricesHidden, $sku->base_price),
-            'discount_percent' => $this->when(! $this->pricesHidden, fn (): ?string => app(PriceResolver::class)->baseDiscountPercent($sku)),
-            'tiers' => $this->when(! $this->pricesHidden && $sku->relationLoaded('tiers'), fn (): array => $this->tiers($sku)),
+            'base_price' => $this->when(! $this->pricesHidden, $listed->basePrice ?? $sku->base_price),
+            'discount_percent' => $this->when(! $this->pricesHidden, fn (): ?string => $listed instanceof ListedPrice ? $listed->discountPercent : app(PriceResolver::class)->baseDiscountPercent($sku)),
+            'tiers' => $this->when(! $this->pricesHidden && $listed instanceof ListedPrice, fn (): array => $this->tiers($listed->tiers ?? [])),
+            'price_source' => $this->when(! $this->pricesHidden && $listed instanceof ListedPrice && $listed->source->isCustomerSpecific(), fn (): ?string => $listed?->source->value),
             'available' => $this->when(! $comingSoon, $available),
             'in_stock' => $this->resource->status === ProductStatus::Active && $available >= $sku->conversion_factor,
             'coming_soon' => $this->when($comingSoon, true),
@@ -169,14 +176,12 @@ final class StoreProductResource extends JsonResource
     }
 
     /**
+     * @param  list<TierData>  $tiers
      * @return list<array{min_quantity: int, unit_price: string|null}>
      */
-    private function tiers(Sku $sku): array
+    private function tiers(array $tiers): array
     {
-        return array_map(
-            fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice],
-            app(PriceResolver::class)->tiers($sku),
-        );
+        return array_map(fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice], $tiers);
     }
 
     /**
@@ -189,7 +194,7 @@ final class StoreProductResource extends JsonResource
         return [
             'type' => $relation->type->value,
             'direction' => $outgoing ? 'outgoing' : 'incoming',
-            'product' => new self($outgoing ? $relation->relatedProduct : $relation->product, $this->fields, $this->pricesHidden),
+            'product' => new self($outgoing ? $relation->relatedProduct : $relation->product, $this->fields, $this->pricesHidden, $this->pricing),
         ];
     }
 }

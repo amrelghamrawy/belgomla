@@ -507,3 +507,12 @@ arch('platform reaches other modules only through their queries, services, data,
 arch('no business module depends on platform')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
     ->not->toUse('App\Modules\Platform');
+
+// V2 Task 11 (BR-PR14): the storefront reads a customer's prices through Pricing's contract, filled by Customers.
+arch('customers fill the customer pricing contract of pricing')
+    ->expect(App\Modules\Customers\Queries\PricingContextQuery::class)
+    ->toImplement(App\Modules\Pricing\Contracts\CustomerPricing::class);
+
+arch('pricing contracts are interfaces')
+    ->expect('App\Modules\Pricing\Contracts')
+    ->toBeInterfaces();

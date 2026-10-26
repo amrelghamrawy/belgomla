@@ -218,3 +218,29 @@ describe("CartView pre-orders (BR-O14)", () => {
     expect(callsTo(fetchMock, "DELETE /api/store/cart/items/777")[0]?.url.searchParams.get("kind")).toBe("preorder");
   });
 });
+
+describe("CartView customer prices (BR-PR14)", () => {
+  it("marks a line priced at the customer's negotiated price, not a tier line", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/cart": json(200, {
+        data: cart({
+          items: [
+            cartItem({ sku_id: 1, product_name: "سعر خاص", unit_price: "70.00", price_source: "customer" }),
+            cartItem({
+              sku_id: 2,
+              product_name: "سعر كمية",
+              unit_price: "85.00",
+              tier_min_quantity: 10,
+              price_source: "tier",
+            }),
+          ],
+        }),
+      }),
+    });
+    renderWithQuery(<CartView />);
+
+    await screen.findByRole("link", { name: "سعر خاص" });
+    expect(screen.getAllByTestId("your-price")).toHaveLength(1);
+  });
+});

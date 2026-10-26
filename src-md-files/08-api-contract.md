@@ -70,6 +70,7 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 422  | `exceeds_balance`          | a collection above the order's remaining balance (BR-C03, `details.remaining`) |
 | 409  | `order_cancelled`          | recording a collection on a cancelled order (BR-C04)      |
 | 409  | `is_preorder`              | recording a collection or applying credit on a pre-order (D88) |
+| 409  | `group_archived`           | assigning a customer to an archived customer group (BR-PR12, D89) |
 | 409  | `product_not_active`       | converting pre-orders of a product that is not active yet (BR-O14, `details.status`) |
 | 409  | `already_voided`           | voiding a collection twice (BR-C02, `details.voided_at`)  |
 | 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
@@ -531,6 +532,21 @@ Delivered (Task 3):
 
 V2 Task 02: create and update take `credit_limit` (≥ 0, null = no limit) and `payment_terms_days` (0–365, null = due on delivery); not sent on create = the store defaults, not sent on update = unchanged; changes are audited `customer.credit_terms_changed`; the dashboard customer shows both.
 
+V2 Task 11 (BR-PR12..PR14, D89), all `pricing.customers`:
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET    | `/api/dashboard/customer-groups` | every group, active first, then `sort_order`, name; each with `customers_count` |
+| POST   | `/api/dashboard/customer-groups` | `name` (≤ 100, unique → `409 duplicate_name`), `discount_percent` (0–90), `sort_order?` → 201 |
+| PATCH  | `/api/dashboard/customer-groups/{id}` | any of the fields; `status: active` restores an archived group |
+| POST   | `/api/dashboard/customer-groups/{id}/archive` | members keep the group, the discount stops |
+| POST   | `/api/dashboard/customer-groups/{id}/assign` | `customer_ids[]` (≤ 500) or `filter {q, status, group}` (not empty) → `{ assigned }`; archived group → `409 group_archived` |
+| GET    | `/api/dashboard/customers/{id}/prices` | `?q=` product or SKU code; paginated `{ sku_id, sku_code, product_name, unit, base_price, unit_price, note, updated_at }` |
+| PUT    | `/api/dashboard/customers/{id}/prices/{sku}` | `unit_price` (≥ 0.01), `note?` (≤ 300) → 201 new, 200 replaced |
+| DELETE | `/api/dashboard/customers/{id}/prices/{sku}` | 204; no such price → 404 |
+
+The dashboard customer adds `group` (`{ id, name, discount_percent, status }` or null); the list takes `?group=`; create and update take `customer_group_id` (null = no group; needs `pricing.customers`, an archived group → `409 group_archived`, another store's → `422`). Storefront shapes are unchanged: a logged-in customer's `sku.base_price` / `tiers` and the price list's `base_price` are their own prices (BR-PR14), with `price_source` (`group` | `customer`) only then; cart lines, quote lines and order items always carry `price_source` (`base` | `tier` | `group` | `customer`).
+
 Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by Collections since Task 7: delivered orders only, D59), `created_by`, `approved_by`, `blocked_at`, `blocked_reason`; the detail page adds `addresses` (active) and `recent_orders` ([] until Orders, Task 6). `PUT` takes `addresses[]` as the full list (D54). `invite` answers `200 { sent_via, expires_at, sent_count }`; only `invited` customers. `approve` only from `pending_approval`; `block` from any other status (keeps it), `unblock` restores it. Invalid transitions → `409 invalid_transition` with `details.from`. Duplicate phone → `409 phone_taken`. Audit actions: `customer.created`, `customer.updated`, `customer.invited`, `customer.approved`, `customer.blocked`, `customer.unblocked`.
 
 ---
@@ -739,9 +755,9 @@ php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their 
 | Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        16 |
-| Dashboard      |        91 |
+| Dashboard      |        99 |
 | Webhooks       |         2 |
-| **Total**      |   **126** |
+| **Total**      |   **134** |
 
 ---
 

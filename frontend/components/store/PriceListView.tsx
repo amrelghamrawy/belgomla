@@ -17,6 +17,7 @@ import { findCategory, useCategories, useDownloadPriceList, usePriceList } from 
 import { parseListing, priceListHref, type Listing } from "@/lib/store/listing";
 
 import { PriceListFilters } from "./PriceListFilters";
+import { YourPriceBadge } from "./YourPriceBadge";
 
 /**
  * Copies the page URL, which carries the whole selection, so the list can be sent as a link (BR-P13). The Clipboard
@@ -197,6 +198,7 @@ export function PriceListView() {
                   {!pricesHidden && (
                     <td className="p-2 font-medium whitespace-nowrap">
                       {row.base_price ? formatMoney(row.base_price) : "—"}
+                      <YourPriceBadge source={row.price_source} className="ms-1 print:hidden" />
                     </td>
                   )}
                   <td className="p-2">{row.moq}</td>

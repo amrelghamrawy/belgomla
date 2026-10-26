@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Customers\Models\CustomerGroup;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\OutboundMessage;
@@ -25,6 +27,7 @@ use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderItemChange;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Pricing\Enums\DiscountType;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Exceptions\DiscountTooLarge;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Models\TenantSetting;
@@ -387,4 +390,23 @@ test('D88 a pre-order\'s lines are not edited', function (): void {
             expect([$e->status, $e->errorCode, $e->details])->toBe([409, 'order_locked', ['status' => 'pending', 'kind' => 'preorder']]);
         })
         ->and($line->refresh()->quantity)->toBe(5);
+});
+
+test('BR-O12 BR-PR14 a changed line is re-priced at the customer\'s negotiated price of today', function (): void {
+    CustomerSkuPrice::factory()->create(['customer_id' => $this->customer->id, 'sku_id' => $this->skuA->id, 'unit_price' => '70.00']);
+
+    ($this->edit)([($this->a)(7), ($this->b)()]);
+
+    expect($this->lineA->refresh()->only(['quantity', 'list_unit_price', 'unit_price', 'price_source', 'line_total']))->toBe([
+        'quantity' => 7, 'list_unit_price' => '70.00', 'unit_price' => '70.00', 'price_source' => PriceSource::Customer, 'line_total' => '490.00',
+    ]);
+});
+
+test('BR-O12 BR-PR12 an added line takes the customer\'s group price', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '20.00']);
+    $this->customer->forceFill(['customer_group_id' => $group->id])->save();
+
+    ($this->edit)([($this->a)(), ($this->b)(), [null, $this->skuC->id, 5]]);
+
+    expect(OrderItem::query()->where('order_id', $this->order->id)->where('sku_id', $this->skuC->id)->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '72.00', 'price_source' => PriceSource::Group]);
 });

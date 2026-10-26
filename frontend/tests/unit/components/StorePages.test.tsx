@@ -159,6 +159,15 @@ describe("PriceListView", () => {
     expect(callsTo(fetchMock, "GET /api/store/price-list")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
   });
 
+  it("BR-PR14 marks the rows priced at the customer's own price", async () => {
+    stubList({}, [{ ...rows[0], base_price: "85.00", price_source: "group" }, rows[1]]);
+    renderWithQuery(<PriceListView />);
+
+    const table = await screen.findByTestId("price-list");
+    expect(within(table).getAllByTestId("your-price")).toHaveLength(1);
+    expect(table).toHaveTextContent("85.00 ج.مسعرك الخاص");
+  });
+
   it("D68 names the reference column after the category's section, and both ways without a category", async () => {
     searchParams.value = new URLSearchParams("category=supplies");
     stubApi({

@@ -140,6 +140,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
         unit_price: "90.00",
         discount_percent: "25.00",
         tier_min_quantity: null,
+        price_source: "base",
         line_total: "450.00",
         delivered_quantity: null,
         removed_at: null,
@@ -397,6 +398,19 @@ describe("OrderDetail actions", () => {
   });
 });
 
+describe("OrderDetail price source (BR-PR14)", () => {
+  it("names a line priced at the customer's own price, not a base one", () => {
+    stubApi({});
+    const base = order();
+    const line = base.items[0];
+    const items = line === undefined ? [] : [line, { ...line, id: 62, sku_id: 6, price_source: "customer" as const }];
+    renderWithQuery(<OrderDetail order={{ ...base, items }} />);
+
+    expect(screen.getByTestId("price-source-62")).toHaveTextContent("سعر خاص بالعميل");
+    expect(screen.queryByTestId("price-source-61")).toBeNull();
+  });
+});
+
 describe("OrderDetail discounts (BR-PR08, D85)", () => {
   const discounted = (): DashboardOrderDetail =>
     order({
@@ -420,6 +434,7 @@ describe("OrderDetail discounts (BR-PR08, D85)", () => {
           unit_price: "81.00",
           discount_percent: "25.00",
           tier_min_quantity: null,
+          price_source: "base",
           line_total: "405.00",
           delivered_quantity: null,
           removed_at: null,
@@ -1037,6 +1052,7 @@ function pickerCustomer(): DashboardCustomer {
     blocked_reason: null,
     credit_limit: null,
     payment_terms_days: null,
+    group: null,
   };
 }
 

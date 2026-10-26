@@ -8,6 +8,7 @@ use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\CartItem;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Actions\PlacePreorder;
 use App\Modules\Orders\Data\CheckoutData;
@@ -19,6 +20,7 @@ use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 
@@ -158,4 +160,16 @@ test('BR-O09 a pre-order takes the next order number of the store', function ():
     $this->fillPreorderCart($this->customer, [$this->sku->id => 5]);
 
     expect(($this->place)()->number)->toBe($order->number + 1);
+});
+
+test('BR-O14 BR-PR14 a pre-order is priced at the customer\'s own price, indicatively', function (): void {
+    $customer = $this->makeCustomer();
+    $sku = $this->preorderableSku(name: 'أطلس ٢٠٢٧');
+    CustomerSkuPrice::factory()->create(['customer_id' => $customer->id, 'sku_id' => $sku->id, 'unit_price' => '66.00']);
+
+    $order = $this->placePreorder($customer, [$sku->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(OrderItem::query()->where('order_id', $order->id)->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '66.00', 'price_source' => PriceSource::Customer])
+        ->and($order->order_total)->toBe('330.00');
 });

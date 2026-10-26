@@ -149,6 +149,11 @@ function LineHints({ line }: { line: OrderQuoteLine }) {
   return (
     <>
       <span className="text-muted-foreground text-xs">{copy.available(line.available, line.unit)}</span>
+      {ar.dashboard.orders.priceSources[line.price_source] !== undefined && (
+        <span className="text-primary text-xs" data-testid={`price-source-${line.sku_id}`}>
+          {ar.dashboard.orders.priceSources[line.price_source]}
+        </span>
+      )}
       {line.tiers.length > 0 && (
         <span className="flex flex-wrap gap-1" aria-label={copy.tiers}>
           {line.tiers.map((tier) => (

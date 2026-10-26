@@ -4586,6 +4586,14 @@
                         }
                     },
                     {
+                        "name": "group",
+                        "in": "query",
+                        "description": "Only the members of this customer group (V2 Task 11)",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
                         "$ref": "#/components/parameters/Page"
                     },
                     {
@@ -4679,6 +4687,13 @@
                                         "minimum": 0,
                                         "maximum": 365,
                                         "description": "BR-C06; not sent = the store default"
+                                    },
+                                    "customer_group_id": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "description": "BR-PR12; an active group; needs pricing.customers"
                                     }
                                 }
                             }
@@ -4696,7 +4711,7 @@
                         "$ref": "#/components/responses/Error"
                     },
                     "409": {
-                        "description": "phone_taken",
+                        "description": "phone_taken, group_archived",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4773,6 +4788,13 @@
                                         "maximum": 365,
                                         "description": "BR-C06; not sent = unchanged, null = due on delivery"
                                     },
+                                    "customer_group_id": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "description": "BR-PR12; not sent = unchanged, null = no group; needs pricing.customers"
+                                    },
                                     "addresses": {
                                         "type": "array",
                                         "items": {
@@ -4809,7 +4831,510 @@
                     "404": {
                         "$ref": "#/components/responses/Error"
                     },
+                    "409": {
+                        "description": "group_archived",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
                     "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customer-groups": {
+            "get": {
+                "operationId": "dashboardCustomerGroups",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "Customer groups (BR-PR12, V2 Task 11): active first, then sort_order and name, with their customer count",
+                "responses": {
+                    "200": {
+                        "description": "Every group, archived included",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CustomerGroup"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "dashboardCreateCustomerGroup",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "discount_percent"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                    },
+                                    "discount_percent": {
+                                        "type": [
+                                            "string",
+                                            "number"
+                                        ],
+                                        "description": "% off the base price, 0–90 (D89)"
+                                    },
+                                    "sort_order": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9999
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "$ref": "#/components/responses/CustomerGroup"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "duplicate_name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customer-groups/{group}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/CustomerGroupId"
+                }
+            ],
+            "patch": {
+                "operationId": "dashboardUpdateCustomerGroup",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "Any of the fields; a field left out stays; status active brings an archived group back",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                    },
+                                    "discount_percent": {
+                                        "type": [
+                                            "string",
+                                            "number"
+                                        ]
+                                    },
+                                    "sort_order": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9999
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "active"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/CustomerGroup"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "duplicate_name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customer-groups/{group}/archive": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/CustomerGroupId"
+                }
+            ],
+            "post": {
+                "operationId": "dashboardArchiveCustomerGroup",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "Stops the group discount at once; its customers keep the group (D89)",
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/CustomerGroup"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customer-groups/{group}/assign": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/CustomerGroupId"
+                }
+            ],
+            "post": {
+                "operationId": "dashboardAssignCustomerGroup",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "Moves customers into the group: the ticked ids, or every customer of the list filter (not empty)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customer_ids": {
+                                        "type": "array",
+                                        "maxItems": 500,
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "filter": {
+                                        "type": "object",
+                                        "properties": {
+                                            "q": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 100
+                                            },
+                                            "status": {
+                                                "$ref": "#/components/schemas/CustomerStatus"
+                                            },
+                                            "group": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "How many customers moved into the group",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "required": [
+                                                "assigned"
+                                            ],
+                                            "properties": {
+                                                "assigned": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "group_archived",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customers/{customer}/prices": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/CustomerId"
+                }
+            ],
+            "get": {
+                "operationId": "dashboardCustomerPrices",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "The prices negotiated with the customer (BR-PR13, V2 Task 11), newest first",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of the customer's prices",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CustomerSkuPrice"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/customers/{customer}/prices/{sku}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/CustomerId"
+                },
+                {
+                    "$ref": "#/components/parameters/SkuId"
+                }
+            ],
+            "put": {
+                "operationId": "dashboardSetCustomerPrice",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU; it may be above the normal price (D89)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "unit_price"
+                                ],
+                                "properties": {
+                                    "unit_price": {
+                                        "type": [
+                                            "string",
+                                            "number"
+                                        ],
+                                        "description": "In the SKU's selling unit, at least 0.01"
+                                    },
+                                    "note": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 300
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The customer's new price",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerSkuPrice"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "The customer's price, replaced",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerSkuPrice"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "dashboardRemoveCustomerPrice",
+                "tags": [
+                    "dashboard-customers"
+                ],
+                "summary": "Back to the normal price; no such price is 404",
+                "responses": {
+                    "204": {
+                        "description": "Removed"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
                         "$ref": "#/components/responses/Error"
                     }
                 }
@@ -7087,6 +7612,14 @@
                     "type": "integer"
                 }
             },
+            "CustomerGroupId": {
+                "name": "group",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "type": "integer"
+                }
+            },
             "UserId": {
                 "name": "user",
                 "in": "path",
@@ -7412,6 +7945,24 @@
                     }
                 }
             },
+            "CustomerGroup": {
+                "description": "The customer group",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/components/schemas/CustomerGroup"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "DashboardCustomer": {
                 "description": "The customer",
                 "content": {
@@ -7526,6 +8077,7 @@
                     "field_type_locked",
                     "forbidden",
                     "gallery_full",
+                    "group_archived",
                     "has_collections",
                     "http_error",
                     "idempotency_in_progress",
@@ -8111,6 +8663,24 @@
                     }
                 }
             },
+            "PriceSource": {
+                "description": "Where a unit price came from (BR-PR14, D89): the base price, a quantity tier, the customer's group or their negotiated price",
+                "type": "string",
+                "enum": [
+                    "base",
+                    "tier",
+                    "group",
+                    "customer"
+                ]
+            },
+            "CustomerPriceSource": {
+                "description": "Present only when the price is the shopper's own (their group or negotiated price), for the «سعرك الخاص» badge",
+                "type": "string",
+                "enum": [
+                    "group",
+                    "customer"
+                ]
+            },
             "PriceTier": {
                 "type": "object",
                 "required": [
@@ -8134,7 +8704,7 @@
                 }
             },
             "StoreSku": {
-                "description": "Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21).\n",
+                "description": "Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price.\n",
                 "type": "object",
                 "required": [
                     "id",
@@ -8191,6 +8761,9 @@
                         "items": {
                             "$ref": "#/components/schemas/PriceTier"
                         }
+                    },
+                    "price_source": {
+                        "$ref": "#/components/schemas/CustomerPriceSource"
                     },
                     "available": {
                         "type": "integer"
@@ -8466,6 +9039,9 @@
                             }
                         ]
                     },
+                    "price_source": {
+                        "$ref": "#/components/schemas/CustomerPriceSource"
+                    },
                     "availability": {
                         "type": "string",
                         "enum": [
@@ -8727,6 +9303,7 @@
                     "quantity",
                     "unit_price",
                     "tier_min_quantity",
+                    "price_source",
                     "line_total",
                     "moq",
                     "available"
@@ -8759,6 +9336,9 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "price_source": {
+                        "$ref": "#/components/schemas/PriceSource"
                     },
                     "line_total": {
                         "$ref": "#/components/schemas/Money"
@@ -8959,6 +9539,7 @@
                     "unit_price",
                     "discount_percent",
                     "tier_min_quantity",
+                    "price_source",
                     "line_total",
                     "delivered_quantity",
                     "removed_at",
@@ -9035,6 +9616,9 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "price_source": {
+                        "$ref": "#/components/schemas/PriceSource"
                     },
                     "line_total": {
                         "$ref": "#/components/schemas/Money",
@@ -9617,6 +10201,7 @@
                 "enum": [
                     "catalog.manage",
                     "pricing.manage",
+                    "pricing.customers",
                     "inventory.adjust",
                     "orders.view",
                     "orders.manage",
@@ -11502,11 +12087,23 @@
                             "blocked_at",
                             "blocked_reason",
                             "credit_limit",
-                            "payment_terms_days"
+                            "payment_terms_days",
+                            "group"
                         ],
                         "properties": {
                             "outstanding_amount": {
                                 "$ref": "#/components/schemas/Money"
+                            },
+                            "group": {
+                                "description": "BR-PR12; null = no group. An archived group no longer lowers prices",
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/CustomerGroupRef"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
                             },
                             "credit_limit": {
                                 "description": "BR-C05; null = no limit",
@@ -11568,6 +12165,113 @@
                         }
                     }
                 ]
+            },
+            "CustomerGroupStatus": {
+                "type": "string",
+                "enum": [
+                    "active",
+                    "archived"
+                ]
+            },
+            "CustomerGroupRef": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "discount_percent",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "discount_percent": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/CustomerGroupStatus"
+                    }
+                }
+            },
+            "CustomerGroup": {
+                "description": "A wholesale level with one % off the base price (BR-PR12, D89)",
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "discount_percent",
+                    "status",
+                    "sort_order",
+                    "customers_count"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "discount_percent": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/CustomerGroupStatus"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "customers_count": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "CustomerSkuPrice": {
+                "description": "A price negotiated with one customer for one SKU (BR-PR13, D89)",
+                "type": "object",
+                "required": [
+                    "sku_id",
+                    "sku_code",
+                    "product_name",
+                    "unit",
+                    "base_price",
+                    "unit_price",
+                    "note",
+                    "updated_at"
+                ],
+                "properties": {
+                    "sku_id": {
+                        "type": "integer"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "base_price": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "The SKU's own base price, to compare"
+                    },
+                    "unit_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
             },
             "InviteResult": {
                 "type": "object",
@@ -12007,6 +12711,7 @@
                     "unit_price",
                     "discount_percent",
                     "tier_min_quantity",
+                    "price_source",
                     "line_total",
                     "tiers",
                     "problem"
@@ -12064,6 +12769,9 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "price_source": {
+                        "$ref": "#/components/schemas/PriceSource"
                     },
                     "line_total": {
                         "$ref": "#/components/schemas/Money"

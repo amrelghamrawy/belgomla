@@ -9,6 +9,8 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerGroup;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Actions\Checkout;
@@ -21,6 +23,7 @@ use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Models\TenantSetting;
@@ -290,4 +293,34 @@ test('BR-O14 a cart with only pre-order lines is an empty checkout', function ()
     expect(fn (): Order => ($this->checkout)())->toThrow(function (CheckoutFailed $e): void {
         expect($e->errorCode)->toBe('cart_empty');
     });
+});
+
+test('BR-PR14 checkout charges and snapshots the customer\'s negotiated price, with its source', function (): void {
+    CustomerSkuPrice::factory()->create(['customer_id' => $this->customer->id, 'sku_id' => $this->sku->id, 'unit_price' => '80.00']);
+    $this->fillCart($this->customer, [$this->sku->id => 12]);
+
+    $order = ($this->checkout)();
+
+    expect(OrderItem::query()->sole()->only(['list_unit_price', 'unit_price', 'tier_min_quantity', 'price_source', 'discount_percent', 'line_total']))->toBe([
+        'list_unit_price' => '80.00', 'unit_price' => '80.00', 'tier_min_quantity' => null, 'price_source' => PriceSource::Customer, 'discount_percent' => '33.33', 'line_total' => '960.00',
+    ])
+        ->and($order->refresh()->order_total)->toBe('960.00');
+});
+
+test('BR-PR12 checkout takes the group price when it is below the tier', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '10.00']);
+    $this->customer->forceFill(['customer_group_id' => $group->id])->save();
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+
+    ($this->checkout)();
+
+    expect(OrderItem::query()->sole()->only(['unit_price', 'price_source', 'line_total']))->toBe(['unit_price' => '81.00', 'price_source' => PriceSource::Group, 'line_total' => '405.00']);
+});
+
+test('BR-PR04 a customer without a group or price keeps the tier and the source says so', function (): void {
+    $this->fillCart($this->customer, [$this->sku->id => 12]);
+
+    ($this->checkout)();
+
+    expect(OrderItem::query()->sole()->price_source)->toBe(PriceSource::Tier);
 });

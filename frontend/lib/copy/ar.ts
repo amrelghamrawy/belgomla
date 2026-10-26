@@ -39,6 +39,7 @@ const errors: Record<ApiErrorCode, string> = {
   field_type_locked: "لا يمكن تغيير نوع الحقل بعد استخدامه",
   forbidden: "غير مسموح بهذا الإجراء",
   gallery_full: "وصلت للحد الأقصى من الصور",
+  group_archived: "هذا المستوى مؤرشف، أعد تفعيله أولًا",
   has_collections: "لا يمكن إلغاء طلب عليه تحصيلات",
   http_error: "حدث خطأ، حاول مرة أخرى",
   idempotency_in_progress: "الطلب قيد التنفيذ، انتظر لحظة",
@@ -285,6 +286,8 @@ export const ar = {
     referencePrice: (kind: CategoryKind | null) =>
       kind === "books" ? "سعر الغلاف" : kind === null ? "سعر الغلاف / القطاعي" : "سعر القطاعي",
     wholesalePrice: "سعر الجملة",
+    // BR-PR14 (V2 Task 11): the price is the customer's group or negotiated price.
+    yourPrice: "سعرك الخاص",
     margin: (percent: string) => `هامش ربحك ${percent}%`,
     tierShort: (min: number, unit: string, price: string) => `من ${min} ${unit}: ${price}`,
     tiers: "أسعار الكميات",

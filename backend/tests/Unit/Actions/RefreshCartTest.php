@@ -9,6 +9,8 @@ use App\Modules\Customers\Data\PricedCartLine;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerGroup;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\TenantContext;
 
 beforeEach(function (): void {
@@ -71,4 +73,17 @@ test('BR-P04 an order line of a coming soon product is still dropped as inactive
 
     expect(app(RefreshCart::class)->handle($this->customer)->removed)->toBe([['product_name' => 'قريبًا', 'reason' => 'inactive']])
         ->and(CartItem::query()->find($line->id))->toBeNull();
+});
+
+test('BR-PR14 the refreshed cart shows the customer\'s group price', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '20.00']);
+    $customer = $this->makeCustomer(['customer_group_id' => $group->id]);
+    $sku = $this->orderableSku(['code' => 'GRP-1'], name: 'كتاب المستوى');
+    $this->fillCart($customer, [$sku->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    $line = app(RefreshCart::class)->handle($customer)->lines[0];
+
+    expect($line->price->unitPrice)->toBe('72.00')
+        ->and($line->price->source)->toBe(PriceSource::Group);
 });

@@ -39,6 +39,7 @@ export const ROLE_PERMISSIONS: Record<TenantUser["role"], DashboardMe["permissio
   owner: [
     "catalog.manage",
     "pricing.manage",
+    "pricing.customers",
     "inventory.adjust",
     "orders.view",
     "orders.manage",
@@ -58,6 +59,7 @@ export const ROLE_PERMISSIONS: Record<TenantUser["role"], DashboardMe["permissio
   manager: [
     "catalog.manage",
     "pricing.manage",
+    "pricing.customers",
     "inventory.adjust",
     "orders.view",
     "orders.manage",
@@ -245,6 +247,7 @@ export function orderQuoteLine(overrides: Partial<OrderQuoteLine> = {}): OrderQu
     unit_price: "85.00",
     discount_percent: null,
     tier_min_quantity: 10,
+    price_source: "tier",
     line_total: "1020.00",
     tiers: [{ min_quantity: 10, unit_price: "85.00" }],
     problem: null,

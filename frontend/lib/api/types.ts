@@ -91,6 +91,14 @@ export type BulkAdjustResult = Schemas["BulkAdjustResult"];
 export type CustomerStatus = Schemas["CustomerStatus"];
 export type DashboardCustomer = Schemas["DashboardCustomer"];
 export type InviteResult = Schemas["InviteResult"];
+
+// Customer groups and negotiated prices (V2 Task 11, BR-PR12..PR14)
+export type PriceSource = Schemas["PriceSource"];
+export type CustomerPriceSource = Schemas["CustomerPriceSource"];
+export type CustomerGroup = Schemas["CustomerGroup"];
+export type CustomerGroupRef = Schemas["CustomerGroupRef"];
+export type CustomerGroupStatus = Schemas["CustomerGroupStatus"];
+export type CustomerSkuPrice = Schemas["CustomerSkuPrice"];
 export type CollectionStatus = Schemas["CollectionStatus"];
 export type DashboardOrder = Schemas["DashboardOrder"];
 export type DashboardOrderDetail = Schemas["DashboardOrderDetail"];

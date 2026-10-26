@@ -6,6 +6,8 @@ import { ar } from "@/lib/copy/ar";
 import { formatMoney, formatPercent } from "@/lib/format/money";
 import { cn } from "@/lib/utils";
 
+import { YourPriceBadge } from "./YourPriceBadge";
+
 type PriceBlockProps = {
   sku: StoreSku | null;
   pricesHidden: boolean;
@@ -21,7 +23,8 @@ type PriceBlockProps = {
 /**
  * Wholesale price per selling unit, the retailer's margin (the discount off the reference price, BR-PR10, shown
  * as "هامش ربحك" per D67), the reference price struck through and, on cards, the first quantity tier. When the
- * store hides prices from guests the same box shows a login link, so the layout does not shift either way.
+ * store hides prices from guests the same box shows a login link, so the layout does not shift either way. A price that is
+ * the customer's own (their group or negotiated price, BR-PR14) carries «سعرك الخاص».
  */
 export function PriceBlock({ sku, pricesHidden, kind, size = "sm", loginNext, showMargin = true }: PriceBlockProps) {
   const large = size === "lg";
@@ -50,6 +53,7 @@ export function PriceBlock({ sku, pricesHidden, kind, size = "sm", loginNext, sh
         </span>
         {sku.unit !== null && <span className="text-muted-foreground text-xs">/ {sku.unit}</span>}
       </div>
+      <YourPriceBadge source={sku.price_source} />
       {showMargin && sku.discount_percent && (
         <span className="bg-highlight-soft text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold">
           <TrendingUpIcon className="size-3.5" aria-hidden />

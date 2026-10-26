@@ -13,6 +13,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardCustomer } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
@@ -27,11 +28,12 @@ import {
   useUpdateCustomer,
   useVoidCredit,
 } from "@/lib/dashboard/customers";
+import { useCustomerGroups } from "@/lib/dashboard/customer-pricing";
 import { pageOf } from "@/lib/dashboard/list-query";
 import { toPiasters } from "@/lib/dashboard/price-math";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
-import { formatMoney } from "@/lib/format/money";
+import { formatMoney, formatPercent } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 import { useRouteParam } from "@/lib/store/route";
 import { useCan } from "@/lib/dashboard/permissions";
@@ -40,6 +42,7 @@ import { Pager } from "../common/Pager";
 import { ReasonDialog } from "../common/ReasonDialog";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { AddressDialog, addressInput } from "./AddressDialog";
+import { CustomerPricesTab } from "./CustomerPricesTab";
 import { CustomerStatusBadge, inviteMessage } from "./CustomerStatusBadge";
 
 const copy = ar.dashboard.customers;
@@ -78,6 +81,12 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
           <span className="flex flex-wrap items-center gap-2">
             <bdi>{formatPhone(customer.phone)}</bdi>
             <CustomerStatusBadge status={customer.status} />
+            {customer.group !== null && (
+              <Badge variant="outline" data-testid="customer-group">
+                {copy.group}: {copy.groupBadge(customer.group.name, formatPercent(customer.group.discount_percent))}
+                {customer.group.status === "archived" && ` · ${copy.groupArchived}`}
+              </Badge>
+            )}
             {customer.credit_limit !== null && (
               <Badge variant="outline">
                 {copy.creditLimit}: {formatMoney(customer.credit_limit)}
@@ -114,11 +123,12 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
           <TabsTrigger value="profile">{copy.tabs.profile}</TabsTrigger>
           <TabsTrigger value="orders">{copy.tabs.orders}</TabsTrigger>
           <TabsTrigger value="statement">{copy.tabs.statement}</TabsTrigger>
+          {allowed("pricing.customers") && <TabsTrigger value="prices">{copy.tabs.prices}</TabsTrigger>}
         </TabsList>
         <TabsContent value="profile" className="pt-4">
           {/* Remount with the server's list after a save, so new rows get their ids and are not created twice. */}
           <ProfileForm
-            key={`${customer.id}-${customer.name}-${customer.credit_limit}-${customer.payment_terms_days}-${(customer.addresses ?? []).map((address) => address.id).join(",")}`}
+            key={`${customer.id}-${customer.name}-${customer.credit_limit}-${customer.payment_terms_days}-${customer.group?.id ?? ""}-${(customer.addresses ?? []).map((address) => address.id).join(",")}`}
             customer={customer}
           />
         </TabsContent>
@@ -128,6 +138,11 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
         <TabsContent value="statement" className="pt-4">
           <Statement customerId={customer.id} />
         </TabsContent>
+        {allowed("pricing.customers") && (
+          <TabsContent value="prices" className="pt-4">
+            <CustomerPricesTab customerId={customer.id} />
+          </TabsContent>
+        )}
       </Tabs>
     </>
   );
@@ -209,14 +224,17 @@ export function creditTerms(
 
 /**
  * Name and the address list, saved together: the PUT replaces the whole list (D54). The phone is fixed. D82: the name
- * and addresses need `customers.manage`, the credit terms `customers.credit`; what the role may not change is shown
- * read-only and left out of the PUT.
+ * and addresses need `customers.manage`, the credit terms `customers.credit`, the group `pricing.customers` (BR-PR12,
+ * V2 Task 11; sent only when changed); what the role may not change is shown read-only and left out of the PUT.
  */
 function ProfileForm({ customer }: { customer: DashboardCustomer }) {
   const update = useUpdateCustomer(customer.id);
   const allowed = useCan();
   const editsProfile = allowed("customers.manage");
   const editsCredit = allowed("customers.credit");
+  const editsGroup = allowed("pricing.customers");
+  const groups = useCustomerGroups(editsGroup);
+  const [groupId, setGroupId] = useState(customer.group === null ? "" : String(customer.group.id));
   const [name, setName] = useState(customer.name);
   const [addresses, setAddresses] = useState<CustomerAddressInput[]>((customer.addresses ?? []).map(addressInput));
   const [creditLimit, setCreditLimit] = useState(customer.credit_limit ?? "");
@@ -237,9 +255,14 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
       return;
     }
 
+    const nextGroup = groupId === "" ? null : Number(groupId);
+    const groupBody = editsGroup && nextGroup !== (customer.group?.id ?? null) ? { customer_group_id: nextGroup } : {};
+
     setError(null);
     update.mutate(
-      editsProfile ? { name: name.trim(), addresses, ...termsBody } : { name: customer.name, ...termsBody },
+      editsProfile
+        ? { name: name.trim(), addresses, ...termsBody, ...groupBody }
+        : { name: customer.name, ...termsBody, ...groupBody },
       { onSuccess: () => toast.success(copy.profileSaved), onError: (failure) => setError(messageFor(failure)) },
     );
   };
@@ -291,6 +314,22 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
           <p className="text-muted-foreground text-xs">{copy.paymentTermsHint}</p>
         </div>
       </div>
+      {editsGroup && (
+        <div className="flex max-w-sm flex-col gap-1">
+          <Label htmlFor="profile-group">{copy.group}</Label>
+          <NativeSelect id="profile-group" value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+            <option value="">{copy.noGroup}</option>
+            {groups.data
+              ?.filter((group) => group.status === "active" || group.id === customer.group?.id)
+              .map((group) => (
+                <option key={group.id} value={group.id}>
+                  {copy.groupBadge(group.name, formatPercent(group.discount_percent))}
+                </option>
+              ))}
+          </NativeSelect>
+          <p className="text-muted-foreground text-xs">{copy.groupHint}</p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="font-medium">{copy.addresses}</h2>
         {editsProfile && (
@@ -339,7 +378,7 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
         </ul>
       )}
       {error !== null && <FieldError role="alert">{error}</FieldError>}
-      {(editsProfile || editsCredit) && (
+      {(editsProfile || editsCredit || editsGroup) && (
         <Button className="self-start" disabled={update.isPending} onClick={save}>
           {update.isPending ? ar.saving : copy.saveProfile}
         </Button>

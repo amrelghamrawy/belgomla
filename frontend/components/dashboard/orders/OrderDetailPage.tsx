@@ -169,6 +169,11 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                           </s>
                         )}
                         {formatMoney(item.unit_price)}
+                        {copy.priceSources[item.price_source] !== undefined && (
+                          <span className="text-primary block text-xs" data-testid={`price-source-${item.id}`}>
+                            {copy.priceSources[item.price_source]}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{formatMoney(item.line_total)}</TableCell>
                     </TableRow>

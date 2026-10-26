@@ -29,7 +29,7 @@ test('the demo activity seeds fourteen bookshops, twelve of them ordering', func
 
     $statuses = $this->inTenant(fn (): array => Customer::query()->pluck('status')->countBy(fn (CustomerStatus $status): string => $status->value)->all());
 
-    expect($statuses)->toBe(['active' => 12, 'invited' => 1, 'pending_approval' => 1]);
+    expect($statuses)->toEqual(['active' => 12, 'invited' => 1, 'pending_approval' => 1]);
 });
 
 test('the demo orders span two months, end now and reach every status', function (): void {

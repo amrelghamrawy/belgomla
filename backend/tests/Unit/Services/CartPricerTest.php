@@ -8,6 +8,8 @@ use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Queries\CartQuery;
 use App\Modules\Customers\Services\CartPricer;
+use App\Modules\Pricing\Data\PricingContext;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
@@ -105,4 +107,19 @@ test('a sku without a stock row shows nothing available', function (): void {
 
 test('BR-P04 the removed lines are passed through for the message', function (): void {
     expect(priceCart($this->customer, [['product_name' => 'قديم', 'reason' => 'inactive']])->removed)->toBe([['product_name' => 'قديم', 'reason' => 'inactive']]);
+});
+
+test('BR-PR14 the cart prices each line at the customer\'s context, with its source', function (): void {
+    $negotiated = pricedSku('100.00', [10 => '90.00']);
+    $grouped = pricedSku('100.00', [10 => '90.00']);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $negotiated->id, 'quantity' => 10]);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $grouped->id, 'quantity' => 1]);
+
+    $cart = app(CartPricer::class)->price(app(CartQuery::class)->linesOf($this->customer), pricing: new PricingContext('15.00', [$negotiated->id => '95.00']));
+
+    expect(array_map(fn (App\Modules\Customers\Data\PricedCartLine $line): array => [$line->price->unitPrice, $line->price->source], $cart->lines))->toBe([
+        ['95.00', PriceSource::Customer],
+        ['85.00', PriceSource::Group],
+    ])
+        ->and($cart->itemsTotal)->toBe('1035.00');
 });

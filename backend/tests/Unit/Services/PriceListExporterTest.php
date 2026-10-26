@@ -40,3 +40,12 @@ test('the writer streams the file to the response', function (): void {
 
     expect(mb_substr($content, 0, 2))->toBe('PK');
 });
+
+test('BR-PR14 the file has the customer\'s own wholesale price', function (): void {
+    $sku = Product::factory()->withSku(['code' => 'A-1', 'base_price' => '12.50'])->create(['name' => 'كراسة'])->sku()->sole();
+    $path = sys_get_temp_dir().'/price-list-'.Str::uuid().'.xlsx';
+
+    app(PriceListExporter::class)->write($path, new ProductFilterData, new App\Modules\Pricing\Data\PricingContext(null, [$sku->id => '11.00']));
+
+    expect(spreadsheetRows($path)[2][6])->toBe('11');
+});

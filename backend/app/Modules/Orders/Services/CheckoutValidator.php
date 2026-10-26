@@ -13,6 +13,7 @@ use App\Modules\Orders\Data\CheckoutLine;
 use App\Modules\Orders\Data\CheckoutProblem;
 use App\Modules\Orders\Data\CheckoutReport;
 use App\Modules\Orders\Exceptions\CheckoutFailed;
+use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Services\PriceResolver;
 use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Support\Money;
@@ -20,7 +21,7 @@ use Illuminate\Support\Collection;
 
 /**
  * BR-PR06 steps 2–7 for every line, against the stock rows given: product active (BR-P04), price resolved from the
- * current tiers (BR-PR04), MOQ (BR-MOQ01), Available ≥ quantity × conversion factor (BR-INV01, BR-U03), the minimum
+ * current tiers at the customer's own prices (BR-PR04, BR-PR14: the caller hands in their PricingContext), MOQ (BR-MOQ01), Available ≥ quantity × conversion factor (BR-INV01, BR-U03), the minimum
  * order value on the items total (BR-MOV02), and the customer's credit limit against what they already owe or have on
  * order (BR-C05, D77). Every failure is collected, so the customer sees all of them at once; nothing is written here.
  * `check()` reports (the merchant's quote, on unlocked rows), `validate()` refuses (checkout, on locked rows).
@@ -42,9 +43,9 @@ final readonly class CheckoutValidator
      *
      * @throws CheckoutFailed
      */
-    public function validate(array $lines, Collection $stock, Customer $customer): array
+    public function validate(array $lines, Collection $stock, Customer $customer, ?PricingContext $pricing): array
     {
-        return $this->check($lines, $stock, $customer)->assertPasses();
+        return $this->check($lines, $stock, $customer, $pricing)->assertPasses();
     }
 
     /**
@@ -52,9 +53,9 @@ final readonly class CheckoutValidator
      * @param  Collection<int, SkuInventory>  $stock  rows keyed by sku_id
      * @param  string  $alreadyExposed  an order of these lines already counted in the customer's exposure (an edit's quote, BR-O12)
      */
-    public function check(array $lines, Collection $stock, Customer $customer, string $alreadyExposed = '0.00'): CheckoutReport
+    public function check(array $lines, Collection $stock, Customer $customer, ?PricingContext $pricing, string $alreadyExposed = '0.00'): CheckoutReport
     {
-        $report = $this->checkLines($lines, $stock);
+        $report = $this->checkLines($lines, $stock, $pricing);
         $mov = $this->settings->minimumOrderValue();
 
         return new CheckoutReport($report->lines, $report->problems, $report->total, $mov['amount'], $this->movShortfall($mov['amount'], $report->total), $this->creditShortfall($customer, $report->total, $alreadyExposed));
@@ -67,7 +68,7 @@ final readonly class CheckoutValidator
      * @param  list<CartLineInput>  $lines
      * @param  Collection<int, SkuInventory>  $stock  rows keyed by sku_id
      */
-    public function checkLines(array $lines, Collection $stock): CheckoutReport
+    public function checkLines(array $lines, Collection $stock, ?PricingContext $pricing): CheckoutReport
     {
         $priced = [];
         $problems = [];
@@ -75,7 +76,7 @@ final readonly class CheckoutValidator
 
         foreach ($lines as $line) {
             $sku = $line->sku;
-            $price = $this->prices->resolve($sku, $line->quantity);
+            $price = $this->prices->resolve($sku, $line->quantity, $pricing);
             $total = Money::add($total, $price->lineTotal);
             $priced[] = new CheckoutLine($sku, $line->quantity, $price);
 
@@ -98,7 +99,7 @@ final readonly class CheckoutValidator
      * @param  list<CartLineInput>  $lines
      * @param  array<int, int>  $open  sku_id => open pre-ordered selling units
      */
-    public function checkPreorder(array $lines, Customer $customer, array $open): CheckoutReport
+    public function checkPreorder(array $lines, Customer $customer, array $open, ?PricingContext $pricing): CheckoutReport
     {
         $priced = [];
         $problems = [];
@@ -106,7 +107,7 @@ final readonly class CheckoutValidator
 
         foreach ($lines as $line) {
             $sku = $line->sku;
-            $price = $this->prices->resolve($sku, $line->quantity);
+            $price = $this->prices->resolve($sku, $line->quantity, $pricing);
             $total = Money::add($total, $price->lineTotal);
             $priced[] = new CheckoutLine($sku, $line->quantity, $price);
             $problem = $this->preorderProblem($line, $open[$sku->id] ?? 0);

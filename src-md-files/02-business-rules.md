@@ -57,6 +57,7 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 | ---------- | :---: | :-----: | :---: | :-------: | :--------: |
 | `catalog.manage` (products, categories, units, fields) | ✓ | ✓ | | | |
 | `pricing.manage` | ✓ | ✓ | | | |
+| `pricing.customers` (customer groups, negotiated prices, the group on the customer form; V2 Task 11, BR-PR12, BR-PR13) | ✓ | ✓ | | | |
 | `inventory.adjust` | ✓ | ✓ | | ✓ | |
 | `orders.view` (also reading the catalog and stock) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `orders.manage` (transition, cancel, address) | ✓ | ✓ | ✓ | ✓ (preparing / out for delivery only, no cancel) | |
@@ -240,7 +241,7 @@ School-book merchants replace most of the catalog every academic year. V1 suppor
 
 ### BR-P13 — Printable Price List
 
-Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL. The page also downloads the same selection as an Excel file (V2 Task 06); PDF is the browser's print-to-PDF of the page (D83). A guest of a store that hides prices gets no file.
+Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. A logged-in customer sees their own wholesale price (BR-PR14, V2 Task 11). The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL. The page also downloads the same selection as an Excel file (V2 Task 06); PDF is the browser's print-to-PDF of the page (D83). A guest of a store that hides prices gets no file.
 
 ### BR-P07 — Product Images
 
@@ -443,6 +444,18 @@ V1 had none. From V2 the merchant may lower the price of an order that is still 
 - The new total can never be below what was already collected. The collection status is derived again.
 - Every change is audited (`order.discount_changed`, old and new values) and noted in the order history («خصم»). The customer sees the discounted prices and the order discount (not the reason), and gets a WhatsApp message only if the store notifies `discount` (BR-N03).
 - A line's `discount_percent` (shown next to a tier price) is unrelated: it is the display margin off the cover price (BR-PR10).
+### BR-PR12 — Customer Groups (V2 Task 11, D89)
+
+The merchant defines wholesale levels («موزع», «مكتبة كبيرة», «مكتبة صغيرة»), each with one discount percentage off the base price (0–90) and a place in the list. A customer belongs to at most one group, set from the customer form or assigned in bulk (ticked customers, or every customer the list's filter selects). A group customer pays the group price, `base_price × (100 − %) / 100`, rounded half-up to the piaster (D27), whenever it is lower than the normal price (BR-PR14). Archiving a group stops its discount at once; its customers keep it and get their prices back if it is restored. Names are unique in the store. Groups, assignment and changes are audited (`customer_group.created/updated/archived/assigned`, `customer.group_changed`). Who: `pricing.customers`.
+
+### BR-PR13 — Negotiated Customer Prices (V2 Task 11, D89)
+
+The merchant sets a unit price for one customer on one SKU (in its selling unit, > 0, with an optional note), from the customer's page («أسعار خاصة»). It applies at every quantity and wins over the base price, the tiers and the group price, even when it is higher (BR-PR14). One price per customer and SKU; setting it again replaces it, removing it brings the normal price back. Audited (`customer.price_set`, `customer.price_removed`). Who: `pricing.customers`.
+
+### BR-PR14 — Price Precedence (V2 Task 11, D89)
+
+For a customer, SKU and quantity: (1) the customer's negotiated price for the SKU, if any; (2) otherwise the lower of the normal price (BR-PR04: base or tier) and the group price (BR-PR12). Guests and customers without a group or negotiated price pay the normal price. The PriceResolver stays the single authority: it receives the customer's pricing context (their active group's % and their negotiated prices, read once per request) and never queries. Every price the customer sees or pays follows this rule: the storefront product list and page, the price list and its Excel file, the cart, checkout (BR-PR06), the merchant's quote and order (BR-O11), order edits (BR-O12) and pre-orders and their conversion (BR-O14). The order line snapshots the price and where it came from (`price_source`: base, tier, group or customer, BR-PR07); the storefront marks a group or negotiated price «سعرك الخاص». Manual discounts (BR-PR08) apply on top.
+
 ### BR-PR09 — Taxes
 
 Prices entered by the merchant are final customer prices. V1 has no tax engine and does not add VAT on top.

@@ -9,6 +9,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Queries\StorefrontFieldsQuery;
+use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -142,4 +143,40 @@ test('BR-O14 a coming soon product without pre-orders, or without a cap, has no 
 
     expect(rendered(new StoreProductResource($closed, new Collection, false), storeRequest())['preorder'])->toBe(['enabled' => false, 'expected_at' => null, 'remaining' => null])
         ->and(rendered(new StoreProductResource($uncapped, new Collection, false), storeRequest())['preorder'])->toBe(['enabled' => true, 'expected_at' => null, 'remaining' => null]);
+});
+
+test('BR-PR14 a store sku at the customer\'s own price carries price_source; a plain one does not', function (): void {
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['sku.tiers']);
+
+    $own = rendered(new StoreProductResource($product, new Collection, false, new PricingContext(null, [$product->sku->id => '80.00'])), storeRequest())['sku'];
+    $plain = rendered(new StoreProductResource($product, new Collection, false, new PricingContext), storeRequest())['sku'];
+
+    expect($own['base_price'])->toBe('80.00')
+        ->and($own['discount_percent'])->toBe('33.33')
+        ->and($own['price_source'])->toBe('customer')
+        ->and($plain)->not->toHaveKey('price_source')
+        ->and($plain['base_price'])->toBe('90.00');
+});
+
+test('BR-PR14 related products are shown at the same customer\'s prices', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '90'])->create();
+    $related = Product::factory()->withSku(['base_price' => '50'])->create();
+    App\Modules\Catalog\Models\ProductRelation::factory()->create(['product_id' => $product->id, 'related_product_id' => $related->id]);
+    $product->load(['sku.tiers', 'relations.relatedProduct.sku.tiers', 'incomingRelations']);
+
+    $data = rendered(new StoreProductResource($product, new Collection, false, new PricingContext('10.00')), storeRequest());
+
+    expect($data['related'][0]['product']['sku']['base_price'])->toBe('45.00')
+        ->and($data['related'][0]['product']['sku']['price_source'])->toBe('group');
+});
+
+test('BR-PR14 a price list row shows the customer\'s wholesale price and its source', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '80'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers']);
+
+    $row = rendered(new PriceListRowResource($product, false, new PricingContext('25.00')), storeRequest());
+    $hidden = rendered(new PriceListRowResource($product, true, new PricingContext('25.00')), storeRequest());
+
+    expect($row['base_price'])->toBe('60.00')
+        ->and($row['price_source'])->toBe('group')
+        ->and($hidden)->not->toHaveKeys(['base_price', 'price_source']);
 });

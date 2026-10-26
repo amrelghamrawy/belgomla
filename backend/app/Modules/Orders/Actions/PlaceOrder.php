@@ -11,6 +11,7 @@ use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
 use App\Modules\Customers\Queries\CustomerAddressesQuery;
+use App\Modules\Customers\Queries\PricingContextQuery;
 use App\Modules\Inventory\Services\StockLedger;
 use App\Modules\Orders\Data\CartLineInput;
 use App\Modules\Orders\Data\CheckoutLine;
@@ -26,6 +27,7 @@ use App\Modules\Orders\Queries\PreorderDemandQuery;
 use App\Modules\Orders\Services\CheckoutValidator;
 use App\Modules\Orders\Services\OrderNumbers;
 use App\Modules\Orders\Services\OrderSnapshots;
+use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Tenancy\TenantContext;
 use App\Support\Money;
 
@@ -34,7 +36,7 @@ use App\Support\Money;
  * checkout, or a dashboard user's form (BR-O11). A step: it joins the caller's transaction (Checkout,
  * PlaceOrderForCustomer, PlacePreorder, ConvertPreorders), so any failure rolls back the caller's own writes too. Steps,
  * in the §12 order: tenant and customer active (the customer row locked) → address → lines → lock the stock rows in
- * sku_id order → re-check and re-price every line → MOV (unless waived, D84) → order number → order and snapshotted
+ * sku_id order → re-check and re-price every line at the customer's own prices (PricingContextQuery, BR-PR14) → MOV (unless waived, D84) → order number → order and snapshotted
  * lines → reserve → history with the actor → the merchant's `new_order` notification (only for a customer's own order)
  * → audit.
  *
@@ -50,6 +52,7 @@ final readonly class PlaceOrder
         private CustomerAddressesQuery $addresses,
         private StockLedger $ledger,
         private CheckoutValidator $validator,
+        private PricingContextQuery $pricing,
         private PreorderDemandQuery $demand,
         private OrderNumbers $numbers,
         private OrderSnapshots $snapshots,
@@ -67,7 +70,8 @@ final readonly class PlaceOrder
             throw CheckoutFailed::emptyCart();
         }
 
-        $report = $data->kind === OrderKind::Preorder ? $this->checkPreorder($data, $customer) : $this->checkOrder($data, $customer);
+        $pricing = $this->pricing->for($customer);
+        $report = $data->kind === OrderKind::Preorder ? $this->checkPreorder($data, $customer, $pricing) : $this->checkOrder($data, $customer, $pricing);
         $checked = $data->convertedFrom instanceof Order ? $report->assertConvertible() : $report->assertPasses($data->skipMov);
 
         $order = $this->createOrder($customer, $delivery, $data, $checked);
@@ -130,18 +134,18 @@ final readonly class PlaceOrder
     }
 
     /** BR-INV01, BR-INV03: the stock rows locked in sku_id order, then every check against them. */
-    private function checkOrder(OrderPlacementData $data, Customer $customer): CheckoutReport
+    private function checkOrder(OrderPlacementData $data, Customer $customer, ?PricingContext $pricing): CheckoutReport
     {
         $stock = $this->ledger->lock(array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
 
-        return $this->validator->check($data->lines, $stock, $customer);
+        return $this->validator->check($data->lines, $stock, $customer, $pricing);
     }
 
     /**
      * BR-O14: the products are locked in id order, so two pre-orders cannot both take the last units under the cap; the
      * lines are checked against the locked rows and what every open pre-order already holds of each SKU.
      */
-    private function checkPreorder(OrderPlacementData $data, Customer $customer): CheckoutReport
+    private function checkPreorder(OrderPlacementData $data, Customer $customer, ?PricingContext $pricing): CheckoutReport
     {
         $productIds = array_values(array_unique(array_map(fn (CartLineInput $line): int => $line->sku->product_id, $data->lines)));
         $products = Product::query()->whereKey($productIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
@@ -152,7 +156,7 @@ final readonly class PlaceOrder
 
         $open = $this->demand->openQuantities(array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
 
-        return $this->validator->checkPreorder($data->lines, $customer, $open);
+        return $this->validator->checkPreorder($data->lines, $customer, $open, $pricing);
     }
 
     /**

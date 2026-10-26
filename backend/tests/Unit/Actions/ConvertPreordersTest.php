@@ -8,6 +8,7 @@ use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Enums\CustomerStatus;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\OutboundMessage;
@@ -23,6 +24,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderItemChange;
 use App\Modules\Orders\Models\OrderStatusHistory;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Queue;
@@ -215,4 +217,17 @@ test('D88 with no stock nothing is converted and every pre-order is untouched', 
     expect($result->orders)->toBe([])
         ->and($result->untouched)->toBe(3)
         ->and(Order::query()->where('kind', OrderKind::Order)->count())->toBe(0);
+});
+
+test('BR-PR14 a converted order is priced at the customer\'s own price of the day', function (): void {
+    CustomerSkuPrice::factory()->create(['customer_id' => $this->first->id, 'sku_id' => $this->sku->id, 'unit_price' => '75.00']);
+    ($this->activate)(10);
+
+    ($this->convert)();
+
+    $converted = ($this->convertedFrom)($this->preorders[0]);
+
+    expect($converted)->not->toBeNull()
+        ->and(($this->line)($converted ?? new Order)->only(['unit_price', 'price_source']))->toBe(['unit_price' => '75.00', 'price_source' => PriceSource::Customer])
+        ->and($converted?->order_total)->toBe('750.00');
 });

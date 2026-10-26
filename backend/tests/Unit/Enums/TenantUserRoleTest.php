@@ -14,6 +14,7 @@ const ROLE_TABLE = [
     //                     owner manager sales warehouse accountant
     'catalog.manage' => [true, true, false, false, false],
     'pricing.manage' => [true, true, false, false, false],
+    'pricing.customers' => [true, true, false, false, false], // V2 Task 11: customer groups and negotiated prices
     'inventory.adjust' => [true, true, false, true, false],
     'orders.view' => [true, true, true, true, true],
     'orders.manage' => [true, true, true, true, false],
@@ -59,5 +60,5 @@ test('BR-T06 the five roles and their Arabic labels', function (): void {
 
 test('every permission has an Arabic label', function (): void {
     expect(array_filter(Permission::toArray(), fn (string $label): bool => $label === ''))->toBe([])
-        ->and(Permission::toArray())->toHaveCount(17);
+        ->and(Permission::toArray())->toHaveCount(18);
 });

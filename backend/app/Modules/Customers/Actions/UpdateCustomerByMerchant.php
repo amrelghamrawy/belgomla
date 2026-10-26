@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\DB;
  * The merchant edits a customer's name and, when sent, their address list (08-api-contract.md §8, D54): rows
  * with an id are edited, rows without one are added, active addresses missing from the list are archived.
  * The phone never changes here. An address id of another customer is `404`. Audited as `customer.updated`; changed
- * credit terms (BR-C05, BR-C06) are audited apart as `customer.credit_terms_changed`.
+ * credit terms (BR-C05, BR-C06) are audited apart as `customer.credit_terms_changed`, a new group (BR-PR12) as
+ * `customer.group_changed` (SetCustomerGroup).
  * Owns its transaction.
  */
 final readonly class UpdateCustomerByMerchant
@@ -25,6 +26,7 @@ final readonly class UpdateCustomerByMerchant
         private CreateAddress $createAddress,
         private UpdateAddress $updateAddress,
         private ArchiveAddress $archiveAddress,
+        private SetCustomerGroup $setGroup,
         private AuditLogger $audit,
     ) {}
 
@@ -46,6 +48,10 @@ final readonly class UpdateCustomerByMerchant
             }
 
             $this->updateCreditTerms($customer, $data);
+
+            if ($data->groupSent) {
+                $this->setGroup->handle($customer, $data->groupId);
+            }
 
             return $customer;
         });

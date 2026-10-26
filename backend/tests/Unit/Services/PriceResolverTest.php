@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
@@ -105,4 +107,103 @@ test('tiers() lists the stored tiers lowest threshold first', function (): void 
         new TierData(10, '90.00'),
         new TierData(50, '80.00', '20.00'),
     ]);
+});
+
+/*
+| BR-PR14 (V2 Task 11, D89): the customer's PricingContext on top of BR-PR04. The SKU below: base 100.00, 10+ → 90.00,
+| 100+ → 80.00, cover 125.00, id 7.
+*/
+
+function contextSku(): Sku
+{
+    $sku = resolverSku('100.00', [[10, '90.00'], [100, '80.00']], coverPrice: '125.00');
+    $sku->id = 7;
+
+    return $sku;
+}
+
+test('BR-PR14 D89 price precedence: negotiated price, else the lower of the normal price and the group price', function (?PricingContext $context, int $quantity, string $unitPrice, ?int $tier, PriceSource $source): void {
+    $price = app(PriceResolver::class)->resolve(contextSku(), $quantity, $context);
+
+    expect($price->unitPrice)->toBe($unitPrice)
+        ->and($price->tierMinQuantity)->toBe($tier)
+        ->and($price->source)->toBe($source)
+        ->and($price->lineTotal)->toBe(bcmul($unitPrice, (string) $quantity, 2));
+})->with([
+    'no context is V1, base' => [null, 1, '100.00', null, PriceSource::Base],
+    'no context is V1, tier' => [null, 10, '90.00', 10, PriceSource::Tier],
+    'an empty context is V1' => [new PricingContext, 100, '80.00', 100, PriceSource::Tier],
+    'group lower than base' => [new PricingContext('15.00'), 1, '85.00', null, PriceSource::Group],
+    'group lower than the first tier' => [new PricingContext('15.00'), 10, '85.00', null, PriceSource::Group],
+    'tier lower than group' => [new PricingContext('15.00'), 100, '80.00', 100, PriceSource::Tier],
+    'group equal to the tier keeps the tier' => [new PricingContext('10.00'), 10, '90.00', 10, PriceSource::Tier],
+    'a 0% group changes nothing' => [new PricingContext('0.00'), 1, '100.00', null, PriceSource::Base],
+    'no group (or an archived one) is V1' => [new PricingContext(null, [8 => '50.00']), 1, '100.00', null, PriceSource::Base],
+    'negotiated below everything' => [new PricingContext('15.00', [7 => '70.00']), 100, '70.00', null, PriceSource::Customer],
+    'negotiated beats both even when higher' => [new PricingContext('15.00', [7 => '95.00']), 100, '95.00', null, PriceSource::Customer],
+    'negotiated above the base price' => [new PricingContext(null, [7 => '110.00']), 1, '110.00', null, PriceSource::Customer],
+]);
+
+test('BR-PR12 D27 the group price is the base price less the % rounded half-up to the piaster', function (): void {
+    $price = app(PriceResolver::class)->resolve(tap(resolverSku('10.10'), function (Sku $sku): void {
+        $sku->id = 1;
+    }), 1, new PricingContext('25.00'));
+
+    expect($price->unitPrice)->toBe('7.58')
+        ->and($price->source)->toBe(PriceSource::Group);
+});
+
+test('BR-PR12 a group price never goes below 0.01', function (): void {
+    expect(app(PriceResolver::class)->resolve(tap(resolverSku('0.02'), function (Sku $sku): void {
+        $sku->id = 1;
+    }), 1, new PricingContext('90.00'))->unitPrice)->toBe('0.01');
+});
+
+test('BR-PR10 BR-PR14 a group or negotiated price shows its discount off the cover price, none above it', function (?string $groupPercent, array $prices, ?string $discount): void {
+    expect(app(PriceResolver::class)->resolve(contextSku(), 1, new PricingContext($groupPercent, $prices))->discountPercent)->toBe($discount);
+})->with([
+    'group' => ['20.00', [], '36.00'],
+    'negotiated' => [null, [7 => '75.00'], '40.00'],
+    'negotiated above the cover price' => [null, [7 => '130.00'], null],
+]);
+
+test('BR-PR14 a negotiated price needs no tiers and carries the cover price', function (): void {
+    $price = app(PriceResolver::class)->resolve(contextSku(), 3, new PricingContext(null, [7 => '75.00']));
+
+    expect($price->coverPrice)->toBe('125.00')
+        ->and($price->lineTotal)->toBe('225.00');
+});
+
+test('BR-PR14 listed() without a context is the sku as stored', function (): void {
+    $listed = app(PriceResolver::class)->listed(contextSku());
+
+    expect($listed->basePrice)->toBe('100.00')
+        ->and($listed->source)->toBe(PriceSource::Base)
+        ->and($listed->discountPercent)->toBe('20.00')
+        ->and($listed->tiers)->toEqual([new TierData(10, '90.00'), new TierData(100, '80.00')]);
+});
+
+test('BR-PR14 listed() shows a group price with only the tiers below it', function (): void {
+    $listed = app(PriceResolver::class)->listed(contextSku(), new PricingContext('15.00'));
+
+    expect($listed->basePrice)->toBe('85.00')
+        ->and($listed->source)->toBe(PriceSource::Group)
+        ->and($listed->discountPercent)->toBe('32.00')
+        ->and($listed->tiers)->toEqual([new TierData(100, '80.00')]);
+});
+
+test('BR-PR14 listed() shows a negotiated price alone, at every quantity', function (): void {
+    $listed = app(PriceResolver::class)->listed(contextSku(), new PricingContext('15.00', [7 => '95.00']));
+
+    expect($listed->basePrice)->toBe('95.00')
+        ->and($listed->source)->toBe(PriceSource::Customer)
+        ->and($listed->tiers)->toBe([]);
+});
+
+test('BR-PR14 listed() keeps the base price when a 0% group does not lower it', function (): void {
+    $listed = app(PriceResolver::class)->listed(contextSku(), new PricingContext('0.00'));
+
+    expect($listed->basePrice)->toBe('100.00')
+        ->and($listed->source)->toBe(PriceSource::Base)
+        ->and($listed->tiers)->toHaveCount(2);
 });

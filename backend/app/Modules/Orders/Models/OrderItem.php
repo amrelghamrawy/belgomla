@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Models;
 
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Pricing\Enums\DiscountType;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\OrderItemFactory;
@@ -37,6 +38,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $unit_price the price charged per unit, after the manual discount
  * @property string|null $discount_percent
  * @property int|null $tier_min_quantity
+ * @property PriceSource $price_source where the list price came from (BR-PR14, V2 Task 11)
  * @property string $line_total = unit_price × the quantity charged: delivered_quantity once delivered (BR-O13), else quantity
  * @property int|null $delivered_quantity selling units that went out, set on delivery (BR-O13, D86)
  * @property bool $reserved whether the line holds stock: false on a pre-order line (BR-O14, D88)
@@ -57,6 +59,7 @@ final class OrderItem extends Model
     protected $attributes = [
         'reserved' => true,
         'converted_quantity' => 0,
+        'price_source' => 'base',
     ];
 
     protected static function newFactory(): OrderItemFactory
@@ -104,6 +107,7 @@ final class OrderItem extends Model
             'unit_price' => 'decimal:2',
             'discount_percent' => 'decimal:2',
             'tier_min_quantity' => 'integer',
+            'price_source' => PriceSource::class,
             'line_total' => 'decimal:2',
             'delivered_quantity' => 'integer',
             'removed_at' => 'datetime',

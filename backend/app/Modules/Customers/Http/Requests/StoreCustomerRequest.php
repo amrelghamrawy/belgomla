@@ -6,15 +6,25 @@ namespace App\Modules\Customers\Http\Requests;
 
 use App\Modules\Customers\Data\AddressData;
 use App\Modules\Customers\Rules\EgyptianPhone;
+use App\Modules\Tenancy\Enums\Permission;
 use App\Support\Money;
 use App\Support\PhoneNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 
-/** POST /api/dashboard/customers: `{ name, phone, addresses[]?, credit_limit?, payment_terms_days? }` → status `invited` (BR-CU08, BR-C05/C06). */
+/**
+ * POST /api/dashboard/customers: `{ name, phone, addresses[]?, credit_limit?, payment_terms_days?, customer_group_id? }` →
+ * status `invited` (BR-CU08, BR-C05/C06). Putting the new customer in a group needs `pricing.customers` (BR-PR12).
+ */
 final class StoreCustomerRequest extends FormRequest
 {
     public const int MAX_ADDRESSES = 10;
+
+    public function authorize(): bool
+    {
+        return $this->groupId() === null || Gate::allows(Permission::PricingCustomers->value);
+    }
 
     /**
      * @return array<string, list<string|ValidationRule>>
@@ -29,12 +39,24 @@ final class StoreCustomerRequest extends FormRequest
             ...SaveAddressRequest::fieldRules('addresses.*.'),
             'credit_limit' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'payment_terms_days' => ['sometimes', 'nullable', 'integer', 'between:0,365'],
+            'customer_group_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 
     public function name(): string
     {
         return mb_trim($this->string('name')->value());
+    }
+
+    /** BR-PR12 (V2 Task 11): whether `customer_group_id` was sent, so null takes the customer out of their group on purpose. */
+    public function groupSent(): bool
+    {
+        return $this->has('customer_group_id');
+    }
+
+    public function groupId(): ?int
+    {
+        return $this->filled('customer_group_id') ? $this->integer('customer_group_id') : null;
     }
 
     /** BR-C05: the limit as "150.00", null = no limit; only meaningful when creditTermsSent() lists it. */

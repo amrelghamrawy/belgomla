@@ -6,13 +6,17 @@ use App\Modules\Customers\Data\PricedCart;
 use App\Modules\Customers\Data\PricedCartLine;
 use App\Modules\Customers\Http\Resources\AddressResource;
 use App\Modules\Customers\Http\Resources\CartResource;
+use App\Modules\Customers\Http\Resources\CustomerGroupResource;
 use App\Modules\Customers\Http\Resources\CustomerResource;
+use App\Modules\Customers\Http\Resources\CustomerSkuPriceResource;
 use App\Modules\Customers\Http\Resources\InvitationResource;
 use App\Modules\Customers\Http\Resources\InviteResultResource;
 use App\Modules\Customers\Http\Resources\OtpSentResource;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Customers\Models\CustomerInvitation;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Messaging\Enums\Channel;
 use App\Modules\Pricing\Data\ResolvedPrice;
 use App\Modules\Tenancy\TenantContext;
@@ -43,7 +47,7 @@ test('the dashboard customer resource adds the outstanding amount, creator, appr
 
     expect(array_keys(rendered(CustomerResource::forDashboard($customer, '12.50'), dashboardRequest())))->toBe([
         'id', 'name', 'phone', 'status', 'status_label', 'phone_verified_at', 'created_at', 'order_notifications',
-        'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days',
+        'outstanding_amount', 'created_by', 'approved_by', 'blocked_at', 'blocked_reason', 'credit_limit', 'payment_terms_days', 'group',
     ])
         ->and(rendered(CustomerResource::forDashboard($customer, '12.50'), dashboardRequest())['outstanding_amount'])->toBe('12.50');
 });
@@ -87,7 +91,7 @@ test('BR-CU06 the cart resource matches the contract, money as strings', functio
     expect(rendered(new CartResource($cart), storeRequest('/api/store/cart')))->toBe([
         'items' => [[
             'sku_id' => 501, 'product_name' => 'علوم', 'product_slug' => 'olom', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 12, 'unit_price' => '85.00',
-            'tier_min_quantity' => 10, 'line_total' => '1020.00', 'moq' => 5, 'available' => 140,
+            'tier_min_quantity' => 10, 'price_source' => 'base', 'line_total' => '1020.00', 'moq' => 5, 'available' => 140,
         ]],
         'removed_items' => [['product_name' => 'قديم', 'reason' => 'inactive']],
         'items_total' => '1020.00',
@@ -115,7 +119,7 @@ test('BR-O14 the cart lists its pre-order lines apart with the expected day and 
         ->and($data['preorders'])->toBe([
             'items' => [[
                 'sku_id' => 77, 'product_name' => 'سلاح التلميذ ٢٠٢٧', 'product_slug' => 'selah', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 5, 'unit_price' => '90.00',
-                'tier_min_quantity' => null, 'line_total' => '450.00', 'moq' => 5, 'available' => 0, 'expected_at' => '2026-12-01',
+                'tier_min_quantity' => null, 'price_source' => 'base', 'line_total' => '450.00', 'moq' => 5, 'available' => 0, 'expected_at' => '2026-12-01',
             ]],
             'items_total' => '450.00',
         ]);
@@ -144,3 +148,30 @@ test('BR-CU08 the invite result', function (): void {
 test('BR-CU07 the otp sent resource names the channel', function (Channel $channel): void {
     expect(rendered(new OtpSentResource($channel), storeRequest()))->toBe(['otp_sent_via' => $channel->value]);
 })->with([Channel::WhatsApp, Channel::Sms]);
+
+test('BR-PR12 the dashboard customer shows their group, null without one or when it is not loaded', function (): void {
+    $group = CustomerGroup::factory()->create(['name' => 'موزع', 'discount_percent' => '15.00']);
+    $member = Customer::factory()->create(['customer_group_id' => $group->id])->load('group');
+
+    expect(rendered(CustomerResource::forDashboard($member, '0.00'), dashboardRequest())['group'])->toBe(['id' => $group->id, 'name' => 'موزع', 'discount_percent' => '15.00', 'status' => 'active'])
+        ->and(rendered(CustomerResource::forDashboard(Customer::query()->findOrFail($member->id), '0.00'), dashboardRequest())['group'])->toBeNull()
+        ->and(rendered(new CustomerResource($member), storeRequest('/api/store/me')))->not->toHaveKey('group');
+});
+
+test('BR-PR12 the customer group resource key set, with the customer count', function (): void {
+    $group = CustomerGroup::factory()->create(['name' => 'موزع', 'discount_percent' => '15.00', 'sort_order' => 2]);
+
+    expect(rendered(new CustomerGroupResource($group->loadCount('customers')), dashboardRequest()))->toBe([
+        'id' => $group->id, 'name' => 'موزع', 'discount_percent' => '15.00', 'status' => 'active', 'sort_order' => 2, 'customers_count' => 0,
+    ])
+        ->and(rendered(new CustomerGroupResource($group->refresh()), dashboardRequest())['customers_count'])->toBe(0);
+});
+
+test('BR-PR13 the customer price resource shows the sku next to the negotiated price', function (): void {
+    $price = CustomerSkuPrice::factory()->create(['unit_price' => '82.50', 'note' => 'اتفاق'])->load(['sku.product', 'sku.sellingUnit']);
+
+    expect(rendered(new CustomerSkuPriceResource($price), dashboardRequest()))->toBe([
+        'sku_id' => $price->sku_id, 'sku_code' => $price->sku->code, 'product_name' => $price->sku->product->name, 'unit' => $price->sku->sellingUnit->name,
+        'base_price' => '100.00', 'unit_price' => '82.50', 'note' => 'اتفاق', 'updated_at' => $price->updated_at->toIso8601String(),
+    ]);
+});

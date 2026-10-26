@@ -1451,6 +1451,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/customer-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer groups (BR-PR12, V2 Task 11): active first, then sort_order and name, with their customer count */
+        get: operations["dashboardCustomerGroups"];
+        put?: never;
+        post: operations["dashboardCreateCustomerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups/{group}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Any of the fields; a field left out stays; status active brings an archived group back */
+        patch: operations["dashboardUpdateCustomerGroup"];
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups/{group}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops the group discount at once; its customers keep the group (D89) */
+        post: operations["dashboardArchiveCustomerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups/{group}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves customers into the group: the ticked ids, or every customer of the list filter (not empty) */
+        post: operations["dashboardAssignCustomerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /** The prices negotiated with the customer (BR-PR13, V2 Task 11), newest first */
+        get: operations["dashboardCustomerPrices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/prices/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU; it may be above the normal price (D89) */
+        put: operations["dashboardSetCustomerPrice"];
+        post?: never;
+        /** Back to the normal price; no such price is 404 */
+        delete: operations["dashboardRemoveCustomerPrice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/customers/{customer}/invite": {
         parameters: {
             query?: never;
@@ -2022,7 +2136,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2155,11 +2269,21 @@ export interface components {
             label: string;
             value: string;
         };
+        /**
+         * @description Where a unit price came from (BR-PR14, D89): the base price, a quantity tier, the customer's group or their negotiated price
+         * @enum {string}
+         */
+        PriceSource: "base" | "tier" | "group" | "customer";
+        /**
+         * @description Present only when the price is the shopper's own (their group or negotiated price), for the «سعرك الخاص» badge
+         * @enum {string}
+         */
+        CustomerPriceSource: "group" | "customer";
         PriceTier: {
             min_quantity: number;
             unit_price: components["schemas"]["Money"] | null;
         };
-        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). */
+        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price. */
         StoreSku: {
             id: number;
             code: string;
@@ -2170,6 +2294,7 @@ export interface components {
             base_price?: components["schemas"]["Money"];
             discount_percent?: components["schemas"]["Money"] | null;
             tiers?: components["schemas"]["PriceTier"][];
+            price_source?: components["schemas"]["CustomerPriceSource"];
             available?: number;
             in_stock: boolean;
             /** @constant */
@@ -2228,6 +2353,7 @@ export interface components {
             moq: number | null;
             cover_price?: components["schemas"]["Money"] | null;
             base_price?: components["schemas"]["Money"] | null;
+            price_source?: components["schemas"]["CustomerPriceSource"];
             /** @enum {string} */
             availability: "available" | "coming_soon";
         };
@@ -2300,6 +2426,7 @@ export interface components {
             quantity: number;
             unit_price: components["schemas"]["Money"];
             tier_min_quantity: number | null;
+            price_source: components["schemas"]["PriceSource"];
             line_total: components["schemas"]["Money"];
             moq: number;
             /** @description Base units (D37) */
@@ -2371,6 +2498,7 @@ export interface components {
             /** @description Display only: the tier margin off the cover price (BR-PR10) */
             discount_percent: components["schemas"]["Money"] | null;
             tier_min_quantity: number | null;
+            price_source: components["schemas"]["PriceSource"];
             /** @description unit_price × the quantity charged: delivered_quantity once delivered, else quantity */
             line_total: components["schemas"]["Money"];
             /** @description Selling units that went out, set on delivery; less than quantity when delivered short (BR-O13) */
@@ -2525,7 +2653,7 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
         };
         /** @enum {string} */
-        Permission: "catalog.manage" | "pricing.manage" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.edit" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
+        Permission: "catalog.manage" | "pricing.manage" | "pricing.customers" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.edit" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description BR-N03 the statuses customers are told about, plus `discount` (D85) and `edited` (D87, on by default) */
             order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount" | "edited")[];
@@ -2976,6 +3104,8 @@ export interface components {
         };
         DashboardCustomer: components["schemas"]["Customer"] & {
             outstanding_amount: components["schemas"]["Money"];
+            /** @description BR-PR12; null = no group. An archived group no longer lowers prices */
+            group: components["schemas"]["CustomerGroupRef"] | null;
             /** @description BR-C05; null = no limit */
             credit_limit: components["schemas"]["Money"] | null;
             /** @description BR-C06; null = due on delivery */
@@ -2989,6 +3119,36 @@ export interface components {
             addresses?: components["schemas"]["Address"][];
             /** @description GET customers/{customer} only, the 5 newest */
             recent_orders?: components["schemas"]["RecentOrder"][];
+        };
+        /** @enum {string} */
+        CustomerGroupStatus: "active" | "archived";
+        CustomerGroupRef: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            status: components["schemas"]["CustomerGroupStatus"];
+        };
+        /** @description A wholesale level with one % off the base price (BR-PR12, D89) */
+        CustomerGroup: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            status: components["schemas"]["CustomerGroupStatus"];
+            sort_order: number;
+            customers_count: number;
+        };
+        /** @description A price negotiated with one customer for one SKU (BR-PR13, D89) */
+        CustomerSkuPrice: {
+            sku_id: number;
+            sku_code: string;
+            product_name: string;
+            unit: string;
+            /** @description The SKU's own base price, to compare */
+            base_price: components["schemas"]["Money"];
+            unit_price: components["schemas"]["Money"];
+            note: string | null;
+            /** Format: date-time */
+            updated_at: string;
         };
         InviteResult: {
             /** @enum {string} */
@@ -3103,6 +3263,7 @@ export interface components {
             unit_price: components["schemas"]["Money"];
             discount_percent: string | null;
             tier_min_quantity: number | null;
+            price_source: components["schemas"]["PriceSource"];
             line_total: components["schemas"]["Money"];
             tiers: {
                 min_quantity: number;
@@ -3621,6 +3782,17 @@ export interface components {
                 };
             };
         };
+        /** @description The customer group */
+        CustomerGroup: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["CustomerGroup"];
+                };
+            };
+        };
         /** @description The customer */
         DashboardCustomer: {
             headers: {
@@ -3696,6 +3868,7 @@ export interface components {
         ProductId: number;
         SkuId: number;
         CustomerId: number;
+        CustomerGroupId: number;
         UserId: number;
     };
     requestBodies: {
@@ -6266,6 +6439,8 @@ export interface operations {
             query?: {
                 q?: string;
                 status?: components["schemas"]["CustomerStatus"];
+                /** @description Only the members of this customer group (V2 Task 11) */
+                group?: number;
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -6310,6 +6485,8 @@ export interface operations {
                     credit_limit?: string | null;
                     /** @description BR-C06; not sent = the store default */
                     payment_terms_days?: number | null;
+                    /** @description BR-PR12; an active group; needs pricing.customers */
+                    customer_group_id?: number | null;
                 };
             };
         };
@@ -6317,7 +6494,7 @@ export interface operations {
             201: components["responses"]["DashboardCustomer"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
-            /** @description phone_taken */
+            /** @description phone_taken, group_archived */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6363,6 +6540,8 @@ export interface operations {
                     credit_limit?: string | null;
                     /** @description BR-C06; not sent = unchanged, null = due on delivery */
                     payment_terms_days?: number | null;
+                    /** @description BR-PR12; not sent = unchanged, null = no group; needs pricing.customers */
+                    customer_group_id?: number | null;
                     addresses?: (components["schemas"]["AddressRequest"] & {
                         id?: number;
                     })[];
@@ -6374,7 +6553,283 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            /** @description group_archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomerGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every group, archived included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerGroup"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @description % off the base price, 0–90 (D89) */
+                    discount_percent: string | number;
+                    sort_order?: number;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["CustomerGroup"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description duplicate_name */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    discount_percent?: string | number;
+                    sort_order?: number;
+                    /** @enum {string} */
+                    status?: "active";
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["CustomerGroup"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description duplicate_name */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardArchiveCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["CustomerGroup"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardAssignCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    customer_ids?: number[];
+                    filter?: {
+                        q?: string | null;
+                        status?: components["schemas"]["CustomerStatus"];
+                        group?: number;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description How many customers moved into the group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            assigned: number;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description group_archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomerPrices: {
+        parameters: {
+            query?: {
+                q?: string;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the customer's prices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerSkuPrice"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardSetCustomerPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description In the SKU's selling unit, at least 0.01 */
+                    unit_price: string | number;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The customer's price, replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerSkuPrice"];
+                    };
+                };
+            };
+            /** @description The customer's new price */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerSkuPrice"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRemoveCustomerPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     dashboardInviteCustomer: {
