@@ -14,7 +14,9 @@ use App\Modules\Customers\Queries\CustomerSkuPricesQuery;
 use App\Modules\Customers\Queries\PricingContextQuery;
 use App\Modules\Pricing\Contracts\CustomerPricing;
 use App\Modules\Pricing\Data\PricingContext;
+use App\Modules\Pricing\Models\Promotion;
 use App\Modules\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
@@ -66,6 +68,40 @@ test('BR-T04 the context never reads another tenant\'s prices', function (): voi
     app(TenantContext::class)->set($this->tenant);
 
     expect(app(PricingContextQuery::class)->for($customer)?->customerPrices)->toBe([]);
+});
+
+test('BR-PR15 a guest gets a context only when a sku priced is on a live promotion', function (): void {
+    [$on, $off] = [pricingQuerySku('أ', 'A-1'), pricingQuerySku('ب', 'B-1')];
+    $promotion = Promotion::factory()->covering($on)->create(['discount_percent' => '20.00']);
+
+    $context = app(PricingContextQuery::class)->for(null, [$on->id, $off->id]);
+
+    expect(array_keys($context?->promotions ?? []))->toBe([$on->id])
+        ->and($context?->promotion($on->id)?->promotionId)->toBe($promotion->id)
+        ->and($context?->groupDiscountPercent)->toBeNull()
+        ->and(app(PricingContextQuery::class)->for(null, [$off->id]))->toBeNull();
+});
+
+test('BR-PR15 a customer context carries the promotions of the skus priced, in one more query', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '10.00']);
+    $customer = $this->makeCustomer(['customer_group_id' => $group->id]);
+    $sku = pricingQuerySku();
+    Promotion::factory()->covering($sku)->create();
+    DB::enableQueryLog();
+
+    $context = app(PricingContextQuery::class)->for($customer, [$sku->id]);
+
+    expect(DB::getQueryLog())->toHaveCount(2)
+        ->and($context?->groupDiscountPercent)->toBe('10.00')
+        ->and($context?->promotion($sku->id))->not->toBeNull();
+});
+
+test('BR-PR06 D90 the context reads the promotions live at the moment given', function (): void {
+    $sku = pricingQuerySku();
+    Promotion::factory()->covering($sku)->create(['starts_at' => '2026-11-01 00:00:00', 'ends_at' => '2026-11-02 00:00:00']);
+
+    expect(app(PricingContextQuery::class)->for(null, [$sku->id], CarbonImmutable::parse('2026-11-01 12:00:00')))->not->toBeNull()
+        ->and(app(PricingContextQuery::class)->for(null, [$sku->id], CarbonImmutable::parse('2026-11-02 00:00:00')))->toBeNull();
 });
 
 test('BR-PR14 the query fills the storefront\'s customer pricing contract', function (): void {

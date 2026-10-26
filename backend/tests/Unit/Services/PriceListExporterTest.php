@@ -45,7 +45,10 @@ test('BR-PR14 the file has the customer\'s own wholesale price', function (): vo
     $sku = Product::factory()->withSku(['code' => 'A-1', 'base_price' => '12.50'])->create(['name' => 'كراسة'])->sku()->sole();
     $path = sys_get_temp_dir().'/price-list-'.Str::uuid().'.xlsx';
 
-    app(PriceListExporter::class)->write($path, new ProductFilterData, new App\Modules\Pricing\Data\PricingContext(null, [$sku->id => '11.00']));
+    $customer = $this->makeCustomer();
+    App\Modules\Customers\Models\CustomerSkuPrice::factory()->create(['customer_id' => $customer->id, 'sku_id' => $sku->id, 'unit_price' => '11.00']);
+
+    app(PriceListExporter::class)->write($path, new ProductFilterData, $customer);
 
     expect(spreadsheetRows($path)[2][6])->toBe('11');
 });

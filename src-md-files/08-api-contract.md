@@ -71,6 +71,7 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 409  | `order_cancelled`          | recording a collection on a cancelled order (BR-C04)      |
 | 409  | `is_preorder`              | recording a collection or applying credit on a pre-order (D88) |
 | 409  | `group_archived`           | assigning a customer to an archived customer group (BR-PR12, D89) |
+| 409  | `promotion_locked`         | editing a promotion that started, ended or was cancelled, or cancelling an ended or cancelled one (BR-PR15, D90) |
 | 409  | `product_not_active`       | converting pre-orders of a product that is not active yet (BR-O14, `details.status`) |
 | 409  | `already_voided`           | voiding a collection twice (BR-C02, `details.voided_at`)  |
 | 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
@@ -472,6 +473,21 @@ Delivered (Task 2):
 - `POST /pricing/bulk` returns `{ affected, skipped_no_cover_price: [{ product_id, sku_id, code, name }], batch_id }`; `…/bulk/preview` returns the same without `batch_id` and writes nothing. Bulk tiers are `{ min_quantity, discount_percent }` only. An empty filter is `422` on `filter`.
 - Audit: `sku.price_changed`, `sku.tiers_changed`, `sku.moq_changed` (per SKU, only what changed) and `pricing.bulk_applied` (one per bulk, same `batch_id`).
 
+### Promotions (V2 Task 12, BR-PR15, D90)
+
+| Method | Path | Body / Notes |
+| ------ | ---- | ------------ |
+| GET    | `/api/dashboard/promotions` | `?status=draft\|scheduled\|active\|ended\|cancelled`, paginated, latest start first, each with `skus_count` |
+| POST   | `/api/dashboard/promotions` | `{ name (≤ 100), discount_percent (> 0, < 90), starts_at, ends_at, filter: {...as bulk pricing...} \| sku_ids: [...] (≤ 1000), status?: draft\|scheduled }` → 201; `Idempotency-Key` honored |
+| POST   | `/api/dashboard/promotions/preview` | `{ filter \| sku_ids, discount_percent? }` → `{ skus_count, sample: [{ sku_id, code, product_name, base_price, promotion_price }] }` (10), writes nothing |
+| GET    | `/api/dashboard/promotions/{id}` | the promotion; an explicit list adds `skus: [{ sku_id, code, product_name }]` |
+| PATCH  | `/api/dashboard/promotions/{id}` | any create field; a draft or a promotion that has not started only (`409 promotion_locked` with `details.status`); the SKUs are selected again |
+| POST   | `/api/dashboard/promotions/{id}/cancel` | stops it at once; an ended or cancelled one → `409 promotion_locked` |
+
+All need `pricing.manage`. A promotion: `{ id, name, discount_percent, starts_at, ends_at, status (as of now), target: filter\|skus, filter, skus_count, cancelled_at, created_at }`. Times without an offset are Cairo wall time (D60); answers are ISO-8601 UTC. Validation (`422`): both or neither target, an empty filter (BR-P12), a selection without any SKU, an unknown or foreign SKU id, an end not after the start or already past. Audit: `promotion.created`, `promotion.updated`, `promotion.cancelled`. `php artisan pricing:promotions-tick` (every minute) moves scheduled → active → ended.
+
+Storefront (BR-PR15): the product list and page `sku`, the price-list row (and its Excel file) carry `promotion { id, name, discount_percent, ends_at }` when a live promotion sets the price (guests too, unless prices are hidden, D1); cart lines always carry `promotion` (null without one) and `price_source` may be `promotion`; `GET /api/store/products?on_offer=1` lists only the products on a live promotion. Order items snapshot `price_source = promotion` and `promotion_id`.
+
 ---
 
 ## 7. Dashboard — Inventory
@@ -744,6 +760,7 @@ php artisan tenant:list
 php artisan api:openapi          # compile backend/openapi/openapi.yaml → backend/openapi.json (Task 8)
 php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-gateway, remove stray sessions (every 5 min)
 php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their store's pending_expiry_hours (every 15 min)
+php artisan pricing:promotions-tick # D90: move promotions scheduled → active → ended at their boundaries (every minute)
 ```
 
 ---
@@ -755,9 +772,9 @@ php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their 
 | Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        16 |
-| Dashboard      |        99 |
+| Dashboard      |       105 |
 | Webhooks       |         2 |
-| **Total**      |   **134** |
+| **Total**      |   **140** |
 
 ---
 

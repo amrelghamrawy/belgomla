@@ -87,3 +87,16 @@ test('BR-PR14 the refreshed cart shows the customer\'s group price', function ()
     expect($line->price->unitPrice)->toBe('72.00')
         ->and($line->price->source)->toBe(PriceSource::Group);
 });
+
+test('BR-PR15 the refreshed cart shows a live promotion to a customer without a group', function (): void {
+    $customer = $this->makeCustomer();
+    $sku = $this->orderableSku(['code' => 'PRM-1'], name: 'كتاب العرض');
+    $this->inTenant(fn () => App\Modules\Pricing\Models\Promotion::factory()->covering($sku)->percent('20.00')->create());
+    $this->fillCart($customer, [$sku->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    $line = app(RefreshCart::class)->handle($customer)->lines[0];
+
+    expect($line->price->unitPrice)->toBe('72.00')
+        ->and($line->price->source)->toBe(PriceSource::Promotion);
+});

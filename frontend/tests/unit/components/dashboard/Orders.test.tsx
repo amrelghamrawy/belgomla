@@ -409,6 +409,16 @@ describe("OrderDetail price source (BR-PR14)", () => {
     expect(screen.getByTestId("price-source-62")).toHaveTextContent("سعر خاص بالعميل");
     expect(screen.queryByTestId("price-source-61")).toBeNull();
   });
+
+  it("BR-PR15 names a line priced by a promotion", () => {
+    stubApi({});
+    const base = order();
+    const line = base.items[0];
+    const items = line === undefined ? [] : [{ ...line, id: 63, price_source: "promotion" as const }];
+    renderWithQuery(<OrderDetail order={{ ...base, items }} />);
+
+    expect(screen.getByTestId("price-source-63")).toHaveTextContent("سعر العرض");
+  });
 });
 
 describe("OrderDetail discounts (BR-PR08, D85)", () => {

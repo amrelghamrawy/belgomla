@@ -129,7 +129,7 @@ describe("DashboardNav per role (D82)", () => {
     const nav = await screen.findByRole("navigation", { name: "القائمة الرئيسية" });
     expect(within(nav).getByRole("link", { name: "الطلبات" })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "العملاء" })).toBeInTheDocument();
-    for (const hidden of ["الإعدادات", "المستخدمون", "سجل التغييرات", "التقارير", "التحصيلات"]) {
+    for (const hidden of ["الإعدادات", "المستخدمون", "سجل التغييرات", "التقارير", "التحصيلات", "العروض"]) {
       expect(within(nav).queryByRole("link", { name: hidden })).toBeNull();
     }
   });
@@ -141,6 +141,7 @@ describe("DashboardNav per role (D82)", () => {
     const nav = await screen.findByRole("navigation", { name: "القائمة الرئيسية" });
     expect(within(nav).getByRole("link", { name: "الإعدادات" })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "المستخدمون" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "العروض" })).toHaveAttribute("href", "/dashboard/promotions");
   });
 });
 

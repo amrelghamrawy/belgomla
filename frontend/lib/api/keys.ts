@@ -50,6 +50,10 @@ export const queryKeys = {
   dashboardCustomerGroups: ["dashboard", "customer-groups"] as const,
   dashboardCustomerPrices: (id: number, params: ListParams) =>
     ["dashboard", "customers", "prices", id, params] as const,
+  // V2 Task 12 (BR-PR15): promotions.
+  dashboardPromotionsLists: ["dashboard", "promotions", "list"] as const,
+  dashboardPromotionsList: (params: ListParams) => ["dashboard", "promotions", "list", params] as const,
+  dashboardPromotion: (id: number) => ["dashboard", "promotions", "detail", id] as const,
   dashboardOrdersLists: ["dashboard", "orders", "list"] as const,
   dashboardOrdersList: (params: ListParams) => ["dashboard", "orders", "list", params] as const,
   dashboardOrder: (number: number) => ["dashboard", "orders", "detail", number] as const,

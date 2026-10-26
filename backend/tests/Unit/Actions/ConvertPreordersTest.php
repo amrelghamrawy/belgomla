@@ -231,3 +231,14 @@ test('BR-PR14 a converted order is priced at the customer\'s own price of the da
         ->and(($this->line)($converted ?? new Order)->only(['unit_price', 'price_source']))->toBe(['unit_price' => '75.00', 'price_source' => PriceSource::Customer])
         ->and($converted?->order_total)->toBe('750.00');
 });
+
+test('BR-PR15 a converted order is priced at the promotion live on the day of conversion', function (): void {
+    $this->inTenant(fn () => App\Modules\Pricing\Models\Promotion::factory()->covering($this->sku)->percent('20.00')->create());
+    ($this->activate)(10);
+
+    ($this->convert)();
+
+    $converted = ($this->convertedFrom)($this->preorders[0]);
+
+    expect(($this->line)($converted ?? new Order)->only(['unit_price', 'price_source']))->toBe(['unit_price' => '72.00', 'price_source' => PriceSource::Promotion]);
+});

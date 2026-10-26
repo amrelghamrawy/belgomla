@@ -34,6 +34,7 @@ test('BR-PR07 the item snapshot keeps names, unit, conversion and the applied pr
         'discount_percent' => '29.17',
         'tier_min_quantity' => 10,
         'price_source' => 'base',
+        'promotion_id' => null,
         'line_total' => '1020.00',
     ]);
 });

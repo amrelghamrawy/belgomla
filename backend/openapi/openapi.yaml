@@ -193,6 +193,10 @@ paths:
           schema:
             type: string
             enum: [name, -created_at, price, -price]
+        - name: on_offer
+          in: query
+          description: 'Only the products on a live promotion (BR-PR15, V2 Task 12), the storefront''s «عروض»'
+          schema: { type: boolean }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -2189,6 +2193,124 @@ paths:
         '409': { description: group_archived, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
         '422': { $ref: '#/components/responses/Error' }
 
+  /api/dashboard/promotions:
+    get:
+      operationId: dashboardPromotions
+      tags: [dashboard-pricing]
+      summary: 'Promotions (BR-PR15, V2 Task 12), latest start first, with how many SKUs each covers'
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/PromotionStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of promotions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Promotion' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: dashboardCreatePromotion
+      tags: [dashboard-pricing]
+      summary: 'Creates a promotion, scheduled or a draft; its SKUs are selected now (D90 d). Idempotency-Key honored'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromotionRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Promotion' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/promotions/preview:
+    post:
+      operationId: dashboardPreviewPromotion
+      tags: [dashboard-pricing]
+      summary: 'How many SKUs a promotion would cover and the first ten, priced when a % is sent; writes nothing'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filter: { $ref: '#/components/schemas/ProductFilter' }
+                sku_ids:
+                  type: array
+                  maxItems: 1000
+                  items: { type: integer }
+                discount_percent: { type: [string, number, 'null'] }
+      responses:
+        '200':
+          description: The preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PromotionPreview' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/promotions/{promotion}:
+    parameters:
+      - $ref: '#/components/parameters/PromotionId'
+    get:
+      operationId: dashboardPromotion
+      tags: [dashboard-pricing]
+      summary: 'One promotion; an explicit SKU list comes with its SKUs'
+      responses:
+        '200': { $ref: '#/components/responses/Promotion' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: dashboardUpdatePromotion
+      tags: [dashboard-pricing]
+      summary: 'Any of the fields of a draft or a promotion that has not started (409 promotion_locked otherwise); the SKUs are selected again'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromotionPatch' }
+      responses:
+        '200': { $ref: '#/components/responses/Promotion' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: promotion_locked, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/promotions/{promotion}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PromotionId'
+    post:
+      operationId: dashboardCancelPromotion
+      tags: [dashboard-pricing]
+      summary: 'Stops a promotion that has not ended, at once (D90 f)'
+      responses:
+        '200': { $ref: '#/components/responses/Promotion' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { description: promotion_locked, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+
   /api/dashboard/customer-groups:
     get:
       operationId: dashboardCustomerGroups
@@ -3364,6 +3486,11 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    PromotionId:
+      name: promotion
+      in: path
+      required: true
+      schema: { type: integer }
     UserId:
       name: user
       in: path
@@ -3538,6 +3665,15 @@ components:
             required: [data]
             properties:
               data: { $ref: '#/components/schemas/CustomerGroup' }
+    Promotion:
+      description: The promotion
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Promotion' }
     DashboardCustomer:
       description: The customer
       content:
@@ -3646,6 +3782,7 @@ components:
         - phone_taken
         - prices_hidden
         - product_not_active
+        - promotion_locked
         - rate_limited
         - refund_required
         - reserved_subdomain
@@ -3851,9 +3988,19 @@ components:
         value: { type: string }
 
     PriceSource:
-      description: 'Where a unit price came from (BR-PR14, D89): the base price, a quantity tier, the customer''s group or their negotiated price'
+      description: 'Where a unit price came from (BR-PR14, D89, D90): the base price, a quantity tier, the customer''s group, their negotiated price or a live promotion (V2 Task 12)'
       type: string
-      enum: [base, tier, group, customer]
+      enum: [base, tier, group, customer, promotion]
+
+    PromotionSummary:
+      description: 'The live promotion that set a price (BR-PR15, V2 Task 12): the offer badge''s % and «ينتهي خلال …»'
+      type: object
+      required: [id, name, discount_percent, ends_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        discount_percent: { $ref: '#/components/schemas/Money' }
+        ends_at: { type: string, format: date-time }
 
     CustomerPriceSource:
       description: 'Present only when the price is the shopper''s own (their group or negotiated price), for the «سعرك الخاص» badge'
@@ -3874,7 +4021,8 @@ components:
       description: >
         Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out
         when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21).
-        Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price.
+        Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price,
+        `promotion` only when a live promotion sets the price (BR-PR15, guests too).
       type: object
       required: [id, code, unit, conversion_factor, moq, in_stock]
       properties:
@@ -3896,6 +4044,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/PriceTier' }
         price_source: { $ref: '#/components/schemas/CustomerPriceSource' }
+        promotion: { $ref: '#/components/schemas/PromotionSummary' }
         available: { type: integer }
         in_stock: { type: boolean }
         coming_soon: { type: boolean, const: true }
@@ -3999,6 +4148,7 @@ components:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
         price_source: { $ref: '#/components/schemas/CustomerPriceSource' }
+        promotion: { $ref: '#/components/schemas/PromotionSummary' }
         availability:
           type: string
           enum: [available, coming_soon]
@@ -4092,7 +4242,7 @@ components:
 
     CartItem:
       type: object
-      required: [sku_id, product_name, product_slug, unit, conversion_factor, quantity, unit_price, tier_min_quantity, price_source, line_total, moq, available]
+      required: [sku_id, product_name, product_slug, unit, conversion_factor, quantity, unit_price, tier_min_quantity, price_source, promotion, line_total, moq, available]
       properties:
         sku_id: { type: integer }
         product_name: { type: string }
@@ -4103,6 +4253,11 @@ components:
         unit_price: { $ref: '#/components/schemas/Money' }
         tier_min_quantity: { type: [integer, 'null'] }
         price_source: { $ref: '#/components/schemas/PriceSource' }
+        promotion:
+          description: The promotion that set the price (price_source promotion), else null
+          oneOf:
+            - $ref: '#/components/schemas/PromotionSummary'
+            - type: 'null'
         line_total: { $ref: '#/components/schemas/Money' }
         moq: { type: integer }
         available: { type: integer, description: Base units (D37) }
@@ -5124,6 +5279,96 @@ components:
         status: { $ref: '#/components/schemas/CustomerGroupStatus' }
         sort_order: { type: integer }
         customers_count: { type: integer }
+
+    PromotionStatus:
+      type: string
+      enum: [draft, scheduled, active, ended, cancelled]
+
+    Promotion:
+      description: 'A time-boxed % off the base price of the SKUs it covers (BR-PR15, D90); `status` is as of now'
+      type: object
+      required: [id, name, discount_percent, starts_at, ends_at, status, target, filter, skus_count, cancelled_at, created_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        discount_percent: { $ref: '#/components/schemas/Money' }
+        starts_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/PromotionStatus' }
+        target:
+          type: string
+          enum: [filter, skus]
+        filter:
+          description: 'The stored product filter {category, f, q, status}; null for an explicit SKU list'
+          type: [object, 'null']
+          additionalProperties: true
+        skus_count: { type: integer }
+        skus:
+          description: 'The explicit SKU list (detail only)'
+          type: array
+          items:
+            type: object
+            required: [sku_id, code, product_name]
+            properties:
+              sku_id: { type: integer }
+              code: { type: string }
+              product_name: { type: string }
+        cancelled_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+
+    PromotionRequest:
+      description: 'Times without an offset are Cairo time (D60); the target is filter or sku_ids, never both'
+      type: object
+      required: [name, discount_percent, starts_at, ends_at]
+      properties:
+        name: { type: string, maxLength: 100 }
+        discount_percent: { type: [string, number], description: 'More than 0, below 90' }
+        starts_at: { type: string }
+        ends_at: { type: string }
+        filter: { $ref: '#/components/schemas/ProductFilter' }
+        sku_ids:
+          type: array
+          maxItems: 1000
+          items: { type: integer }
+        status:
+          type: string
+          enum: [draft, scheduled]
+
+    PromotionPatch:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100 }
+        discount_percent: { type: [string, number] }
+        starts_at: { type: string }
+        ends_at: { type: string }
+        filter: { $ref: '#/components/schemas/ProductFilter' }
+        sku_ids:
+          type: array
+          maxItems: 1000
+          items: { type: integer }
+        status:
+          type: string
+          enum: [draft, scheduled]
+
+    PromotionPreview:
+      type: object
+      required: [skus_count, sample]
+      properties:
+        skus_count: { type: integer }
+        sample:
+          type: array
+          items:
+            type: object
+            required: [sku_id, code, product_name, base_price, promotion_price]
+            properties:
+              sku_id: { type: integer }
+              code: { type: string }
+              product_name: { type: string }
+              base_price: { $ref: '#/components/schemas/Money' }
+              promotion_price:
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
 
     CustomerSkuPrice:
       description: 'A price negotiated with one customer for one SKU (BR-PR13, D89)'

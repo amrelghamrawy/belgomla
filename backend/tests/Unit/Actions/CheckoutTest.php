@@ -324,3 +324,36 @@ test('BR-PR04 a customer without a group or price keeps the tier and the source 
 
     expect(OrderItem::query()->sole()->price_source)->toBe(PriceSource::Tier);
 });
+
+test('BR-PR15 BR-PR07 checkout charges a live promotion and snapshots it with its id', function (): void {
+    $promotion = App\Modules\Pricing\Models\Promotion::factory()->covering($this->sku)->create(['discount_percent' => '15.00']);
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+
+    ($this->checkout)();
+
+    expect(OrderItem::query()->sole()->only(['list_unit_price', 'unit_price', 'price_source', 'promotion_id', 'line_total']))->toBe([
+        'list_unit_price' => '76.50', 'unit_price' => '76.50', 'price_source' => PriceSource::Promotion, 'promotion_id' => $promotion->id, 'line_total' => '382.50',
+    ]);
+});
+
+test('BR-PR06 D90 c an offer that ended between the cart and checkout is not applied', function (): void {
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-11-01 10:00:00'));
+    App\Modules\Pricing\Models\Promotion::factory()->covering($this->sku)->create(['starts_at' => '2026-11-01 00:00:00', 'ends_at' => '2026-11-01 12:00:00']);
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+    $cart = app(App\Modules\Customers\Actions\RefreshCart::class)->handle($this->customer);
+
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-11-01 12:00:00'));
+    ($this->checkout)();
+
+    expect($cart->lines[0]->price->source)->toBe(PriceSource::Promotion)
+        ->and(OrderItem::query()->sole()->only(['unit_price', 'price_source', 'promotion_id']))->toBe(['unit_price' => '90.00', 'price_source' => PriceSource::Base, 'promotion_id' => null]);
+});
+
+test('BR-PR15 a cancelled promotion is not applied at checkout', function (): void {
+    App\Modules\Pricing\Models\Promotion::factory()->covering($this->sku)->cancelled()->create();
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+
+    ($this->checkout)();
+
+    expect(OrderItem::query()->sole()->price_source)->toBe(PriceSource::Base);
+});

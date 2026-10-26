@@ -298,3 +298,17 @@ test('BR-PR14 the validator prices every line at the context it is handed', func
         ->and($report->lines[0]->price->source)->toBe(PriceSource::Customer)
         ->and($report->total)->toBe('385.00');
 });
+
+test('BR-PR06 BR-PR15 a line is priced with the promotion in the context it is handed', function (): void {
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+    $lines = app(CartQuery::class)->linesOf($this->customer);
+    $stock = SkuInventory::query()->whereIn('sku_id', $lines->pluck('sku_id'))->get()->keyBy('sku_id');
+    $inputs = array_values($lines->map(fn ($line): CartLineInput => new CartLineInput($line->sku, $line->quantity))->all());
+    $context = new PricingContext(promotions: [$this->sku->id => new App\Modules\Pricing\Data\PromotionPrice(9, 'عرض', '20.00', Carbon\CarbonImmutable::parse('2026-12-01'))]);
+
+    $line = app(CheckoutValidator::class)->validate($inputs, $stock, $this->customer->refresh(), $context)[0];
+
+    expect($line->price->unitPrice)->toBe('72.00')
+        ->and($line->price->source)->toBe(PriceSource::Promotion)
+        ->and($line->price->promotion?->promotionId)->toBe(9);
+});

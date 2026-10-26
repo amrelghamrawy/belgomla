@@ -70,7 +70,8 @@ final readonly class PlaceOrder
             throw CheckoutFailed::emptyCart();
         }
 
-        $pricing = $this->pricing->for($customer);
+        // BR-PR06, D90: the promotions live at this moment, inside the checkout transaction
+        $pricing = $this->pricing->for($customer, array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
         $report = $data->kind === OrderKind::Preorder ? $this->checkPreorder($data, $customer, $pricing) : $this->checkOrder($data, $customer, $pricing);
         $checked = $data->convertedFrom instanceof Order ? $report->assertConvertible() : $report->assertPasses($data->skipMov);
 

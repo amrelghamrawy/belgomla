@@ -38,7 +38,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $unit_price the price charged per unit, after the manual discount
  * @property string|null $discount_percent
  * @property int|null $tier_min_quantity
- * @property PriceSource $price_source where the list price came from (BR-PR14, V2 Task 11)
+ * @property PriceSource $price_source where the list price came from (BR-PR14, V2 Task 11; `promotion`, BR-PR15)
+ * @property int|null $promotion_id the promotion that set the list price, set exactly when `price_source` is `promotion` (V2 Task 12)
  * @property string $line_total = unit_price × the quantity charged: delivered_quantity once delivered (BR-O13), else quantity
  * @property int|null $delivered_quantity selling units that went out, set on delivery (BR-O13, D86)
  * @property bool $reserved whether the line holds stock: false on a pre-order line (BR-O14, D88)

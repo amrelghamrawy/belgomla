@@ -30,6 +30,7 @@ import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatMoney } from "@/lib/format/money";
 
 import { FilterPanel } from "../common/FilterPanel";
+import { NewPromotionButton } from "../pricing/PromotionDialog";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { BulkPricingDialog } from "./BulkPricingDialog";
@@ -80,6 +81,7 @@ export function ProductsPage() {
             <span className="text-muted-foreground">{copy.bulkScope(total)}</span>
             <BulkStatusDialog filter={scope.filter} count={total} />
             <BulkPricingDialog filter={scope.filter} />
+            {allowed("pricing.manage") && <NewPromotionButton filter={scope.filter} />}
           </>
         ) : (
           <span className="text-muted-foreground" data-testid="bulk-blocked">

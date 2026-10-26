@@ -244,3 +244,30 @@ describe("CartView customer prices (BR-PR14)", () => {
     expect(screen.getAllByTestId("your-price")).toHaveLength(1);
   });
 });
+
+describe("CartView offers (BR-PR15)", () => {
+  it("shows the offer badge on a line a promotion priced", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/cart": json(200, {
+        data: cart({
+          items: [
+            cartItem({
+              sku_id: 1,
+              product_name: "كتاب العرض",
+              unit_price: "76.50",
+              price_source: "promotion",
+              promotion: { id: 4, name: "عرض", discount_percent: "15.00", ends_at: "2030-01-01T00:00:00Z" },
+            }),
+            cartItem({ sku_id: 2, product_name: "كتاب عادي" }),
+          ],
+        }),
+      }),
+    });
+    renderWithQuery(<CartView />);
+
+    await screen.findByRole("link", { name: "كتاب العرض" });
+    expect(screen.getAllByTestId("offer-badge")).toHaveLength(1);
+    expect(screen.getByTestId("offer-badge")).toHaveTextContent("عرض 15%");
+  });
+});

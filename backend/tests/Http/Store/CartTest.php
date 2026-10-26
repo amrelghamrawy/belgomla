@@ -64,6 +64,7 @@ test('BR-CU06 BR-PR04 adding a sku returns the cart with the price resolved for 
                 'unit_price' => '90.00',
                 'tier_min_quantity' => null,
                 'price_source' => 'base',
+                'promotion' => null,
                 'line_total' => '540.00',
                 'moq' => 5,
                 'available' => 400,

@@ -173,3 +173,14 @@ test('BR-O14 BR-PR14 a pre-order is priced at the customer\'s own price, indicat
     expect(OrderItem::query()->where('order_id', $order->id)->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '66.00', 'price_source' => PriceSource::Customer])
         ->and($order->order_total)->toBe('330.00');
 });
+
+test('BR-O14 BR-PR15 a pre-order is priced at a live promotion, indicatively', function (): void {
+    $customer = $this->makeCustomer();
+    $sku = $this->preorderableSku(name: 'أطلس العرض');
+    $this->inTenant(fn () => App\Modules\Pricing\Models\Promotion::factory()->covering($sku)->percent('10.00')->create());
+
+    $order = $this->placePreorder($customer, [$sku->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(OrderItem::query()->where('order_id', $order->id)->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '81.00', 'price_source' => PriceSource::Promotion]);
+});

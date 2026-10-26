@@ -67,7 +67,7 @@ final readonly class OrderQuoter
         $inputs = $this->lines($lines);
         $order = $orderNumber === null ? null : $this->order($customer, $orderNumber);
         $held = $order instanceof Order ? $this->held($order) : [];
-        $pricing = $this->pricing->for($customer);
+        $pricing = $this->pricing->for($customer, array_map(fn (CartLineInput $line): int => $line->sku->id, $inputs));
 
         $tiers = [];
 

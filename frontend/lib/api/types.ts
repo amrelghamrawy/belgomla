@@ -98,6 +98,14 @@ export type CustomerPriceSource = Schemas["CustomerPriceSource"];
 export type CustomerGroup = Schemas["CustomerGroup"];
 export type CustomerGroupRef = Schemas["CustomerGroupRef"];
 export type CustomerGroupStatus = Schemas["CustomerGroupStatus"];
+
+// Promotions (V2 Task 12, BR-PR15, D90)
+export type Promotion = Schemas["Promotion"];
+export type PromotionStatus = Schemas["PromotionStatus"];
+export type PromotionSummary = Schemas["PromotionSummary"];
+export type PromotionPreview = Schemas["PromotionPreview"];
+export type PromotionRequest = Schemas["PromotionRequest"];
+export type PromotionPatch = Schemas["PromotionPatch"];
 export type CustomerSkuPrice = Schemas["CustomerSkuPrice"];
 export type CollectionStatus = Schemas["CollectionStatus"];
 export type DashboardOrder = Schemas["DashboardOrder"];

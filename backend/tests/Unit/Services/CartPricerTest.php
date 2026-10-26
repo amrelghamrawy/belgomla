@@ -123,3 +123,13 @@ test('BR-PR14 the cart prices each line at the customer\'s context, with its sou
     ])
         ->and($cart->itemsTotal)->toBe('1035.00');
 });
+
+test('BR-PR15 the cart prices a line at a promotion in the context, with the promotion', function (): void {
+    $sku = pricedSku('100.00', [10 => '90.00']);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'quantity' => 2]);
+    $promotion = new App\Modules\Pricing\Data\PromotionPrice(4, 'عرض', '25.00', Carbon\CarbonImmutable::parse('2026-12-01'));
+
+    $line = app(CartPricer::class)->price(app(CartQuery::class)->linesOf($this->customer), pricing: new PricingContext(promotions: [$sku->id => $promotion]))->lines[0];
+
+    expect([$line->price->unitPrice, $line->price->source, $line->price->promotion])->toBe(['75.00', PriceSource::Promotion, $promotion]);
+});

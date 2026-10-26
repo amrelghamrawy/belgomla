@@ -18,6 +18,7 @@ import { preorderBounds, quantityBounds } from "@/lib/store/quantity";
 
 import { MovProgress } from "./MovProgress";
 import { QuantityStepper } from "./QuantityStepper";
+import { OfferBadge } from "./OfferBadge";
 import { YourPriceBadge } from "./YourPriceBadge";
 
 /** Quantity changes wait this long for the next tap before going to the server. */
@@ -202,6 +203,7 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
             {item.tier_min_quantity !== null && ` · ${ar.cart.tierApplied(item.tier_min_quantity)}`}
           </span>
           <YourPriceBadge source={item.price_source} className="self-start" />
+          <OfferBadge promotion={item.promotion} className="self-start" />
           {expectedAt !== null && (
             <span className="text-primary flex items-center gap-1 text-xs font-semibold">
               <CalendarClockIcon className="size-3.5" aria-hidden />

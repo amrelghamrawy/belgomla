@@ -20,7 +20,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * BR-P13 compact price-list row: name, section kind, code, unit, MOQ, reference and wholesale price, availability.
  * Prices follow the same visibility rule as the product list (D1) and are the shopper's own (BR-PR14): the wholesale price
- * is their negotiated or group price when lower, with `price_source` (`group` or `customer`) for the badge.
+ * is their negotiated or group price when lower, with `price_source` (`group` or `customer`) for the badge, or a live
+ * promotion's price with `promotion { id, name, discount_percent, ends_at }` (BR-PR15, V2 Task 12).
  *
  * @property-read Product $resource
  */
@@ -40,6 +41,25 @@ final class PriceListRowResource extends JsonResource
 
         return new AnonymousResourceCollection($resources, self::class)
             ->additional(['meta' => ['count' => $rows->count(), 'truncated' => $truncated, 'prices_hidden' => $pricesHidden]]);
+    }
+
+    /**
+     * The SKUs of the rows, whose promotions the PricingContext must know (BR-PR15).
+     *
+     * @param  Collection<int, Product>  $rows
+     * @return list<int>
+     */
+    public static function skuIds(Collection $rows): array
+    {
+        $ids = [];
+
+        foreach ($rows as $product) {
+            if ($product->sku instanceof Sku) {
+                $ids[] = $product->sku->id;
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -63,6 +83,7 @@ final class PriceListRowResource extends JsonResource
             'cover_price' => $this->when(! $this->pricesHidden, $sku?->cover_price),
             'base_price' => $this->when(! $this->pricesHidden, $listed->basePrice ?? $sku?->base_price),
             'price_source' => $this->when(! $this->pricesHidden && $listed instanceof ListedPrice && $listed->source->isCustomerSpecific(), fn (): ?string => $listed?->source->value),
+            'promotion' => $this->when(! $this->pricesHidden && $listed?->promotion !== null, fn (): ?array => $listed?->promotion?->summary()),
             'availability' => $this->resource->status === ProductStatus::ComingSoon ? 'coming_soon' : 'available',
         ];
     }

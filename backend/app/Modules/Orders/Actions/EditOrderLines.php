@@ -26,7 +26,6 @@ use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Orders\Services\CheckoutValidator;
 use App\Modules\Orders\Services\OrderSnapshots;
 use App\Modules\Orders\Services\OrderTotals;
-use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Services\DiscountCalculator;
 use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Support\Money;
@@ -96,7 +95,7 @@ final readonly class EditOrderLines
 
             $before = $this->totalsOf($order);
             $customer = Customer::query()->findOrFail($order->customer_id);
-            $priced = $this->check($live, $changed, $added, $removed, $this->pricing->for($customer));
+            $priced = $this->check($live, $changed, $added, $removed, $customer);
             $changes = [
                 ...$this->remove($removed),
                 ...$this->change($live, $changed, $priced),
@@ -164,7 +163,7 @@ final readonly class EditOrderLines
      * @param  list<OrderItem>  $removed
      * @return array<int, CheckoutLine> sku_id => the line priced at its new quantity
      */
-    private function check(array $live, array $changed, array $added, array $removed, ?PricingContext $pricing): array
+    private function check(array $live, array $changed, array $added, array $removed, Customer $customer): array
     {
         $skus = $this->skus->findMany([...array_map(fn (int $id): int => $live[$id]->sku_id, array_keys($changed)), ...array_values(array_map(fn (OrderEditLineData $line): int => $line->skuId, $added))]);
         $inputs = [];
@@ -185,6 +184,7 @@ final readonly class EditOrderLines
             ...array_map(fn (OrderItem $item): int => $item->sku_id, $removed),
         ]);
 
+        $pricing = $this->pricing->for($customer, array_map(fn (CartLineInput $input): int => $input->sku->id, $inputs));
         $report = $this->validator->checkLines($inputs, $this->withOwnReservation($stock, $own), $pricing);
 
         if ($report->problems !== []) {
@@ -278,6 +278,7 @@ final readonly class EditOrderLines
                 'discount_percent' => $line->price->discountPercent,
                 'tier_min_quantity' => $line->price->tierMinQuantity,
                 'price_source' => $line->price->source,
+                'promotion_id' => $line->price->promotion?->promotionId,
                 'line_total' => Money::times($unit, $quantity),
             ])->save();
 

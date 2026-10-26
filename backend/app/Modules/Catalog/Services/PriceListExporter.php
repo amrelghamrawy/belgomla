@@ -17,13 +17,14 @@ use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Services\PriceResolver;
 use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\LazyCollection;
 
 /**
  * BR-P13 price list as an Excel file (V2 Task 06, D83): the storefront price list's rows (name, code, unit, MOQ,
  * reference and wholesale price, availability) for any facet selection, uncapped. Prices follow D1: when the store
  * hides them from guests, a guest gets `403 prices_hidden` rather than a file without prices. "PDF" stays the
  * browser's print of the price list page. The wholesale price is the shopper's own (BR-PR14): their negotiated or group
- * price when it is lower.
+ * price when it is lower, or a live promotion's (BR-PR15).
  */
 final readonly class PriceListExporter
 {
@@ -59,14 +60,24 @@ final readonly class PriceListExporter
             throw PricesHidden::forGuest();
         }
 
-        $pricing = $this->pricing->for($customer);
-
-        return fn () => $this->write('php://output', $filter, $pricing);
+        return fn () => $this->write('php://output', $filter, $customer);
     }
 
-    public function write(string $path, ProductFilterData $filter, ?PricingContext $pricing = null): void
+    /**
+     * The rows are read in chunks; each chunk is priced with the shopper's context for its SKUs (their promotions too,
+     * BR-PR15).
+     */
+    public function write(string $path, ProductFilterData $filter, ?Authenticatable $customer = null): void
     {
-        $this->spreadsheet->write($path, SpreadsheetFormat::Xlsx, self::COLUMNS, $this->query->get($filter)->map(fn (Product $product): array => $this->row($product, $pricing)), 'قائمة الأسعار');
+        $rows = $this->query->get($filter)
+            ->chunk(PriceListExportQuery::CHUNK)
+            ->flatMap(function (LazyCollection $chunk) use ($customer): array {
+                $pricing = $this->pricing->for($customer, array_values($chunk->map(fn (Product $product): ?int => $product->sku?->id)->filter()->all()));
+
+                return $chunk->map(fn (Product $product): array => $this->row($product, $pricing))->values()->all();
+            });
+
+        $this->spreadsheet->write($path, SpreadsheetFormat::Xlsx, self::COLUMNS, $rows, 'قائمة الأسعار');
     }
 
     /**

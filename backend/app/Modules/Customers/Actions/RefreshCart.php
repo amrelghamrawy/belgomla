@@ -51,7 +51,7 @@ final readonly class RefreshCart
             $kept->filter(fn (CartItem $item): bool => $item->kind === CartLineKind::Order)->values(),
             $removed,
             $kept->filter(fn (CartItem $item): bool => $item->kind === CartLineKind::Preorder)->values(),
-            $this->pricing->for($customer),
+            $this->pricing->for($customer, array_values($kept->map(fn (CartItem $item): int => $item->sku_id)->all())),
         );
     }
 }

@@ -17,7 +17,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final readonly class ProductController
 {
-    /** GET /api/store/products?category=&f[key]=&q=&sort=&page=&per_page= — prices are the shopper's own (BR-PR14). */
+    /** GET /api/store/products?category=&f[key]=&q=&on_offer=&sort=&page=&per_page= — prices are the shopper's own (BR-PR14, BR-PR15). */
     public function index(
         StoreProductListRequest $request,
         StoreProductListQuery $products,
@@ -25,11 +25,13 @@ final readonly class ProductController
         PriceVisibilityQuery $prices,
         CustomerPricing $pricing,
     ): AnonymousResourceCollection {
+        $page = $products->paginate(ProductFilterData::fromRequest($request), $request->sort(), $request->perPage(), $request->onOffer());
+
         return StoreProductResource::page(
-            $products->paginate(ProductFilterData::fromRequest($request), $request->sort(), $request->perPage()),
+            $page,
             $fields->get(),
             $prices->hiddenFor($request->customer()),
-            $pricing->for($request->customer()),
+            $pricing->for($request->customer(), StoreProductResource::skuIds($page->items())),
         );
     }
 
@@ -42,6 +44,8 @@ final readonly class ProductController
         PriceVisibilityQuery $prices,
         CustomerPricing $pricing,
     ): StoreProductResource {
-        return new StoreProductResource($product->bySlug($slug), $fields->get(), $prices->hiddenFor($request->customer()), $pricing->for($request->customer()));
+        $found = $product->bySlug($slug);
+
+        return new StoreProductResource($found, $fields->get(), $prices->hiddenFor($request->customer()), $pricing->for($request->customer(), StoreProductResource::skuIds([$found])));
     }
 }

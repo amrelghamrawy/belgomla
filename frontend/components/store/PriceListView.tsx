@@ -17,6 +17,7 @@ import { findCategory, useCategories, useDownloadPriceList, usePriceList } from 
 import { parseListing, priceListHref, type Listing } from "@/lib/store/listing";
 
 import { PriceListFilters } from "./PriceListFilters";
+import { OfferBadge } from "./OfferBadge";
 import { YourPriceBadge } from "./YourPriceBadge";
 
 /**
@@ -199,6 +200,7 @@ export function PriceListView() {
                     <td className="p-2 font-medium whitespace-nowrap">
                       {row.base_price ? formatMoney(row.base_price) : "—"}
                       <YourPriceBadge source={row.price_source} className="ms-1 print:hidden" />
+                      <OfferBadge promotion={row.promotion} className="ms-1 print:hidden" />
                     </td>
                   )}
                   <td className="p-2">{row.moq}</td>

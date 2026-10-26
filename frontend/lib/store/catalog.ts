@@ -109,6 +109,16 @@ export function useFeaturedProducts() {
   });
 }
 
+/** BR-PR15 (V2 Task 12): the products on a live promotion, for the home page's «عروض» row. */
+export function useOfferProducts() {
+  const params = { on_offer: 1, sort: "-created_at", per_page: 8 } as const;
+
+  return useQuery({
+    queryKey: queryKeys.products(params),
+    queryFn: () => apiFetchPage<StoreProduct>(withQuery("/api/store/products", params)),
+  });
+}
+
 /** A category's newest products, for its row on the home page (D67). */
 export function useCategoryProducts(slug: string) {
   const params = { category: slug, sort: "-created_at", per_page: 8 } as const;

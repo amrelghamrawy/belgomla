@@ -180,3 +180,52 @@ test('BR-PR14 a price list row shows the customer\'s wholesale price and its sou
         ->and($row['price_source'])->toBe('group')
         ->and($hidden)->not->toHaveKeys(['base_price', 'price_source']);
 });
+
+function storePromotion(int $promotionId = 5): App\Modules\Pricing\Data\PromotionPrice
+{
+    return new App\Modules\Pricing\Data\PromotionPrice($promotionId, 'عرض الأضواء', '20.00', Carbon\CarbonImmutable::parse('2026-11-30 22:00:00'));
+}
+
+test('BR-PR15 a store sku priced by a promotion carries the promotion; prices hidden hide it', function (): void {
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['sku.tiers']);
+    $context = new PricingContext(promotions: [$product->sku->id => storePromotion()]);
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false, $context), storeRequest())['sku'];
+    $hidden = rendered(new StoreProductResource($product, new Collection, true, $context), storeRequest())['sku'];
+
+    expect($sku['base_price'])->toBe('72.00')
+        ->and($sku['promotion'])->toBe(['id' => 5, 'name' => 'عرض الأضواء', 'discount_percent' => '20.00', 'ends_at' => '2026-11-30T22:00:00+00:00'])
+        ->and($sku)->not->toHaveKey('price_source')
+        ->and($hidden)->not->toHaveKeys(['base_price', 'promotion']);
+});
+
+test('BR-PR15 a store sku whose group price beats the promotion shows no promotion', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '90'])->create()->load(['sku.tiers']);
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false, new PricingContext('30.00', [], [$product->sku->id => storePromotion()])), storeRequest())['sku'];
+
+    expect($sku['price_source'])->toBe('group')
+        ->and($sku)->not->toHaveKey('promotion');
+});
+
+test('BR-PR15 a price list row priced by a promotion carries the promotion', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '80'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers']);
+
+    $row = rendered(new PriceListRowResource($product, false, new PricingContext(promotions: [$product->sku->id => storePromotion()])), storeRequest());
+
+    expect($row['base_price'])->toBe('64.00')
+        ->and($row['promotion']['id'])->toBe(5);
+});
+
+test('BR-PR15 the sku ids a page of products and its related products show', function (): void {
+    $product = Product::factory()->withSku()->create();
+    $related = Product::factory()->withSku()->create();
+    $incoming = Product::factory()->withSku()->create();
+    App\Modules\Catalog\Models\ProductRelation::factory()->create(['product_id' => $product->id, 'related_product_id' => $related->id]);
+    App\Modules\Catalog\Models\ProductRelation::factory()->create(['product_id' => $incoming->id, 'related_product_id' => $product->id]);
+    $product->load(['sku', 'relations.relatedProduct.sku', 'incomingRelations.product.sku']);
+    $bare = Product::factory()->create();
+
+    expect(StoreProductResource::skuIds([$product, $bare]))->toBe([$product->sku->id, $related->sku->id, $incoming->sku->id])
+        ->and(PriceListRowResource::skuIds(new Collection([$related->load('sku'), $bare->load('sku')])))->toBe([$related->sku->id]);
+});

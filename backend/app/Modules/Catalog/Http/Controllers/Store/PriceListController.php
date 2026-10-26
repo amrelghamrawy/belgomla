@@ -14,11 +14,11 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final readonly class PriceListController
 {
-    /** GET /api/store/price-list — BR-P13, same filters as the product list, unpaginated (capped), at the shopper's own prices (BR-PR14). */
+    /** GET /api/store/price-list — BR-P13, same filters as the product list, unpaginated (capped), at the shopper's own prices (BR-PR14, BR-PR15). */
     public function index(StoreProductListRequest $request, PriceListQuery $priceList, PriceVisibilityQuery $prices, CustomerPricing $pricing): AnonymousResourceCollection
     {
         $list = $priceList->get(ProductFilterData::fromRequest($request));
 
-        return PriceListRowResource::list($list['rows'], $prices->hiddenFor($request->customer()), $list['truncated'], $pricing->for($request->customer()));
+        return PriceListRowResource::list($list['rows'], $prices->hiddenFor($request->customer()), $list['truncated'], $pricing->for($request->customer(), PriceListRowResource::skuIds($list['rows'])));
     }
 }

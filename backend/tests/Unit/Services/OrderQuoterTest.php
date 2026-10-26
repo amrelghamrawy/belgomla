@@ -146,3 +146,15 @@ test('BR-O11 BR-PR14 the quote prices at the customer\'s group and lists only th
         ->and($quote->report->lines[0]->price->source)->toBe(PriceSource::Group)
         ->and($quote->tiers[$sku->id])->toBe([]);
 });
+
+test('BR-O11 BR-PR15 the merchant\'s quote prices at a live promotion and lists only the tiers below it', function (): void {
+    $sku = $this->orderableSku(['code' => 'P-1'], name: 'عرض');
+    $this->inTenant(fn () => App\Modules\Pricing\Models\Promotion::factory()->covering($sku)->percent('20.00')->create());
+    app(TenantContext::class)->set($this->tenant);
+
+    $quote = app(OrderQuoter::class)->quote($this->customer->id, [['sku_id' => $sku->id, 'quantity' => 5]]);
+
+    expect($quote->report->lines[0]->price->unitPrice)->toBe('72.00')
+        ->and($quote->report->lines[0]->price->source)->toBe(PriceSource::Promotion)
+        ->and($quote->tiers[$sku->id])->toBe([]);
+});

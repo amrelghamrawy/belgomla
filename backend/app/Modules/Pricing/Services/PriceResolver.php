@@ -7,6 +7,7 @@ namespace App\Modules\Pricing\Services;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Pricing\Data\ListedPrice;
 use App\Modules\Pricing\Data\PricingContext;
+use App\Modules\Pricing\Data\PromotionPrice;
 use App\Modules\Pricing\Data\ResolvedPrice;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Enums\PriceSource;
@@ -25,9 +26,11 @@ use LogicException;
  * is a separate checkout assertion). Tiers are per SKU only (BR-PR02).
  *
  * BR-PR14 (D89), with a context: (1) a price negotiated with the customer for the SKU (BR-PR13) wins outright, at every
- * quantity, even above the normal price; (2) otherwise the customer pays the lower of the normal price (base or tier) and
- * the group price, `base × (100 − group %) / 100` rounded half-up to the piaster (BR-PR12, D27). The result says which
- * (`source`); `discountPercent` stays relative to the cover price (BR-PR10).
+ * quantity, even above the normal price; (2) otherwise the customer pays the lowest of the normal price (base or tier),
+ * the group price, `base × (100 − group %) / 100` (BR-PR12), and the price of the SKU's live promotion,
+ * `base × (100 − promotion %) / 100` (BR-PR15, D90), each rounded half-up to the piaster (D27) and never below 0.01; on a
+ * tie the earlier of the three is the source. The result says which (`source`, and the `promotion` when it is one);
+ * `discountPercent` stays relative to the cover price (BR-PR10).
  */
 final readonly class PriceResolver
 {
@@ -53,11 +56,13 @@ final readonly class PriceResolver
             }
         }
 
-        $group = $this->groupPrice($sku, $context);
         $unitPrice = $tier instanceof SkuPriceTier ? $tier->unit_price : $sku->base_price;
+        $special = $this->specialPrice($sku, $context, $unitPrice);
 
-        if ($group !== null && Money::compare($group, $unitPrice) < 0) {
-            return $this->resolved($sku, $group, null, $this->impliedDiscount($sku, $group), $quantity, PriceSource::Group);
+        if ($special !== null) {
+            [$price, $source, $promotion] = $special;
+
+            return $this->resolved($sku, $price, null, $this->impliedDiscount($sku, $price), $quantity, $source, $promotion);
         }
 
         return $tier instanceof SkuPriceTier
@@ -78,12 +83,13 @@ final readonly class PriceResolver
         }
 
         $tiers = $this->tiers($sku);
-        $group = $this->groupPrice($sku, $context);
+        $special = $this->specialPrice($sku, $context, $sku->base_price);
 
-        if ($group !== null && Money::compare($group, $sku->base_price) < 0) {
-            $below = array_values(array_filter($tiers, fn (TierData $tier): bool => Money::compare($tier->unitPrice ?? $sku->base_price, $group) < 0));
+        if ($special !== null) {
+            [$price, $source, $promotion] = $special;
+            $below = array_values(array_filter($tiers, fn (TierData $tier): bool => Money::compare($tier->unitPrice ?? $sku->base_price, $price) < 0));
 
-            return new ListedPrice($group, PriceSource::Group, $this->impliedDiscount($sku, $group), $below);
+            return new ListedPrice($price, $source, $this->impliedDiscount($sku, $price), $below, $promotion);
         }
 
         return new ListedPrice($sku->base_price, PriceSource::Base, $this->baseDiscountPercent($sku), $tiers);
@@ -114,7 +120,13 @@ final readonly class PriceResolver
         return $sku->base_price_percent ?? $this->impliedDiscount($sku, $sku->base_price);
     }
 
-    private function resolved(Sku $sku, string $unitPrice, ?int $tierMinQuantity, ?string $discount, int $quantity, PriceSource $source): ResolvedPrice
+    /** BR-PR15: the price of the SKU under a promotion of `$percent` off its base price (the promotion preview). */
+    public function promotionPrice(Sku $sku, string $percent): string
+    {
+        return $this->percentOffBase($sku, $percent) ?? $sku->base_price;
+    }
+
+    private function resolved(Sku $sku, string $unitPrice, ?int $tierMinQuantity, ?string $discount, int $quantity, PriceSource $source, ?PromotionPrice $promotion = null): ResolvedPrice
     {
         return new ResolvedPrice(
             unitPrice: $unitPrice,
@@ -123,14 +135,38 @@ final readonly class PriceResolver
             coverPrice: $sku->cover_price,
             lineTotal: Money::times($unitPrice, $quantity),
             source: $source,
+            promotion: $promotion,
         );
     }
 
-    /** BR-PR12, D27: the base price less the group's %, half-up to the piaster and never below 0.01; null without one. */
-    private function groupPrice(Sku $sku, ?PricingContext $context): ?string
+    /**
+     * BR-PR14, BR-PR15 (D89, D90): the group or promotion price when one is lower than `$normal` (the group first on a tie),
+     * with its source and promotion; null when neither lowers it.
+     *
+     * @return array{0: string, 1: PriceSource, 2: PromotionPrice|null}|null
+     */
+    private function specialPrice(Sku $sku, ?PricingContext $context, string $normal): ?array
     {
-        $percent = $context?->groupDiscount();
+        $best = null;
+        $group = $this->percentOffBase($sku, $context?->groupDiscount());
 
+        if ($group !== null && Money::compare($group, $normal) < 0) {
+            $best = [$group, PriceSource::Group, null];
+        }
+
+        $promotion = $context?->promotion($sku->id);
+        $promoted = $this->percentOffBase($sku, $promotion?->discountPercent);
+
+        if ($promoted !== null && Money::compare($promoted, $best[0] ?? $normal) < 0) {
+            return [$promoted, PriceSource::Promotion, $promotion];
+        }
+
+        return $best;
+    }
+
+    /** BR-PR12, BR-PR15, D27: the base price less a group's or a promotion's %, half-up to the piaster and never below 0.01; null without one. */
+    private function percentOffBase(Sku $sku, ?string $percent): ?string
+    {
         if ($percent === null) {
             return null;
         }

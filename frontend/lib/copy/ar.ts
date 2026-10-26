@@ -1,6 +1,7 @@
 import type { ApiErrorCode } from "@/lib/api/errors";
 import type { CategoryIcon, CategoryKind } from "@/lib/api/types";
 import { dashboard } from "@/lib/copy/ar-dashboard";
+import type { TimeLeft } from "@/lib/store/offer";
 
 // Every Arabic string the UI shows (rules/03 §5). No i18n framework in V1: Arabic only.
 
@@ -72,6 +73,7 @@ const errors: Record<ApiErrorCode, string> = {
   phone_taken: "رقم الهاتف مسجل من قبل",
   prices_hidden: "سجل الدخول لرؤية الأسعار",
   product_not_active: "فعّل المنتج وأضف مخزونه قبل تحويل الحجوزات",
+  promotion_locked: "لا يمكن تعديل عرض بدأ أو انتهى أو أُلغي",
   rate_limited: "محاولات كثيرة، حاول لاحقًا",
   refund_required: "يجب تأكيد رد المبلغ الزائد للعميل",
   reserved_subdomain: "اسم النطاق محجوز",
@@ -92,6 +94,25 @@ const errors: Record<ApiErrorCode, string> = {
   wa_gateway_unavailable: "خدمة ربط واتساب غير متاحة الآن، حاول بعد قليل",
   whatsapp_already_connected: "رقم واتساب مربوط بالفعل، افصله أولًا لربط رقم آخر",
 };
+
+/** Arabic counting for the offer countdown: 1 → «يوم»، 2 → «يومين»، 3–10 → «3 أيام»، 11+ → «11 يومًا». */
+const UNITS = {
+  days: ["يوم", "يومين", "أيام", "يومًا"],
+  hours: ["ساعة", "ساعتين", "ساعات", "ساعة"],
+  minutes: ["دقيقة", "دقيقتين", "دقائق", "دقيقة"],
+} as const;
+
+function countOf(value: number, [one, two, few, many]: readonly [string, string, string, string]): string {
+  if (value === 1) {
+    return one;
+  }
+
+  if (value === 2) {
+    return two;
+  }
+
+  return `${value} ${value <= 10 ? few : many}`;
+}
 
 export const ar = {
   appName: "بالجملة",
@@ -160,6 +181,9 @@ export const ar = {
     shopByCategory: "تسوّق حسب القسم",
     shopByCategoryHint: "اختر القسم ثم الصف لتصفح منتجاته.",
     featuredHint: "آخر ما أضافه المتجر.",
+    // BR-PR15 (V2 Task 12): the products on a live promotion.
+    offers: "عروض",
+    offersHint: "أسعار مخفضة لفترة محدودة.",
     viewAll: "عرض الكل",
     contactUs: "تواصل معنا",
     rights: (name: string) => `© ${name}. كل الحقوق محفوظة.`,
@@ -288,6 +312,10 @@ export const ar = {
     wholesalePrice: "سعر الجملة",
     // BR-PR14 (V2 Task 11): the price is the customer's group or negotiated price.
     yourPrice: "سعرك الخاص",
+    // BR-PR15 (V2 Task 12): a live promotion set the price.
+    offer: (percent: string) => `عرض ${percent}%`,
+    offerEndsIn: (left: TimeLeft) => `ينتهي خلال ${countOf(left.value, UNITS[left.unit])}`,
+    offerEnded: "انتهى العرض",
     margin: (percent: string) => `هامش ربحك ${percent}%`,
     tierShort: (min: number, unit: string, price: string) => `من ${min} ${unit}: ${price}`,
     tiers: "أسعار الكميات",

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProductCard } from "@/components/store/ProductCard";
 
@@ -289,5 +289,39 @@ describe("the customer's own price on the card (BR-PR14)", () => {
     renderWithQuery(<ProductCard product={storeProduct()} />);
 
     expect(screen.queryByTestId("your-price")).toBeNull();
+  });
+});
+
+describe("the offer on the card (BR-PR15)", () => {
+  const promotion = { id: 4, name: "عرض الأضواء", discount_percent: "15.00", ends_at: "2026-11-30T22:00:00+00:00" };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows the offer's % and how long it has left", () => {
+    vi.useFakeTimers({ now: new Date("2026-11-27T21:00:00Z"), toFake: ["Date"] });
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct({ sku: storeSku({ base_price: "76.50", promotion }) })} />);
+
+    expect(screen.getByText("76.50 ج.م")).toBeInTheDocument();
+    expect(screen.getByTestId("offer-badge")).toHaveTextContent("عرض 15%");
+    expect(screen.getByTestId("offer-badge")).toHaveTextContent("ينتهي خلال 3 أيام");
+    expect(screen.queryByTestId("your-price")).toBeNull();
+  });
+
+  it("says the offer ended once the clock passes its end", () => {
+    vi.useFakeTimers({ now: new Date("2026-12-01T00:00:00Z"), toFake: ["Date"] });
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct({ sku: storeSku({ promotion }) })} />);
+
+    expect(screen.getByTestId("offer-badge")).toHaveTextContent("انتهى العرض");
+  });
+
+  it("shows no offer badge without a promotion", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={storeProduct()} />);
+
+    expect(screen.queryByTestId("offer-badge")).toBeNull();
   });
 });

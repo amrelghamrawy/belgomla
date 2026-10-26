@@ -56,7 +56,7 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 | Permission | owner | manager | sales | warehouse | accountant |
 | ---------- | :---: | :-----: | :---: | :-------: | :--------: |
 | `catalog.manage` (products, categories, units, fields) | ✓ | ✓ | | | |
-| `pricing.manage` | ✓ | ✓ | | | |
+| `pricing.manage` (incl. promotions, V2 Task 12, BR-PR15) | ✓ | ✓ | | | |
 | `pricing.customers` (customer groups, negotiated prices, the group on the customer form; V2 Task 11, BR-PR12, BR-PR13) | ✓ | ✓ | | | |
 | `inventory.adjust` | ✓ | ✓ | | ✓ | |
 | `orders.view` (also reading the catalog and stock) | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -454,7 +454,11 @@ The merchant sets a unit price for one customer on one SKU (in its selling unit,
 
 ### BR-PR14 — Price Precedence (V2 Task 11, D89)
 
-For a customer, SKU and quantity: (1) the customer's negotiated price for the SKU, if any; (2) otherwise the lower of the normal price (BR-PR04: base or tier) and the group price (BR-PR12). Guests and customers without a group or negotiated price pay the normal price. The PriceResolver stays the single authority: it receives the customer's pricing context (their active group's % and their negotiated prices, read once per request) and never queries. Every price the customer sees or pays follows this rule: the storefront product list and page, the price list and its Excel file, the cart, checkout (BR-PR06), the merchant's quote and order (BR-O11), order edits (BR-O12) and pre-orders and their conversion (BR-O14). The order line snapshots the price and where it came from (`price_source`: base, tier, group or customer, BR-PR07); the storefront marks a group or negotiated price «سعرك الخاص». Manual discounts (BR-PR08) apply on top.
+For a customer, SKU and quantity: (1) the customer's negotiated price for the SKU, if any; (2) otherwise the lowest of the normal price (BR-PR04: base or tier), the group price (BR-PR12) and the price of a live promotion on the SKU (BR-PR15, V2 Task 12, D90). Guests and customers without a group or negotiated price pay the normal price. The PriceResolver stays the single authority: it receives the customer's pricing context (their active group's % and their negotiated prices, read once per request) and never queries. Every price the customer sees or pays follows this rule: the storefront product list and page, the price list and its Excel file, the cart, checkout (BR-PR06), the merchant's quote and order (BR-O11), order edits (BR-O12) and pre-orders and their conversion (BR-O14). The order line snapshots the price and where it came from (`price_source`: base, tier, group or customer, BR-PR07); the storefront marks a group or negotiated price «سعرك الخاص». Manual discounts (BR-PR08) apply on top.
+
+### BR-PR15 — Promotions (V2 Task 12, D90)
+
+The merchant runs time-boxed offers («خصم 15% على كتب الأضواء حتى آخر الشهر»): a name, one % off the base price (more than 0, below 90), a start and an end in Cairo time, and the products it covers, chosen by the same filter as bulk pricing (BR-PR11, not empty) or as an explicit list of SKUs. The covered SKUs are fixed when the promotion is saved. While a promotion is live (`starts_at ≤ now < ends_at`, not a draft, not cancelled) every customer and guest pays the promotion price, `base_price × (100 − %) / 100` rounded half-up to the piaster, whenever it is the lowest price they can get (BR-PR14): a negotiated price still wins outright; otherwise the lowest of the normal price, the group price and the promotion price applies. Promotions never stack: a SKU in two live promotions gets the higher %. The storefront shows the offer's % and when it ends on the card, product page, cart and price list. Checkout prices at the moment of the order (BR-PR06), so an offer that ended in the meantime is not applied; order lines keep `price_source = promotion` and the promotion's id (BR-PR07). Only a draft or a promotion that has not started can be edited; any promotion that has not ended can be cancelled. Audited (`promotion.created`, `promotion.updated`, `promotion.cancelled`). Who: `pricing.manage`.
 
 ### BR-PR09 — Taxes
 

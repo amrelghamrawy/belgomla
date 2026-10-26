@@ -207,3 +207,69 @@ test('BR-PR14 listed() keeps the base price when a 0% group does not lower it', 
         ->and($listed->source)->toBe(PriceSource::Base)
         ->and($listed->tiers)->toHaveCount(2);
 });
+
+/*
+| BR-PR15 (V2 Task 12, D90): a live promotion of the SKU in the context. The same book (base 100.00, 10+ → 90.00,
+| 100+ → 80.00, cover 125.00, sku 7).
+*/
+
+function promoOff(string $percent, int $id = 3): App\Modules\Pricing\Data\PromotionPrice
+{
+    return new App\Modules\Pricing\Data\PromotionPrice($id, 'عرض الأضواء', $percent, Carbon\CarbonImmutable::parse('2026-11-30 22:00:00'));
+}
+
+test('BR-PR15 D90 price precedence with a promotion: negotiated wins, else the lowest of normal, group and promotion', function (PricingContext $context, int $quantity, string $unitPrice, ?int $tier, PriceSource $source): void {
+    $price = app(PriceResolver::class)->resolve(contextSku(), $quantity, $context);
+
+    expect($price->unitPrice)->toBe($unitPrice)
+        ->and($price->tierMinQuantity)->toBe($tier)
+        ->and($price->source)->toBe($source)
+        ->and($price->promotion?->promotionId)->toBe($source === PriceSource::Promotion ? 3 : null);
+})->with([
+    'promotion lower than base' => [new PricingContext(promotions: [7 => promoOff('15.00')]), 1, '85.00', null, PriceSource::Promotion],
+    'promotion lower than the first tier' => [new PricingContext(promotions: [7 => promoOff('15.00')]), 10, '85.00', null, PriceSource::Promotion],
+    'tier lower than the promotion' => [new PricingContext(promotions: [7 => promoOff('15.00')]), 100, '80.00', 100, PriceSource::Tier],
+    'promotion equal to the tier keeps the tier' => [new PricingContext(promotions: [7 => promoOff('10.00')]), 10, '90.00', 10, PriceSource::Tier],
+    'promotion lower than the group' => [new PricingContext('10.00', [], [7 => promoOff('15.00')]), 1, '85.00', null, PriceSource::Promotion],
+    'group lower than the promotion' => [new PricingContext('20.00', [], [7 => promoOff('15.00')]), 1, '80.00', null, PriceSource::Group],
+    'group equal to the promotion keeps the group' => [new PricingContext('15.00', [], [7 => promoOff('15.00')]), 1, '85.00', null, PriceSource::Group],
+    'negotiated above the promotion still wins (D90 a)' => [new PricingContext(null, [7 => '95.00'], [7 => promoOff('50.00')]), 1, '95.00', null, PriceSource::Customer],
+    'a promotion of another sku changes nothing' => [new PricingContext(promotions: [8 => promoOff('50.00')]), 1, '100.00', null, PriceSource::Base],
+]);
+
+test('BR-PR15 D27 the promotion price is the base price less the % rounded half-up, never below 0.01', function (string $base, string $percent, string $expected): void {
+    $sku = resolverSku($base);
+    $sku->id = 1;
+
+    expect(app(PriceResolver::class)->resolve($sku, 1, new PricingContext(promotions: [1 => promoOff($percent)]))->unitPrice)->toBe($expected);
+})->with([
+    'half-up' => ['10.10', '25.00', '7.58'],
+    'floor at 0.01' => ['0.02', '89.99', '0.01'],
+]);
+
+test('BR-PR15 a promotion price shows its discount off the cover price', function (): void {
+    expect(app(PriceResolver::class)->resolve(contextSku(), 1, new PricingContext(promotions: [7 => promoOff('20.00')]))->discountPercent)->toBe('36.00');
+});
+
+test('BR-PR15 listed() shows a promotion price with its promotion and only the tiers below it', function (): void {
+    $listed = app(PriceResolver::class)->listed(contextSku(), new PricingContext(promotions: [7 => promoOff('15.00')]));
+
+    expect($listed->basePrice)->toBe('85.00')
+        ->and($listed->source)->toBe(PriceSource::Promotion)
+        ->and($listed->promotion?->name)->toBe('عرض الأضواء')
+        ->and($listed->tiers)->toEqual([new TierData(100, '80.00')]);
+});
+
+test('BR-PR15 listed() keeps the group price and no promotion when the group is lower', function (): void {
+    $listed = app(PriceResolver::class)->listed(contextSku(), new PricingContext('20.00', [], [7 => promoOff('15.00')]));
+
+    expect($listed->basePrice)->toBe('80.00')
+        ->and($listed->source)->toBe(PriceSource::Group)
+        ->and($listed->promotion)->toBeNull();
+});
+
+test('BR-PR15 promotionPrice() prices a sku under a % without tiers loaded', function (): void {
+    $sku = new Sku(['base_price' => '10.10']);
+
+    expect(app(PriceResolver::class)->promotionPrice($sku, '25.00'))->toBe('7.58');
+});

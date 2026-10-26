@@ -249,11 +249,13 @@ The uploaded file waits in `storage/app/private/imports/{tenant}/{uuid}.{xlsx|cs
 
 ```
 resolve(sku, qty, context = null):          # context: the customer's group % and negotiated prices (V2 Task 11)
+                                             #          + the live promotion of each SKU priced (V2 Task 12)
   if context has a negotiated price for sku: return it            (source customer, BR-PR13)
   tier = max(min_quantity) among tiers where min_quantity <= qty
   normal = tier ? tier.unit_price : sku.base_price               (source tier | base, BR-PR04)
   group = context.group% ? round_half_up(sku.base_price × (100 − group%) / 100) : null
-  return group < normal ? group : normal                         (source group, BR-PR12, BR-PR14)
+  promo = context.promotion(sku) ? round_half_up(sku.base_price × (100 − promo%) / 100) : null
+  return the lowest of normal, group, promo (ties: that order)   (source group | promotion, BR-PR12, BR-PR15)
 ```
 
 ### `customer_groups` (V2 Task 11, BR-PR12, D89)
@@ -279,6 +281,28 @@ resolve(sku, qty, context = null):          # context: the customer's group % an
 | note        | varchar(300)  | nullable                                           |
 
 ---
+
+### `promotions` (V2 Task 12, BR-PR15, D90)
+
+| Column           | Type          | Notes                                            |
+| ---------------- | ------------- | ------------------------------------------------ |
+| id               | bigint PK     |                                                  |
+| tenant_id        | FK            | index (tenant_id, status, ends_at)               |
+| name             | varchar(100)  |                                                  |
+| discount_percent | numeric(5,2)  | **check > 0 and < 90**; % off the base price     |
+| starts_at        | timestamp     | UTC, like every timestamp here                   |
+| ends_at          | timestamp     | **check ends_at > starts_at**                    |
+| filter           | jsonb         | nullable; the dashboard product filter `{category, f, q, status}`; null = an explicit SKU list |
+| status           | varchar(10)   | `draft` \| `scheduled` \| `active` \| `ended` \| `cancelled` (check); scheduled → active → ended moved by `pricing:promotions-tick`; prices read the times, not this column |
+| created_by       | FK tenant_users | nullable                                       |
+| cancelled_at     | timestamp     | nullable                                         |
+
+### `promotion_skus` (V2 Task 12)
+
+| Column       | Type   | Notes                                                        |
+| ------------ | ------ | ------------------------------------------------------------ |
+| promotion_id | FK     | cascade on delete; **PK (promotion_id, sku_id)**             |
+| sku_id       | FK     | index (sku_id); the SKUs the filter or list selected when the promotion was last saved |
 
 ## 5. Inventory
 
@@ -453,7 +477,8 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | unit_price        | numeric(12,2) | applied price = list_unit_price less the manual discount; **check 0.01 ≤ unit_price ≤ list_unit_price**, = list_unit_price without a discount |
 | discount_percent  | numeric(5,2)  | nullable, **display only**: the tier margin off the cover price (BR-PR10), not the manual discount |
 | tier_min_quantity | int           | nullable; which tier applied           |
-| price_source      | varchar(10)   | V2 Task 11: `base` \| `tier` \| `group` \| `customer` (check), where the list price came from (BR-PR14); backfilled `tier` / `base` |
+| price_source      | varchar(10)   | V2 Task 11: `base` \| `tier` \| `group` \| `customer` \| `promotion` (V2 Task 12) (check), where the list price came from (BR-PR14, BR-PR15); backfilled `tier` / `base` |
+| promotion_id      | FK promotions | V2 Task 12: nullable; the promotion that set the list price (set exactly when `price_source = promotion`, check) |
 | line_total        | numeric(12,2) | = quantity × unit_price; once delivered = delivered_quantity × unit_price (BR-O13) |
 | delivered_quantity | int          | V2 Task 09: selling units that went out, set on delivery (backfilled = quantity for orders delivered before); **check 0 ≤ delivered_quantity ≤ quantity**; null until delivered (BR-O13) |
 | removed_at        | timestamp     | V2 Task 09: the merchant removed the line (BR-O12); kept for history, out of totals, stock moves and returns; **check** a removed line has no delivered_quantity |

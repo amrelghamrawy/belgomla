@@ -268,3 +268,11 @@ test('BR-O11 BR-PR14 a merchant\'s order for a customer is priced at that custom
 
     expect(OrderItem::query()->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '45.00', 'price_source' => PriceSource::Group]);
 });
+
+test('BR-O11 BR-PR15 a merchant\'s order takes a live promotion like checkout', function (): void {
+    $promotion = App\Modules\Pricing\Models\Promotion::factory()->covering($this->sku)->percent('30.00')->create();
+
+    ($this->place)();
+
+    expect(OrderItem::query()->sole()->only(['unit_price', 'price_source', 'promotion_id']))->toBe(['unit_price' => '63.00', 'price_source' => PriceSource::Promotion, 'promotion_id' => $promotion->id]);
+});

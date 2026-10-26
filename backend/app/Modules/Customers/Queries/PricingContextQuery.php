@@ -10,6 +10,8 @@ use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Pricing\Contracts\CustomerPricing;
 use App\Modules\Pricing\Data\PricingContext;
+use App\Modules\Pricing\Services\ActivePromotions;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
@@ -18,13 +20,24 @@ use Illuminate\Contracts\Auth\Authenticatable;
  * context (null). Callers build it once per request and hand it to the PriceResolver: the storefront through the
  * CustomerPricing contract, the cart, checkout, the merchant's quote and order, order edits and pre-order conversion
  * directly.
+ *
+ * BR-PR15 (V2 Task 12, D90): the context also carries the live promotion of each SKU the caller is about to price
+ * (`$skuIds`, one more query through Pricing's ActivePromotions, at `$at` or now), for guests too: a guest gets a context
+ * only when one of those SKUs is on a promotion.
  */
 final readonly class PricingContextQuery implements CustomerPricing
 {
-    public function for(?Authenticatable $customer): ?PricingContext
+    public function __construct(private ActivePromotions $promotions) {}
+
+    /**
+     * @param  list<int>  $skuIds
+     */
+    public function for(?Authenticatable $customer, array $skuIds = [], ?CarbonImmutable $at = null): ?PricingContext
     {
+        $promotions = $this->promotions->forSkus($skuIds, $at);
+
         if (! $customer instanceof Customer) {
-            return null;
+            return $promotions === [] ? null : new PricingContext(promotions: $promotions);
         }
 
         $rows = CustomerSkuPrice::query()
@@ -52,6 +65,6 @@ final readonly class PricingContextQuery implements CustomerPricing
             }
         }
 
-        return new PricingContext($group, $prices);
+        return new PricingContext($group, $prices, $promotions);
     }
 }

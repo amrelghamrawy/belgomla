@@ -36,7 +36,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * `base_price`, `discount_percent` (off the cover price) and `tiers` come from Pricing's PriceResolver, read-only
  * (BR-PR03, BR-PR10), at the shopper's own prices (BR-PR14, V2 Task 11): a negotiated price as `base_price` with no tiers,
  * a group price with only the tiers below it, and then `price_source` (`group` or `customer`) for the «سعرك الخاص» badge;
- * guests and customers without either see the SKU as stored and no `price_source`. `available` is the SKU's stock in base units from Inventory (BR-INV02, BR-U03; no
+ * guests and customers without either see the SKU as stored and no `price_source`. A live promotion (BR-PR15, V2 Task 12)
+ * that sets the price adds `promotion { id, name, discount_percent, ends_at }` for the offer badge, for guests too. `available` is the SKU's stock in base units from Inventory (BR-INV02, BR-U03; no
  * stock row = 0); `in_stock` means at least one selling unit can be ordered (D37).
  *
  * @property-read Product $resource
@@ -65,6 +66,33 @@ final class StoreProductResource extends JsonResource
             $products->through(fn (Product $product): self => new self($product, $fields, $pricesHidden, $pricing)),
             self::class,
         );
+    }
+
+    /**
+     * The SKUs these products show, related products included when loaded: what the PricingContext must know the
+     * promotions of (BR-PR15).
+     *
+     * @param  iterable<Product>  $products
+     * @return list<int>
+     */
+    public static function skuIds(iterable $products): array
+    {
+        $ids = [];
+
+        foreach ($products as $product) {
+            $related = [
+                ...($product->relationLoaded('relations') ? $product->relations->map(fn (ProductRelation $relation): Product => $relation->relatedProduct)->all() : []),
+                ...($product->relationLoaded('incomingRelations') ? $product->incomingRelations->map(fn (ProductRelation $relation): Product => $relation->product)->all() : []),
+            ];
+
+            foreach ([$product, ...$related] as $shown) {
+                if ($shown->relationLoaded('sku') && $shown->sku instanceof Sku) {
+                    $ids[] = $shown->sku->id;
+                }
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**
@@ -169,6 +197,7 @@ final class StoreProductResource extends JsonResource
             'discount_percent' => $this->when(! $this->pricesHidden, fn (): ?string => $listed instanceof ListedPrice ? $listed->discountPercent : app(PriceResolver::class)->baseDiscountPercent($sku)),
             'tiers' => $this->when(! $this->pricesHidden && $listed instanceof ListedPrice, fn (): array => $this->tiers($listed->tiers ?? [])),
             'price_source' => $this->when(! $this->pricesHidden && $listed instanceof ListedPrice && $listed->source->isCustomerSpecific(), fn (): ?string => $listed?->source->value),
+            'promotion' => $this->when(! $this->pricesHidden && $listed?->promotion !== null, fn (): ?array => $listed?->promotion?->summary()),
             'available' => $this->when(! $comingSoon, $available),
             'in_stock' => $this->resource->status === ProductStatus::Active && $available >= $sku->conversion_factor,
             'coming_soon' => $this->when($comingSoon, true),

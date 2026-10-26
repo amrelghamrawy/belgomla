@@ -410,3 +410,22 @@ test('BR-O12 BR-PR12 an added line takes the customer\'s group price', function 
 
     expect(OrderItem::query()->where('order_id', $this->order->id)->where('sku_id', $this->skuC->id)->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '72.00', 'price_source' => PriceSource::Group]);
 });
+
+test('BR-O12 BR-PR15 a changed line is re-priced at today\'s promotion and records it; an unchanged line keeps its snapshot', function (): void {
+    $promotion = App\Modules\Pricing\Models\Promotion::factory()->covering($this->skuA, $this->skuB)->percent('10.00')->create();
+
+    ($this->edit)([($this->a)(7), ($this->b)()]);
+
+    expect($this->lineA->refresh()->only(['unit_price', 'price_source', 'promotion_id']))->toBe(['unit_price' => '81.00', 'price_source' => PriceSource::Promotion, 'promotion_id' => $promotion->id])
+        ->and(OrderItem::query()->where('order_id', $this->order->id)->where('sku_id', $this->skuB->id)->sole()->promotion_id)->toBeNull();
+});
+
+test('BR-O12 BR-PR15 a line re-priced after its promotion ended drops the promotion', function (): void {
+    $promotion = App\Modules\Pricing\Models\Promotion::factory()->covering($this->skuA)->percent('10.00')->create();
+    ($this->edit)([($this->a)(7), ($this->b)()]);
+    $promotion->forceFill(['status' => 'cancelled'])->save();
+
+    ($this->edit)([($this->a)(8), ($this->b)()]);
+
+    expect($this->lineA->refresh()->only(['unit_price', 'price_source', 'promotion_id']))->toBe(['unit_price' => '90.00', 'price_source' => PriceSource::Base, 'promotion_id' => null]);
+});

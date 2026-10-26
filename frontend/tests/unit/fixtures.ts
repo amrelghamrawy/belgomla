@@ -126,6 +126,7 @@ export function cartItem(overrides: Partial<CartItem> = {}): CartItem {
     unit_price: "90.00",
     tier_min_quantity: null,
     price_source: "base",
+    promotion: null,
     line_total: "540.00",
     moq: 2,
     available: 400,

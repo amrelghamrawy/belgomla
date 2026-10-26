@@ -165,7 +165,7 @@ V2 should focus on increasing merchant flexibility and operational capability af
 - Item-level discount.
 - Customer-specific pricing. **Done (V2 Task 11, BR-PR12..PR14).**
 - Negotiated customer pricing. **Done (V2 Task 11, BR-PR13).**
-- Promotional pricing.
+- Promotional pricing. **Done (V2 Task 12, BR-PR15).**
 - Taxes / VAT handling if required.
 
 ### Orders (highest V2 priority for school books)

@@ -231,11 +231,35 @@ describe("StoreHome (D67)", () => {
     renderWithQuery(<StoreHome />);
 
     expect(await screen.findByRole("heading", { level: 2, name: "المرحلة الإعدادية" })).toBeInTheDocument();
-    await waitFor(() => expect(callsTo(fetchMock, "GET /api/store/products")).toHaveLength(3));
+    await waitFor(() => expect(callsTo(fetchMock, "GET /api/store/products")).toHaveLength(4));
     expect(screen.queryByRole("heading", { level: 2, name: "المرحلة الثانوية" })).not.toBeInTheDocument();
-    expect(callsTo(fetchMock, "GET /api/store/products")[1]?.url.search).toBe(
+    expect(callsTo(fetchMock, "GET /api/store/products").map((call) => call.url.search)).toContain(
       "?category=prep&sort=-created_at&per_page=8",
     );
+  });
+
+  it("BR-PR15 shows a row of the products on offer when there are some", async () => {
+    const fetchMock = stubHome();
+    renderWithQuery(<StoreHome />);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "عروض" })).toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET /api/store/products").map((call) => call.url.search)).toContain(
+      "?on_offer=1&sort=-created_at&per_page=8",
+    );
+  });
+
+  it("BR-PR15 hides the offers row when nothing is on offer", async () => {
+    stubApi({
+      "GET /api/store/tenant": json(200, { data: storeWithMinimum }),
+      "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/products": ({ url }) =>
+        url.searchParams.has("on_offer") ? json(200, page([])) : json(200, page([storeProduct()], { total: 34 })),
+      ...guest,
+    });
+    renderWithQuery(<StoreHome />);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "المرحلة الإعدادية" })).toBeInTheDocument();
+    expect(screen.queryByTestId("home-offers")).not.toBeInTheDocument();
   });
 
   it("explains how to order to a guest, with the approval step when the store requires it", async () => {

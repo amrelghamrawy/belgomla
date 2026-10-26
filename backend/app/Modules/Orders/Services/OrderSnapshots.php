@@ -39,7 +39,8 @@ final readonly class OrderSnapshots
             'unit_price' => $line->price->unitPrice,
             'discount_percent' => $line->price->discountPercent,
             'tier_min_quantity' => $line->price->tierMinQuantity,
-            'price_source' => $line->price->source->value, // BR-PR14: base, tier, group or customer
+            'price_source' => $line->price->source->value, // BR-PR14, BR-PR15: base, tier, group, customer or promotion
+            'promotion_id' => $line->price->promotion?->promotionId,
             'line_total' => $line->price->lineTotal,
         ];
     }

@@ -35,8 +35,10 @@ describe("StoreHome", () => {
     renderWithQuery(<StoreHome />);
 
     expect(await screen.findByRole("link", { name: "المرحلة الإعدادية" })).toHaveAttribute("href", "/c/prep");
-    expect(await screen.findByRole("link", { name: "الأضواء علوم أولى إعدادي" })).toBeInTheDocument();
-    expect(callsTo(fetchMock, "GET /api/store/products")[0]?.url.search).toBe("?sort=-created_at&per_page=8");
+    expect((await screen.findAllByRole("link", { name: "الأضواء علوم أولى إعدادي" }))[0]).toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET /api/store/products").map((call) => call.url.search)).toContain(
+      "?sort=-created_at&per_page=8",
+    );
   });
 
   it("D41 a store without categories shows a WhatsApp contact button", async () => {
@@ -157,6 +159,22 @@ describe("PriceListView", () => {
     expect(table).toHaveTextContent("الأضواء علومBK-001نسخة120.00 ج.م96.00 ج.م1متوفر");
     expect(table).toHaveTextContent("المعلم علومBK-002كرتونة—80.00 ج.م2قريبًا");
     expect(callsTo(fetchMock, "GET /api/store/price-list")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
+  });
+
+  it("BR-PR15 marks the rows a promotion priced with the offer badge", async () => {
+    stubList({}, [
+      {
+        ...rows[0],
+        base_price: "76.50",
+        promotion: { id: 4, name: "عرض", discount_percent: "15.00", ends_at: "2030-01-01T00:00:00Z" },
+      },
+      rows[1],
+    ]);
+    renderWithQuery(<PriceListView />);
+
+    const table = await screen.findByTestId("price-list");
+    expect(within(table).getAllByTestId("offer-badge")).toHaveLength(1);
+    expect(within(table).getByTestId("offer-badge")).toHaveTextContent("عرض 15%");
   });
 
   it("BR-PR14 marks the rows priced at the customer's own price", async () => {

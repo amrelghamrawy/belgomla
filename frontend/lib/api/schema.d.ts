@@ -1451,6 +1451,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Promotions (BR-PR15, V2 Task 12), latest start first, with how many SKUs each covers */
+        get: operations["dashboardPromotions"];
+        put?: never;
+        /** Creates a promotion, scheduled or a draft; its SKUs are selected now (D90 d). Idempotency-Key honored */
+        post: operations["dashboardCreatePromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/promotions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** How many SKUs a promotion would cover and the first ten, priced when a % is sent; writes nothing */
+        post: operations["dashboardPreviewPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/promotions/{promotion}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        /** One promotion; an explicit SKU list comes with its SKUs */
+        get: operations["dashboardPromotion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Any of the fields of a draft or a promotion that has not started (409 promotion_locked otherwise); the SKUs are selected again */
+        patch: operations["dashboardUpdatePromotion"];
+        trace?: never;
+    };
+    "/api/dashboard/promotions/{promotion}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops a promotion that has not ended, at once (D90 f) */
+        post: operations["dashboardCancelPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/customer-groups": {
         parameters: {
             query?: never;
@@ -2136,7 +2210,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "promotion_locked" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2270,10 +2344,18 @@ export interface components {
             value: string;
         };
         /**
-         * @description Where a unit price came from (BR-PR14, D89): the base price, a quantity tier, the customer's group or their negotiated price
+         * @description Where a unit price came from (BR-PR14, D89, D90): the base price, a quantity tier, the customer's group, their negotiated price or a live promotion (V2 Task 12)
          * @enum {string}
          */
-        PriceSource: "base" | "tier" | "group" | "customer";
+        PriceSource: "base" | "tier" | "group" | "customer" | "promotion";
+        /** @description The live promotion that set a price (BR-PR15, V2 Task 12): the offer badge's % and «ينتهي خلال …» */
+        PromotionSummary: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            /** Format: date-time */
+            ends_at: string;
+        };
         /**
          * @description Present only when the price is the shopper's own (their group or negotiated price), for the «سعرك الخاص» badge
          * @enum {string}
@@ -2283,7 +2365,7 @@ export interface components {
             min_quantity: number;
             unit_price: components["schemas"]["Money"] | null;
         };
-        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price. */
+        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price, `promotion` only when a live promotion sets the price (BR-PR15, guests too). */
         StoreSku: {
             id: number;
             code: string;
@@ -2295,6 +2377,7 @@ export interface components {
             discount_percent?: components["schemas"]["Money"] | null;
             tiers?: components["schemas"]["PriceTier"][];
             price_source?: components["schemas"]["CustomerPriceSource"];
+            promotion?: components["schemas"]["PromotionSummary"];
             available?: number;
             in_stock: boolean;
             /** @constant */
@@ -2354,6 +2437,7 @@ export interface components {
             cover_price?: components["schemas"]["Money"] | null;
             base_price?: components["schemas"]["Money"] | null;
             price_source?: components["schemas"]["CustomerPriceSource"];
+            promotion?: components["schemas"]["PromotionSummary"];
             /** @enum {string} */
             availability: "available" | "coming_soon";
         };
@@ -2427,6 +2511,8 @@ export interface components {
             unit_price: components["schemas"]["Money"];
             tier_min_quantity: number | null;
             price_source: components["schemas"]["PriceSource"];
+            /** @description The promotion that set the price (price_source promotion), else null */
+            promotion: components["schemas"]["PromotionSummary"] | null;
             line_total: components["schemas"]["Money"];
             moq: number;
             /** @description Base units (D37) */
@@ -3137,6 +3223,68 @@ export interface components {
             sort_order: number;
             customers_count: number;
         };
+        /** @enum {string} */
+        PromotionStatus: "draft" | "scheduled" | "active" | "ended" | "cancelled";
+        /** @description A time-boxed % off the base price of the SKUs it covers (BR-PR15, D90); `status` is as of now */
+        Promotion: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            status: components["schemas"]["PromotionStatus"];
+            /** @enum {string} */
+            target: "filter" | "skus";
+            /** @description The stored product filter {category, f, q, status}; null for an explicit SKU list */
+            filter: {
+                [key: string]: unknown;
+            } | null;
+            skus_count: number;
+            /** @description The explicit SKU list (detail only) */
+            skus?: {
+                sku_id: number;
+                code: string;
+                product_name: string;
+            }[];
+            /** Format: date-time */
+            cancelled_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** @description Times without an offset are Cairo time (D60); the target is filter or sku_ids, never both */
+        PromotionRequest: {
+            name: string;
+            /** @description More than 0, below 90 */
+            discount_percent: string | number;
+            starts_at: string;
+            ends_at: string;
+            filter?: components["schemas"]["ProductFilter"];
+            sku_ids?: number[];
+            /** @enum {string} */
+            status?: "draft" | "scheduled";
+        };
+        PromotionPatch: {
+            name?: string;
+            discount_percent?: string | number;
+            starts_at?: string;
+            ends_at?: string;
+            filter?: components["schemas"]["ProductFilter"];
+            sku_ids?: number[];
+            /** @enum {string} */
+            status?: "draft" | "scheduled";
+        };
+        PromotionPreview: {
+            skus_count: number;
+            sample: {
+                sku_id: number;
+                code: string;
+                product_name: string;
+                base_price: components["schemas"]["Money"];
+                promotion_price: components["schemas"]["Money"] | null;
+            }[];
+        };
         /** @description A price negotiated with one customer for one SKU (BR-PR13, D89) */
         CustomerSkuPrice: {
             sku_id: number;
@@ -3793,6 +3941,17 @@ export interface components {
                 };
             };
         };
+        /** @description The promotion */
+        Promotion: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["Promotion"];
+                };
+            };
+        };
         /** @description The customer */
         DashboardCustomer: {
             headers: {
@@ -3869,6 +4028,7 @@ export interface components {
         SkuId: number;
         CustomerId: number;
         CustomerGroupId: number;
+        PromotionId: number;
         UserId: number;
     };
     requestBodies: {
@@ -4103,6 +4263,8 @@ export interface operations {
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
                 sort?: "name" | "-created_at" | "price" | "-price";
+                /** @description Only the products on a live promotion (BR-PR15, V2 Task 12), the storefront's «عروض» */
+                on_offer?: boolean;
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -6563,6 +6725,163 @@ export interface operations {
                 };
             };
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardPromotions: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["PromotionStatus"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of promotions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Promotion"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCreatePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionRequest"];
+            };
+        };
+        responses: {
+            201: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreviewPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    filter?: components["schemas"]["ProductFilter"];
+                    sku_ids?: number[];
+                    discount_percent?: string | number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PromotionPreview"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdatePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionPatch"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description promotion_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCancelPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description promotion_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardCustomerGroups: {

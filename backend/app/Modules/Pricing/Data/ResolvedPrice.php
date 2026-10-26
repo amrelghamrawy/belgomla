@@ -9,7 +9,7 @@ use App\Modules\Pricing\Enums\PriceSource;
 /**
  * The outcome of BR-PR04 / BR-PR14 for one SKU, quantity and customer: the applied unit price, the tier it came from
  * (null = not a tier), the discount off the cover price shown next to it, `unitPrice × quantity`, and where the price
- * came from (`source`: base, tier, group or customer, D89). Money and percents are 2-decimal strings. Cart display and
+ * came from (`source`: base, tier, group, customer or promotion, D89, D90; `promotion` = the promotion that set it). Money and percents are 2-decimal strings. Cart display and
  * checkout (BR-PR06) snapshot this.
  */
 final readonly class ResolvedPrice
@@ -21,5 +21,6 @@ final readonly class ResolvedPrice
         public ?string $coverPrice,
         public string $lineTotal,
         public PriceSource $source = PriceSource::Base,
+        public ?PromotionPrice $promotion = null,
     ) {}
 }

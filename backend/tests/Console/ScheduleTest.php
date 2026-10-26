@@ -33,3 +33,13 @@ test('D70 wa-gateway is reconciled every five minutes without overlapping runs',
         ->and($reconcile?->expression)->toBe('*/5 * * * *')
         ->and($reconcile?->withoutOverlapping)->toBeTrue();
 });
+
+test('BR-PR15 D90 promotions are ticked every minute without overlapping runs', function (): void {
+    $events = collect(app(Schedule::class)->events());
+
+    $tick = $events->first(fn (Event $event): bool => str_contains((string) $event->command, 'pricing:promotions-tick'));
+
+    expect($tick)->not->toBeNull()
+        ->and($tick?->expression)->toBe('* * * * *')
+        ->and($tick?->withoutOverlapping)->toBeTrue();
+});

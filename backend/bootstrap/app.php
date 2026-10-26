@@ -8,6 +8,7 @@ use App\Modules\Messaging\Console\WaReconcileCommand;
 use App\Modules\Orders\Console\ExpirePendingOrdersCommand;
 use App\Modules\Platform\Console\MonitorCommand;
 use App\Modules\Platform\Console\OpenApiCommand;
+use App\Modules\Pricing\Console\PromotionsTickCommand;
 use App\Modules\Tenancy\Console\TenantActivateCommand;
 use App\Modules\Tenancy\Console\TenantCreateCommand;
 use App\Modules\Tenancy\Console\TenantDemoCommand;
@@ -51,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
         MonitorCommand::class,
         WaReconcileCommand::class,
         ExpirePendingOrdersCommand::class,
+        PromotionsTickCommand::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA: cookie sessions for requests coming from tenant hosts (Tech §6).

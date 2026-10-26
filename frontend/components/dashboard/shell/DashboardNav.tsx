@@ -13,6 +13,7 @@ import {
   SettingsIcon,
   ShoppingBagIcon,
   SlidersHorizontalIcon,
+  TagIcon,
   Undo2Icon,
   UsersIcon,
   UserCogIcon,
@@ -74,6 +75,7 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/dashboard/units", label: copy.units, icon: RulerIcon },
       { href: "/dashboard/fields", label: copy.fields, icon: SlidersHorizontalIcon },
       { href: "/dashboard/inventory", label: copy.inventory, icon: BoxesIcon },
+      { href: "/dashboard/promotions", label: copy.promotions, icon: TagIcon, permissions: ["pricing.manage"] },
     ],
   },
   {
