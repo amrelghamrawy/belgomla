@@ -41,7 +41,7 @@ final class OrderEditRefused extends ApiException
     {
         $message = 'لا يمكن تغيير صنف بند موجود، احذفه وأضف الصنف الآخر';
 
-        return new self(422, 'validation_failed', $message, ["lines.{$index}.sku_id" => [$message]]);
+        return new self(422, 'validation_failed', $message, ["lines.{$index}.sku_unit_id" => [$message]]);
     }
 
     /** BR-O13: a line delivered above what was ordered: `422 validation_failed` on its quantity. */

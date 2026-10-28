@@ -15,11 +15,13 @@ beforeEach(function (): void {
 });
 
 test('BR-PR07 the item snapshot keeps names, unit, conversion and the applied price', function (): void {
-    $sku = $this->sku->load(['product', 'sellingUnit']);
+    $unit = app(App\Modules\Catalog\Queries\CartSkuQuery::class)->findDefault($this->sku->id);
+    $sku = $unit->sku;
     $price = new ResolvedPrice(unitPrice: '85.00', tierMinQuantity: 10, discountPercent: '29.17', coverPrice: '120.00', lineTotal: '1020.00');
 
-    expect(new OrderSnapshots()->item(new CheckoutLine($sku, 12, $price)))->toBe([
+    expect(new OrderSnapshots()->item(new CheckoutLine($unit, 12, $price)))->toBe([
         'sku_id' => $sku->id,
+        'sku_unit_id' => $unit->id,
         'product_id' => $sku->product_id,
         'product_name' => 'الأضواء علوم',
         'sku_code' => 'ADW-SCI',
@@ -43,7 +45,7 @@ test('BR-PR07 a sku without its own name is snapshotted with the product name', 
     $this->sku->forceFill(['name' => null])->save();
     $price = new ResolvedPrice(unitPrice: '90.00', tierMinQuantity: null, discountPercent: null, coverPrice: null, lineTotal: '450.00');
 
-    expect(new OrderSnapshots()->item(new CheckoutLine($this->sku->load(['product', 'sellingUnit']), 5, $price))['sku_name'])->toBe('الأضواء علوم');
+    expect(new OrderSnapshots()->item(new CheckoutLine(app(App\Modules\Catalog\Queries\CartSkuQuery::class)->findDefault($this->sku->id), 5, $price))['sku_name'])->toBe('الأضواء علوم');
 });
 
 test('BR-O10 the delivery snapshot takes the customer name and the address with its phone', function (): void {

@@ -12,12 +12,11 @@ use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Catalog\Services\ProductSnapshot;
 use App\Modules\Inventory\Actions\RecordOpeningStock;
-use App\Modules\Pricing\Actions\UpdateSkuPricing;
 use Illuminate\Support\Facades\DB;
 
 /**
- * BR-P02: creates the product and its single SKU in one transaction (owned here), audited. The SKU's
- * prices, MOQ and tiers are validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05).
+ * BR-P02: creates the product and its single SKU in one transaction (owned here), audited. The SKU's units (D91) are
+ * written by SaveSkuUnits, their prices, MOQ and tiers validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05).
  * The opening stock is written by Inventory's RecordOpeningStock in the same transaction (an `opening`
  * movement, BR-INV06) and recorded in the `product.created` audit as `opening_stock`. The catalog import passes
  * its audit batch id (V2 Task 06).
@@ -28,7 +27,7 @@ final readonly class CreateProduct
         private ProductReferences $references,
         private CustomFieldValidator $fields,
         private ProductSnapshot $snapshot,
-        private UpdateSkuPricing $pricing,
+        private SaveSkuUnits $units,
         private RecordOpeningStock $openingStock,
         private AuditLogger $audit,
     ) {}
@@ -49,9 +48,10 @@ final readonly class CreateProduct
                 ...($data->preorder?->attributes() ?? []), // D88: pre-orders off unless sent
             ]);
 
-            $sku = $this->pricing->handle($product->skus()->make($data->sku->attributes()), $data->sku->pricing);
+            $sku = $product->skus()->create($data->sku->attributes());
+            $this->units->handle($sku, $data->sku->units);
             $this->openingStock->handle($sku, $data->openingStock, $createdBy);
-            $product->load('sku.tiers');
+            $product->load('sku.activeUnits.tiers');
 
             $this->audit->log('product.created', $product, null, [...$this->snapshot->of($product), 'opening_stock' => $data->openingStock], $batchId);
 

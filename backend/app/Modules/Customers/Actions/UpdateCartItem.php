@@ -10,29 +10,32 @@ use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\Scopes\InCartOf;
+use App\Modules\Customers\Queries\CartQuery;
 use App\Modules\Customers\Services\OrderableQuantity;
 
 /**
- * BR-CU06: changes the quantity of a SKU already in the cart as that kind of line (`404` when it is not), with the
- * same checks as adding it (OrderableQuantity). Returns the refreshed cart.
+ * BR-CU06: changes the quantity of a SKU unit already in the cart as that kind of line (`404` when it is not), with the
+ * same checks as adding it (OrderableQuantity, next to the SKU's other units in the cart, D91). Returns the refreshed cart.
  */
 final readonly class UpdateCartItem
 {
     public function __construct(
         private CartSkuQuery $skus,
         private OrderableQuantity $orderable,
+        private CartQuery $cart,
         private RefreshCart $refresh,
     ) {}
 
-    public function handle(Customer $customer, int $skuId, int $quantity, CartLineKind $kind = CartLineKind::Order): PricedCart
+    public function handle(Customer $customer, int $skuUnitId, int $quantity, CartLineKind $kind = CartLineKind::Order): PricedCart
     {
         $item = CartItem::query()
             ->tap(new InCartOf($customer))
-            ->where('sku_id', $skuId)
+            ->where('sku_unit_id', $skuUnitId)
             ->where('kind', $kind)
             ->firstOrFail();
 
-        $this->orderable->assert($this->skus->find($skuId), $quantity, $kind);
+        $unit = $this->skus->find($skuUnitId);
+        $this->orderable->assert($unit, $quantity, $kind, $this->cart->heldBesides($customer, $unit, $kind));
 
         $item->forceFill(['quantity' => $quantity])->save();
 

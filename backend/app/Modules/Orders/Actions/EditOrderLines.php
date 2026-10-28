@@ -32,6 +32,7 @@ use App\Support\Money;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * PUT /api/dashboard/orders/{number}/lines (BR-O12, D87): the merchant changes the lines of a pending or confirmed
@@ -139,7 +140,7 @@ final readonly class EditOrderLines
 
             $item = $live[$line->orderItemId] ?? throw OrderEditRefused::unknownLine('lines', $index);
 
-            if ($item->sku_id !== $line->skuId) {
+            if ($item->sku_unit_id !== $line->skuUnitId) {
                 throw OrderEditRefused::skuChanged($index);
             }
 
@@ -161,22 +162,22 @@ final readonly class EditOrderLines
      * @param  array<int, int>  $changed
      * @param  array<int, OrderEditLineData>  $added
      * @param  list<OrderItem>  $removed
-     * @return array<int, CheckoutLine> sku_id => the line priced at its new quantity
+     * @return array<int, CheckoutLine> sku_unit_id => the line priced at its new quantity
      */
     private function check(array $live, array $changed, array $added, array $removed, Customer $customer): array
     {
-        $skus = $this->skus->findMany([...array_map(fn (int $id): int => $live[$id]->sku_id, array_keys($changed)), ...array_values(array_map(fn (OrderEditLineData $line): int => $line->skuId, $added))]);
+        $units = $this->skus->findMany([...array_map(fn (int $id): int => $live[$id]->sku_unit_id ?? 0, array_keys($changed)), ...array_values(array_map(fn (OrderEditLineData $line): int => $line->skuUnitId, $added))]);
         $inputs = [];
         $own = [];
 
         foreach ($changed as $id => $quantity) {
             $item = $live[$id];
-            $inputs[] = new CartLineInput($skus->get($item->sku_id) ?? $item->sku->load(CartSkuQuery::RELATIONS), $quantity);
-            $own[$item->sku_id] = $item->quantity_base;
+            $inputs[] = new CartLineInput($units->get($item->sku_unit_id ?? 0) ?? throw new RuntimeException("Order line {$item->id} has no SKU unit."), $quantity);
+            $own[$item->sku_id] = ($own[$item->sku_id] ?? 0) + $item->quantity_base;
         }
 
         foreach ($added as $index => $line) {
-            $inputs[] = new CartLineInput($skus->get($line->skuId) ?? throw CheckoutFailed::skuUnavailable($index), $line->quantity);
+            $inputs[] = new CartLineInput($units->get($line->skuUnitId) ?? throw CheckoutFailed::skuUnavailable($index), $line->quantity);
         }
 
         $stock = $this->ledger->lock([
@@ -194,7 +195,7 @@ final readonly class EditOrderLines
         $priced = [];
 
         foreach ($report->lines as $line) {
-            $priced[$line->sku->id] = $line;
+            $priced[$line->unit->id] = $line;
         }
 
         return $priced;
@@ -252,7 +253,7 @@ final readonly class EditOrderLines
 
         foreach ($changed as $id => $quantity) {
             $item = $live[$id];
-            $line = $priced[$item->sku_id];
+            $line = $priced[$item->sku_unit_id ?? 0];
             $difference = $line->quantityBase() - $item->quantity_base;
 
             if ($difference > 0) {
@@ -268,8 +269,8 @@ final readonly class EditOrderLines
                 : $list;
 
             $item->forceFill([
-                'unit_name' => $line->sku->sellingUnit->name,
-                'conversion_factor' => $line->sku->conversion_factor,
+                'unit_name' => $line->unit->unit->name,
+                'conversion_factor' => $line->unit->conversion_factor,
                 'quantity' => $quantity,
                 'quantity_base' => $line->quantityBase(),
                 'cover_price' => $line->price->coverPrice,
@@ -300,7 +301,7 @@ final readonly class EditOrderLines
         $changes = [];
 
         foreach ($added as $line) {
-            $checked = $priced[$line->skuId];
+            $checked = $priced[$line->skuUnitId];
             $item = $order->items()->create($this->snapshots->item($checked));
             $this->ledger->reserve($checked->sku, $checked->quantityBase());
             $changes[] = ['order_item_id' => $item->id, 'change' => OrderItemChangeType::Added, 'new_quantity' => $line->quantity, 'unit_price_after' => $item->unit_price];

@@ -12,7 +12,7 @@ import { ProductForm } from "@/components/dashboard/catalog/ProductEditor";
 import { ProductsPage } from "@/components/dashboard/catalog/ProductsPage";
 import { UnitsPage } from "@/components/dashboard/catalog/UnitsPage";
 
-import { category, dashboardProduct, selectField, unit } from "../../dashboard-fixtures";
+import { category, dashboardProduct, dashboardSku, selectField, unit } from "../../dashboard-fixtures";
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderWithQuery, router, searchParams } from "../../render";
@@ -203,7 +203,7 @@ describe("ProductForm", () => {
   it("BR-PR04 refuses a duplicate tier threshold before calling the API", async () => {
     const fetchMock = stubApi({});
     const user = userEvent.setup();
-    renderForm(dashboardProduct({ sku: { ...dashboardProduct().sku!, tiers: [] } }));
+    renderForm(dashboardProduct({ sku: dashboardSku({ tiers: [] }) }));
 
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
     await user.click(screen.getByRole("button", { name: "إضافة شريحة" }));
@@ -221,7 +221,7 @@ describe("ProductForm", () => {
   it("shows placeholders on a tier's quantity and value, the value one following the price mode", async () => {
     stubApi({});
     const user = userEvent.setup();
-    renderForm(dashboardProduct({ sku: { ...dashboardProduct().sku!, tiers: [] } }));
+    renderForm(dashboardProduct({ sku: dashboardSku({ tiers: [] }) }));
 
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
     await user.click(screen.getByRole("button", { name: "إضافة شريحة" }));
@@ -251,10 +251,19 @@ describe("ProductForm", () => {
       custom_fields: { grade: 11 },
       sku: {
         code: "ADW-SCI-1",
-        base_price_percent: "25.00",
-        base_price: null,
-        moq: 5,
-        tiers: [{ min_quantity: 10, discount_percent: "30.00" }],
+        base_unit_id: 1,
+        units: [
+          {
+            id: 5,
+            unit_id: 2,
+            conversion_factor: 20,
+            base_price_percent: "25.00",
+            base_price: null,
+            moq: 5,
+            tiers: [{ min_quantity: 10, discount_percent: "30.00" }],
+            is_default: true,
+          },
+        ],
       },
     });
     expect(body).not.toHaveProperty("status");
@@ -279,7 +288,7 @@ describe("ProductForm", () => {
   it("lists the backend's invalid_tiers problems on the pricing tab", async () => {
     stubApi({
       "PUT /api/dashboard/products/3": envelopeError(422, "invalid_tiers", "شرائح الأسعار غير صحيحة", {
-        tiers: ["سعر شريحة 10 أعلى من السعر الأساسي"],
+        "sku.units.0.tiers": ["سعر شريحة 10 أعلى من السعر الأساسي"],
       }),
     });
     const user = userEvent.setup();
@@ -379,12 +388,12 @@ describe("ProductForm", () => {
     await user.type(screen.getByLabelText("اسم المنتج *"), "كتاب جديد");
     await pickCategory(user, "المرحلة الابتدائية");
     await user.type(screen.getByLabelText("كود الصنف (SKU) *"), "NEW-1");
-    await user.selectOptions(screen.getByLabelText("وحدة البيع *"), "2");
     await user.selectOptions(screen.getByLabelText("الوحدة الأساسية *"), "1");
-    await user.clear(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"));
-    await user.type(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"), "20");
     await user.type(screen.getByLabelText("الرصيد الافتتاحي (بالوحدة الأساسية) (اختياري)"), "200");
     await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    await user.selectOptions(screen.getByLabelText("وحدة البيع *"), "2");
+    await user.clear(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"));
+    await user.type(screen.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"), "20");
     await user.type(screen.getByLabelText("سعر الجملة *"), "50.00");
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
@@ -394,13 +403,69 @@ describe("ProductForm", () => {
       opening_stock: 200,
       sku: {
         code: "NEW-1",
-        selling_unit_id: 2,
         base_unit_id: 1,
-        conversion_factor: 20,
-        base_price: "50.00",
-        cover_price: null,
+        units: [{ unit_id: 2, conversion_factor: 20, base_price: "50.00", cover_price: null, is_default: true }],
       },
     });
+  });
+
+  it("D91 sells a SKU in a second unit with its own price and makes it the default", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/products/3": json(200, { data: dashboardProduct() }) });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(screen.getByText("وحدات البيع")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "إضافة وحدة" }));
+    const second = within(screen.getByTestId("sku-unit-1"));
+    await user.selectOptions(second.getByLabelText("وحدة البيع *"), "1");
+    await user.clear(second.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"));
+    await user.type(second.getByLabelText("عدد الوحدات الأساسية في وحدة البيع *"), "12");
+    await user.type(second.getByLabelText("سعر الجملة *"), "1000");
+    await user.click(second.getByRole("radio", { name: /الوحدة الافتراضية/ }));
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/products/3")).toHaveLength(1));
+    const body = callsTo(fetchMock, "PUT /api/dashboard/products/3")[0]?.body as { sku: { units: unknown[] } };
+    expect(body.sku.units).toEqual([
+      expect.objectContaining({ id: 5, unit_id: 2, is_default: false }),
+      expect.objectContaining({ unit_id: 1, conversion_factor: 12, base_price: "1000", moq: 1, is_default: true }),
+    ]);
+    expect(body.sku.units[1]).not.toHaveProperty("id");
+  });
+
+  it("D91 refuses the same unit twice before calling the API, and removes a unit", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    await user.click(screen.getByRole("button", { name: "إضافة وحدة" }));
+    const second = within(screen.getByTestId("sku-unit-1"));
+    await user.selectOptions(second.getByLabelText("وحدة البيع *"), "2");
+    await user.type(second.getByLabelText("سعر الجملة *"), "1000");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("هذه الوحدة مكررة")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/products/3")).toHaveLength(0);
+
+    await user.click(second.getByRole("button", { name: "حذف الوحدة" }));
+    expect(screen.queryByTestId("sku-unit-1")).toBeNull();
+  });
+
+  it("D91 shows a unit's server error on that unit", async () => {
+    stubApi({
+      "PUT /api/dashboard/products/3": envelopeError(422, "validation_failed", "بعض البيانات غير صحيحة", {
+        "sku.units.0.unit_id": ["العنصر المختار مؤرشف"],
+      }),
+    });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("العنصر المختار مؤرشف")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "التسعير" })).toHaveAttribute("aria-selected", "true");
   });
 });
 

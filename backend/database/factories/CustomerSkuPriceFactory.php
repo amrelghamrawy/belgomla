@@ -20,6 +20,7 @@ final class CustomerSkuPriceFactory extends Factory
         return [
             'customer_id' => CustomerFactory::new(),
             'sku_id' => SkuFactory::new(),
+            'sku_unit_id' => fn (array $attributes): int => SkuFactory::defaultUnitIdOf($attributes['sku_id']), // D91: negotiated per unit
             'unit_price' => '80.00',
             'note' => null,
         ];

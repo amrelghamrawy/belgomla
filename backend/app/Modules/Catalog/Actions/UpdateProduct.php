@@ -11,14 +11,14 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Catalog\Services\ProductSnapshot;
-use App\Modules\Pricing\Actions\UpdateSkuPricing;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Replaces product and SKU fields (not status, not stock), and the pre-order settings when sent (D88). Values of archived custom fields, and of
  * fields bound to another section than the (new) category's kind, are carried over (BR-P08, D69). The `product.updated` audit record holds only what changed in product and SKU
- * identity fields; prices, MOQ and tiers go through Pricing's UpdateSkuPricing, which audits them as
- * `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed` (BR-L). Tiers not sent are kept.
+ * identity fields and its units (`sku.units`: which units, factors, default; D91); each unit's prices, MOQ and tiers go
+ * through SaveSkuUnits and Pricing's UpdateSkuPricing, which audits them per unit as `sku.price_changed` /
+ * `sku.moq_changed` / `sku.tiers_changed` (BR-L). A unit's tiers not sent are kept; a unit not sent is archived.
  * Inside an audit batch (the catalog import, V2 Task 06) every record carries the batch id, and a product whose
  * own fields did not change gets no `product.updated` record, so re-importing a file does not flood the log.
  * Owns its transaction.
@@ -29,13 +29,13 @@ final readonly class UpdateProduct
         private ProductReferences $references,
         private CustomFieldValidator $fields,
         private ProductSnapshot $snapshot,
-        private UpdateSkuPricing $pricing,
+        private SaveSkuUnits $units,
         private AuditLogger $audit,
     ) {}
 
     public function handle(Product $product, ProductData $data, ?string $batchId = null): Product
     {
-        $product->loadMissing('sku');
+        $product->loadMissing('sku.activeUnits');
         $category = $this->references->check($data, $product);
         $customFields = $this->fields->validate($data->customFields, $category->kind, $product->custom_fields);
         $old = $this->snapshot->of($product, withPricing: false);
@@ -50,9 +50,10 @@ final readonly class UpdateProduct
             ]);
 
             $sku = $product->sku instanceof Sku ? $product->sku->fill($data->sku->attributes()) : $product->skus()->make($data->sku->attributes());
-            $this->pricing->handle($sku, $data->sku->pricing, $batchId);
+            $sku->save();
+            $this->units->handle($sku, $data->sku->units, $batchId);
 
-            $product->load('sku.tiers');
+            $product->load('sku.activeUnits.tiers');
 
             $new = $this->snapshot->of($product, withPricing: false);
 

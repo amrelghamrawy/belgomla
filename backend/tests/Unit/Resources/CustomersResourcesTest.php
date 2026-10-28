@@ -80,7 +80,7 @@ test('BR-CU03 the address resource key set', function (): void {
 
 test('BR-CU06 the cart resource matches the contract, money as strings', function (): void {
     $cart = new PricedCart(
-        lines: [new PricedCartLine(501, 'علوم', 'olom', 'كرتونة', 20, 12, new ResolvedPrice('85.00', 10, null, null, '1020.00'), 5, 140)],
+        lines: [new PricedCartLine(501, 601, 'علوم', 'olom', 'كرتونة', 20, 12, new ResolvedPrice('85.00', 10, null, null, '1020.00'), 5, 140)],
         removed: [['product_name' => 'قديم', 'reason' => 'inactive']],
         itemsTotal: '1020.00',
         movEnabled: true,
@@ -90,7 +90,7 @@ test('BR-CU06 the cart resource matches the contract, money as strings', functio
 
     expect(rendered(new CartResource($cart), storeRequest('/api/store/cart')))->toBe([
         'items' => [[
-            'sku_id' => 501, 'product_name' => 'علوم', 'product_slug' => 'olom', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 12, 'unit_price' => '85.00',
+            'sku_id' => 501, 'sku_unit_id' => 601, 'product_name' => 'علوم', 'product_slug' => 'olom', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 12, 'unit_price' => '85.00',
             'tier_min_quantity' => 10, 'price_source' => 'base', 'promotion' => null, 'line_total' => '1020.00', 'moq' => 5, 'available' => 140,
         ]],
         'removed_items' => [['product_name' => 'قديم', 'reason' => 'inactive']],
@@ -108,7 +108,7 @@ test('BR-O14 the cart lists its pre-order lines apart with the expected day and 
         movEnabled: false,
         movAmount: null,
         movSatisfied: true,
-        preorderLines: [new PricedCartLine(77, 'سلاح التلميذ ٢٠٢٧', 'selah', 'كرتونة', 20, 5, new ResolvedPrice('90.00', null, null, null, '450.00'), 5, 0, '2026-12-01')],
+        preorderLines: [new PricedCartLine(77, 177, 'سلاح التلميذ ٢٠٢٧', 'selah', 'كرتونة', 20, 5, new ResolvedPrice('90.00', null, null, null, '450.00'), 5, 0, '2026-12-01')],
         preorderTotal: '450.00',
     );
 
@@ -118,7 +118,7 @@ test('BR-O14 the cart lists its pre-order lines apart with the expected day and 
         ->and($data['removed_items'])->toBe([['product_name' => 'أطلس', 'reason' => 'preorder_closed']])
         ->and($data['preorders'])->toBe([
             'items' => [[
-                'sku_id' => 77, 'product_name' => 'سلاح التلميذ ٢٠٢٧', 'product_slug' => 'selah', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 5, 'unit_price' => '90.00',
+                'sku_id' => 77, 'sku_unit_id' => 177, 'product_name' => 'سلاح التلميذ ٢٠٢٧', 'product_slug' => 'selah', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 5, 'unit_price' => '90.00',
                 'tier_min_quantity' => null, 'price_source' => 'base', 'promotion' => null, 'line_total' => '450.00', 'moq' => 5, 'available' => 0, 'expected_at' => '2026-12-01',
             ]],
             'items_total' => '450.00',
@@ -167,11 +167,11 @@ test('BR-PR12 the customer group resource key set, with the customer count', fun
         ->and(rendered(new CustomerGroupResource($group->refresh()), dashboardRequest())['customers_count'])->toBe(0);
 });
 
-test('BR-PR13 the customer price resource shows the sku next to the negotiated price', function (): void {
-    $price = CustomerSkuPrice::factory()->create(['unit_price' => '82.50', 'note' => 'اتفاق'])->load(['sku.product', 'sku.sellingUnit']);
+test('BR-PR13 D91 the customer price resource shows the sku unit next to the negotiated price', function (): void {
+    $price = CustomerSkuPrice::factory()->create(['unit_price' => '82.50', 'note' => 'اتفاق'])->load(['sku.product', 'skuUnit.unit']);
 
     expect(rendered(new CustomerSkuPriceResource($price), dashboardRequest()))->toBe([
-        'sku_id' => $price->sku_id, 'sku_code' => $price->sku->code, 'product_name' => $price->sku->product->name, 'unit' => $price->sku->sellingUnit->name,
-        'base_price' => '100.00', 'unit_price' => '82.50', 'note' => 'اتفاق', 'updated_at' => $price->updated_at->toIso8601String(),
+        'sku_id' => $price->sku_id, 'sku_unit_id' => $price->sku_unit_id, 'sku_code' => $price->sku->code, 'product_name' => $price->sku->product->name, 'unit' => $price->skuUnit->unit->name,
+        'conversion_factor' => 1, 'base_price' => '100.00', 'unit_price' => '82.50', 'note' => 'اتفاق', 'updated_at' => $price->updated_at->toIso8601String(),
     ]);
 });

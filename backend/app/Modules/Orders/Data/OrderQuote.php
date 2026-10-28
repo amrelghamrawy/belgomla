@@ -8,7 +8,7 @@ use App\Modules\Pricing\Data\TierData;
 
 /**
  * BR-O11: the merchant's order form as checkout would see it now (OrderQuoter): the validator's report and, for the
- * tier hint next to each line, every SKU's tiers keyed by sku_id. Shown by OrderQuoteResource.
+ * tier hint next to each line, every line's tiers keyed by sku_unit_id (D91). Shown by OrderQuoteResource.
  */
 final readonly class OrderQuote
 {

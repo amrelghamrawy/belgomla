@@ -94,24 +94,24 @@ export function useCustomerPrices(customerId: number, query: { q?: string; page?
   });
 }
 
-/** Sets or replaces the customer's price for a SKU (D89: it may be above the normal price). */
+/** Sets or replaces the customer's price for a SKU unit (D89: it may be above the normal price; D91: per unit). */
 export function useSetCustomerPrice(customerId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ skuId, ...body }: { skuId: number; unit_price: string; note?: string | null }) =>
-      apiFetch<CustomerSkuPrice>(`/api/dashboard/customers/${customerId}/prices/${skuId}`, { method: "PUT", body }),
+    mutationFn: ({ skuUnitId, ...body }: { skuUnitId: number; unit_price: string; note?: string | null }) =>
+      apiFetch<CustomerSkuPrice>(`/api/dashboard/customers/${customerId}/prices/${skuUnitId}`, { method: "PUT", body }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard", "customers", "prices", customerId] }),
   });
 }
 
-/** Back to the normal price of the SKU. */
+/** Back to the normal price of the SKU unit. */
 export function useRemoveCustomerPrice(customerId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (skuId: number) =>
-      apiFetch<undefined>(`/api/dashboard/customers/${customerId}/prices/${skuId}`, { method: "DELETE" }),
+    mutationFn: (skuUnitId: number) =>
+      apiFetch<undefined>(`/api/dashboard/customers/${customerId}/prices/${skuUnitId}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard", "customers", "prices", customerId] }),
   });
 }

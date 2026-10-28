@@ -32,7 +32,7 @@ final readonly class InventoryListQuery
         $query = Sku::query()
             ->select('skus.*')
             ->leftJoin('sku_inventory', 'sku_inventory.sku_id', '=', 'skus.id')
-            ->with(['product', 'inventory']);
+            ->with(['product', 'inventory', 'smallestUnit']);
 
         if ($q !== null) {
             $query->whereIn('skus.product_id', $this->products->builder(new ProductFilterData(q: $q))->select('products.id'));

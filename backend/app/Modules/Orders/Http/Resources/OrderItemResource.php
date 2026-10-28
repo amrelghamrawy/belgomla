@@ -31,6 +31,7 @@ final class OrderItemResource extends JsonResource
         return [
             'id' => $item->id, // the line a discount names (D85)
             'sku_id' => $item->sku_id,
+            'sku_unit_id' => $item->sku_unit_id,
             'product_name' => $item->product_name,
             'sku_code' => $item->sku_code,
             'sku_name' => $item->sku_name,

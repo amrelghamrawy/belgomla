@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Customers\Models;
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\CustomerSkuPriceFactory;
@@ -20,12 +21,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $tenant_id
  * @property int $customer_id
  * @property int $sku_id
+ * @property int $sku_unit_id
  * @property string $unit_price
  * @property string|null $note
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Customer $customer
  * @property-read Sku $sku
+ * @property-read SkuUnit $skuUnit
  */
 final class CustomerSkuPrice extends Model
 {
@@ -53,6 +56,16 @@ final class CustomerSkuPrice extends Model
     public function sku(): BelongsTo
     {
         return $this->belongsTo(Sku::class);
+    }
+
+    /**
+     * The unit the price is negotiated for (D91).
+     *
+     * @return BelongsTo<SkuUnit, $this>
+     */
+    public function skuUnit(): BelongsTo
+    {
+        return $this->belongsTo(SkuUnit::class);
     }
 
     /**

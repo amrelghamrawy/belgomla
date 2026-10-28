@@ -11,7 +11,7 @@ beforeEach(function (): void {
 });
 
 test('BR-P11 duplicating copies fields, units, prices and moq into a new inactive product with a new code', function (): void {
-    $source = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['base_price_percent' => 25]]))->json('data');
+    $source = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['units' => [['base_price_percent' => 25]]]]))->json('data');
 
     $copy = $this->tenantJson('POST', "/api/dashboard/products/{$source['id']}/duplicate")
         ->assertCreated()
@@ -27,6 +27,8 @@ test('BR-P11 duplicating copies fields, units, prices and moq into a new inactiv
         ->assertJsonPath('data.sku.base_price', '90.00')
         ->assertJsonPath('data.sku.base_price_percent', '25.00')
         ->assertJsonPath('data.sku.moq', 5)
+        ->assertJsonCount(1, 'data.sku.units')
+        ->assertJsonPath('data.sku.units.0.is_default', true)
         ->json('data');
 
     expect($copy['id'])->not->toBe($source['id'])

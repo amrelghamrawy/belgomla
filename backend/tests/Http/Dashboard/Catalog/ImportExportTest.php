@@ -122,7 +122,7 @@ test('the template is the empty file with the store\'s custom field columns', fu
 test('the preview answers the counts, the row errors and a token, and writes nothing', function (): void {
     $response = $this->tenantJson('POST', '/api/dashboard/products/import/preview', ['file' => catalogUpload([
         $this->importRow(),
-        $this->importRow(['sku_code' => 'B-1', 'selling_unit' => 'علبة']),
+        $this->importRow(['sku_code' => 'B-1', 'unit' => 'علبة']),
     ])]);
 
     $response->assertOk()
@@ -130,7 +130,7 @@ test('the preview answers the counts, the row errors and a token, and writes not
         ->assertJsonPath('data.total', 2)
         ->assertJsonPath('data.create', 1)
         ->assertJsonPath('data.skip', 1)
-        ->assertJsonPath('data.errors.0', ['row' => 4, 'column' => 'selling_unit', 'label' => 'وحدة البيع', 'message' => 'الوحدة غير موجودة، أضفها أولًا من صفحة الوحدات'])
+        ->assertJsonPath('data.errors.0', ['row' => 4, 'column' => 'unit', 'label' => 'وحدة البيع', 'message' => 'الوحدة غير موجودة، أضفها أولًا من صفحة الوحدات'])
         ->assertJsonPath('data.errors_truncated', false);
     expect($this->inTenant(fn (): int => Product::query()->count()))->toBe(0);
 });

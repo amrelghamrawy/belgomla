@@ -11,7 +11,11 @@ use App\Modules\Catalog\Models\ProductImage;
 
 const STORE_PRODUCT_KEYS = [
     'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name', 'kind'],
-    'sku' => ['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'],
+    'sku' => [
+        'id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers',
+        'units' => ['*' => ['id', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'is_default', 'in_stock']],
+        'available', 'in_stock',
+    ],
     'preorder',
 ];
 
@@ -54,6 +58,23 @@ test('the store lists visible products in the documented shape with laravel pagi
         ->assertJsonMissingPath('data.0.prices_hidden')
         ->assertJsonMissingPath('data.0.sku.coming_soon')
         ->assertJsonMissingPath('data.0.gallery');
+});
+
+test('D91 a product sold by the piece and by the carton shows both units with their own prices', function (): void {
+    $product = $this->inTenant(fn (): Product => Product::factory()->withSku(['base_price' => '10.00', 'moq' => 6], onHand: 30)->create());
+    $carton = $this->addUnit($this->inTenant(fn () => $product->sku()->sole()), ['conversion_factor' => 24, 'base_price' => '220.00'], [5 => '210.00']);
+
+    $this->tenantJson('GET', "/api/store/products/{$product->slug}")
+        ->assertOk()
+        ->assertJsonCount(2, 'data.sku.units')
+        ->assertJsonPath('data.sku.units.0.base_price', '10.00')
+        ->assertJsonPath('data.sku.units.0.moq', 6)
+        ->assertJsonPath('data.sku.units.0.in_stock', true)
+        ->assertJsonPath('data.sku.units.1.id', $carton->id)
+        ->assertJsonPath('data.sku.units.1.conversion_factor', 24)
+        ->assertJsonPath('data.sku.units.1.base_price', '220.00')
+        ->assertJsonPath('data.sku.units.1.tiers', [['min_quantity' => 5, 'unit_price' => '210.00']])
+        ->assertJsonPath('data.sku.units.1.in_stock', true);
 });
 
 test('BR-P04 inactive products are hidden; coming soon is shown, not in stock and without available', function (): void {

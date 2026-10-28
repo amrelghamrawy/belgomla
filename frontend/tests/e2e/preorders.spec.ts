@@ -27,11 +27,8 @@ test("BR-O14 a pre-order becomes a normal order once the book arrives", async ({
     preorder: { enabled: true, expected_at: "2027-01-15", limit: 50 },
     sku: {
       code: `PRE-${suffix}`,
-      selling_unit_id: unit!.id,
       base_unit_id: unit!.id,
-      conversion_factor: 1,
-      base_price: "90.00",
-      moq: 2,
+      units: [{ unit_id: unit!.id, conversion_factor: 1, base_price: "90.00", moq: 2 }],
     },
   });
   expect(created.status).toBe(201);

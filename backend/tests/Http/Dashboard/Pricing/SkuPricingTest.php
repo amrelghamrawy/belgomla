@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use Illuminate\Support\Arr;
 
 const SKU_PRICING_KEYS = [
-    'product_id', 'sku_id', 'code', 'cover_price', 'base_price', 'base_price_percent', 'discount_percent', 'moq',
+    'product_id', 'sku_id', 'sku_unit_id', 'code', 'unit', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'discount_percent', 'moq',
     'tiers' => ['*' => ['min_quantity', 'unit_price', 'discount_percent']],
 ];
 
@@ -16,10 +17,12 @@ beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
     $this->product = $this->inTenant(function (): Product {
         $product = Product::factory()->withSku(['code' => 'ADW-1', 'cover_price' => '120.00', 'base_price' => '100.00', 'moq' => 1])->create();
-        SkuPriceTier::factory()->for($product->sku)->create(['min_quantity' => 5, 'unit_price' => '99.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 5, 'unit_price' => '99.00']);
 
         return $product;
     });
+    $this->unit = $this->inTenant(fn (): SkuUnit => $this->product->sku()->sole()->defaultUnit ?? throw new RuntimeException);
+    $this->url = "/api/dashboard/products/{$this->product->id}/units/{$this->unit->id}/pricing";
     $this->body = fn (array $overrides = []): array => [
         'cover_price' => '120.00',
         'base_price_percent' => 25,
@@ -30,10 +33,12 @@ beforeEach(function (): void {
 });
 
 test('BR-PR10 an owner sets the prices as percents and absolute amounts; tiers are replaced', function (): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)())
+    $this->tenantJson('PUT', $this->url, ($this->body)())
         ->assertOk()
         ->assertExactJsonStructure(['data' => SKU_PRICING_KEYS])
         ->assertJsonPath('data.product_id', $this->product->id)
+        ->assertJsonPath('data.sku_unit_id', $this->unit->id)
+        ->assertJsonPath('data.conversion_factor', 1)
         ->assertJsonPath('data.code', 'ADW-1')
         ->assertJsonPath('data.cover_price', '120.00')
         ->assertJsonPath('data.base_price', '90.00')
@@ -45,16 +50,18 @@ test('BR-PR10 an owner sets the prices as percents and absolute amounts; tiers a
             ['min_quantity' => 50, 'unit_price' => '80.00', 'discount_percent' => null],
         ]);
 
-    $this->assertDatabaseMissing('sku_price_tiers', ['sku_id' => $this->product->sku->id, 'min_quantity' => 5]);
+    $this->assertDatabaseMissing('sku_price_tiers', ['sku_unit_id' => $this->unit->id, 'min_quantity' => 5]);
 });
 
 test('BR-L the change is audited as price, tiers and moq records by the acting owner', function (): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)())->assertOk();
+    $this->tenantJson('PUT', $this->url, ($this->body)())->assertOk();
 
     $logs = $this->inTenant(fn () => AuditLog::query()->get()->keyBy('action'));
 
     expect($logs->keys()->sort()->values()->all())->toBe(['sku.moq_changed', 'sku.price_changed', 'sku.tiers_changed'])
         ->and($logs->pluck('actor_id')->unique()->all())->toBe([$this->me->id])
+        ->and($logs->pluck('entity_type')->unique()->all())->toBe(['sku_units'])
+        ->and($logs->pluck('entity_id')->unique()->all())->toBe([$this->unit->id])
         ->and($logs['sku.price_changed']->old_values)->toEqual(['base_price' => '100.00', 'base_price_percent' => null])
         ->and($logs['sku.price_changed']->new_values)->toEqual(['base_price' => '90.00', 'base_price_percent' => '25.00'])
         ->and($logs['sku.moq_changed']->new_values)->toEqual(['moq' => 5]);
@@ -64,7 +71,7 @@ test('a cover price that is not sent is kept, and an empty tier list removes eve
     $body = ($this->body)(['tiers' => [], 'base_price_percent' => 50]);
     unset($body['cover_price']);
 
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", $body)
+    $this->tenantJson('PUT', $this->url, $body)
         ->assertOk()
         ->assertJsonPath('data.cover_price', '120.00')
         ->assertJsonPath('data.base_price', '60.00')
@@ -72,7 +79,7 @@ test('a cover price that is not sent is kept, and an empty tier list removes eve
 });
 
 test('BR-PR05 duplicate thresholds are refused with invalid_tiers and nothing changes', function (): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)([
+    $this->tenantJson('PUT', $this->url, ($this->body)([
         'tiers' => [['min_quantity' => 10, 'unit_price' => '85'], ['min_quantity' => 10, 'unit_price' => '80']],
     ]))
         ->assertUnprocessable()
@@ -82,28 +89,28 @@ test('BR-PR05 duplicate thresholds are refused with invalid_tiers and nothing ch
             'details' => ['tiers' => ['الحد الأدنى 10 مكرر في أكثر من شريحة']],
         ]]);
 
-    $this->assertDatabaseHas('skus', ['id' => $this->product->sku->id, 'base_price' => '100.00', 'moq' => 1]);
-    $this->assertDatabaseHas('sku_price_tiers', ['sku_id' => $this->product->sku->id, 'min_quantity' => 5]);
+    $this->assertDatabaseHas('sku_units', ['id' => $this->unit->id, 'base_price' => '100.00', 'moq' => 1]);
+    $this->assertDatabaseHas('sku_price_tiers', ['sku_unit_id' => $this->unit->id, 'min_quantity' => 5]);
 });
 
 test('D28 a tier priced above the base price is refused with invalid_tiers', function (): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)(['tiers' => [['min_quantity' => 10, 'unit_price' => '95']]]))
+    $this->tenantJson('PUT', $this->url, ($this->body)(['tiers' => [['min_quantity' => 10, 'unit_price' => '95']]]))
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'invalid_tiers')
         ->assertJsonPath('error.details.tiers.0', 'سعر شريحة 10 أعلى من السعر الأساسي');
 });
 
 test('BR-PR10 a percent on a sku without a cover price is refused with cover_price_required', function (): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)(['cover_price' => null]))
+    $this->tenantJson('PUT', $this->url, ($this->body)(['cover_price' => null]))
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'cover_price_required')
         ->assertJsonPath('error.message', 'أدخل سعر القطاعي أولًا لحساب السعر بنسبة الخصم');
 
-    $this->assertDatabaseHas('skus', ['id' => $this->product->sku->id, 'cover_price' => '120.00']);
+    $this->assertDatabaseHas('sku_units', ['id' => $this->unit->id, 'cover_price' => '120.00']);
 });
 
 test('pricing validation', function (array $overrides, string $field, array $without = []): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", Arr::except(($this->body)($overrides), $without))
+    $this->tenantJson('PUT', $this->url, Arr::except(($this->body)($overrides), $without))
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'validation_failed')
         ->assertJsonStructure(['error' => ['details' => [$field]]]);
@@ -129,23 +136,41 @@ test('pricing validation', function (array $overrides, string $field, array $wit
 ]);
 
 test('BR-T04 the pricing of another tenant product is 404 and stays untouched', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku(['base_price' => '100.00'])->create(), $this->otherTenant());
+    $other = $this->otherTenant();
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku(['base_price' => '100.00'])->create(), $other);
+    $unit = $this->defaultUnitId($this->inTenant(fn () => $foreign->sku()->sole(), $other));
 
-    $this->tenantJson('PUT', "/api/dashboard/products/{$foreign->id}/pricing", ($this->body)())
+    $this->tenantJson('PUT', "/api/dashboard/products/{$foreign->id}/units/{$unit}/pricing", ($this->body)())
         ->assertNotFound()
         ->assertJsonPath('error.code', 'not_found');
 
-    $this->assertDatabaseHas('skus', ['product_id' => $foreign->id, 'base_price' => '100.00']);
+    $this->assertDatabaseHas('sku_units', ['id' => $unit, 'base_price' => '100.00']);
 });
 
-test('a product without a sku has no pricing: 404', function (): void {
-    $bare = $this->inTenant(fn () => Product::factory()->create());
+test('D91 a unit of another product, or an archived unit, has no pricing here: 404 and untouched', function (): void {
+    $elsewhere = $this->inTenant(fn (): int => $this->defaultUnitId(Product::factory()->withSku()->create()->sku()->sole()));
+    $archived = $this->inTenant(fn (): SkuUnit => SkuUnit::factory()->archived()->create(['sku_id' => $this->unit->sku_id]));
 
-    $this->tenantJson('PUT', "/api/dashboard/products/{$bare->id}/pricing", ($this->body)())->assertNotFound();
+    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/units/{$elsewhere}/pricing", ($this->body)())->assertNotFound();
+    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/units/{$archived->id}/pricing", ($this->body)())->assertNotFound();
+
+    $this->assertDatabaseHas('sku_units', ['id' => $elsewhere, 'base_price' => '100.00']);
+});
+
+test('D91 each unit is priced on its own: the carton keeps its prices when the piece changes', function (): void {
+    $carton = $this->addUnit($this->inTenant(fn () => $this->product->sku()->sole()), ['cover_price' => '1440.00', 'base_price' => '1100.00']);
+
+    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/units/{$carton->id}/pricing", ($this->body)(['cover_price' => '1440.00', 'tiers' => []]))
+        ->assertOk()
+        ->assertJsonPath('data.sku_unit_id', $carton->id)
+        ->assertJsonPath('data.conversion_factor', 12)
+        ->assertJsonPath('data.base_price', '1080.00');
+
+    $this->assertDatabaseHas('sku_units', ['id' => $this->unit->id, 'base_price' => '100.00', 'moq' => 1]);
 });
 
 test('BR-PR04 the tiers set here are what the storefront shows', function (): void {
-    $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/pricing", ($this->body)())->assertOk();
+    $this->tenantJson('PUT', $this->url, ($this->body)())->assertOk();
 
     $this->tenantJson('GET', "/api/store/products/{$this->product->slug}")
         ->assertOk()

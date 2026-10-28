@@ -8,8 +8,9 @@ use App\Modules\Pricing\Data\TierData;
 use App\Support\Money;
 
 /**
- * Rules and parsing of a SKU price set (08-api-contract.md §6), optionally nested under a prefix such as
- * "sku." in the product create/update body. One place for these rules, used by the pricing endpoint and
+ * Rules and parsing of a SKU unit's price set (08-api-contract.md §6), optionally nested under a prefix such as
+ * "sku.units.0." in the product create/update body (one price set per unit, V2 Task 13); rules take a wildcard prefix
+ * ("sku.units.*."). One place for these rules, used by the pricing endpoint and
  * the Catalog product requests alike.
  *
  * BR-PR10: `base_price` or `base_price_percent` is required; when the percent is sent it wins and the
@@ -23,9 +24,9 @@ trait ReadsSkuPricing
      *
      * @return array{basePrice: string|null, basePricePercent: string|null, moq: int, tiers: list<TierData>|null, coverPrice: string|null, coverPriceGiven: bool}
      */
-    public function pricingInput(): array
+    public function pricingInput(?string $prefix = null): array
     {
-        $prefix = $this->pricingPrefix();
+        $prefix ??= $this->pricingPrefix();
         $percent = $this->moneyInput($this->input("{$prefix}base_price_percent"));
         $moq = $this->input("{$prefix}moq");
 
@@ -33,7 +34,7 @@ trait ReadsSkuPricing
             'basePrice' => $percent === null ? $this->moneyInput($this->input("{$prefix}base_price")) : null,
             'basePricePercent' => $percent,
             'moq' => is_numeric($moq) ? (int) $moq : 1,
-            'tiers' => $this->tierInput(),
+            'tiers' => $this->tierInput($prefix),
             'coverPrice' => $this->moneyInput($this->input("{$prefix}cover_price")),
             'coverPriceGiven' => ! $this->keepsCoverPriceWhenAbsent() || $this->has("{$prefix}cover_price"),
         ];
@@ -44,9 +45,9 @@ trait ReadsSkuPricing
      *
      * @return list<TierData>|null
      */
-    public function tierInput(): ?array
+    public function tierInput(?string $prefix = null): ?array
     {
-        $key = $this->pricingPrefix().'tiers';
+        $key = ($prefix ?? $this->pricingPrefix()).'tiers';
 
         if (! $this->has($key)) {
             return null;
@@ -83,9 +84,9 @@ trait ReadsSkuPricing
     /**
      * @return array<string, list<string>>
      */
-    protected function pricingRules(bool $moqRequired = false, bool $tiersRequired = false): array
+    protected function pricingRules(bool $moqRequired = false, bool $tiersRequired = false, ?string $prefix = null): array
     {
-        $prefix = $this->pricingPrefix();
+        $prefix ??= $this->pricingPrefix();
 
         return [
             "{$prefix}cover_price" => ['nullable', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],

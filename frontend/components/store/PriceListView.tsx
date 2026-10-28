@@ -183,7 +183,7 @@ export function PriceListView() {
             </thead>
             <tbody>
               {list.data.data.map((row) => (
-                <tr key={row.id} className="break-inside-avoid border-b">
+                <tr key={`${row.id}-${row.sku_unit_id ?? 0}`} className="break-inside-avoid border-b">
                   <td className="p-2">
                     <Link href={`/p/${encodeURIComponent(row.slug)}`} className="hover:underline print:no-underline">
                       {row.name}
@@ -192,7 +192,10 @@ export function PriceListView() {
                   <td className="p-2 whitespace-nowrap">
                     <bdi>{row.code}</bdi>
                   </td>
-                  <td className="p-2 whitespace-nowrap">{row.unit}</td>
+                  <td className="p-2 whitespace-nowrap">
+                    {row.unit}
+                    {row.conversion_factor !== null && row.conversion_factor > 1 && ` (${row.conversion_factor})`}
+                  </td>
                   {!pricesHidden && (
                     <td className="p-2 whitespace-nowrap">{row.cover_price ? formatMoney(row.cover_price) : "—"}</td>
                   )}

@@ -374,7 +374,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Adds a SKU (or adds to its quantity); guests get 403 prices_hidden or 401 (D53) */
+        /** Puts a SKU unit in the cart with this quantity; guests get 403 prices_hidden or 401 (D53) */
         post: operations["storeAddCartItem"];
         delete?: never;
         options?: never;
@@ -382,12 +382,13 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/store/cart/items/{sku}": {
+    "/api/store/cart/items/{skuUnit}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                sku: number;
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -1255,17 +1256,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dashboard/products/{product}/pricing": {
+    "/api/dashboard/products/{product}/units/{skuUnit}/pricing": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 product: components["parameters"]["ProductId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
         get?: never;
-        /** Replaces the SKU's price set; tiers is required and replaces all tiers */
+        /** Replaces the price set of one active unit of the product's SKU (D91); tiers is required and replaces all its tiers */
         put: operations["dashboardUpdatePricing"];
         post?: never;
         delete?: never;
@@ -1285,7 +1288,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Recomputes percentage-based prices from the current cover price (BR-PR10, audited) */
+        /** Recomputes percentage-based prices from the current cover price of every unit (BR-PR10, D91, audited) */
         post: operations["dashboardRecomputePricing"];
         delete?: never;
         options?: never;
@@ -1618,18 +1621,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dashboard/customers/{customer}/prices/{sku}": {
+    "/api/dashboard/customers/{customer}/prices/{skuUnit}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 customer: components["parameters"]["CustomerId"];
-                sku: components["parameters"]["SkuId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
         get?: never;
-        /** Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU; it may be above the normal price (D89) */
+        /** Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU unit (D91); it may be above the normal price (D89) */
         put: operations["dashboardSetCustomerPrice"];
         post?: never;
         /** Back to the normal price; no such price is 404 */
@@ -2378,10 +2382,29 @@ export interface components {
             tiers?: components["schemas"]["PriceTier"][];
             price_source?: components["schemas"]["CustomerPriceSource"];
             promotion?: components["schemas"]["PromotionSummary"];
+            /** @description Every unit the SKU is sold in, the default first (V2 Task 13, D91); the flat unit, factor, MOQ and prices above are the default unit's */
+            units: components["schemas"]["StoreSkuUnit"][];
             available?: number;
+            /** @description At least one unit can be ordered */
             in_stock: boolean;
             /** @constant */
             coming_soon?: true;
+        };
+        /** @description One unit of a SKU (D91), priced on its own at the shopper's prices; price keys follow the SKU's rules */
+        StoreSkuUnit: {
+            id: number;
+            unit: string | null;
+            conversion_factor: number;
+            moq: number;
+            cover_price?: components["schemas"]["Money"] | null;
+            base_price?: components["schemas"]["Money"];
+            discount_percent?: components["schemas"]["Money"] | null;
+            tiers?: components["schemas"]["PriceTier"][];
+            price_source?: components["schemas"]["CustomerPriceSource"];
+            promotion?: components["schemas"]["PromotionSummary"];
+            is_default: boolean;
+            /** @description The product is active and at least one of this unit can be ordered */
+            in_stock: boolean;
         };
         /** @description A Coming Soon product's pre-order offer (BR-O14, D88); `remaining` is what is left under the merchant's cap in selling units, null = no cap */
         StorePreorder: {
@@ -2426,8 +2449,13 @@ export interface components {
             gallery: components["schemas"]["ProductImage"][];
             related: components["schemas"]["RelatedProduct"][];
         };
+        /** @description One row per unit the product is sold in, the default first (D91) */
         PriceListRow: {
+            /** @description The product */
             id: number;
+            sku_unit_id: number | null;
+            conversion_factor: number | null;
+            is_default: boolean;
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"] | null;
@@ -2502,6 +2530,8 @@ export interface components {
         };
         CartItem: {
             sku_id: number;
+            /** @description The unit of the line (D91); a SKU may be in the cart in two units */
+            sku_unit_id: number;
             product_name: string;
             product_slug: string;
             unit: string;
@@ -2554,6 +2584,8 @@ export interface components {
         /** @description One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units. */
         LineProblem: {
             sku_id: number;
+            /** @description The line's SKU unit (D91) */
+            sku_unit_id: number;
             /** @enum {string} */
             reason: "insufficient_stock" | "below_moq" | "product_inactive" | "preorder_unavailable" | "preorder_limit";
             requested?: number;
@@ -2568,6 +2600,8 @@ export interface components {
             /** @description The order line, as PUT …/discount names it (D85) */
             id: number;
             sku_id: number;
+            /** @description The unit the line was ordered in (D91) */
+            sku_unit_id: number | null;
             product_name: string;
             sku_code: string;
             sku_name: string;
@@ -2881,17 +2915,30 @@ export interface components {
             reserved: number;
             available: number;
         };
-        DashboardSku: {
+        /** @description One active unit of a SKU (D91), the default first; tiers on the detail only */
+        DashboardSkuUnit: {
             id: number;
-            code: string;
-            selling_unit: components["schemas"]["IdName"] | null;
-            base_unit: components["schemas"]["IdName"] | null;
+            unit: components["schemas"]["IdName"] | null;
             conversion_factor: number;
             cover_price: components["schemas"]["Money"] | null;
             base_price: components["schemas"]["Money"];
             base_price_percent: components["schemas"]["Money"] | null;
             moq: number;
+            is_default: boolean;
             tiers?: components["schemas"]["DashboardTier"][];
+        };
+        /** @description selling_unit, conversion_factor, prices and moq are the default unit's (for lists); units lists them all (D91) */
+        DashboardSku: {
+            id: number;
+            code: string;
+            selling_unit: components["schemas"]["IdName"] | null;
+            base_unit: components["schemas"]["IdName"] | null;
+            conversion_factor: number | null;
+            cover_price: components["schemas"]["Money"] | null;
+            base_price: components["schemas"]["Money"] | null;
+            base_price_percent: components["schemas"]["Money"] | null;
+            moq: number | null;
+            units?: components["schemas"]["DashboardSkuUnit"][];
             inventory?: components["schemas"]["StockLevels"];
         };
         DashboardProduct: {
@@ -2952,8 +2999,10 @@ export interface components {
             limit: number | null;
         };
         PreorderDemandCounts: {
-            /** @description Open pre-ordered selling units, not yet converted */
+            /** @description Open pre-ordered units (in the units ordered), not yet converted */
             quantity: number;
+            /** @description The same in base units (D91) */
+            quantity_base: number;
             customers: number;
             preorders: number;
         };
@@ -2995,12 +3044,19 @@ export interface components {
             custom_fields?: {
                 [key: string]: string | number | boolean | null;
             };
-            sku: components["schemas"]["PriceSetRequest"] & {
+            sku: {
                 code: string;
-                selling_unit_id: number;
                 base_unit_id: number;
-                conversion_factor: number;
+                /** @description The units the SKU is sold in (D91), each unit_id once; at most one is_default (none = the first). A unit left out is archived; sending its unit_id again restores it. */
+                units: components["schemas"]["SkuUnitRequest"][];
             };
+        };
+        SkuUnitRequest: components["schemas"]["PriceSetRequest"] & {
+            /** @description An existing unit of the SKU; omitted for a new one */
+            id?: number | null;
+            unit_id: number;
+            conversion_factor: number;
+            is_default?: boolean;
         };
         PricingRequest: components["schemas"]["PriceSetRequest"] & Record<string, never>;
         /** @description Must not be empty (BR-P12) */
@@ -3077,7 +3133,10 @@ export interface components {
         SkuPricing: {
             product_id: number;
             sku_id: number;
+            sku_unit_id: number;
             code: string;
+            unit: string;
+            conversion_factor: number;
             cover_price: components["schemas"]["Money"] | null;
             base_price: components["schemas"]["Money"];
             base_price_percent: components["schemas"]["Money"] | null;
@@ -3094,12 +3153,16 @@ export interface components {
                 discount_percent: string;
             }[];
             moq?: number;
+            /** @description Only the SKU units sold in this store unit (D91); left out = every unit */
+            unit_id?: number | null;
         };
         SkippedNoCoverPrice: {
             product_id: number;
             sku_id: number;
+            sku_unit_id: number;
             code: string;
             name: string;
+            unit: string;
         };
         BulkPricingResult: {
             affected: number;
@@ -3288,10 +3351,13 @@ export interface components {
         /** @description A price negotiated with one customer for one SKU (BR-PR13, D89) */
         CustomerSkuPrice: {
             sku_id: number;
+            /** @description Negotiated per unit (D91) */
+            sku_unit_id: number;
             sku_code: string;
             product_name: string;
             unit: string;
-            /** @description The SKU's own base price, to compare */
+            conversion_factor: number;
+            /** @description The unit's own base price, to compare */
             base_price: components["schemas"]["Money"];
             unit_price: components["schemas"]["Money"];
             note: string | null;
@@ -3340,11 +3406,11 @@ export interface components {
             expires_at: string | null;
         };
         OrderLinesRequest: {
-            /** @description Every line the order should have; each SKU once, quantity in selling units */
+            /** @description Every line the order should have; each SKU unit once (D91), quantity in that unit */
             lines: {
                 /** @description An existing live line; omitted or null for a new one */
                 order_item_id?: number | null;
-                sku_id: number;
+                sku_unit_id: number;
                 quantity: number;
             }[];
             /** @description Goes to the history after «تعديل الطلب» */
@@ -3372,9 +3438,9 @@ export interface components {
             customer_id: number;
             /** @description BR-O12: quote an edit of this order of the customer (its number): what it holds counts as available and its total is not counted twice against the credit limit */
             order?: number | null;
-            /** @description Each SKU once; quantity in selling units */
+            /** @description Each SKU unit once (D91; one SKU may come in two units); quantity in that unit */
             lines: {
-                sku_id: number;
+                sku_unit_id: number;
                 quantity: number;
             }[];
         };
@@ -3398,6 +3464,7 @@ export interface components {
         };
         OrderQuoteLine: {
             sku_id: number;
+            sku_unit_id: number;
             product_name: string;
             sku_code: string;
             sku_name: string;
@@ -3417,7 +3484,7 @@ export interface components {
                 min_quantity: number;
                 unit_price: components["schemas"]["Money"] | null;
             }[];
-            /** @description The checkout_failed entry of this SKU without sku_id, or null */
+            /** @description The checkout_failed entry of this line without sku_id and sku_unit_id, or null */
             problem: {
                 /** @enum {string} */
                 reason: "insufficient_stock" | "below_moq" | "product_inactive";
@@ -4026,6 +4093,8 @@ export interface components {
         OptionId: number;
         ProductId: number;
         SkuId: number;
+        /** @description A SKU unit id (V2 Task 13, D91) */
+        SkuUnitId: number;
         CustomerId: number;
         CustomerGroupId: number;
         PromotionId: number;
@@ -4703,7 +4772,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    sku_id: number;
+                    sku_unit_id?: number | null;
+                    sku_id?: number | null;
                     quantity: number;
                     kind?: components["schemas"]["CartLineKind"];
                 };
@@ -4725,7 +4795,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                sku: number;
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -4742,7 +4813,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                sku: number;
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -6371,6 +6443,8 @@ export interface operations {
             header?: never;
             path: {
                 product: components["parameters"]["ProductId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -6404,7 +6478,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["SkuPricing"];
+            /** @description Every active unit's price set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SkuPricing"][];
+                    };
+                };
+            };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
@@ -7085,14 +7169,15 @@ export interface operations {
             header?: never;
             path: {
                 customer: components["parameters"]["CustomerId"];
-                sku: components["parameters"]["SkuId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description In the SKU's selling unit, at least 0.01 */
+                    /** @description In that unit, at least 0.01 */
                     unit_price: string | number;
                     note?: string | null;
                 };
@@ -7133,7 +7218,8 @@ export interface operations {
             header?: never;
             path: {
                 customer: components["parameters"]["CustomerId"];
-                sku: components["parameters"]["SkuId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };

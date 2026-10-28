@@ -61,9 +61,11 @@ function customerRow(overrides: Partial<DashboardCustomer> = {}): DashboardCusto
 function price(overrides: Partial<CustomerSkuPrice> = {}): CustomerSkuPrice {
   return {
     sku_id: 11,
+    sku_unit_id: 21,
     sku_code: "ADW-1",
     product_name: "الأضواء علوم",
     unit: "كرتونة",
+    conversion_factor: 20,
     base_price: "90.00",
     unit_price: "82.50",
     note: "اتفاق الموسم",
@@ -288,13 +290,13 @@ describe("CustomerPricesTab (BR-PR13)", () => {
   it("lists the negotiated prices next to the base price, changes one and removes one", async () => {
     const fetchMock = stubApi({
       "GET /api/dashboard/customers/7/prices": json(200, page([price()])),
-      "PUT /api/dashboard/customers/7/prices/11": json(200, { data: price({ unit_price: "80.00" }) }),
-      "DELETE /api/dashboard/customers/7/prices/11": json(204),
+      "PUT /api/dashboard/customers/7/prices/21": json(200, { data: price({ unit_price: "80.00" }) }),
+      "DELETE /api/dashboard/customers/7/prices/21": json(204),
     });
     const user = userEvent.setup();
     renderWithQuery(<CustomerPricesTab customerId={7} />);
 
-    const row = await screen.findByTestId("price-11");
+    const row = await screen.findByTestId("price-21");
     expect(row).toHaveTextContent("الأضواء علوم");
     expect(row).toHaveTextContent("90.00 ج.م / كرتونة");
     expect(row).toHaveTextContent("اتفاق الموسم");
@@ -303,14 +305,14 @@ describe("CustomerPricesTab (BR-PR13)", () => {
     await user.type(input, "80");
     await user.click(within(row).getByRole("button", { name: "حفظ" }));
     await waitFor(() =>
-      expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7/prices/11")[0]?.body).toEqual({
+      expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7/prices/21")[0]?.body).toEqual({
         unit_price: "80",
         note: "اتفاق الموسم",
       }),
     );
     await user.click(within(row).getByRole("button", { name: "حذف السعر الخاص الأضواء علوم" }));
 
-    await waitFor(() => expect(callsTo(fetchMock, "DELETE /api/dashboard/customers/7/prices/11")).toHaveLength(1));
+    await waitFor(() => expect(callsTo(fetchMock, "DELETE /api/dashboard/customers/7/prices/21")).toHaveLength(1));
   });
 
   it("asks for a product and a positive price before adding", async () => {
@@ -322,6 +324,6 @@ describe("CustomerPricesTab (BR-PR13)", () => {
     await user.click(screen.getByRole("button", { name: "إضافة سعر خاص" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent("اختر المنتج");
-    expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7/prices/11")).toHaveLength(0);
+    expect(callsTo(fetchMock, "PUT /api/dashboard/customers/7/prices/21")).toHaveLength(0);
   });
 });

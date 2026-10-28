@@ -8,7 +8,7 @@ use App\Modules\Catalog\Models\Unit;
 use App\Modules\Customers\Models\CustomerSkuPrice;
 
 /*
-| /api/dashboard/customers/{id}/prices[/{sku}] (BR-PR13, V2 Task 11, D89): the prices negotiated with one customer.
+| /api/dashboard/customers/{id}/prices[/{skuUnit}] (BR-PR13, V2 Task 11, D89): the prices negotiated with one customer, per SKU unit (D91).
 | `pricing.customers` (owner, manager); the permission matrix covers every role.
 */
 
@@ -20,7 +20,7 @@ beforeEach(function (): void {
 
         return Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '90', 'selling_unit_id' => $carton->id])->create(['name' => 'الأضواء علوم'])->sku()->sole();
     });
-    $this->url = fn (?Sku $sku = null): string => "/api/dashboard/customers/{$this->customer->id}/prices".($sku instanceof Sku ? "/{$sku->id}" : '');
+    $this->url = fn (?Sku $sku = null): string => "/api/dashboard/customers/{$this->customer->id}/prices".($sku instanceof Sku ? "/{$this->defaultUnitId($sku)}" : '');
 });
 
 test('BR-PR13 an owner sets a negotiated price, audited, and sees it in the list', function (): void {
@@ -29,8 +29,8 @@ test('BR-PR13 an owner sets a negotiated price, audited, and sees it in the list
     $response = $this->tenantJson('PUT', ($this->url)($this->sku), ['unit_price' => '82.5', 'note' => ' اتفاق الموسم '])
         ->assertCreated()
         ->assertExactJson(['data' => [
-            'sku_id' => $this->sku->id, 'sku_code' => 'ADW-1', 'product_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
-            'base_price' => '90.00', 'unit_price' => '82.50', 'note' => 'اتفاق الموسم', 'updated_at' => now()->toIso8601String(),
+            'sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'sku_code' => 'ADW-1', 'product_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
+            'conversion_factor' => 1, 'base_price' => '90.00', 'unit_price' => '82.50', 'note' => 'اتفاق الموسم', 'updated_at' => now()->toIso8601String(),
         ]]);
     expectDocumentedShape($response->json('data'), 'CustomerSkuPrice');
 
@@ -89,8 +89,8 @@ test('BR-T04 another store\'s customer or sku is 404 and nothing changes there',
     $foreignSku = $this->inTenant(fn (): Sku => Product::factory()->withSku()->create()->sku()->sole(), $other);
     $foreignPrice = $this->inTenant(fn () => CustomerSkuPrice::factory()->create(['customer_id' => $foreignCustomer->id, 'sku_id' => $foreignSku->id, 'unit_price' => '50.00']), $other);
     $uri = $which === 'customer'
-        ? "/api/dashboard/customers/{$foreignCustomer->id}/prices/{$this->sku->id}"
-        : "/api/dashboard/customers/{$this->customer->id}/prices/{$foreignSku->id}";
+        ? "/api/dashboard/customers/{$foreignCustomer->id}/prices/{$this->defaultUnitId($this->sku)}"
+        : "/api/dashboard/customers/{$this->customer->id}/prices/{$this->defaultUnitId($foreignSku)}";
 
     $this->tenantJson($method, $uri, ['unit_price' => '10'])->assertNotFound()->assertJsonPath('error.code', 'not_found');
 
@@ -106,4 +106,19 @@ test('BR-T04 the list of another store\'s customer is 404', function (): void {
     $foreign = $this->makeCustomer(tenant: $this->otherTenant());
 
     $this->tenantJson('GET', "/api/dashboard/customers/{$foreign->id}/prices")->assertNotFound();
+});
+
+test('D91 BR-PR13 a price is negotiated per unit: the carton and the piece of one SKU each keep their own, audited with the unit', function (): void {
+    $box = $this->addUnit($this->sku, ['conversion_factor' => 12, 'base_price' => '1000.00']);
+
+    $this->tenantJson('PUT', ($this->url)($this->sku), ['unit_price' => '85.00'])->assertCreated();
+    $this->tenantJson('PUT', "/api/dashboard/customers/{$this->customer->id}/prices/{$box->id}", ['unit_price' => '950.00'])
+        ->assertCreated()
+        ->assertJsonPath('data.sku_unit_id', $box->id)
+        ->assertJsonPath('data.conversion_factor', 12)
+        ->assertJsonPath('data.base_price', '1000.00');
+
+    $this->tenantJson('GET', ($this->url)())->assertOk()->assertJsonCount(2, 'data');
+    expect(App\Modules\Audit\Models\AuditLog::withoutTenantScope()->where('action', 'customer.price_set')->latest('id')->first()?->new_values)
+        ->toEqual(['sku_id' => $this->sku->id, 'sku_unit_id' => $box->id, 'unit_price' => '950.00', 'note' => null]);
 });

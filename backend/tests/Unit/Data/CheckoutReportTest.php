@@ -14,13 +14,13 @@ test('BR-PR06 a clean report passes and hands back its lines', function (): void
 });
 
 test('BR-PR06 problems refuse with every problem listed', function (): void {
-    $report = new CheckoutReport([], [7 => CheckoutProblem::belowMoq(7, 5)], '0.00', null, null, null);
+    $report = new CheckoutReport([], [17 => CheckoutProblem::belowMoq(7, 17, 5)], '0.00', null, null, null);
 
     expect(fn (): array => $report->assertPasses())->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => 7, 'reason' => 'below_moq', 'moq' => 5]]);
+        expect($e->items)->toBe([['sku_id' => 7, 'sku_unit_id' => 17, 'reason' => 'below_moq', 'moq' => 5]]);
     })
-        ->and($report->problemFor(7)?->reason)->toBe('below_moq')
-        ->and($report->problemFor(8))->toBeNull();
+        ->and($report->problemFor(17)?->reason)->toBe('below_moq')
+        ->and($report->problemFor(7))->toBeNull();
 });
 
 test('D84 skipping the mov lets a short order through', function () use ($mov): void {

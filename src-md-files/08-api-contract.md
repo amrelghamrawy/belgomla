@@ -159,11 +159,17 @@ Item shape:
     "base_price": "90.00",
     "discount_percent": "25.00",
     "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }],
+    "units": [
+      { "id": 811, "unit": "كرتونة", "conversion_factor": 20, "moq": 5, "cover_price": "120.00", "base_price": "90.00", "discount_percent": "25.00", "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }], "is_default": true, "in_stock": true },
+      { "id": 812, "unit": "قطعة", "conversion_factor": 1, "moq": 10, "cover_price": "6.00", "base_price": "4.75", "discount_percent": "20.83", "tiers": [], "is_default": false, "in_stock": true }
+    ],
     "available": 140,
     "in_stock": true
   }
 }
 ```
+
+V2 Task 13 (BR-U02, D91): `sku.units` lists every active unit the SKU is sold in, the default first, each priced on its own (the shopper's own prices, BR-PR14/PR15) with its own `in_stock` (Available ≥ its factor); the flat `unit`, `conversion_factor`, `moq` and prices of `sku` are the default unit's, and `sku.in_stock` is true when any unit can be ordered.
 
 If `require_login_for_prices` is on and no customer session: `sku.cover_price/base_price/tiers/discount_percent` are omitted and `prices_hidden: true` is added at the product level. `coming_soon` products return `in_stock:false, coming_soon:true` and `available` omitted.
 
@@ -179,7 +185,7 @@ Detail notes (Task 1): `gallery` items are `{ id, url, is_main, sort_order }`; `
 
 Same filters as the product list; returns all matching products (no pagination, max 2000) in a compact shape for the printable page (BR-P13).
 
-Row: `{ id, name, slug, kind, code, unit, moq, cover_price, base_price, availability: "available"|"coming_soon" }`; `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
+Row: `{ id, sku_unit_id, name, slug, kind, code, unit, conversion_factor, is_default, moq, cover_price, base_price, availability: "available"|"coming_soon" }`, one row per unit the product is sold in, the default first (V2 Task 13, D91); `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
 
 ### `GET /api/store/price-list/export` (V2 Task 06)
 
@@ -235,9 +241,9 @@ Address: `{ id, label, governorate, city, address_line, landmark, phone, is_defa
 | Method | Path                             | Body               | Notes                                                                                                 |
 | ------ | -------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
 | GET    | `/api/store/cart`                |                    | items with resolved prices, `removed_items[]` for now-inactive products (BR-P04), totals, `mov_check` |
-| POST   | `/api/store/cart/items`          | `sku_id, quantity` | upsert; validates integer, `≥ moq`, `≤ available`, product active                                     |
-| PATCH  | `/api/store/cart/items/{sku_id}` | `quantity`         |                                                                                                       |
-| DELETE | `/api/store/cart/items/{sku_id}` |                    |                                                                                                       |
+| POST   | `/api/store/cart/items`          | `sku_unit_id \| sku_id, quantity` | upsert; validates integer, `≥ moq`, `≤ available`, product active                                     |
+| PATCH  | `/api/store/cart/items/{sku_unit_id}` | `quantity`         |                                                                                                       |
+| DELETE | `/api/store/cart/items/{sku_unit_id}` |                    |                                                                                                       |
 | DELETE | `/api/store/cart`                |                    | clear                                                                                                 |
 
 Cart response:
@@ -270,6 +276,8 @@ Cart response:
 V2 Task 10 (BR-O14, D88): `POST /cart/items` and `PATCH /cart/items/{sku_id}` take `kind: order | preorder` (default `order`), `DELETE /cart/items/{sku_id}?kind=` too; a pre-order line needs a Coming Soon product with pre-orders on and the MOQ, never stock (`cart_line_invalid` reason `preorder_unavailable`). The cart adds `preorders: { items: [...the line shape + expected_at, available 0], items_total }` (indicative prices, no MOV). A pre-order line whose product stops taking pre-orders is dropped as `removed_items[].reason = preorder_closed`.
 
 Delivered in Task 5: every cart write answers this same body. `quantity`, `moq` are in selling units, `available` in base units (D37). A line that cannot be ordered is `422 cart_line_invalid` with `items: [{ sku_id, reason: below_moq|insufficient_stock|product_inactive, moq?|available? }]` (`available` here in selling units). Unknown or another tenant's SKU, or a SKU not in the cart for PATCH/DELETE → `404`. `mov.enabled` is false when the setting is on without an amount. Guest `POST /cart/items`: `403 prices_hidden` when `require_login_for_prices` is on, else `401` (D53). Task 9 added `product_slug` (link back to the product page) and `conversion_factor` (so the storefront can cap the quantity at `available / conversion_factor`) to each line.
+
+V2 Task 13 (D91): a cart line is a SKU **unit**: `POST` takes `sku_unit_id` (or `sku_id` alone for the SKU's default unit), `PATCH`/`DELETE` address the line by its unit id, and every line carries `sku_unit_id`; a SKU may be in the cart in two units (two lines). The stock check counts the base units the cart already holds of the SKU in its other units. `cart_line_invalid` and `checkout_failed` items carry `sku_unit_id` next to `sku_id`, `available` in the line's unit; checkout sums a SKU's lines in base units (a line that does not fit is refused per line). An archived unit is `product_inactive` and drops out of the cart on refresh.
 
 ### Checkout (BR-PR06, section 12 of the domain model)
 
@@ -428,20 +436,28 @@ Create/update body:
   },
   "sku": {
     "code": "ADW-SCI-P1-T1",
-    "selling_unit_id": 2,
     "base_unit_id": 1,
-    "conversion_factor": 20,
-    "cover_price": "120.00",
-    "base_price": "90.00",
-    "base_price_percent": null,
-    "moq": 5,
-    "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }]
+    "units": [
+      {
+        "id": 811,
+        "unit_id": 2,
+        "conversion_factor": 20,
+        "cover_price": "120.00",
+        "base_price": "90.00",
+        "base_price_percent": null,
+        "moq": 5,
+        "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }],
+        "is_default": true
+      }
+    ]
   },
   "opening_stock": 100
 }
 ```
 
 `base_price` **or** `base_price_percent` is required (BR-PR10); when percent is given, server computes the price and stores both (the percent wins if both are sent). Same for each tier (`unit_price` or `discount_percent`). On update, a body without `sku.tiers` keeps the tiers (D34). The detail response carries `sku.tiers: [{ min_quantity, unit_price, discount_percent }]`. Prices, MOQ and tiers are audited as `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed`, not inside `product.updated`. `opening_stock` is accepted only on create and writes an `opening` movement.
+
+V2 Task 13 (BR-U02, D91): `sku.units` (1–10, each `unit_id` once, at most one `is_default`, none = the first) replaces the flat `selling_unit_id, conversion_factor, cover_price, base_price, base_price_percent, moq, tiers`; each unit's price rules are the ones above, keyed `sku.units.{i}.…` in errors (`invalid_tiers` and `cover_price_required` too). A unit sent with its `id` (or the `unit_id` of a unit the SKU had) is updated and active again, a new one created, one left out archived. The dashboard product's `sku` carries `base_unit`, `units: [{ id, unit: {id, name}, conversion_factor, cover_price, base_price, base_price_percent, moq, is_default, tiers? }]` (active units, default first, tiers on the detail) and the default unit's `selling_unit, conversion_factor, cover_price, base_price, base_price_percent, moq` for the lists; the price sort uses the default unit. Price audits (`sku.price_changed`, …) are on the unit (`sku_units`); `product.updated` lists `sku.units` (unit, factor, default).
 
 V2 Task 10 (BR-O14, D88): both bodies take an optional `preorder { enabled, expected_at? (Y-m-d), limit? (1..10,000,000 selling units) }`; left out it is off on create and kept on update. Every dashboard product carries `preorder { enabled, expected_at, limit }` (audited as the product fields `preorder_enabled`, `expected_at`, `preorder_limit`). `PATCH …/status` answers `meta.preorder_demand { quantity, customers, preorders }` (the product's open pre-orders); going active converts nothing by itself. The storefront product adds `preorder`: null unless Coming Soon, then `{ enabled, expected_at, remaining }` (`remaining` under the cap in selling units, null = no cap).
 
@@ -456,13 +472,13 @@ V2 Task 10 (BR-O14, D88): both bodies take an optional `preorder { enabled, expe
 | POST | `/api/dashboard/products/import` | `{ token }` → `202` the run; one run per token; `Idempotency-Key` honored; `422 import_expired` after 24 h |
 | GET | `/api/dashboard/imports/{id}` | the run: `{ id, file_name, status: queued\|running\|done\|failed, total, processed, created, updated, skipped, failed, errors, batch_id, started_at, finished_at, created_at }` |
 
-All need `catalog.manage`. File format v1: sheet `products_v1`; columns `sku_code*, product_name*, category_path*, status, description, selling_unit*, base_unit*, conversion_factor*, cover_price, base_price*, base_price_percent, moq, tier_N_min, tier_N_price (N = 1…5, more when a SKU has more tiers), on_hand, field:<key>` (one per active custom field). The XLSX carries the Arabic labels with the keys in a thin second row; CSV has the keys only. Row rules: D95. Audit: one `batch_id` per import (`catalog.import_started`, the product/SKU/stock records, `catalog.imported` or `catalog.import_failed`).
+All need `catalog.manage`. File format v2 (V2 Task 13, D91): sheet `products_v2`, one row per SKU unit; columns `sku_code*, product_name*, category_path*, status, description, base_unit*, unit*, unit_is_default (نعم/لا), conversion_factor*, cover_price, base_price*, base_price_percent, moq, tier_N_min, tier_N_price, on_hand, field:<key>`; the consecutive rows of one code are its units, the product columns are read from the first; `total`, `processed`, `create/update/skip` count SKUs; rules D95. File format v1 (still read): sheet `products_v1`; columns `sku_code*, product_name*, category_path*, status, description, selling_unit*, base_unit*, conversion_factor*, cover_price, base_price*, base_price_percent, moq, tier_N_min, tier_N_price (N = 1…5, more when a SKU has more tiers), on_hand, field:<key>` (one per active custom field). The XLSX carries the Arabic labels with the keys in a thin second row; CSV has the keys only. Row rules: D95. Audit: one `batch_id` per import (`catalog.import_started`, the product/SKU/stock records, `catalog.imported` or `catalog.import_failed`).
 
 ### Pricing (BR-PR11)
 
 | Method | Path                                             | Body                                                                                         |
 | ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| PUT    | `/api/dashboard/products/{id}/pricing`           | `{ cover_price?, base_price                                                                  | base_price_percent, moq, tiers: [...] }` replaces tiers |
+| PUT    | `/api/dashboard/products/{id}/units/{sku_unit_id}/pricing` | `{ cover_price?, base_price                                                                  | base_price_percent, moq, tiers: [...] }` replaces the unit's tiers (V2 Task 13) |
 | POST   | `/api/dashboard/pricing/bulk`                    | `{ filter: {...}, base_price_percent, tiers: [ { min_quantity, discount_percent } ], moq? }` |
 | POST   | `/api/dashboard/pricing/bulk/preview`            | same body → `{ affected, skipped_no_cover_price: [...] }` without writing                    |
 | POST   | `/api/dashboard/products/{id}/pricing/recompute` | recompute prices from stored percentages after a cover-price change                          |
@@ -472,6 +488,7 @@ Delivered (Task 2):
 - `PUT …/pricing` and `…/recompute` return the SKU price set: `{ product_id, sku_id, code, cover_price, base_price, base_price_percent, discount_percent, moq, tiers: [{ min_quantity, unit_price, discount_percent }] }`. A missing `cover_price` keeps the current one (D34); `tiers` is required and replaces every tier (`[]` removes them). Errors: `422 invalid_tiers`, `422 cover_price_required`, `404` for another tenant's product.
 - `POST /pricing/bulk` returns `{ affected, skipped_no_cover_price: [{ product_id, sku_id, code, name }], batch_id }`; `…/bulk/preview` returns the same without `batch_id` and writes nothing. Bulk tiers are `{ min_quantity, discount_percent }` only. An empty filter is `422` on `filter`.
 - Audit: `sku.price_changed`, `sku.tiers_changed`, `sku.moq_changed` (per SKU, only what changed) and `pricing.bulk_applied` (one per bulk, same `batch_id`).
+- V2 Task 13 (D91): pricing is per SKU unit. `PUT …/units/{sku_unit_id}/pricing` answers that unit's set with `sku_unit_id, unit, conversion_factor` (a unit of another product, or archived, is `404`); `…/recompute` recomputes every active unit and answers the list. Bulk pricing prices every active unit of the selection off its own cover price, or only the units sold in `unit_id` when given; `affected` counts units and skipped rows carry `sku_unit_id, unit`. Audit records are on `sku_units`.
 
 ### Promotions (V2 Task 12, BR-PR15, D90)
 
@@ -557,9 +574,9 @@ V2 Task 11 (BR-PR12..PR14, D89), all `pricing.customers`:
 | PATCH  | `/api/dashboard/customer-groups/{id}` | any of the fields; `status: active` restores an archived group |
 | POST   | `/api/dashboard/customer-groups/{id}/archive` | members keep the group, the discount stops |
 | POST   | `/api/dashboard/customer-groups/{id}/assign` | `customer_ids[]` (≤ 500) or `filter {q, status, group}` (not empty) → `{ assigned }`; archived group → `409 group_archived` |
-| GET    | `/api/dashboard/customers/{id}/prices` | `?q=` product or SKU code; paginated `{ sku_id, sku_code, product_name, unit, base_price, unit_price, note, updated_at }` |
-| PUT    | `/api/dashboard/customers/{id}/prices/{sku}` | `unit_price` (≥ 0.01), `note?` (≤ 300) → 201 new, 200 replaced |
-| DELETE | `/api/dashboard/customers/{id}/prices/{sku}` | 204; no such price → 404 |
+| GET    | `/api/dashboard/customers/{id}/prices` | `?q=` product or SKU code; paginated `{ sku_id, sku_unit_id, sku_code, product_name, unit, conversion_factor, base_price, unit_price, note, updated_at }` (V2 Task 13: per unit) |
+| PUT    | `/api/dashboard/customers/{id}/prices/{sku_unit_id}` | `unit_price` (≥ 0.01), `note?` (≤ 300) → 201 new, 200 replaced |
+| DELETE | `/api/dashboard/customers/{id}/prices/{sku_unit_id}` | 204; no such price → 404 |
 
 The dashboard customer adds `group` (`{ id, name, discount_percent, status }` or null); the list takes `?group=`; create and update take `customer_group_id` (null = no group; needs `pricing.customers`, an archived group → `409 group_archived`, another store's → `422`). Storefront shapes are unchanged: a logged-in customer's `sku.base_price` / `tiers` and the price list's `base_price` are their own prices (BR-PR14), with `price_source` (`group` | `customer`) only then; cart lines, quote lines and order items always carry `price_source` (`base` | `tier` | `group` | `customer`).
 
@@ -602,7 +619,7 @@ V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about th
 
 | Method | Path                                    | Body / Notes |
 | ------ | --------------------------------------- | ------------ |
-| PUT    | `/api/dashboard/orders/{number}/lines`  | `{ lines: [{ order_item_id?, sku_id, quantity }], note? }` → the dashboard order detail + `meta.below_mov`. `orders.edit` (owner, manager, sales), `idempotent` |
+| PUT    | `/api/dashboard/orders/{number}/lines`  | `{ lines: [{ order_item_id?, sku_unit_id, quantity }], note? }` (V2 Task 13: a line is a SKU unit; an existing line keeps its unit) → the dashboard order detail + `meta.below_mov`. `orders.edit` (owner, manager, sales), `idempotent` |
 
 - **Lines** are every line the order should have: an existing live line by `order_item_id` with its own `sku_id`, a new one without. 1..200, each SKU once, `quantity` 1..1,000,000 selling units; `note` ≤ 250 (history «تعديل الطلب: note»).
 - `409 order_locked` from `preparing` on (`details.status`); `409 below_collected`; `422 checkout_failed` with `items` for the added or changed lines (stock counts what the order holds), `details.credit` when a higher total passes the credit limit; `422 discount_too_large` when an EGP order discount no longer fits; `422 validation_failed` on `lines.N.order_item_id` (not a live line of the order), `lines.N.sku_id` (changed, or not this store's). `meta.below_mov` is `{ required, current }` when the new total is under the minimum order value (allowed), else null.
@@ -628,11 +645,11 @@ V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about th
 
 | Method | Path                           | Body / Notes |
 | ------ | ------------------------------ | ------------ |
-| POST   | `/api/dashboard/orders/quote`  | `{ customer_id, lines: [{ sku_id, quantity }] }` → the quote; nothing saved. `orders.create` |
-| POST   | `/api/dashboard/orders`        | `{ customer_id, address_id, lines: [{ sku_id, quantity }], note?, notify_customer?, override_mov? }` → `201` the dashboard order detail. `orders.create`, `idempotent` |
+| POST   | `/api/dashboard/orders/quote`  | `{ customer_id, lines: [{ sku_unit_id, quantity }] }` → the quote; nothing saved. `orders.create` |
+| POST   | `/api/dashboard/orders`        | `{ customer_id, address_id, lines: [{ sku_unit_id, quantity, discount? }], note?, notify_customer?, override_mov? }` → `201` the dashboard order detail. `orders.create`, `idempotent` |
 
 - `lines` 1..200, each SKU once, `quantity` 1..1,000,000 selling units; `note` ≤ 1000 (stored as the order's `customer_note`); `notify_customer` and `override_mov` default false.
-- **Quote** shape: `{ lines: [{ sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, line_total, tiers: [{ min_quantity, unit_price }], problem }], items_total, mov: { enabled, amount, satisfied }, credit }`. `available` is selling units now (not locked); `problem` is the `checkout_failed` entry without `sku_id`, or null; `credit` is `{ limit, exposure, order_total }` past the limit, else null.
+- **Quote** shape (V2 Task 13: lines are SKU units, `sku_unit_id` distinct; two units of one SKU allowed; an unknown unit is `422` on `lines.{i}.sku_unit_id`): `{ lines: [{ sku_id, sku_unit_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, line_total, tiers: [{ min_quantity, unit_price }], problem }], items_total, mov: { enabled, amount, satisfied }, credit }`. `available` is selling units now (not locked); `problem` is the `checkout_failed` entry without `sku_id`, or null; `credit` is `{ limit, exposure, order_total }` past the limit, else null.
 - **Place**: the same failures as checkout (`422 checkout_failed` with `items`, `details.mov` unless `override_mov`, `details.credit`); `override_mov: true` without `orders.override_mov` → `403 forbidden`; blocked customer → `409 customer_blocked`, invited / pending approval → `409 customer_not_active` (both `details.status`); a customer, address or SKU not of this store → `422 validation_failed` on `customer_id`, `address_id` or `lines.N.sku_id`. No `new_order` notification; `notify_customer: true` sends the `placed` WhatsApp message after commit (D84). Audit: `order.created` with `placed_by { type, id }` and `mov_overridden { required, current }` when the MOV was waived.
 - Every dashboard order adds `placed_by` (`customer` | `tenant_user`) and `placed_by_id`. `order_status_messages` in the settings accepts `placed` too (not in `order_notify_statuses`).
 

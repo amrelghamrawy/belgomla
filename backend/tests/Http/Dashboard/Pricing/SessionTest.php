@@ -15,5 +15,5 @@ test('a dashboard session from one tenant host cannot reprice products on anothe
         ->assertUnauthorized()
         ->assertJsonPath('error.code', 'unauthenticated');
 
-    $this->assertDatabaseHas('skus', ['product_id' => $foreign->id, 'base_price' => '100.00']);
+    $this->assertDatabaseHas('sku_units', ['sku_id' => Illuminate\Support\Facades\DB::table('skus')->where('product_id', $foreign->id)->value('id'), 'base_price' => '100.00']);
 });

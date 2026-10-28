@@ -18,18 +18,19 @@ beforeEach(function (): void {
 });
 
 test('the store product resource key set with visible prices', function (): void {
-    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers', 'sku.inventory', 'mainImage']);
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers', 'sku.inventory', 'mainImage']);
 
     $data = rendered(new StoreProductResource($product, new Collection, false), storeRequest());
 
     expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category', 'custom_fields', 'sku', 'preorder'])
         ->and($data['preorder'])->toBeNull()
-        ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'available', 'in_stock'])
-        ->and($data['sku']['unit'])->toBe($product->sku->sellingUnit->name);
+        ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'units', 'available', 'in_stock'])
+        ->and(array_keys($data['sku']['units'][0]))->toBe(['id', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'is_default', 'in_stock'])
+        ->and($data['sku']['unit'])->toBe($product->sku?->activeUnits->sole()->unit->name);
 });
 
 test('D1 hidden prices drop the price keys and flag the product', function (): void {
-    $product = Product::factory()->withSku()->create()->load('sku.tiers');
+    $product = Product::factory()->withSku()->create()->load('sku.activeUnits.tiers');
 
     $data = rendered(new StoreProductResource($product, new Collection, true), storeRequest());
 
@@ -38,9 +39,9 @@ test('D1 hidden prices drop the price keys and flag the product', function (): v
 });
 
 test('BR-PR10 the store sku shows the discount off the cover price and its tiers from the resolver', function (): void {
-    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load('sku');
-    App\Modules\Pricing\Models\SkuPriceTier::factory()->for($product->sku)->percent('30.00')->create(['min_quantity' => 10, 'unit_price' => '84.00']);
-    $product->load('sku.tiers');
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create();
+    App\Modules\Pricing\Models\SkuPriceTier::factory()->percent('30.00')->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '84.00']);
+    $product->load('sku.activeUnits.tiers');
 
     $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
 
@@ -49,7 +50,7 @@ test('BR-PR10 the store sku shows the discount off the cover price and its tiers
 });
 
 test('BR-P04 a coming soon product is flagged, not in stock and shows no available stock', function (): void {
-    $product = Product::factory()->withSku(onHand: 50)->comingSoon()->create()->load('sku.inventory');
+    $product = Product::factory()->withSku(onHand: 50)->comingSoon()->create()->load('sku.inventory', 'sku.activeUnits');
 
     $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
 
@@ -59,7 +60,7 @@ test('BR-P04 a coming soon product is flagged, not in stock and shows no availab
 });
 
 test('D37 an active sku is in stock while at least one selling unit is available', function (int $onHand, int $reserved, int $available, bool $inStock): void {
-    $product = Product::factory()->withSku(['conversion_factor' => 20], $onHand, $reserved)->create()->load('sku.inventory');
+    $product = Product::factory()->withSku(['conversion_factor' => 20], $onHand, $reserved)->create()->load('sku.inventory', 'sku.activeUnits');
 
     $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
 
@@ -73,7 +74,7 @@ test('D37 an active sku is in stock while at least one selling unit is available
 ]);
 
 test('BR-INV02 a sku without a stock row has nothing available', function (): void {
-    $product = Product::factory()->withSku()->create()->load('sku.inventory');
+    $product = Product::factory()->withSku()->create()->load('sku.inventory', 'sku.activeUnits');
 
     $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
 
@@ -117,12 +118,12 @@ test('the facet resource key set', function (): void {
 });
 
 test('BR-P13 the price list row key set, with and without prices', function (): void {
-    $product = Product::factory()->withSku(['code' => 'A-1', 'cover_price' => '10', 'base_price' => '8'])->create()->load(['category', 'sku.sellingUnit']);
+    $product = Product::factory()->withSku(['code' => 'A-1', 'cover_price' => '10', 'base_price' => '8'])->create()->load(['category', 'sku.activeUnits.unit']);
 
-    $visible = rendered(new PriceListRowResource($product, false), storeRequest());
-    $hidden = rendered(new PriceListRowResource($product, true), storeRequest());
+    $visible = rendered(new PriceListRowResource($product, $product->sku?->activeUnits->first(), false), storeRequest());
+    $hidden = rendered(new PriceListRowResource($product, $product->sku?->activeUnits->first(), true), storeRequest());
 
-    expect(array_keys($visible))->toBe(['id', 'name', 'slug', 'kind', 'code', 'unit', 'moq', 'cover_price', 'base_price', 'availability'])
+    expect(array_keys($visible))->toBe(['id', 'sku_unit_id', 'name', 'slug', 'kind', 'code', 'unit', 'conversion_factor', 'is_default', 'moq', 'cover_price', 'base_price', 'availability'])
         ->and($visible['kind'])->toBe('general')
         ->and($visible['availability'])->toBe('available')
         ->and($hidden)->not->toHaveKeys(['cover_price', 'base_price']);
@@ -146,9 +147,9 @@ test('BR-O14 a coming soon product without pre-orders, or without a cap, has no 
 });
 
 test('BR-PR14 a store sku at the customer\'s own price carries price_source; a plain one does not', function (): void {
-    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['sku.tiers']);
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['sku.activeUnits.tiers']);
 
-    $own = rendered(new StoreProductResource($product, new Collection, false, new PricingContext(null, [$product->sku->id => '80.00'])), storeRequest())['sku'];
+    $own = rendered(new StoreProductResource($product, new Collection, false, new PricingContext(null, [$this->defaultUnitId($product->sku()->sole()) => '80.00'])), storeRequest())['sku'];
     $plain = rendered(new StoreProductResource($product, new Collection, false, new PricingContext), storeRequest())['sku'];
 
     expect($own['base_price'])->toBe('80.00')
@@ -162,7 +163,7 @@ test('BR-PR14 related products are shown at the same customer\'s prices', functi
     $product = Product::factory()->withSku(['base_price' => '90'])->create();
     $related = Product::factory()->withSku(['base_price' => '50'])->create();
     App\Modules\Catalog\Models\ProductRelation::factory()->create(['product_id' => $product->id, 'related_product_id' => $related->id]);
-    $product->load(['sku.tiers', 'relations.relatedProduct.sku.tiers', 'incomingRelations']);
+    $product->load(['sku.activeUnits.tiers', 'relations.relatedProduct.sku.activeUnits.tiers', 'incomingRelations']);
 
     $data = rendered(new StoreProductResource($product, new Collection, false, new PricingContext('10.00')), storeRequest());
 
@@ -171,10 +172,10 @@ test('BR-PR14 related products are shown at the same customer\'s prices', functi
 });
 
 test('BR-PR14 a price list row shows the customer\'s wholesale price and its source', function (): void {
-    $product = Product::factory()->withSku(['base_price' => '80'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers']);
+    $product = Product::factory()->withSku(['base_price' => '80'])->create()->load(['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers']);
 
-    $row = rendered(new PriceListRowResource($product, false, new PricingContext('25.00')), storeRequest());
-    $hidden = rendered(new PriceListRowResource($product, true, new PricingContext('25.00')), storeRequest());
+    $row = rendered(new PriceListRowResource($product, $product->sku?->activeUnits->first(), false, new PricingContext('25.00')), storeRequest());
+    $hidden = rendered(new PriceListRowResource($product, $product->sku?->activeUnits->first(), true, new PricingContext('25.00')), storeRequest());
 
     expect($row['base_price'])->toBe('60.00')
         ->and($row['price_source'])->toBe('group')
@@ -187,8 +188,8 @@ function storePromotion(int $promotionId = 5): App\Modules\Pricing\Data\Promotio
 }
 
 test('BR-PR15 a store sku priced by a promotion carries the promotion; prices hidden hide it', function (): void {
-    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['sku.tiers']);
-    $context = new PricingContext(promotions: [$product->sku->id => storePromotion()]);
+    $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create()->load(['sku.activeUnits.tiers']);
+    $context = new PricingContext(promotions: [$product->sku()->sole()->id => storePromotion()]);
 
     $sku = rendered(new StoreProductResource($product, new Collection, false, $context), storeRequest())['sku'];
     $hidden = rendered(new StoreProductResource($product, new Collection, true, $context), storeRequest())['sku'];
@@ -200,18 +201,18 @@ test('BR-PR15 a store sku priced by a promotion carries the promotion; prices hi
 });
 
 test('BR-PR15 a store sku whose group price beats the promotion shows no promotion', function (): void {
-    $product = Product::factory()->withSku(['base_price' => '90'])->create()->load(['sku.tiers']);
+    $product = Product::factory()->withSku(['base_price' => '90'])->create()->load(['sku.activeUnits.tiers']);
 
-    $sku = rendered(new StoreProductResource($product, new Collection, false, new PricingContext('30.00', [], [$product->sku->id => storePromotion()])), storeRequest())['sku'];
+    $sku = rendered(new StoreProductResource($product, new Collection, false, new PricingContext('30.00', [], [$product->sku()->sole()->id => storePromotion()])), storeRequest())['sku'];
 
     expect($sku['price_source'])->toBe('group')
         ->and($sku)->not->toHaveKey('promotion');
 });
 
 test('BR-PR15 a price list row priced by a promotion carries the promotion', function (): void {
-    $product = Product::factory()->withSku(['base_price' => '80'])->create()->load(['category', 'sku.sellingUnit', 'sku.tiers']);
+    $product = Product::factory()->withSku(['base_price' => '80'])->create()->load(['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers']);
 
-    $row = rendered(new PriceListRowResource($product, false, new PricingContext(promotions: [$product->sku->id => storePromotion()])), storeRequest());
+    $row = rendered(new PriceListRowResource($product, $product->sku?->activeUnits->first(), false, new PricingContext(promotions: [$product->sku()->sole()->id => storePromotion()])), storeRequest());
 
     expect($row['base_price'])->toBe('64.00')
         ->and($row['promotion']['id'])->toBe(5);
@@ -229,3 +230,48 @@ test('BR-PR15 the sku ids a page of products and its related products show', fun
     expect(StoreProductResource::skuIds([$product, $bare]))->toBe([$product->sku->id, $related->sku->id, $incoming->sku->id])
         ->and(PriceListRowResource::skuIds(new Collection([$related->load('sku'), $bare->load('sku')])))->toBe([$related->sku->id]);
 });
+
+test('D91 a sku sold by the piece and by the carton lists both units, each priced and stocked on its own', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '10.00', 'moq' => 6], onHand: 30)->create();
+    $carton = $this->addUnit($product->sku()->sole(), ['conversion_factor' => 48, 'base_price' => '400.00', 'moq' => 1], [3 => '380.00']);
+    $product->load(storeProductRelations());
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false, new PricingContext(null, [$carton->id => '390.00'])), storeRequest())['sku'];
+
+    expect([$sku['base_price'], $sku['moq'], $sku['conversion_factor'], $sku['in_stock']])->toBe(['10.00', 6, 1, true])
+        ->and(array_map(fn (array $unit): array => [$unit['id'], $unit['conversion_factor'], $unit['moq'], $unit['base_price'], $unit['tiers'], $unit['is_default'], $unit['in_stock']], $sku['units']))->toBe([
+            [$this->defaultUnitId($product->sku()->sole()), 1, 6, '10.00', [], true, true],
+            [$carton->id, 48, 1, '390.00', [], false, false],
+        ])
+        ->and($sku['units'][1]['price_source'])->toBe('customer');
+});
+
+test('D37 D91 a sku is in stock while its smallest unit can be ordered', function (): void {
+    $product = Product::factory()->withSku(['conversion_factor' => 48], onHand: 12)->create();
+    $this->addUnit($product->sku()->sole(), ['conversion_factor' => 12]);
+    $product->load(storeProductRelations());
+
+    $sku = rendered(new StoreProductResource($product, new Collection, false), storeRequest())['sku'];
+
+    expect([$sku['in_stock'], $sku['units'][0]['in_stock'], $sku['units'][1]['in_stock']])->toBe([true, false, true]);
+});
+
+test('BR-P13 D91 the price list shows a row per unit, the default first', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '10.00'])->create();
+    $carton = $this->addUnit($product->sku()->sole(), ['base_price' => '400.00']);
+    $product->load(['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers']);
+
+    $rows = PriceListRowResource::list(new Collection([$product]), false, false)->toResponse(storeRequest())->getData(true);
+
+    expect(array_map(fn (array $row): array => [$row['id'], $row['sku_unit_id'], $row['base_price'], $row['is_default']], $rows['data']))->toBe([
+        [$product->id, $this->defaultUnitId($product->sku()->sole()), '10.00', true],
+        [$product->id, $carton->id, '400.00', false],
+    ])
+        ->and($rows['meta']['count'])->toBe(2);
+});
+
+/** @return list<string> */
+function storeProductRelations(): array
+{
+    return App\Modules\Catalog\Queries\StoreProductListQuery::RELATIONS;
+}

@@ -12,17 +12,21 @@ beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
 });
 
-test('the sku pricing resource key set and money strings', function (): void {
-    $sku = Sku::factory()->withCoverPrice('120', '25')->create(['code' => 'ADW-1', 'base_price' => '90', 'moq' => 5]);
-    SkuPriceTier::factory()->for($sku)->percent('30')->create(['min_quantity' => 10, 'unit_price' => '84']);
-    SkuPriceTier::factory()->for($sku)->create(['min_quantity' => 50, 'unit_price' => '80']);
+test('D91 the sku unit pricing resource key set and money strings', function (): void {
+    $sku = Sku::factory()->withCoverPrice('120', '25')->create(['code' => 'ADW-1', 'base_price' => '90', 'moq' => 5, 'conversion_factor' => 20]);
+    $unit = $sku->defaultUnit ?? throw new RuntimeException;
+    SkuPriceTier::factory()->for($unit)->percent('30')->create(['min_quantity' => 10, 'unit_price' => '84']);
+    SkuPriceTier::factory()->for($unit)->create(['min_quantity' => 50, 'unit_price' => '80']);
 
-    $data = rendered(new SkuPricingResource($sku->refresh()->load('tiers')), dashboardRequest());
+    $data = rendered(new SkuPricingResource($unit->refresh()->load('tiers', 'unit', 'sku')), dashboardRequest());
 
     expect($data)->toBe([
         'product_id' => $sku->product_id,
         'sku_id' => $sku->id,
+        'sku_unit_id' => $unit->id,
         'code' => 'ADW-1',
+        'unit' => $unit->unit->name,
+        'conversion_factor' => 20,
         'cover_price' => '120.00',
         'base_price' => '90.00',
         'base_price_percent' => '25.00',
@@ -36,7 +40,7 @@ test('the sku pricing resource key set and money strings', function (): void {
 });
 
 test('BR-PR11 the bulk result carries the batch id only once applied', function (): void {
-    $skipped = [['product_id' => 1, 'sku_id' => 2, 'code' => 'A-3', 'name' => 'علوم']];
+    $skipped = [['product_id' => 1, 'sku_id' => 2, 'sku_unit_id' => 4, 'code' => 'A-3', 'name' => 'علوم', 'unit' => 'كرتونة']];
 
     $applied = rendered(new BulkPricingResultResource(['affected' => 2, 'skipped_no_cover_price' => $skipped, 'batch_id' => 'b-1']), dashboardRequest());
     $preview = rendered(new BulkPricingResultResource(['affected' => 2, 'skipped_no_cover_price' => $skipped, 'batch_id' => null]), dashboardRequest());

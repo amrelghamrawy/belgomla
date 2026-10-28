@@ -12,17 +12,21 @@ test('a file that cannot be imported as a whole is a validation failure on the f
         ->and($e->details)->toBe(['file' => [$message]]);
 })->with([
     'unreadable' => [InvalidImportFile::unreadable(), 'تعذّرت قراءة الملف، ارفع ملف Excel (xlsx) أو CSV'],
-    'another version' => [InvalidImportFile::unsupportedVersion('products_v2'), 'إصدار الملف «products_v2» غير مدعوم، نزّل قالبًا جديدًا'],
+    'another version' => [InvalidImportFile::unsupportedVersion('products_v3'), 'إصدار الملف «products_v3» غير مدعوم، نزّل قالبًا جديدًا'],
     'missing columns' => [fn (): InvalidImportFile => InvalidImportFile::missingColumns(['كود الصنف', 'سعر الجملة']), 'أعمدة ناقصة في الملف: كود الصنف، سعر الجملة'],
     'no header' => [InvalidImportFile::noHeader(), 'لم يتم التعرف على صف العناوين، استخدم القالب'],
     'empty' => [InvalidImportFile::empty(), 'الملف لا يحتوي على منتجات'],
 ]);
 
-test('a row error keeps its messages by column', function (): void {
-    $e = InvalidImportRow::withErrors(['base_price' => ['سعر الجملة مطلوب.']]);
+test('D91 a SKU error keeps its messages by row and column', function (): void {
+    $e = InvalidImportRow::inRows([3 => ['base_price' => ['سعر الجملة مطلوب.']], 4 => ['unit' => ['الوحدة مؤرشفة', 'أخرى']]]);
 
-    expect([$e->status, $e->errorCode])->toBe([422, 'validation_failed'])
-        ->and($e->details)->toBe(['base_price' => ['سعر الجملة مطلوب.']]);
+    expect([$e->status, $e->errorCode, $e->details])->toBe([422, 'validation_failed', null])
+        ->and($e->items)->toBe([
+            ['row' => 3, 'column' => 'base_price', 'message' => 'سعر الجملة مطلوب.'],
+            ['row' => 4, 'column' => 'unit', 'message' => 'الوحدة مؤرشفة'],
+            ['row' => 4, 'column' => 'unit', 'message' => 'أخرى'],
+        ]);
 });
 
 test('an expired preview token, an export not ready and a missing export have their own answers', function (): void {

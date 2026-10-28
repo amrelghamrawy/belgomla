@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Models\CustomerCredit;
@@ -87,6 +88,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         ProductImage::class,
         ProductRelation::class,
         Sku::class,
+        SkuUnit::class,
         Unit::class,
         CashCollection::class,
         CustomerCredit::class,

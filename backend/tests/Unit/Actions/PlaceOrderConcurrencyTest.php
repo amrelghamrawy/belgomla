@@ -53,7 +53,7 @@ beforeEach(function (): void {
     app(TenantContext::class)->set($this->race['tenant']);
 
     $this->merchantOrder = fn (): Order => app(PlaceOrderForCustomer::class)->handle(
-        new MerchantOrderData($this->race['phoned'][0]->id, $this->race['phoned'][1]->id, [['sku_id' => $this->race['sku']->id, 'quantity' => 5]]),
+        new MerchantOrderData($this->race['phoned'][0]->id, $this->race['phoned'][1]->id, [['sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'quantity' => 5]]),
         $this->race['user']->id,
     );
     $this->checkout = fn (): Order => app(Checkout::class)->handle($this->race['shopper'][0], new CheckoutData($this->race['shopper'][1]->id));
@@ -89,7 +89,7 @@ test('BR-O11 BR-INV03 a merchant order and a checkout for the last units: the ch
 
     expect($blocked)->toBe('55P03')
         ->and(fn (): mixed => onSession('pgsql_session_b', fn (): Order => ($this->checkout)()))->toThrow(function (CheckoutFailed $e): void {
-            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
+            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
         })
         ->and(onSession('pgsql_session_a', fn (): array => [
             Order::query()->pluck('number')->all(),
@@ -104,7 +104,7 @@ test('BR-O11 BR-INV03 a checkout first leaves the merchant order refused', funct
     $a->commit();
 
     expect(fn (): mixed => onSession('pgsql_session_b', fn (): Order => ($this->merchantOrder)()))->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
+        expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
     })
         ->and(onSession('pgsql_session_a', fn (): int => Order::query()->count()))->toBe(1);
 });

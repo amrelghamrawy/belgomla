@@ -87,6 +87,16 @@ test('BR-U05 a cart line is two integers', function (): void {
     expect(CartLineData::fromRequest($request))->toEqual(new CartLineData(12, 5, CartLineKind::Order));
 });
 
+test('D91 a cart line names the SKU unit to buy in; the SKU alone means its default unit', function (): void {
+    $request = validatedCustomersRequest(AddCartItemRequest::class, ['sku_unit_id' => '21', 'quantity' => '5']);
+
+    expect(CartLineData::fromRequest($request))->toEqual(new CartLineData(null, 5, CartLineKind::Order, 21));
+});
+
+test('D91 a cart line needs a SKU unit or a SKU', function (): void {
+    expect(fn (): Illuminate\Foundation\Http\FormRequest => validatedCustomersRequest(AddCartItemRequest::class, ['quantity' => '5']))->toThrow(Illuminate\Validation\ValidationException::class);
+});
+
 test('BR-O14 a cart line may be a pre-order line', function (): void {
     $request = validatedCustomersRequest(AddCartItemRequest::class, ['sku_id' => '12', 'quantity' => '5', 'kind' => 'preorder']);
 

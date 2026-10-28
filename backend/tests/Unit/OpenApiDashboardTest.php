@@ -50,7 +50,7 @@ test('units, fields and options match their schemas', function (): void {
 });
 
 test('a created product matches DashboardProduct with its SKU, tiers, stock, images and relations', function (): void {
-    $payload = $this->productPayload(['opening_stock' => 100, 'sku' => ['tiers' => [['min_quantity' => 10, 'unit_price' => '85.00']]]]);
+    $payload = $this->productPayload(['opening_stock' => 100, 'sku' => ['units' => [['tiers' => [['min_quantity' => 10, 'unit_price' => '85.00']]]]]]);
     $id = $this->tenantJson('POST', '/api/dashboard/products', $payload)->assertCreated()->json('data.id');
     $other = $this->inTenant(fn () => Product::factory()->withSku()->create());
     $this->tenantJson('POST', "/api/dashboard/products/{$id}/images", ['file' => UploadedFile::fake()->image('cover.jpg')])->assertCreated();
@@ -62,7 +62,9 @@ test('a created product matches DashboardProduct with its SKU, tiers, stock, ima
     expectDocumentedShape($data['category'], 'CategoryRef');
     expectDocumentedShape($data['sku'], 'DashboardSku');
     expectDocumentedShape($data['sku']['selling_unit'], 'IdName');
-    expectDocumentedShape($data['sku']['tiers'][0], 'DashboardTier');
+    expectDocumentedShape($data['sku']['units'][0], 'DashboardSkuUnit');
+    expectDocumentedShape($data['sku']['units'][0]['unit'], 'IdName');
+    expectDocumentedShape($data['sku']['units'][0]['tiers'][0], 'DashboardTier');
     expectDocumentedShape($data['sku']['inventory'], 'StockLevels');
     expectDocumentedShape($data['images'][0], 'ProductImage');
     expectDocumentedShape($data['relations'][0], 'ProductRelation');
@@ -83,7 +85,7 @@ test('pricing and the bulk results match their schemas', function (): void {
     $this->orderableSku(['code' => 'NO-COVER', 'cover_price' => null], name: 'بدون غلاف');
     $filter = ['filter' => ['q' => 'الأضواء'], 'base_price_percent' => '25', 'tiers' => [['min_quantity' => 10, 'discount_percent' => '30']]];
 
-    $pricing = $this->tenantJson('PUT', "/api/dashboard/products/{$sku->product_id}/pricing", ['base_price' => '90.00', 'moq' => 5, 'tiers' => []])->assertOk()->json('data');
+    $pricing = $this->tenantJson('PUT', "/api/dashboard/products/{$sku->product_id}/units/{$this->defaultUnitId($sku)}/pricing", ['base_price' => '90.00', 'moq' => 5, 'tiers' => []])->assertOk()->json('data');
     $preview = $this->tenantJson('POST', '/api/dashboard/pricing/bulk/preview', [...$filter, 'filter' => ['status' => 'active']])->assertOk()->json('data');
     $applied = $this->tenantJson('POST', '/api/dashboard/pricing/bulk', $filter)->assertOk()->json('data');
     $status = $this->tenantJson('POST', '/api/dashboard/products/bulk/status', ['filter' => ['q' => 'الأضواء'], 'status' => 'inactive'])->assertOk()->json('data');

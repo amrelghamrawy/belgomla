@@ -28,7 +28,7 @@ beforeEach(function (): void {
     $this->placement = fn (ActorType $by = ActorType::Customer): OrderPlacementData => new OrderPlacementData(
         $this->customer,
         $this->address->id,
-        [new CartLineInput(app(CartSkuQuery::class)->find($this->sku->id), 5)],
+        [new CartLineInput(app(CartSkuQuery::class)->findDefault($this->sku->id), 5)],
         $by,
         $by === ActorType::Customer ? $this->customer->id : 77,
     );

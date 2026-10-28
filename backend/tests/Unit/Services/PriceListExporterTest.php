@@ -25,6 +25,20 @@ test('BR-P13 the price list file holds a row per visible product with the price 
         ->and(spreadsheetRows($path)[2][6])->toBe('12.5');
 });
 
+test('BR-P13 D91 a product sold in two units has a row per unit, the default first', function (): void {
+    $product = Product::factory()->withSku(['code' => 'A-1', 'base_price' => '12.50'])->create(['name' => 'كراسة']);
+    $carton = $this->addUnit($product->sku()->sole(), ['base_price' => '140.00']);
+    $path = sys_get_temp_dir().'/price-list-'.Str::uuid().'.xlsx';
+
+    app(PriceListExporter::class)->write($path, new ProductFilterData);
+
+    expect(spreadsheetRows($path))->toHaveCount(3)
+        ->and(array_map(fn (array $row): array => [$row[2], $row[3], $row[6]], array_slice(spreadsheetRows($path), 1)))->toBe([
+            ['A-1', $product->sku()->sole()->defaultUnit?->unit->name, '12.5'],
+            ['A-1', $carton->unit->name, '140'],
+        ]);
+});
+
 test('D1 the writer refuses a guest of a store that hides prices before anything is streamed', function (): void {
     $this->tenant->settings->update(['require_login_for_prices' => true]);
 

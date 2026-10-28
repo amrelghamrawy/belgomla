@@ -10,16 +10,16 @@ use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\Scopes\InCartOf;
 
-/** BR-CU06: takes a SKU's order or pre-order line out of the cart (`404` when it is not there). Returns the refreshed cart. */
+/** BR-CU06: takes a SKU unit's order or pre-order line out of the cart (`404` when it is not there). Returns the refreshed cart. */
 final readonly class RemoveCartItem
 {
     public function __construct(private RefreshCart $refresh) {}
 
-    public function handle(Customer $customer, int $skuId, CartLineKind $kind = CartLineKind::Order): PricedCart
+    public function handle(Customer $customer, int $skuUnitId, CartLineKind $kind = CartLineKind::Order): PricedCart
     {
         CartItem::query()
             ->tap(new InCartOf($customer))
-            ->where('sku_id', $skuId)
+            ->where('sku_unit_id', $skuUnitId)
             ->where('kind', $kind)
             ->firstOrFail()
             ->delete();

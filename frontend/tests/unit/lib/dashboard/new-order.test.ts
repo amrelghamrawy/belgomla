@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addLine,
   discountedQuote,
+  lineFromProduct,
   type DraftLine,
   orderLinesBody,
   quoteBody,
@@ -10,14 +11,21 @@ import {
   quotePasses,
   removeLine,
   setQuantity,
+  setUnit,
 } from "@/lib/dashboard/new-order";
 
 import { NO_DISCOUNT } from "@/lib/dashboard/price-math";
 
-import { orderQuote as quote, orderQuoteLine as quoteLine } from "../../dashboard-fixtures";
+import {
+  dashboardProduct,
+  dashboardSku,
+  dashboardSkuUnit,
+  orderQuote as quote,
+  orderQuoteLine as quoteLine,
+} from "../../dashboard-fixtures";
 
 const line = (overrides: Partial<DraftLine> = {}): DraftLine => ({
-  sku_id: 3,
+  sku_unit_id: 3,
   quantity: 5,
   name: "الأضواء علوم",
   code: "ADW-SCI",
@@ -29,7 +37,7 @@ describe("draft lines (BR-O11)", () => {
     const lines = addLine([line()], line({ quantity: 9 }));
 
     expect(lines).toEqual([line()]);
-    expect(addLine(lines, line({ sku_id: 4 }))).toHaveLength(2);
+    expect(addLine(lines, line({ sku_unit_id: 4 }))).toHaveLength(2);
   });
 
   it("sets a quantity; anything but a whole number of at least 1 is an empty quantity (0)", () => {
@@ -40,15 +48,52 @@ describe("draft lines (BR-O11)", () => {
     expect(setQuantity([line()], 9, 12)).toEqual([line()]);
   });
 
+  it("D91 makes a picked product a line in its default unit, with the SKU's units to switch between", () => {
+    const sku = dashboardSku({ id: 3, code: "ADW-SCI", moq: 5 });
+    const product = dashboardProduct({
+      name: "الأضواء علوم",
+      sku: {
+        ...sku,
+        units: [
+          dashboardSkuUnit({ id: 9, moq: 2, is_default: true }),
+          ...(sku.units ?? []).map((unit) => ({ ...unit, is_default: false })),
+        ],
+      },
+    });
+
+    expect(lineFromProduct(product)).toEqual({
+      sku_unit_id: 9,
+      quantity: 2,
+      name: "الأضواء علوم",
+      code: "ADW-SCI",
+      units: [
+        { id: 9, name: "كرتونة 12", moq: 2 },
+        { id: 3, name: "كرتونة", moq: 5 },
+      ],
+    });
+    expect(lineFromProduct(dashboardProduct({ sku: null }))).toBeNull();
+  });
+
+  it("D91 moves a line to another unit at its MOQ, unless that unit is already a line", () => {
+    const units = [
+      { id: 3, name: "قطعة", moq: 5 },
+      { id: 9, name: "كرتونة", moq: 1 },
+    ];
+
+    expect(setUnit([line({ units })], 3, 9)).toEqual([line({ units, sku_unit_id: 9, quantity: 1 })]);
+    expect(setUnit([line({ units }), line({ units, sku_unit_id: 9 })], 3, 9)).toHaveLength(2);
+    expect(setUnit([line({ units })], 3, 42)).toEqual([line({ units })]);
+  });
+
   it("removes a line", () => {
-    expect(removeLine([line(), line({ sku_id: 4 })], 3)).toEqual([line({ sku_id: 4 })]);
+    expect(removeLine([line(), line({ sku_unit_id: 4 })], 3)).toEqual([line({ sku_unit_id: 4 })]);
   });
 
   it("quotes only with a customer and at least one line, sending ids and quantities", () => {
     expect(quoteBody(null, [line()])).toBeNull();
     expect(quoteBody(7, [])).toBeNull();
-    expect(quoteBody(7, [line(), line({ sku_id: 4, quantity: 0 })])).toBeNull();
-    expect(quoteBody(7, [line()])).toEqual({ customer_id: 7, lines: [{ sku_id: 3, quantity: 5 }] });
+    expect(quoteBody(7, [line(), line({ sku_unit_id: 4, quantity: 0 })])).toBeNull();
+    expect(quoteBody(7, [line()])).toEqual({ customer_id: 7, lines: [{ sku_unit_id: 3, quantity: 5 }] });
   });
 });
 
@@ -85,20 +130,20 @@ describe("quotePasses (BR-PR06, D84)", () => {
 
 describe("discounts on the form (D85)", () => {
   const lines = [
-    { sku_id: 3, quantity: 12, name: "الأضواء علوم", code: "ADW-SCI" },
-    { sku_id: 4, quantity: 5, name: "سلاح التلميذ", code: "SLH" },
+    { sku_unit_id: 3, quantity: 12, name: "الأضواء علوم", code: "ADW-SCI" },
+    { sku_unit_id: 4, quantity: 5, name: "سلاح التلميذ", code: "SLH" },
   ];
 
   it("sends a line's discount only when it has one", () => {
     expect(orderLinesBody(lines, { 3: { type: "percent", value: " 10 " }, 4: { type: "amount", value: "" } })).toEqual([
-      { sku_id: 3, quantity: 12, discount: { type: "percent", value: "10" } },
-      { sku_id: 4, quantity: 5 },
+      { sku_unit_id: 3, quantity: 12, discount: { type: "percent", value: "10" } },
+      { sku_unit_id: 4, quantity: 5 },
     ]);
   });
 
   it("prices the discounts from the quoted prices, and has nothing to show before every line is quoted", () => {
     const quoted = quote({
-      lines: [quoteLine(), quoteLine({ sku_id: 4, quantity: 5, unit_price: "20.00", line_total: "100.00" })],
+      lines: [quoteLine(), quoteLine({ sku_unit_id: 4, quantity: 5, unit_price: "20.00", line_total: "100.00" })],
     });
 
     expect(

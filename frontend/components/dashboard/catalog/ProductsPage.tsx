@@ -124,7 +124,9 @@ function ProductRow({ product }: { product: DashboardProduct }) {
   const duplicate = useDuplicateProduct();
   const available = product.sku?.inventory?.available;
   const low =
-    product.sku !== null && available !== undefined && available <= product.sku.moq * product.sku.conversion_factor;
+    product.sku !== null &&
+    available !== undefined &&
+    available <= (product.sku.moq ?? 0) * (product.sku.conversion_factor ?? 1);
 
   return (
     <TableRow data-testid={`product-${product.id}`}>
@@ -143,7 +145,7 @@ function ProductRow({ product }: { product: DashboardProduct }) {
         </Badge>
       </TableCell>
       <TableCell className="whitespace-nowrap">
-        {product.sku ? formatMoney(product.sku.base_price) : ar.dashboard.none}
+        {product.sku?.base_price ? formatMoney(product.sku.base_price) : ar.dashboard.none}
       </TableCell>
       <TableCell className="whitespace-nowrap">
         {available ?? ar.dashboard.none}

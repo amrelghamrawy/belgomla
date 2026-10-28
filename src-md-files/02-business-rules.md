@@ -267,17 +267,15 @@ Each tenant defines its own unit names such as:
 
 Unit names are not hardcoded to a single vertical.
 
-### BR-U02 — One Selling Unit Per SKU
+### BR-U02 — Selling Units of a SKU
 
-In V1 every SKU is sold in exactly **one** selling unit.
+A SKU has one `base_unit` (e.g. Piece), the unit its stock is kept in (BR-U03), and is sold in **one or more selling units** (V2 Task 13, D91; V1 allowed exactly one). Each selling unit defines:
 
-A SKU defines:
+- its `unit` (e.g. Carton), at most once per SKU;
+- `conversion_factor` = how many base units in one of it (e.g. 240; 1 for the base unit itself);
+- its own prices, MOQ and tiers (BR-U04).
 
-- `selling_unit` (e.g. Carton)
-- `base_unit` (e.g. Piece)
-- `conversion_factor` = how many base units in one selling unit (e.g. 240)
-
-Selling the same SKU in several units (piece and carton) is V2. If a merchant needs that in V1, they create two SKUs.
+One active selling unit is the **default**: shown first, and used where a single unit stands for the SKU (the product card, the price list order, the pre-order cap). A notebook can be sold by the piece (factor 1, 12 EGP) and by the carton of 48 (factor 48, its own price and tiers); both draw on the same stock. A unit the merchant stops selling is archived, not deleted.
 
 ### BR-U03 — Base Unit Is the Inventory Unit
 
@@ -287,7 +285,7 @@ Ordered quantity in base units = `quantity × conversion_factor`.
 
 ### BR-U04 — Pricing and MOQ Are in the Selling Unit
 
-Pricing tiers, base price and MOQ are expressed in the SKU's selling unit.
+Pricing tiers, base price and MOQ are expressed in the selling unit they belong to: every selling unit of a SKU has its own (V2 Task 13, D91). A cart or order line is in one selling unit; two units of one SKU are two lines.
 
 Example:
 
@@ -316,7 +314,7 @@ Invalid:
 
 ### BR-MOQ01 — SKU-Level MOQ
 
-Minimum Order Quantity is defined per SKU, in its selling unit. Default = 1.
+Minimum Order Quantity is defined per SKU selling unit, in that unit (V2 Task 13, D91: each unit has its own). Default = 1.
 
 Example:
 
@@ -326,7 +324,7 @@ The customer cannot order fewer than 5 cartons of that SKU.
 
 ### BR-MOQ02 — MOQ Is Not Aggregated
 
-MOQ is evaluated per SKU.
+MOQ is evaluated per SKU selling unit (a line), never summed across lines or units.
 
 Example:
 
@@ -341,15 +339,15 @@ Ordering 5 of A + 5 of B does not satisfy either MOQ.
 
 ### BR-PR01 — Base Price Is Mandatory
 
-Every SKU has a mandatory `base_price` per selling unit.
+Every selling unit of a SKU has a mandatory `base_price` (V2 Task 13, D91).
 
 Pricing tiers are optional and only reduce the price for larger quantities.
 
 ### BR-PR02 — Independent Tiers Per SKU
 
-Every SKU has its own quantity pricing tiers.
+Every SKU selling unit has its own quantity pricing tiers (V2 Task 13, D91).
 
-Quantities from different SKUs are never combined to reach a pricing tier.
+Quantities from different SKUs, or from different units of one SKU, are never combined to reach a pricing tier.
 
 ### BR-PR03 — Tier Structure
 
@@ -375,9 +373,9 @@ Example: quantity 35 → 90 EGP. Quantity 7 with tiers starting at 10 → base p
 
 ### BR-PR05 — No Duplicate Tier Thresholds
 
-Two tiers of the same SKU cannot share the same `min_quantity`. Tier prices must be `> 0`.
+Two tiers of the same SKU selling unit cannot share the same `min_quantity`. Tier prices must be `> 0`.
 
-A tier may not cost more than the SKU's base price (D28: no surcharges); a tier equal to the base price is allowed. Violations are rejected together with `422 invalid_tiers`, one Arabic message per problem in `details.tiers`.
+A tier may not cost more than its unit's base price (D28: no surcharges); a tier equal to the base price is allowed. Violations are rejected together with `422 invalid_tiers`, one Arabic message per problem in `details.tiers`.
 
 ### BR-PR06 — Checkout Recalculation
 

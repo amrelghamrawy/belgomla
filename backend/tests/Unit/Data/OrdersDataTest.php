@@ -182,22 +182,22 @@ test('BR-C07 return data keeps the refund as credit when asked, cash otherwise',
 test('BR-O11 merchant order data: integer ids and lines, the trimmed note and both flags', function (): void {
     $this->actingAsOwner(); // override_mov needs orders.override_mov (D84)
     $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, [
-        'customer_id' => '7', 'address_id' => '9', 'lines' => [['sku_id' => '3', 'quantity' => '12']], 'note' => '  بالتليفون  ', 'notify_customer' => true, 'override_mov' => '1',
+        'customer_id' => '7', 'address_id' => '9', 'lines' => [['sku_unit_id' => '3', 'quantity' => '12']], 'note' => '  بالتليفون  ', 'notify_customer' => true, 'override_mov' => '1',
     ]);
 
-    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(7, 9, [['sku_id' => 3, 'quantity' => 12]], 'بالتليفون', true, true));
+    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(7, 9, [['sku_unit_id' => 3, 'quantity' => 12]], 'بالتليفون', true, true));
 });
 
 test('BR-O11 merchant order data without note or flags: no note, no message, no override', function (): void {
-    $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, ['customer_id' => 7, 'address_id' => 9, 'lines' => [['sku_id' => 3, 'quantity' => 1]], 'note' => '  ']);
+    $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, ['customer_id' => 7, 'address_id' => 9, 'lines' => [['sku_unit_id' => 3, 'quantity' => 1]], 'note' => '  ']);
 
-    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(7, 9, [['sku_id' => 3, 'quantity' => 1]]));
+    expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(7, 9, [['sku_unit_id' => 3, 'quantity' => 1]]));
 });
 
 test('BR-O11 the quote request gives the customer and the lines as integers', function (): void {
-    $request = validatedOrdersRequest(QuoteOrderRequest::class, ['customer_id' => '7', 'lines' => [['sku_id' => '3', 'quantity' => '5'], ['sku_id' => 4, 'quantity' => 1]]]);
+    $request = validatedOrdersRequest(QuoteOrderRequest::class, ['customer_id' => '7', 'lines' => [['sku_unit_id' => '3', 'quantity' => '5'], ['sku_unit_id' => 4, 'quantity' => 1]]]);
 
-    expect([$request->customerId(), $request->lines()])->toBe([7, [['sku_id' => 3, 'quantity' => 5], ['sku_id' => 4, 'quantity' => 1]]]);
+    expect([$request->customerId(), $request->lines()])->toBe([7, [['sku_unit_id' => 3, 'quantity' => 5], ['sku_unit_id' => 4, 'quantity' => 1]]]);
 });
 
 test('BR-O11 placement data knows whether a merchant placed the order', function (): void {
@@ -235,12 +235,12 @@ test('D85 discount data without an order discount has no type, value or reason',
 test('D85 merchant order data carries the line discounts by sku and the order discount', function (): void {
     $request = validatedOrdersRequest(StoreMerchantOrderRequest::class, [
         'customer_id' => 7, 'address_id' => 9,
-        'lines' => [['sku_id' => '3', 'quantity' => 12, 'discount' => ['type' => 'amount', 'value' => '2']], ['sku_id' => 4, 'quantity' => 1, 'discount' => null]],
+        'lines' => [['sku_unit_id' => '3', 'quantity' => 12, 'discount' => ['type' => 'amount', 'value' => '2']], ['sku_unit_id' => 4, 'quantity' => 1, 'discount' => null]],
         'discount' => ['type' => 'percent', 'value' => '5', 'reason' => ' بالتليفون '],
     ]);
 
     expect(MerchantOrderData::fromRequest($request))->toEqual(new MerchantOrderData(
-        7, 9, [['sku_id' => 3, 'quantity' => 12], ['sku_id' => 4, 'quantity' => 1]],
+        7, 9, [['sku_unit_id' => 3, 'quantity' => 12], ['sku_unit_id' => 4, 'quantity' => 1]],
         lineDiscounts: [3 => ['type' => App\Modules\Pricing\Enums\DiscountType::Amount, 'value' => '2.00']],
         discountType: App\Modules\Pricing\Enums\DiscountType::Percent,
         discountValue: '5.00',
@@ -265,7 +265,7 @@ test('BR-O13 delivered quantities only count when delivering, and none sent mean
 
 test('BR-O12 order edit data: every line with its id or none, integers, and the trimmed note', function (): void {
     $data = App\Modules\Orders\Data\OrderEditData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\EditOrderLinesRequest::class, [
-        'lines' => [['order_item_id' => '7', 'sku_id' => '3', 'quantity' => '12'], ['sku_id' => 5, 'quantity' => 6], ['order_item_id' => null, 'sku_id' => 8, 'quantity' => 5]],
+        'lines' => [['order_item_id' => '7', 'sku_unit_id' => '3', 'quantity' => '12'], ['sku_unit_id' => 5, 'quantity' => 6], ['order_item_id' => null, 'sku_unit_id' => 8, 'quantity' => 5]],
         'note' => '  نفد الكتاب ',
     ], 'PUT'));
 
@@ -277,7 +277,7 @@ test('BR-O12 order edit data: every line with its id or none, integers, and the 
 });
 
 test('BR-O12 an empty note is no note', function (): void {
-    $data = App\Modules\Orders\Data\OrderEditData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\EditOrderLinesRequest::class, ['lines' => [['sku_id' => 5, 'quantity' => 6]], 'note' => '  '], 'PUT'));
+    $data = App\Modules\Orders\Data\OrderEditData::fromRequest(validatedOrdersRequest(App\Modules\Orders\Http\Requests\EditOrderLinesRequest::class, ['lines' => [['sku_unit_id' => 5, 'quantity' => 6]], 'note' => '  '], 'PUT'));
 
     expect($data->note)->toBeNull();
 });

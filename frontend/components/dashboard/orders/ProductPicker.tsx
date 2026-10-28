@@ -76,7 +76,9 @@ export function ProductPicker({ onPick }: Props) {
                       {product.sku.code}
                     </bdi>
                   </span>
-                  <span className="text-muted-foreground shrink-0 text-xs">{formatMoney(product.sku.base_price)}</span>
+                  <span className="text-muted-foreground shrink-0 text-xs">
+                    {formatMoney(product.sku.base_price ?? "0.00")}
+                  </span>
                 </CommandItem>
               ),
             )}

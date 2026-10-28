@@ -5,6 +5,8 @@ import { formatMoney } from "@/lib/format/money";
 
 export type CheckoutProblem = {
   skuId: number;
+  /** The line's SKU unit (V2 Task 13, D91); a SKU may be in the cart in two units. */
+  skuUnitId: number | null;
   productName: string | null;
   productSlug: string | null;
   message: string;
@@ -42,10 +44,13 @@ export function checkoutFailure(error: unknown, lines: readonly CartItem[]): Che
   }
 
   const problems = (error.items ?? []).filter(isLineProblem).map((problem) => {
-    const line = lines.find((item) => item.sku_id === problem.sku_id);
+    const line =
+      lines.find((item) => item.sku_unit_id === problem.sku_unit_id) ??
+      lines.find((item) => item.sku_id === problem.sku_id);
 
     return {
       skuId: problem.sku_id,
+      skuUnitId: typeof problem.sku_unit_id === "number" ? problem.sku_unit_id : null,
       productName: line?.product_name ?? null,
       productSlug: line?.product_slug ?? null,
       message: reasonText(problem, line?.unit ?? ""),

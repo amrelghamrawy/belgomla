@@ -1052,20 +1052,30 @@
                 "tags": [
                     "store-cart"
                 ],
-                "summary": "Adds a SKU (or adds to its quantity); guests get 403 prices_hidden or 401 (D53)",
+                "summary": "Puts a SKU unit in the cart with this quantity; guests get 403 prices_hidden or 401 (D53)",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
+                                "description": "Send sku_unit_id (V2 Task 13, D91), or sku_id alone for the SKU's default unit",
                                 "required": [
-                                    "sku_id",
                                     "quantity"
                                 ],
                                 "properties": {
+                                    "sku_unit_id": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 1
+                                    },
                                     "sku_id": {
-                                        "type": "integer",
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
                                         "minimum": 1
                                     },
                                     "quantity": {
@@ -1100,15 +1110,10 @@
                 }
             }
         },
-        "/api/store/cart/items/{sku}": {
+        "/api/store/cart/items/{skuUnit}": {
             "parameters": [
                 {
-                    "name": "sku",
-                    "in": "path",
-                    "required": true,
-                    "schema": {
-                        "type": "integer"
-                    }
+                    "$ref": "#/components/parameters/SkuUnitId"
                 }
             ],
             "patch": {
@@ -4151,10 +4156,13 @@
                 }
             }
         },
-        "/api/dashboard/products/{product}/pricing": {
+        "/api/dashboard/products/{product}/units/{skuUnit}/pricing": {
             "parameters": [
                 {
                     "$ref": "#/components/parameters/ProductId"
+                },
+                {
+                    "$ref": "#/components/parameters/SkuUnitId"
                 }
             ],
             "put": {
@@ -4162,7 +4170,7 @@
                 "tags": [
                     "dashboard-pricing"
                 ],
-                "summary": "Replaces the SKU's price set; tiers is required and replaces all tiers",
+                "summary": "Replaces the price set of one active unit of the product's SKU (D91); tiers is required and replaces all its tiers",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -4210,10 +4218,28 @@
                 "tags": [
                     "dashboard-pricing"
                 ],
-                "summary": "Recomputes percentage-based prices from the current cover price (BR-PR10, audited)",
+                "summary": "Recomputes percentage-based prices from the current cover price of every unit (BR-PR10, D91, audited)",
                 "responses": {
                     "200": {
-                        "$ref": "#/components/responses/SkuPricing"
+                        "description": "Every active unit's price set",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SkuPricing"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#/components/responses/Error"
@@ -5503,13 +5529,13 @@
                 }
             }
         },
-        "/api/dashboard/customers/{customer}/prices/{sku}": {
+        "/api/dashboard/customers/{customer}/prices/{skuUnit}": {
             "parameters": [
                 {
                     "$ref": "#/components/parameters/CustomerId"
                 },
                 {
-                    "$ref": "#/components/parameters/SkuId"
+                    "$ref": "#/components/parameters/SkuUnitId"
                 }
             ],
             "put": {
@@ -5517,7 +5543,7 @@
                 "tags": [
                     "dashboard-customers"
                 ],
-                "summary": "Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU; it may be above the normal price (D89)",
+                "summary": "Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU unit (D91); it may be above the normal price (D89)",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -5533,7 +5559,7 @@
                                             "string",
                                             "number"
                                         ],
-                                        "description": "In the SKU's selling unit, at least 0.01"
+                                        "description": "In that unit, at least 0.01"
                                     },
                                     "note": {
                                         "type": [
@@ -7884,6 +7910,15 @@
                     "type": "integer"
                 }
             },
+            "SkuUnitId": {
+                "name": "skuUnit",
+                "in": "path",
+                "required": true,
+                "description": "A SKU unit id (V2 Task 13, D91)",
+                "schema": {
+                    "type": "integer"
+                }
+            },
             "CustomerId": {
                 "name": "customer",
                 "in": "path",
@@ -9045,6 +9080,7 @@
                     "unit",
                     "conversion_factor",
                     "moq",
+                    "units",
                     "in_stock"
                 ],
                 "properties": {
@@ -9101,15 +9137,94 @@
                     "promotion": {
                         "$ref": "#/components/schemas/PromotionSummary"
                     },
+                    "units": {
+                        "description": "Every unit the SKU is sold in, the default first (V2 Task 13, D91); the flat unit, factor, MOQ and prices above are the default unit's",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/StoreSkuUnit"
+                        }
+                    },
                     "available": {
                         "type": "integer"
                     },
                     "in_stock": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "At least one unit can be ordered"
                     },
                     "coming_soon": {
                         "type": "boolean",
                         "const": true
+                    }
+                }
+            },
+            "StoreSkuUnit": {
+                "description": "One unit of a SKU (D91), priced on its own at the shopper's prices; price keys follow the SKU's rules",
+                "type": "object",
+                "required": [
+                    "id",
+                    "unit",
+                    "conversion_factor",
+                    "moq",
+                    "is_default",
+                    "in_stock"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "unit": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
+                    "moq": {
+                        "type": "integer"
+                    },
+                    "cover_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "base_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "discount_percent": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "tiers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PriceTier"
+                        }
+                    },
+                    "price_source": {
+                        "$ref": "#/components/schemas/CustomerPriceSource"
+                    },
+                    "promotion": {
+                        "$ref": "#/components/schemas/PromotionSummary"
+                    },
+                    "is_default": {
+                        "type": "boolean"
+                    },
+                    "in_stock": {
+                        "type": "boolean",
+                        "description": "The product is active and at least one of this unit can be ordered"
                     }
                 }
             },
@@ -9306,20 +9421,40 @@
                 ]
             },
             "PriceListRow": {
+                "description": "One row per unit the product is sold in, the default first (D91)",
                 "type": "object",
                 "required": [
                     "id",
+                    "sku_unit_id",
                     "name",
                     "slug",
                     "kind",
                     "code",
                     "unit",
+                    "conversion_factor",
+                    "is_default",
                     "moq",
                     "availability"
                 ],
                 "properties": {
                     "id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The product"
+                    },
+                    "sku_unit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "conversion_factor": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "is_default": {
+                        "type": "boolean"
                     },
                     "name": {
                         "type": "string"
@@ -9635,6 +9770,7 @@
                 "type": "object",
                 "required": [
                     "sku_id",
+                    "sku_unit_id",
                     "product_name",
                     "product_slug",
                     "unit",
@@ -9651,6 +9787,10 @@
                 "properties": {
                     "sku_id": {
                         "type": "integer"
+                    },
+                    "sku_unit_id": {
+                        "type": "integer",
+                        "description": "The unit of the line (D91); a SKU may be in the cart in two units"
                     },
                     "product_name": {
                         "type": "string"
@@ -9831,11 +9971,16 @@
                 "type": "object",
                 "required": [
                     "sku_id",
+                    "sku_unit_id",
                     "reason"
                 ],
                 "properties": {
                     "sku_id": {
                         "type": "integer"
+                    },
+                    "sku_unit_id": {
+                        "type": "integer",
+                        "description": "The line's SKU unit (D91)"
                     },
                     "reason": {
                         "type": "string",
@@ -9878,6 +10023,7 @@
                 "required": [
                     "id",
                     "sku_id",
+                    "sku_unit_id",
                     "product_name",
                     "sku_code",
                     "sku_name",
@@ -9903,6 +10049,13 @@
                     },
                     "sku_id": {
                         "type": "integer"
+                    },
+                    "sku_unit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "The unit the line was ordered in (D91)"
                     },
                     "product_name": {
                         "type": "string"
@@ -11180,7 +11333,75 @@
                     }
                 }
             },
+            "DashboardSkuUnit": {
+                "description": "One active unit of a SKU (D91), the default first; tiers on the detail only",
+                "type": "object",
+                "required": [
+                    "id",
+                    "unit",
+                    "conversion_factor",
+                    "cover_price",
+                    "base_price",
+                    "base_price_percent",
+                    "moq",
+                    "is_default"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "unit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/IdName"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
+                    "cover_price": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "base_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "base_price_percent": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "moq": {
+                        "type": "integer"
+                    },
+                    "is_default": {
+                        "type": "boolean"
+                    },
+                    "tiers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DashboardTier"
+                        }
+                    }
+                }
+            },
             "DashboardSku": {
+                "description": "selling_unit, conversion_factor, prices and moq are the default unit's (for lists); units lists them all (D91)",
                 "type": "object",
                 "required": [
                     "id",
@@ -11221,7 +11442,10 @@
                         ]
                     },
                     "conversion_factor": {
-                        "type": "integer"
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
                     },
                     "cover_price": {
                         "oneOf": [
@@ -11234,7 +11458,14 @@
                         ]
                     },
                     "base_price": {
-                        "$ref": "#/components/schemas/Money"
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     },
                     "base_price_percent": {
                         "oneOf": [
@@ -11247,12 +11478,15 @@
                         ]
                     },
                     "moq": {
-                        "type": "integer"
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
                     },
-                    "tiers": {
+                    "units": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/components/schemas/DashboardTier"
+                            "$ref": "#/components/schemas/DashboardSkuUnit"
                         }
                     },
                     "inventory": {
@@ -11506,13 +11740,18 @@
                 "type": "object",
                 "required": [
                     "quantity",
+                    "quantity_base",
                     "customers",
                     "preorders"
                 ],
                 "properties": {
                     "quantity": {
                         "type": "integer",
-                        "description": "Open pre-ordered selling units, not yet converted"
+                        "description": "Open pre-ordered units (in the units ordered), not yet converted"
+                    },
+                    "quantity_base": {
+                        "type": "integer",
+                        "description": "The same in base units (D91)"
                     },
                     "customers": {
                         "type": "integer"
@@ -11679,40 +11918,68 @@
                         }
                     },
                     "sku": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/PriceSetRequest"
+                        "type": "object",
+                        "required": [
+                            "code",
+                            "base_unit_id",
+                            "units"
+                        ],
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "maxLength": 60,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
                             },
-                            {
-                                "type": "object",
-                                "required": [
-                                    "code",
-                                    "selling_unit_id",
-                                    "base_unit_id",
-                                    "conversion_factor"
-                                ],
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "maxLength": 60,
-                                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
-                                    },
-                                    "selling_unit_id": {
-                                        "type": "integer"
-                                    },
-                                    "base_unit_id": {
-                                        "type": "integer"
-                                    },
-                                    "conversion_factor": {
-                                        "type": "integer",
-                                        "minimum": 1,
-                                        "maximum": 1000000
-                                    }
+                            "base_unit_id": {
+                                "type": "integer"
+                            },
+                            "units": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 10,
+                                "description": "The units the SKU is sold in (D91), each unit_id once; at most one is_default (none = the first). A unit left out is archived; sending its unit_id again restores it.",
+                                "items": {
+                                    "$ref": "#/components/schemas/SkuUnitRequest"
                                 }
                             }
-                        ]
+                        }
                     }
                 }
+            },
+            "SkuUnitRequest": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/PriceSetRequest"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "unit_id",
+                            "conversion_factor"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "minimum": 1,
+                                "description": "An existing unit of the SKU; omitted for a new one"
+                            },
+                            "unit_id": {
+                                "type": "integer"
+                            },
+                            "conversion_factor": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 1000000
+                            },
+                            "is_default": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                ]
             },
             "PricingRequest": {
                 "allOf": [
@@ -11956,7 +12223,10 @@
                 "required": [
                     "product_id",
                     "sku_id",
+                    "sku_unit_id",
                     "code",
+                    "unit",
+                    "conversion_factor",
                     "cover_price",
                     "base_price",
                     "base_price_percent",
@@ -11971,8 +12241,17 @@
                     "sku_id": {
                         "type": "integer"
                     },
+                    "sku_unit_id": {
+                        "type": "integer"
+                    },
                     "code": {
                         "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
                     },
                     "cover_price": {
                         "oneOf": [
@@ -12058,6 +12337,14 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 1000000
+                    },
+                    "unit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "description": "Only the SKU units sold in this store unit (D91); left out = every unit"
                     }
                 }
             },
@@ -12066,8 +12353,10 @@
                 "required": [
                     "product_id",
                     "sku_id",
+                    "sku_unit_id",
                     "code",
-                    "name"
+                    "name",
+                    "unit"
                 ],
                 "properties": {
                     "product_id": {
@@ -12076,10 +12365,16 @@
                     "sku_id": {
                         "type": "integer"
                     },
+                    "sku_unit_id": {
+                        "type": "integer"
+                    },
                     "code": {
                         "type": "string"
                     },
                     "name": {
+                        "type": "string"
+                    },
+                    "unit": {
                         "type": "string"
                     }
                 }
@@ -12818,9 +13113,11 @@
                 "type": "object",
                 "required": [
                     "sku_id",
+                    "sku_unit_id",
                     "sku_code",
                     "product_name",
                     "unit",
+                    "conversion_factor",
                     "base_price",
                     "unit_price",
                     "note",
@@ -12829,6 +13126,10 @@
                 "properties": {
                     "sku_id": {
                         "type": "integer"
+                    },
+                    "sku_unit_id": {
+                        "type": "integer",
+                        "description": "Negotiated per unit (D91)"
                     },
                     "sku_code": {
                         "type": "string"
@@ -12839,9 +13140,12 @@
                     "unit": {
                         "type": "string"
                     },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
                     "base_price": {
                         "$ref": "#/components/schemas/Money",
-                        "description": "The SKU's own base price, to compare"
+                        "description": "The unit's own base price, to compare"
                     },
                     "unit_price": {
                         "$ref": "#/components/schemas/Money"
@@ -13012,11 +13316,11 @@
                         "type": "array",
                         "minItems": 1,
                         "maxItems": 200,
-                        "description": "Every line the order should have; each SKU once, quantity in selling units",
+                        "description": "Every line the order should have; each SKU unit once (D91), quantity in that unit",
                         "items": {
                             "type": "object",
                             "required": [
-                                "sku_id",
+                                "sku_unit_id",
                                 "quantity"
                             ],
                             "properties": {
@@ -13028,7 +13332,7 @@
                                     "minimum": 1,
                                     "description": "An existing live line; omitted or null for a new one"
                                 },
-                                "sku_id": {
+                                "sku_unit_id": {
                                     "type": "integer",
                                     "minimum": 1
                                 },
@@ -13176,15 +13480,15 @@
                         "type": "array",
                         "minItems": 1,
                         "maxItems": 200,
-                        "description": "Each SKU once; quantity in selling units",
+                        "description": "Each SKU unit once (D91; one SKU may come in two units); quantity in that unit",
                         "items": {
                             "type": "object",
                             "required": [
-                                "sku_id",
+                                "sku_unit_id",
                                 "quantity"
                             ],
                             "properties": {
-                                "sku_id": {
+                                "sku_unit_id": {
                                     "type": "integer",
                                     "minimum": 1
                                 },
@@ -13284,6 +13588,7 @@
                 "type": "object",
                 "required": [
                     "sku_id",
+                    "sku_unit_id",
                     "product_name",
                     "sku_code",
                     "sku_name",
@@ -13303,6 +13608,9 @@
                 ],
                 "properties": {
                     "sku_id": {
+                        "type": "integer"
+                    },
+                    "sku_unit_id": {
                         "type": "integer"
                     },
                     "product_name": {
@@ -13387,7 +13695,7 @@
                         }
                     },
                     "problem": {
-                        "description": "The checkout_failed entry of this SKU without sku_id, or null",
+                        "description": "The checkout_failed entry of this line without sku_id and sku_unit_id, or null",
                         "oneOf": [
                             {
                                 "type": "object",

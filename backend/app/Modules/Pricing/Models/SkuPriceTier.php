@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pricing\Models;
 
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\SkuPriceTierFactory;
@@ -13,18 +13,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * BR-PR03..05: one quantity tier of a SKU, in its selling unit (BR-U04). `unit_price` is always the
+ * BR-PR03..05: one quantity tier of a SKU unit, in that unit (BR-U04, V2 Task 13). `unit_price` is always the
  * absolute price; `discount_percent` is the % off cover price it was derived from, for display (BR-PR10).
  *
  * @property int $id
  * @property int $tenant_id
- * @property int $sku_id
+ * @property int $sku_unit_id
  * @property int $min_quantity
  * @property string $unit_price
  * @property string|null $discount_percent
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
- * @property-read Sku $sku
+ * @property-read SkuUnit $skuUnit
  */
 final class SkuPriceTier extends Model
 {
@@ -39,11 +39,11 @@ final class SkuPriceTier extends Model
     }
 
     /**
-     * @return BelongsTo<Sku, $this>
+     * @return BelongsTo<SkuUnit, $this>
      */
-    public function sku(): BelongsTo
+    public function skuUnit(): BelongsTo
     {
-        return $this->belongsTo(Sku::class);
+        return $this->belongsTo(SkuUnit::class);
     }
 
     /**

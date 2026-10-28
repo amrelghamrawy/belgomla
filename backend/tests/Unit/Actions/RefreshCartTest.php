@@ -100,3 +100,16 @@ test('BR-PR15 the refreshed cart shows a live promotion to a customer without a 
     expect($line->price->unitPrice)->toBe('72.00')
         ->and($line->price->source)->toBe(PriceSource::Promotion);
 });
+
+test('D91 a line in a unit no longer sold is deleted and reported, the SKU\'s other unit kept', function (): void {
+    $kept = cartLine($this->cart, 'كشكول');
+    $box = App\Modules\Catalog\Models\SkuUnit::factory()->create(['sku_id' => $kept->sku_id, 'base_price' => '100.00', 'conversion_factor' => 10]);
+    $gone = CartItem::factory()->for($this->cart)->create(['sku_id' => $kept->sku_id, 'sku_unit_id' => $box->id, 'quantity' => 1]);
+    $box->forceFill(['status' => App\Modules\Catalog\Enums\ArchiveStatus::Archived])->save();
+
+    $cart = app(RefreshCart::class)->handle($this->customer);
+
+    expect(array_map(fn (PricedCartLine $line): int => $line->skuUnitId, $cart->lines))->toBe([$kept->sku_unit_id])
+        ->and($cart->removed)->toBe([['product_name' => 'كشكول', 'reason' => 'inactive']])
+        ->and(CartItem::query()->whereKey($gone->id)->exists())->toBeFalse();
+});

@@ -8,6 +8,7 @@ import type {
   PaginationMeta,
   StoreProductDetail,
   StoreSku,
+  StoreSkuUnit,
   TenantSettings,
 } from "@/lib/api/types";
 
@@ -47,9 +48,50 @@ export function customer(overrides: Partial<Customer> = {}): Customer {
   };
 }
 
+/**
+ * The SKU's one unit (V2 Task 13, D91) mirroring its flat fields, as the API lists a single-unit SKU; a test that wants
+ * several units passes `units` itself.
+ */
+export function withDefaultUnit(sku: Omit<StoreSku, "units"> & { units?: StoreSkuUnit[] }, id = 601): StoreSku {
+  const unit: StoreSkuUnit = {
+    id,
+    unit: sku.unit,
+    conversion_factor: sku.conversion_factor,
+    moq: sku.moq,
+    is_default: true,
+    in_stock: sku.in_stock,
+  };
+
+  for (const key of ["cover_price", "base_price", "discount_percent", "tiers", "price_source", "promotion"] as const) {
+    if (sku[key] !== undefined) {
+      Object.assign(unit, { [key]: sku[key] });
+    }
+  }
+
+  return { ...sku, units: [unit] };
+}
+
+/** One more unit of a SKU (D91): a carton of 12 at 1000.00, MOQ 1, in stock. */
+export function storeSkuUnit(overrides: Partial<StoreSkuUnit> = {}): StoreSkuUnit {
+  return {
+    id: 602,
+    unit: "كرتونة",
+    conversion_factor: 12,
+    moq: 1,
+    cover_price: null,
+    base_price: "1000.00",
+    discount_percent: null,
+    tiers: [],
+    is_default: false,
+    in_stock: true,
+    ...overrides,
+  };
+}
+
 /** A SKU sold in cartons of 20, MOQ 2, 400 pieces (20 cartons) in stock, base 90.00, tier 10+ → 85.00. */
 export function storeSku(overrides: Partial<StoreSku> = {}): StoreSku {
-  return {
+  const { units, ...flat } = overrides;
+  const sku = withDefaultUnit({
     id: 501,
     code: "BK-001",
     unit: "كرتونة",
@@ -61,8 +103,10 @@ export function storeSku(overrides: Partial<StoreSku> = {}): StoreSku {
     tiers: [{ min_quantity: 10, unit_price: "85.00" }],
     available: 400,
     in_stock: true,
-    ...overrides,
-  };
+    ...flat,
+  });
+
+  return units === undefined ? sku : { ...sku, units };
 }
 
 export function storeProduct(overrides: Partial<StoreProductDetail> = {}): StoreProductDetail {
@@ -118,6 +162,7 @@ export function page<T>(data: T[], meta: Partial<PaginationMeta> = {}) {
 export function cartItem(overrides: Partial<CartItem> = {}): CartItem {
   return {
     sku_id: 501,
+    sku_unit_id: 601,
     product_name: "الأضواء علوم أولى إعدادي",
     product_slug: "الأضواء-علوم-أولى-إعدادي",
     unit: "كرتونة",
@@ -193,6 +238,7 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
       {
         id: 61,
         sku_id: 501,
+        sku_unit_id: 601,
         product_name: "الأضواء علوم أولى إعدادي",
         sku_code: "BK-001",
         sku_name: "الأضواء علوم أولى إعدادي",
@@ -232,7 +278,7 @@ export function omit<T extends object, K extends keyof T>(value: T, ...keys: K[]
 
 /** A SKU as a guest sees it while the store hides prices (D1). */
 export function hiddenPriceSku(): StoreSku {
-  return omit(storeSku(), "cover_price", "base_price", "discount_percent", "tiers");
+  return withDefaultUnit(omit(storeSku(), "cover_price", "base_price", "discount_percent", "tiers"));
 }
 
 /** A coming-soon SKU (D21): no `available`, not in stock. */

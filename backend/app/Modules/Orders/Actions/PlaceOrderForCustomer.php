@@ -60,8 +60,8 @@ final readonly class PlaceOrderForCustomer
 
         $lines = [];
 
-        foreach (OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get(['id', 'sku_id']) as $item) {
-            $discount = $data->lineDiscounts[$item->sku_id] ?? null;
+        foreach (OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get(['id', 'sku_unit_id']) as $item) {
+            $discount = $data->lineDiscounts[$item->sku_unit_id ?? 0] ?? null;
 
             if ($discount !== null) {
                 $lines[] = new LineDiscountData($item->id, $discount['type'], $discount['value']);

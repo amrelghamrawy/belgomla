@@ -38,7 +38,7 @@ beforeEach(function (): void {
     $this->place = fn (array $lines = [], array $data = []): Order => app(PlaceOrderForCustomer::class)->handle(new MerchantOrderData(...[
         'customerId' => $this->customer->id,
         'addressId' => $this->address->id,
-        'lines' => $lines === [] ? [['sku_id' => $this->sku->id, 'quantity' => 12]] : $lines,
+        'lines' => $lines === [] ? [['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 12]] : $lines,
         ...$data,
     ]), $this->owner->id);
     $this->expectNothingWritten = function (): void {
@@ -98,7 +98,7 @@ test('BR-O11 the merchant made it, so no new_order notification is written', fun
 test('BR-O11 several lines are priced each at its own tier', function (): void {
     $other = $this->orderableSku(['moq' => 1, 'base_price' => '33.50'], name: 'كراسة');
 
-    $order = ($this->place)([['sku_id' => $this->sku->id, 'quantity' => 6], ['sku_id' => $other->id, 'quantity' => 3]]);
+    $order = ($this->place)([['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 6], ['sku_unit_id' => $this->defaultUnitId($other), 'quantity' => 3]]);
 
     expect($order->order_total)->toBe('640.50')
         ->and(OrderItem::query()->orderBy('id')->pluck('line_total')->all())->toBe(['540.00', '100.50']);
@@ -109,13 +109,13 @@ test('BR-O11 BR-PR06 the same failures as checkout roll everything back and name
 
     expect(fn () => ($this->place)())->toThrow(function (CheckoutFailed $e) use ($item): void {
         expect($e->errorCode)->toBe('checkout_failed')
-            ->and($e->items)->toBe([['sku_id' => $this->sku->id, ...$item]]);
+            ->and($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), ...$item]]);
     });
 
     ($this->expectNothingWritten)();
 })->with([
     'inactive product' => [fn ($sku) => Product::query()->whereKey($sku->product_id)->update(['status' => ProductStatus::Inactive]), ['reason' => 'product_inactive']],
-    'below moq' => [fn ($sku) => $sku->forceFill(['moq' => 15])->save(), ['reason' => 'below_moq', 'moq' => 15]],
+    'below moq' => [fn ($sku) => App\Modules\Catalog\Models\SkuUnit::query()->where('sku_id', $sku->id)->update(['moq' => 15]), ['reason' => 'below_moq', 'moq' => 15]],
     'not enough stock' => [fn ($sku) => SkuInventory::query()->whereKey($sku->id)->update(['on_hand' => 230]), ['reason' => 'insufficient_stock', 'requested' => 12, 'available' => 11]],
 ]);
 
@@ -159,8 +159,8 @@ test('D84 the override never skips the moq, the stock or the credit limit', func
     TenantSetting::query()->whereKey($this->tenant->id)->update(['mov_enabled' => true, 'mov_amount' => '1500.00']);
     $this->customer->forceFill(['credit_limit' => '100.00'])->save();
 
-    expect(fn () => ($this->place)([['sku_id' => $this->sku->id, 'quantity' => 30]], ['overrideMov' => true]))->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'insufficient_stock', 'requested' => 30, 'available' => 20]])
+    expect(fn () => ($this->place)([['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 30]], ['overrideMov' => true]))->toThrow(function (CheckoutFailed $e): void {
+        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'insufficient_stock', 'requested' => 30, 'available' => 20]])
             ->and($e->details)->toHaveKey('credit')->not->toHaveKey('mov');
     });
 });
@@ -200,14 +200,15 @@ test('BR-CU03 an address of another customer is refused with 422 on address_id',
 test('BR-T04 a customer or a sku of another tenant is refused as a field error', function (): void {
     $other = $this->otherTenant();
     $theirCustomer = $this->makeCustomer(tenant: $other);
-    $theirSku = $this->orderableSku(tenant: $other);
+    $theirUnit = $this->asTenant($other, fn (): int => $this->defaultUnitId($this->orderableSku(tenant: $other)));
+    $ours = $this->defaultUnitId($this->sku);
     app(TenantContext::class)->set($this->tenant);
 
     expect(fn () => ($this->place)(data: ['customerId' => $theirCustomer->id]))->toThrow(function (CheckoutFailed $e): void {
         expect($e->errorCode)->toBe('validation_failed')->and($e->details)->toHaveKey('customer_id');
     })
-        ->and(fn () => ($this->place)([['sku_id' => $this->sku->id, 'quantity' => 5], ['sku_id' => $theirSku->id, 'quantity' => 5]]))->toThrow(function (CheckoutFailed $e): void {
-            expect($e->details)->toHaveKey('lines.1.sku_id');
+        ->and(fn () => ($this->place)([['sku_unit_id' => $ours, 'quantity' => 5], ['sku_unit_id' => $theirUnit, 'quantity' => 5]]))->toThrow(function (CheckoutFailed $e): void {
+            expect($e->details)->toHaveKey('lines.1.sku_unit_id');
         });
 
     ($this->expectNothingWritten)();
@@ -247,8 +248,8 @@ test('D85 discounts from the form apply to the matching lines by sku, audited on
     TenantSetting::query()->whereKey($this->tenant->id)->update(['order_notify_statuses' => json_encode(['discount'])]);
     $other = $this->orderableSku(['code' => 'OTHER-1'], name: 'كتاب آخر');
 
-    $order = ($this->place)([['sku_id' => $this->sku->id, 'quantity' => 12], ['sku_id' => $other->id, 'quantity' => 6]], [
-        'lineDiscounts' => [$other->id => ['type' => App\Modules\Pricing\Enums\DiscountType::Amount, 'value' => '10.00']],
+    $order = ($this->place)([['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 12], ['sku_unit_id' => $this->defaultUnitId($other), 'quantity' => 6]], [
+        'lineDiscounts' => [$this->defaultUnitId($other) => ['type' => App\Modules\Pricing\Enums\DiscountType::Amount, 'value' => '10.00']],
         'discountType' => App\Modules\Pricing\Enums\DiscountType::Percent,
         'discountValue' => '5.00',
         'discountReason' => 'بالتليفون',

@@ -28,7 +28,8 @@ function useCartWrite<T>(write: (input: T) => Promise<Cart>) {
   });
 }
 
-export type CartLineInput = { sku_id: number; quantity: number; kind?: CartLineKind };
+/** A line by its SKU unit (V2 Task 13, D91): one SKU may be in the cart in two units. */
+export type CartLineInput = { sku_unit_id: number; quantity: number; kind?: CartLineKind };
 
 /** Adds to the line's quantity. A guest gets 401 (redirected to login) or 403 `prices_hidden` (D53). */
 export function useAddToCart() {
@@ -36,19 +37,21 @@ export function useAddToCart() {
 }
 
 export function useUpdateCartItem() {
-  return useCartWrite(({ sku_id, quantity, kind }: CartLineInput) =>
-    apiFetch<Cart>(`/api/store/cart/items/${sku_id}`, {
+  return useCartWrite(({ sku_unit_id, quantity, kind }: CartLineInput) =>
+    apiFetch<Cart>(`/api/store/cart/items/${sku_unit_id}`, {
       method: "PATCH",
       body: kind === undefined ? { quantity } : { quantity, kind },
     }),
   );
 }
 
-/** Takes an order line out by its SKU id, or a pre-order line with `{ sku_id, kind: "preorder" }`. */
+/** Takes an order line out by its SKU unit id, or a pre-order line with `{ sku_unit_id, kind: "preorder" }`. */
 export function useRemoveCartItem() {
-  return useCartWrite((line: number | { sku_id: number; kind: CartLineKind }) =>
+  return useCartWrite((line: number | { sku_unit_id: number; kind: CartLineKind }) =>
     typeof line === "number"
       ? apiFetch<Cart>(`/api/store/cart/items/${line}`, { method: "DELETE" })
-      : apiFetch<Cart>(withQuery(`/api/store/cart/items/${line.sku_id}`, { kind: line.kind }), { method: "DELETE" }),
+      : apiFetch<Cart>(withQuery(`/api/store/cart/items/${line.sku_unit_id}`, { kind: line.kind }), {
+          method: "DELETE",
+        }),
   );
 }

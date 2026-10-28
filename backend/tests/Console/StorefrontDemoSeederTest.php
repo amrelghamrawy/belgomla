@@ -118,3 +118,20 @@ test('the books read like the publisher describes them, the revision edition as 
     expect($book)->toBe('كتاب الأضواء في مادة عربي لطلاب أولى إعدادي، الترم الأول، طبعة 2026/2027 مطابقة للمنهج الجديد. يغطي النحو والقراءة والنصوص والقصة والتعبير، مع شرح مبسّط لكل درس، وتدريبات متدرجة من السهل للصعب، ونماذج امتحانات بالإجابات.')
         ->and($revision)->toStartWith('مراجعة ليلة الامتحان في مادة عربي لطلاب أولى إعدادي');
 });
+
+test('D91 the A4 notebook sells by the piece and by the carton of 24, the piece by default', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $units = $this->inTenant(fn (): array => App\Modules\Catalog\Models\SkuUnit::query()
+        ->with('unit')
+        ->whereHas('sku', fn (Illuminate\Database\Eloquent\Builder $sku): Illuminate\Database\Eloquent\Builder => $sku->where('code', 'ST-006'))
+        ->orderBy('sort_order')
+        ->get()
+        ->map(fn (App\Modules\Catalog\Models\SkuUnit $unit): array => [$unit->unit->name, $unit->conversion_factor, $unit->base_price, $unit->cover_price, $unit->moq, $unit->is_default])
+        ->all());
+
+    expect($units)->toBe([
+        ['قطعة', 1, '45.00', '60.00', 6, true],
+        ['كرتونة', 24, '972.00', '1440.00', 1, false],
+    ]);
+});

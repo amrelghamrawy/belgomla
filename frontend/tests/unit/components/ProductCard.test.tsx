@@ -4,7 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProductCard } from "@/components/store/ProductCard";
 
-import { cart, cartItem, comingSoonSku, customer, hiddenPriceSku, storeProduct, storeSku } from "../fixtures";
+import {
+  cart,
+  cartItem,
+  comingSoonSku,
+  customer,
+  hiddenPriceSku,
+  storeProduct,
+  storeSku,
+  storeSkuUnit,
+} from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { renderWithQuery, router } from "../render";
 
@@ -140,6 +149,39 @@ describe("QuickAdd on the card", () => {
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/account/login?next=%2Fc%2Fprep%3Fsort%3Dname"));
   });
 
+  it("D91 picks a unit on the card: the price follows and one tap adds that unit's MOQ", async () => {
+    const piece = storeSku({
+      unit: "قطعة",
+      conversion_factor: 1,
+      moq: 5,
+      base_price: "10.00",
+      tiers: [],
+      available: 100,
+    });
+    const fetchMock = stubApi({
+      ...signedIn(),
+      "POST /api/store/cart/items": json(200, {
+        data: cart({ items: [cartItem({ sku_unit_id: 602, unit: "كرتونة", quantity: 1, line_total: "110.00" })] }),
+      }),
+    });
+    renderWithQuery(
+      <ProductCard
+        product={storeProduct({
+          sku: { ...piece, units: [...(piece.units ?? []), storeSkuUnit({ base_price: "110.00" })] },
+        })}
+      />,
+    );
+    await waitFor(() => expect(callsTo(fetchMock, "GET /api/store/cart")).toHaveLength(1));
+
+    expect(screen.getByText("10.00 ج.م")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: "كرتونة (12)" }));
+    expect(screen.getByText("110.00 ج.م")).toBeInTheDocument();
+    await userEvent.click(addButton());
+
+    expect(await screen.findByRole("group", { name: "1 كرتونة في السلة" })).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_unit_id: 602, quantity: 1 });
+  });
+
   it("BR-MOQ01 adds the MOQ in one tap", async () => {
     const fetchMock = stubApi({
       ...signedIn(),
@@ -152,13 +194,13 @@ describe("QuickAdd on the card", () => {
     await userEvent.click(addButton());
 
     expect(await screen.findByRole("group", { name: "2 كرتونة في السلة" })).toBeInTheDocument();
-    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_id: 501, quantity: 2 });
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_unit_id: 601, quantity: 2 });
   });
 
   it("shows the cart line with the server's line total and raises it by one", async () => {
     const fetchMock = stubApi({
       ...signedIn(cart({ items: [cartItem({ quantity: 6, line_total: "540.00" })] })),
-      "PATCH /api/store/cart/items/501": json(200, { data: cart({ items: [cartItem({ quantity: 7 })] }) }),
+      "PATCH /api/store/cart/items/601": json(200, { data: cart({ items: [cartItem({ quantity: 7 })] }) }),
     });
     renderWithQuery(<ProductCard product={storeProduct()} />);
     const line = await screen.findByRole("group", { name: "6 كرتونة في السلة" });
@@ -167,13 +209,13 @@ describe("QuickAdd on the card", () => {
     await userEvent.click(within(line).getByRole("button", { name: "زيادة الكمية" }));
 
     await screen.findByRole("group", { name: "7 كرتونة في السلة" });
-    expect(callsTo(fetchMock, "PATCH /api/store/cart/items/501")[0]?.body).toEqual({ quantity: 7 });
+    expect(callsTo(fetchMock, "PATCH /api/store/cart/items/601")[0]?.body).toEqual({ quantity: 7 });
   });
 
   it("BR-MOQ01 removes the line instead of going below the MOQ", async () => {
     const fetchMock = stubApi({
       ...signedIn(cart({ items: [cartItem({ quantity: 2 })] })),
-      "DELETE /api/store/cart/items/501": json(200, { data: cart({ items: [] }) }),
+      "DELETE /api/store/cart/items/601": json(200, { data: cart({ items: [] }) }),
     });
     renderWithQuery(<ProductCard product={storeProduct()} />);
     const line = await screen.findByRole("group", { name: "2 كرتونة في السلة" });
@@ -181,7 +223,7 @@ describe("QuickAdd on the card", () => {
     await userEvent.click(within(line).getByRole("button", { name: "حذف من السلة" }));
 
     await waitFor(() => expect(addButton()).toBeInTheDocument());
-    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")).toHaveLength(1);
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/601")).toHaveLength(1);
   });
 });
 
@@ -238,7 +280,7 @@ describe("pre-orders on the card (BR-O14)", () => {
 
     expect(await screen.findByRole("group", { name: "محجوز 2 كرتونة" })).toBeInTheDocument();
     expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({
-      sku_id: 501,
+      sku_unit_id: 601,
       quantity: 2,
       kind: "preorder",
     });
@@ -251,8 +293,8 @@ describe("pre-orders on the card (BR-O14)", () => {
     });
     const fetchMock = stubApi({
       ...signedIn(booked),
-      "PATCH /api/store/cart/items/501": json(200, { data: booked }),
-      "DELETE /api/store/cart/items/501": json(200, { data: cart({ items: [] }) }),
+      "PATCH /api/store/cart/items/601": json(200, { data: booked }),
+      "DELETE /api/store/cart/items/601": json(200, { data: cart({ items: [] }) }),
     });
     renderWithQuery(<ProductCard product={preorderable()} />);
     const line = await screen.findByRole("group", { name: "محجوز 2 كرتونة" });
@@ -260,9 +302,9 @@ describe("pre-orders on the card (BR-O14)", () => {
     await userEvent.click(within(line).getByRole("button", { name: "زيادة الكمية" }));
     await userEvent.click(within(line).getByRole("button", { name: "حذف من السلة" }));
 
-    await waitFor(() => expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")).toHaveLength(1));
-    expect(callsTo(fetchMock, "PATCH /api/store/cart/items/501")[0]?.body).toEqual({ quantity: 3, kind: "preorder" });
-    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")[0]?.url.searchParams.get("kind")).toBe("preorder");
+    await waitFor(() => expect(callsTo(fetchMock, "DELETE /api/store/cart/items/601")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PATCH /api/store/cart/items/601")[0]?.body).toEqual({ quantity: 3, kind: "preorder" });
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/601")[0]?.url.searchParams.get("kind")).toBe("preorder");
   });
 
   it("is full when nothing remains under the merchant's cap", () => {

@@ -21,7 +21,7 @@ use App\Modules\Catalog\Services\Spreadsheet;
  * call so every job ends well inside the queue's retry window; returns true while rows remain (the job queues the
  * next chunk). The first call counts the rows and marks the run `running`.
  *
- * Rows go one by one through ImportCatalogRow, each in its own transaction, so a bad row never undoes the others;
+ * SKUs (their rows, one per unit, V2 Task 13; `total` and `processed` count SKUs) go one by one through ImportCatalogRow, each in its own transaction, so a bad row never undoes the others;
  * every change is audited under the import's batch id. The counts, `processed` and the first
  * `catalog.import_stored_errors` errors are saved after each chunk for the dashboard to poll. At the end the run is
  * `done` with a `catalog.imported` summary record and the uploaded file is deleted; a file that cannot be read any
@@ -77,7 +77,7 @@ final readonly class ProcessCatalogImport
         $sheetName = $this->spreadsheet->sheetName($path, $format);
 
         if ($import->status === ImportStatus::Queued) {
-            $total = iterator_count($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $sheetName));
+            $total = iterator_count($this->mapper->skus($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $sheetName)));
             $import->update(['status' => ImportStatus::Running, 'started_at' => now(), 'total' => $total]);
         }
 
@@ -89,8 +89,8 @@ final readonly class ProcessCatalogImport
         $applied = 0;
         $more = false;
 
-        foreach ($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $sheetName) as $number => $row) {
-            $code = $row['sku_code'] ?? '';
+        foreach ($this->mapper->skus($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $sheetName)) as $number => $rows) {
+            $code = $rows[$number]['sku_code'] ?? '';
             $duplicateOf = $code === '' ? null : ($seen[$code] ?? null);
             $seen[$code] ??= $number;
 
@@ -104,7 +104,7 @@ final readonly class ProcessCatalogImport
                 break;
             }
 
-            $result = $this->importRow->handle($row, $number, $lookups, $duplicateOf, $import->batch_id, $import->created_by);
+            $result = $this->importRow->handle($rows, $lookups, $duplicateOf, $import->batch_id, $import->created_by);
             $this->count($import, $result);
             $errors = array_slice([...$errors, ...$result->rowErrors()], 0, $limit);
             $applied++;

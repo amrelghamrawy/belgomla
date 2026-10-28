@@ -125,7 +125,7 @@ describe("useAddToCart", () => {
     stubApi({ "POST /api/store/cart/items": json(200, { data: priced }) });
     const { result, client } = renderHookWithQuery(() => useAddToCart());
 
-    await act(() => result.current.mutateAsync({ sku_id: 501, quantity: 6 }));
+    await act(() => result.current.mutateAsync({ sku_unit_id: 501, quantity: 6 }));
 
     expect(client.getQueryData(queryKeys.cart)).toEqual(priced);
   });
@@ -142,12 +142,12 @@ describe("pre-order cart lines (BR-O14)", () => {
     const update = renderHookWithQuery(() => useUpdateCartItem());
     const remove = renderHookWithQuery(() => useRemoveCartItem());
 
-    await act(() => add.result.current.mutateAsync({ sku_id: 777, quantity: 5, kind: "preorder" }));
-    await act(() => update.result.current.mutateAsync({ sku_id: 777, quantity: 8, kind: "preorder" }));
-    await act(() => remove.result.current.mutateAsync({ sku_id: 777, kind: "preorder" }));
+    await act(() => add.result.current.mutateAsync({ sku_unit_id: 777, quantity: 5, kind: "preorder" }));
+    await act(() => update.result.current.mutateAsync({ sku_unit_id: 777, quantity: 8, kind: "preorder" }));
+    await act(() => remove.result.current.mutateAsync({ sku_unit_id: 777, kind: "preorder" }));
 
     expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({
-      sku_id: 777,
+      sku_unit_id: 777,
       quantity: 5,
       kind: "preorder",
     });

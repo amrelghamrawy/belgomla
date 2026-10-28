@@ -80,7 +80,7 @@ test('BR-O14 two pre-orders for the last units under the cap: the second waits o
 
     expect($blocked)->toBe('55P03')
         ->and(fn (): mixed => onSession('pgsql_session_b', fn (): Order => ($this->place)('b')))->toThrow(function (CheckoutFailed $e): void {
-            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'preorder_limit', 'requested' => 5, 'remaining' => 0]]);
+            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'preorder_limit', 'requested' => 5, 'remaining' => 0]]);
         })
         ->and(onSession('pgsql_session_a', fn (): array => [
             Order::query()->pluck('number')->all(),

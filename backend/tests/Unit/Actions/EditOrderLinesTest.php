@@ -59,8 +59,8 @@ beforeEach(function (): void {
         $this->owner->id,
     );
     // The order as it is: [order item id, sku id, quantity] per line.
-    $this->a = fn (int $quantity = 6): array => [$this->lineA->id, $this->skuA->id, $quantity];
-    $this->b = fn (int $quantity = 10): array => [$this->lineB->id, $this->skuB->id, $quantity];
+    $this->a = fn (int $quantity = 6): array => [$this->lineA->id, $this->defaultUnitId($this->skuA), $quantity];
+    $this->b = fn (int $quantity = 10): array => [$this->lineB->id, $this->defaultUnitId($this->skuB), $quantity];
     $this->reserved = fn (Sku $sku): int => SkuInventory::query()->findOrFail($sku->id)->reserved;
     $this->totals = fn (): array => Order::query()->findOrFail($this->order->id)->only(['items_total', 'discount_amount', 'order_total']);
     $this->expectUnchanged = function (): void {
@@ -76,7 +76,7 @@ beforeEach(function (): void {
 });
 
 test('BR-O12 BR-INV03 adding a SKU reserves it and adds a line snapshotted like checkout', function (): void {
-    $edited = ($this->edit)([($this->a)(), ($this->b)(), [null, $this->skuC->id, 5]]);
+    $edited = ($this->edit)([($this->a)(), ($this->b)(), [null, $this->defaultUnitId($this->skuC), 5]]);
 
     $added = OrderItem::query()->where('order_id', $this->order->id)->where('sku_id', $this->skuC->id)->sole();
 
@@ -122,8 +122,8 @@ test('BR-PR04 a quantity that reaches a tier gets the tier price', function (): 
 });
 
 test('BR-O05 an unchanged line keeps its snapshot price after a catalog price change', function (): void {
-    SkuPriceTier::query()->where('sku_id', $this->skuB->id)->update(['unit_price' => '80.00']);
-    $this->skuA->forceFill(['base_price' => '95.00'])->save();
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($this->skuB))->update(['unit_price' => '80.00']);
+    App\Modules\Catalog\Models\SkuUnit::query()->whereKey($this->defaultUnitId($this->skuA))->update(['base_price' => '95.00']);
 
     ($this->edit)([($this->a)(7), ($this->b)()]);
 
@@ -169,8 +169,8 @@ test('D85 an EGP order discount larger than the new items total refuses the edit
 test('BR-PR06 a stock shortfall is refused like checkout and nothing changes', function (): void {
     $short = $this->orderableSku(['code' => 'D-1'], onHand: 40);
 
-    expect(fn (): EditedOrder => ($this->edit)([($this->a)(8), ($this->b)(), [null, $short->id, 5]]))->toThrow(function (CheckoutFailed $e) use ($short): void {
-        expect([$e->status, $e->errorCode, $e->items])->toBe([422, 'checkout_failed', [['sku_id' => $short->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 2]]]);
+    expect(fn (): EditedOrder => ($this->edit)([($this->a)(8), ($this->b)(), [null, $this->defaultUnitId($short), 5]]))->toThrow(function (CheckoutFailed $e) use ($short): void {
+        expect([$e->status, $e->errorCode, $e->items])->toBe([422, 'checkout_failed', [['sku_id' => $short->id, 'sku_unit_id' => $this->defaultUnitId($short), 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 2]]]);
     });
 
     ($this->expectUnchanged)();
@@ -181,7 +181,7 @@ test('BR-O12 what the order already holds counts as available to it', function (
     $order = $this->placeOrder($this->customer, [$tight->id => 10]);
     $line = OrderItem::query()->where('order_id', $order->id)->sole();
 
-    app(EditOrderLines::class)->handle($order, new OrderEditData([new OrderEditLineData($line->id, $tight->id, 12)]), $this->owner->id);
+    app(EditOrderLines::class)->handle($order, new OrderEditData([new OrderEditLineData($line->id, $this->defaultUnitId($tight), 12)]), $this->owner->id);
 
     expect(SkuInventory::query()->findOrFail($tight->id)->only(['on_hand', 'reserved']))->toBe(['on_hand' => 240, 'reserved' => 240]);
 });
@@ -191,9 +191,9 @@ test('BR-O12 an increase beyond the stock and the order\'s own reservation is re
     $order = $this->placeOrder($this->customer, [$tight->id => 10]);
     $line = OrderItem::query()->where('order_id', $order->id)->sole();
 
-    expect(fn (): EditedOrder => app(EditOrderLines::class)->handle($order, new OrderEditData([new OrderEditLineData($line->id, $tight->id, 13)]), $this->owner->id))
+    expect(fn (): EditedOrder => app(EditOrderLines::class)->handle($order, new OrderEditData([new OrderEditLineData($line->id, $this->defaultUnitId($tight), 13)]), $this->owner->id))
         ->toThrow(function (CheckoutFailed $e) use ($tight): void {
-            expect($e->items)->toBe([['sku_id' => $tight->id, 'reason' => 'insufficient_stock', 'requested' => 13, 'available' => 12]]);
+            expect($e->items)->toBe([['sku_id' => $tight->id, 'sku_unit_id' => $this->defaultUnitId($tight), 'reason' => 'insufficient_stock', 'requested' => 13, 'available' => 12]]);
         });
 
     expect(SkuInventory::query()->findOrFail($tight->id)->reserved)->toBe(200);
@@ -201,7 +201,7 @@ test('BR-O12 an increase beyond the stock and the order\'s own reservation is re
 
 test('BR-MOQ01 a quantity below the MOQ is refused', function (): void {
     expect(fn (): EditedOrder => ($this->edit)([($this->a)(3), ($this->b)()]))->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->skuA->id, 'reason' => 'below_moq', 'moq' => 5]]);
+        expect($e->items)->toBe([['sku_id' => $this->skuA->id, 'sku_unit_id' => $this->defaultUnitId($this->skuA), 'reason' => 'below_moq', 'moq' => 5]]);
     });
 
     ($this->expectUnchanged)();
@@ -283,7 +283,7 @@ test('BR-C05 a lower total is never refused by the credit limit', function (): v
 test('BR-O12 a line id that is not a live line of the order is a validation error on its field', function (): void {
     $other = OrderItem::factory()->create();
 
-    expect(fn (): EditedOrder => ($this->edit)([($this->a)(), [$other->id, $this->skuB->id, 10]]))->toThrow(function (OrderEditRefused $e): void {
+    expect(fn (): EditedOrder => ($this->edit)([($this->a)(), [$other->id, $this->defaultUnitId($this->skuB), 10]]))->toThrow(function (OrderEditRefused $e): void {
         expect([$e->status, $e->errorCode, $e->details])->toBe([422, 'validation_failed', ['lines.1.order_item_id' => ['البند غير موجود في هذا الطلب']]]);
     });
 
@@ -297,18 +297,19 @@ test('BR-O12 a removed line cannot be edited again', function (): void {
 });
 
 test('BR-O12 an existing line cannot change its SKU', function (): void {
-    expect(fn (): EditedOrder => ($this->edit)([[$this->lineA->id, $this->skuC->id, 6], ($this->b)()]))->toThrow(function (OrderEditRefused $e): void {
-        expect([$e->status, $e->details])->toBe([422, ['lines.0.sku_id' => ['لا يمكن تغيير صنف بند موجود، احذفه وأضف الصنف الآخر']]]);
+    expect(fn (): EditedOrder => ($this->edit)([[$this->lineA->id, $this->defaultUnitId($this->skuC), 6], ($this->b)()]))->toThrow(function (OrderEditRefused $e): void {
+        expect([$e->status, $e->details])->toBe([422, ['lines.0.sku_unit_id' => ['لا يمكن تغيير صنف بند موجود، احذفه وأضف الصنف الآخر']]]);
     });
 
     ($this->expectUnchanged)();
 });
 
 test('BR-O12 a new line of a SKU the store does not have is a validation error on its field', function (): void {
-    $foreign = $this->orderableSku(['code' => 'X-1'], tenant: $this->otherTenant());
+    $other = $this->otherTenant();
+    $foreign = $this->asTenant($other, fn (): int => $this->defaultUnitId($this->orderableSku(['code' => 'X-1'], tenant: $other)));
 
-    expect(fn (): EditedOrder => ($this->edit)([($this->a)(), ($this->b)(), [null, $foreign->id, 5]]))->toThrow(function (CheckoutFailed $e): void {
-        expect([$e->status, $e->details])->toBe([422, ['lines.2.sku_id' => ['المنتج غير موجود']]]);
+    expect(fn (): EditedOrder => ($this->edit)([($this->a)(), ($this->b)(), [null, $foreign, 5]]))->toThrow(function (CheckoutFailed $e): void {
+        expect([$e->status, $e->details])->toBe([422, ['lines.2.sku_unit_id' => ['المنتج غير موجود']]]);
     });
 
     ($this->expectUnchanged)();
@@ -321,7 +322,7 @@ test('BR-O12 sending the lines the order already has writes nothing', function (
 });
 
 test('BR-O12 every line change is kept with its quantities, prices and the user', function (): void {
-    ($this->edit)([($this->a)(12), [null, $this->skuC->id, 5]]);
+    ($this->edit)([($this->a)(12), [null, $this->defaultUnitId($this->skuC), 5]]);
 
     $added = OrderItem::query()->where('order_id', $this->order->id)->where('sku_id', $this->skuC->id)->sole();
 
@@ -385,7 +386,7 @@ test('D88 a pre-order\'s lines are not edited', function (): void {
     $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
     $line = OrderItem::query()->where('order_id', $preorder->id)->sole();
 
-    expect(fn (): EditedOrder => app(EditOrderLines::class)->handle($preorder, new OrderEditData([new OrderEditLineData($line->id, $line->sku_id, 8)]), $this->owner->id))
+    expect(fn (): EditedOrder => app(EditOrderLines::class)->handle($preorder, new OrderEditData([new OrderEditLineData($line->id, $line->sku_unit_id ?? 0, 8)]), $this->owner->id))
         ->toThrow(function (OrderEditRefused $e): void {
             expect([$e->status, $e->errorCode, $e->details])->toBe([409, 'order_locked', ['status' => 'pending', 'kind' => 'preorder']]);
         })
@@ -406,7 +407,7 @@ test('BR-O12 BR-PR12 an added line takes the customer\'s group price', function 
     $group = CustomerGroup::factory()->create(['discount_percent' => '20.00']);
     $this->customer->forceFill(['customer_group_id' => $group->id])->save();
 
-    ($this->edit)([($this->a)(), ($this->b)(), [null, $this->skuC->id, 5]]);
+    ($this->edit)([($this->a)(), ($this->b)(), [null, $this->defaultUnitId($this->skuC), 5]]);
 
     expect(OrderItem::query()->where('order_id', $this->order->id)->where('sku_id', $this->skuC->id)->sole()->only(['unit_price', 'price_source']))->toBe(['unit_price' => '72.00', 'price_source' => PriceSource::Group]);
 });
@@ -428,4 +429,35 @@ test('BR-O12 BR-PR15 a line re-priced after its promotion ended drops the promot
     ($this->edit)([($this->a)(8), ($this->b)()]);
 
     expect($this->lineA->refresh()->only(['unit_price', 'price_source', 'promotion_id']))->toBe(['unit_price' => '90.00', 'price_source' => PriceSource::Base, 'promotion_id' => null]);
+});
+
+test('D91 BR-O12 an existing line cannot change its unit, even to another unit of its SKU', function (): void {
+    $piece = $this->addUnit($this->skuA, ['conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 10]);
+
+    expect(fn (): EditedOrder => ($this->edit)([[$this->lineA->id, $piece->id, 6], ($this->b)()]))->toThrow(function (OrderEditRefused $e): void {
+        expect($e->details)->toBe(['lines.0.sku_unit_id' => ['لا يمكن تغيير صنف بند موجود، احذفه وأضف الصنف الآخر']]);
+    });
+
+    ($this->expectUnchanged)();
+});
+
+test('D91 BR-O12 a SKU already on the order can be added again in another unit, from the same stock', function (): void {
+    $piece = $this->addUnit($this->skuA, ['conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 10]);
+
+    ($this->edit)([($this->a)(), ($this->b)(), [null, $piece->id, 15]]);
+
+    expect(OrderItem::query()->where('order_id', $this->order->id)->where('sku_unit_id', $piece->id)->sole()->only(['sku_id', 'quantity', 'quantity_base', 'unit_price']))
+        ->toBe(['sku_id' => $this->skuA->id, 'quantity' => 15, 'quantity_base' => 15, 'unit_price' => '4.50'])
+        ->and(($this->reserved)($this->skuA))->toBe(135)
+        ->and(($this->totals)()['order_total'])->toBe('1457.50');
+});
+
+test('D91 BR-O12 a raised line and a new unit of the same SKU are checked together against its stock', function (): void {
+    $piece = $this->addUnit($this->skuA, ['conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 10]);
+
+    expect(fn (): EditedOrder => ($this->edit)([($this->a)(20), ($this->b)(), [null, $piece->id, 10]]))->toThrow(function (CheckoutFailed $e) use ($piece): void {
+        expect($e->items)->toBe([['sku_id' => $this->skuA->id, 'sku_unit_id' => $piece->id, 'reason' => 'insufficient_stock', 'requested' => 10, 'available' => 0]]);
+    });
+
+    ($this->expectUnchanged)();
 });

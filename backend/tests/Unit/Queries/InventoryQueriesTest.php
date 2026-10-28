@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Queries\InventoryListQuery;
 use App\Modules\Inventory\Queries\InventoryRowQuery;
@@ -24,6 +25,17 @@ test('D36 low stock is available at most moq times the conversion factor, in bas
     'exactly one minimum order left' => [120, 20, true],
     'one piece more than a minimum order' => [101, 0, false],
     'nothing left' => [0, 0, true],
+]);
+
+test('D36 D91 the threshold is the smallest active unit\'s moq times its factor', function (int $onHand, bool $low): void {
+    $sku = Sku::factory()->withStock($onHand)->create(['moq' => 2, 'conversion_factor' => 48]);
+    $this->addUnit($sku, ['conversion_factor' => 6, 'moq' => 4]);
+    SkuUnit::factory()->archived()->create(['sku_id' => $sku->id, 'conversion_factor' => 1, 'moq' => 1]);
+
+    expect(app(LowStockQuery::class)->builder()->whereKey($sku->id)->exists())->toBe($low);
+})->with([
+    'exactly four of the smallest unit left' => [24, true],
+    'one piece more' => [25, false],
 ]);
 
 test('D36 a sku without a stock row is low on stock', function (): void {
@@ -98,5 +110,6 @@ test('the inventory row loads the product and stock of the sku', function (): vo
     $row = app(InventoryRowQuery::class)->get(Sku::query()->findOrFail($sku->id));
 
     expect($row->relationLoaded('product'))->toBeTrue()
+        ->and($row->relationLoaded('smallestUnit'))->toBeTrue()
         ->and($row->inventory?->on_hand)->toBe(5);
 });

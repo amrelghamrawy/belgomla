@@ -123,8 +123,9 @@ final class DemoActivitySeeder extends Seeder
             $skus = Sku::query()
                 ->where('code', 'like', 'BK-%')
                 ->whereHas('product', fn (Builder $query): Builder => $query->where('status', ProductStatus::Active))
+                ->with('defaultUnit')
                 ->orderBy('code')
-                ->get(['id', 'code', 'moq', 'conversion_factor']);
+                ->get(['id', 'code']);
             $orderable = array_values($skus->all());
 
             if ($orderable === []) {
@@ -229,8 +230,9 @@ final class DemoActivitySeeder extends Seeder
     {
         foreach ($this->random->pickArrayKeys($skus, $this->random->getInt(2, 5)) as $key) {
             $sku = $skus[$key];
-            $quantity = $sku->conversion_factor > 1
-                ? $this->random->getInt($sku->moq, $sku->moq + 3)
+            $unit = $sku->defaultUnit ?? throw new RuntimeException("SKU {$sku->code} has no default unit.");
+            $quantity = $unit->conversion_factor > 1
+                ? $this->random->getInt($unit->moq, $unit->moq + 3)
                 : 5 * $this->random->getInt(2, 12);
             $addToCart->handle($customer, new CartLineData($sku->id, $quantity));
         }

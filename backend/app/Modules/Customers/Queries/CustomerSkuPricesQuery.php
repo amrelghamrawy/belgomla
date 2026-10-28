@@ -11,11 +11,11 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * BR-PR13 (V2 Task 11): the prices negotiated with one customer for the «أسعار خاصة» tab, newest first, each with its SKU,
- * product and selling unit (to show next to the SKU's own base price). `q` matches the product name or the SKU code.
+ * product and unit (D91; to show next to the unit's own base price). `q` matches the product name or the SKU code.
  */
 final readonly class CustomerSkuPricesQuery
 {
-    public const array RELATIONS = ['sku.product', 'sku.sellingUnit'];
+    public const array RELATIONS = ['sku.product', 'skuUnit.unit'];
 
     /**
      * @return LengthAwarePaginator<int, CustomerSkuPrice>

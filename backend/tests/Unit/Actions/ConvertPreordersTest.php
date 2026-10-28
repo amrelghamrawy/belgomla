@@ -96,8 +96,8 @@ test('D88 the oldest pre-order goes first whatever its number', function (): voi
 });
 
 test('BR-PR04 the converted orders are priced at today\'s tiers for the converted quantity, not the pre-order price', function (): void {
-    Sku::query()->whereKey($this->sku->id)->update(['base_price' => '95.00']);
-    SkuPriceTier::query()->where('sku_id', $this->sku->id)->update(['unit_price' => '88.00']);
+    App\Modules\Catalog\Models\SkuUnit::query()->whereKey($this->defaultUnitId($this->sku))->update(['base_price' => '95.00']);
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($this->sku))->update(['unit_price' => '88.00']);
     ($this->activate)(15);
 
     ($this->convert)();
@@ -241,4 +241,25 @@ test('BR-PR15 a converted order is priced at the promotion live on the day of co
     $converted = ($this->convertedFrom)($this->preorders[0]);
 
     expect(($this->line)($converted ?? new Order)->only(['unit_price', 'price_source']))->toBe(['unit_price' => '72.00', 'price_source' => PriceSource::Promotion]);
+});
+
+test('D91 BR-O14 a pre-order of one SKU in two units is converted from its one stock, oldest line first, in whole units of each line', function (): void {
+    $piece = $this->addUnit($this->sku, ['conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 1]);
+    $fourth = $this->makeCustomer(['name' => 'الرابع']);
+    $this->fillPreorderCart($fourth, [$this->sku->id => 5]);
+    App\Modules\Customers\Models\CartItem::factory()->preorder()->create(['cart_id' => App\Modules\Customers\Models\Cart::query()->where('customer_id', $fourth->id)->sole()->id, 'sku_id' => $this->sku->id, 'sku_unit_id' => $piece->id, 'quantity' => 30]);
+    $this->travel(1)->minutes();
+    $preorder = app(App\Modules\Orders\Actions\PlacePreorder::class)->handle($fourth, new App\Modules\Orders\Data\CheckoutData($this->addressOf($fourth)->id));
+    ($this->activate)(30);
+    SkuInventory::query()->whereKey($this->sku->id)->update(['on_hand' => 655]);
+
+    ($this->convert)();
+
+    $order = ($this->convertedFrom)($preorder);
+    expect(OrderItem::query()->where('order_id', $order?->id)->orderBy('id')->get()->map->only(['sku_unit_id', 'quantity', 'quantity_base'])->all())->toBe([
+        ['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 2, 'quantity_base' => 40],
+        ['sku_unit_id' => $piece->id, 'quantity' => 15, 'quantity_base' => 15],
+    ])
+        ->and(OrderItem::query()->where('order_id', $preorder->id)->where('sku_unit_id', $piece->id)->sole()->remainingQuantity())->toBe(15)
+        ->and(SkuInventory::query()->findOrFail($this->sku->id)->reserved)->toBe(655);
 });

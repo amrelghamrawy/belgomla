@@ -65,14 +65,14 @@ test('every orders exception fixes its status, code and arabic message', functio
 
 test('BR-PR06 checkout failures list every problem in items and the minimum order value in details', function (): void {
     $e = CheckoutFailed::with(
-        [CheckoutProblem::insufficientStock(501, 12, 7), CheckoutProblem::belowMoq(777, 5), CheckoutProblem::productInactive(802)],
+        [CheckoutProblem::insufficientStock(501, 601, 12, 7), CheckoutProblem::belowMoq(777, 877, 5), CheckoutProblem::productInactive(802, 902)],
         ['required' => '1000.00', 'current' => '700.00'],
     );
 
     expect($e->items)->toBe([
-        ['sku_id' => 501, 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 7],
-        ['sku_id' => 777, 'reason' => 'below_moq', 'moq' => 5],
-        ['sku_id' => 802, 'reason' => 'product_inactive'],
+        ['sku_id' => 501, 'sku_unit_id' => 601, 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 7],
+        ['sku_id' => 777, 'sku_unit_id' => 877, 'reason' => 'below_moq', 'moq' => 5],
+        ['sku_id' => 802, 'sku_unit_id' => 902, 'reason' => 'product_inactive'],
     ])->and($e->details)->toBe(['mov' => ['required' => '1000.00', 'current' => '700.00']]);
 });
 
@@ -94,6 +94,6 @@ test('D57 a missing address is reported on the address_id field', function (): v
 
 test('BR-O11 the field errors of a merchant order name the field', function (): void {
     expect(CheckoutFailed::customerUnavailable()->details)->toBe(['customer_id' => ['العميل غير موجود']])
-        ->and(CheckoutFailed::skuUnavailable(2)->details)->toBe(['lines.2.sku_id' => ['المنتج غير موجود']])
+        ->and(CheckoutFailed::skuUnavailable(2)->details)->toBe(['lines.2.sku_unit_id' => ['المنتج غير موجود']])
         ->and(CustomerCannotOrder::because(CustomerStatus::PendingApproval)->details)->toBe(['status' => 'pending_approval']);
 });

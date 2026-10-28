@@ -2,7 +2,7 @@
 
 import { HashIcon, LayersIcon, PackageIcon } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { StatusPage } from "@/components/shared/StatusPage";
 import { Badge } from "@/components/ui/badge";
@@ -14,17 +14,23 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatMoney } from "@/lib/format/money";
 import { useProduct } from "@/lib/store/catalog";
 import { useRouteParam } from "@/lib/store/route";
+import { skuInUnit, skuUnits, unitOf } from "@/lib/store/units";
 
 import { AddToCartBar } from "./AddToCartBar";
 import { GeneratedCover } from "./GeneratedCover";
 import { PriceBlock } from "./PriceBlock";
 import { ProductCard } from "./ProductCard";
 import { ProductGallery } from "./ProductGallery";
+import { UnitPicker } from "./UnitPicker";
 
-/** `/p/[slug]`: gallery, prices and tiers, ordering facts, custom fields and the other editions (BR-P10). */
+/**
+ * `/p/[slug]`: gallery, prices and tiers, ordering facts, custom fields and the other editions (BR-P10). A SKU sold in
+ * several units (V2 Task 13, D91) shows a unit picker; prices, MOQ, tiers and the buy box follow the unit picked.
+ */
 export function ProductDetail() {
   const slug = useRouteParam("slug");
   const { data: product, error } = useProduct(slug);
+  const [unitId, setUnitId] = useState<number | undefined>(undefined);
 
   if (isApiError(error, "not_found")) {
     return (
@@ -48,6 +54,9 @@ export function ProductDetail() {
     return <ProductDetailSkeleton />;
   }
 
+  const picked = product.sku === null ? undefined : unitOf(product.sku, unitId);
+  const sku = product.sku === null ? null : skuInUnit(product.sku, picked);
+
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 pt-4 pb-40 md:pb-8">
       <div className="grid items-start gap-6 md:grid-cols-2 lg:gap-10">
@@ -69,18 +78,21 @@ export function ProductDetail() {
               <h1 className="font-display text-2xl leading-snug font-bold md:text-3xl">{product.name}</h1>
               {product.sku?.coming_soon && <Badge>{ar.catalog.comingSoon}</Badge>}
             </div>
+            {product.sku !== null && (
+              <UnitPicker units={skuUnits(product.sku)} value={picked?.id} onChange={setUnitId} />
+            )}
             <div className="bg-brand-soft rounded-xl p-4">
               <PriceBlock
-                sku={product.sku}
+                sku={sku}
                 pricesHidden={product.prices_hidden === true}
                 kind={product.category?.kind ?? null}
                 size="lg"
                 loginNext={`/p/${encodeURIComponent(slug)}`}
               />
             </div>
-            {product.sku && <OrderingFacts sku={product.sku} />}
-            {product.sku?.tiers && product.sku.tiers.length > 0 && <TiersTable sku={product.sku} />}
-            <AddToCartBar product={product} />
+            {sku && <OrderingFacts sku={sku} />}
+            {sku?.tiers && sku.tiers.length > 0 && <TiersTable sku={sku} />}
+            <AddToCartBar key={picked?.id ?? 0} product={product} unitId={picked?.id} />
           </section>
           <AboutProduct product={product} />
         </div>

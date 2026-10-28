@@ -6,13 +6,14 @@ namespace App\Modules\Catalog\Services;
 
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Services\PriceResolver;
 
 /**
  * The flat view of a product + its SKU that audit records store (BR-L). Flat `sku.*` keys let the
- * AuditLogger keep only the changed fields. `withPricing: false` leaves out prices, MOQ and tiers for
- * `product.updated`, because UpdateSkuPricing audits those itself.
+ * AuditLogger keep only the changed fields; `sku.units` lists the active units (D91). `withPricing: false` leaves out
+ * each unit's prices, MOQ and tiers for `product.updated`, because UpdateSkuPricing audits those itself.
  */
 final readonly class ProductSnapshot
 {
@@ -34,37 +35,40 @@ final readonly class ProductSnapshot
             'preorder_enabled' => $product->preorder_enabled,
             'expected_at' => $product->expected_at?->toDateString(),
             'preorder_limit' => $product->preorder_limit,
-            ...($sku instanceof Sku ? $this->sku($sku) : []),
-            ...($sku instanceof Sku && $withPricing ? $this->pricing($sku) : []),
+            ...($sku instanceof Sku ? $this->sku($sku, $withPricing) : []),
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function sku(Sku $sku): array
+    private function sku(Sku $sku, bool $withPricing): array
     {
         return [
             'sku.code' => $sku->code,
-            'sku.selling_unit_id' => $sku->selling_unit_id,
             'sku.base_unit_id' => $sku->base_unit_id,
-            'sku.conversion_factor' => $sku->conversion_factor,
+            'sku.units' => $sku->loadMissing('activeUnits')->activeUnits->map(fn (SkuUnit $unit): array => [
+                'unit_id' => $unit->unit_id,
+                'conversion_factor' => $unit->conversion_factor,
+                'is_default' => $unit->is_default,
+                ...($withPricing ? $this->pricing($unit) : []),
+            ])->values()->all(),
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function pricing(Sku $sku): array
+    private function pricing(SkuUnit $unit): array
     {
         return [
-            'sku.cover_price' => $sku->cover_price,
-            'sku.base_price' => $sku->base_price,
-            'sku.base_price_percent' => $sku->base_price_percent,
-            'sku.moq' => $sku->moq,
-            'sku.tiers' => array_map(
+            'cover_price' => $unit->cover_price,
+            'base_price' => $unit->base_price,
+            'base_price_percent' => $unit->base_price_percent,
+            'moq' => $unit->moq,
+            'tiers' => array_map(
                 fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice, 'discount_percent' => $tier->discountPercent],
-                $this->prices->tiers($sku->loadMissing('tiers')),
+                $this->prices->tiers($unit->loadMissing('tiers')),
             ),
         ];
     }

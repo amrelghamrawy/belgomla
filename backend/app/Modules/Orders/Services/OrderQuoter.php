@@ -40,16 +40,16 @@ final readonly class OrderQuoter
     }
 
     /**
-     * @param  list<array{sku_id: int, quantity: int}>  $lines
+     * @param  list<array{sku_unit_id: int, quantity: int}>  $lines
      * @return list<CartLineInput>
      */
     public function lines(array $lines): array
     {
-        $skus = $this->skus->findMany(array_column($lines, 'sku_id'));
+        $units = $this->skus->findMany(array_column($lines, 'sku_unit_id'));
         $inputs = [];
 
         foreach ($lines as $index => $line) {
-            $inputs[] = new CartLineInput($skus->get($line['sku_id']) ?? throw CheckoutFailed::skuUnavailable($index), $line['quantity']);
+            $inputs[] = new CartLineInput($units->get($line['sku_unit_id']) ?? throw CheckoutFailed::skuUnavailable($index), $line['quantity']);
         }
 
         return $inputs;
@@ -59,7 +59,7 @@ final readonly class OrderQuoter
      * `$orderNumber` quotes an edit of that order of the customer (BR-O12): the units it holds of a SKU count as
      * available, and its net total is already part of the customer's exposure.
      *
-     * @param  list<array{sku_id: int, quantity: int}>  $lines
+     * @param  list<array{sku_unit_id: int, quantity: int}>  $lines
      */
     public function quote(int $customerId, array $lines, ?int $orderNumber = null): OrderQuote
     {
@@ -72,8 +72,11 @@ final readonly class OrderQuoter
         $tiers = [];
 
         foreach ($inputs as $line) {
-            $tiers[$line->sku->id] = $this->prices->listed($line->sku, $pricing)->tiers;
-            $this->countHeld($line->sku, $held[$line->sku->id] ?? 0);
+            $tiers[$line->unit->id] = $this->prices->listed($line->unit, $pricing)->tiers;
+        }
+
+        foreach (collect($inputs)->map(fn (CartLineInput $line): Sku => $line->sku)->unique('id') as $sku) {
+            $this->countHeld($sku, $held[$sku->id] ?? 0);
         }
 
         $stock = collect($inputs)->mapWithKeys(fn (CartLineInput $line): array => [$line->sku->id => $line->sku->inventory])->filter();
@@ -87,7 +90,7 @@ final readonly class OrderQuoter
     }
 
     /**
-     * @return array<int, int> sku_id => base units the order's live lines hold
+     * @return array<int, int> sku_id => base units the order's live lines hold (summed over its units, D91)
      */
     private function held(Order $order): array
     {
@@ -98,7 +101,7 @@ final readonly class OrderQuoter
         $held = [];
 
         foreach (OrderItem::query()->where('order_id', $order->id)->tap(new Live)->get(['sku_id', 'quantity_base']) as $item) {
-            $held[$item->sku_id] = $item->quantity_base;
+            $held[$item->sku_id] = ($held[$item->sku_id] ?? 0) + $item->quantity_base;
         }
 
         return $held;

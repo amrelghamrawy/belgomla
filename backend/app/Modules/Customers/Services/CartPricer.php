@@ -17,8 +17,8 @@ use Illuminate\Support\Collection;
  * Prices a cart for display, BR-PR06 steps 3–7 without the writes: each line through PriceResolver (BR-PR04) at the
  * customer's own prices (their PricingContext, BR-PR14),
  * the items total, and the minimum order value against it (BR-MOV02). Pre-order lines (BR-O14) are priced the same way
- * into their own indicative total, without the minimum order value (D88). Expects the lines' `sku.product`,
- * `sku.sellingUnit`, `sku.tiers` and `sku.inventory` loaded (CartQuery) and lines that can no longer be ordered removed.
+ * into their own indicative total, without the minimum order value (D88). Each line is priced in its own unit (D91).
+ * Expects the lines' `skuUnit` with its `unit`, `tiers`, `sku.product` and `sku.inventory` loaded (CartQuery) and lines that can no longer be ordered removed.
  */
 final readonly class CartPricer
 {
@@ -60,19 +60,21 @@ final readonly class CartPricer
         $total = '0.00';
 
         foreach ($items as $item) {
-            $sku = $item->sku;
-            $price = $this->prices->resolve($sku, $item->quantity, $pricing);
+            $unit = $item->skuUnit;
+            $sku = $unit->sku;
+            $price = $this->prices->resolve($unit, $item->quantity, $pricing);
             $total = Money::add($total, $price->lineTotal);
 
             $lines[] = new PricedCartLine(
                 skuId: $sku->id,
+                skuUnitId: $unit->id,
                 productName: $sku->product->name,
                 productSlug: $sku->product->slug,
-                unit: $sku->sellingUnit->name,
-                conversionFactor: $sku->conversion_factor,
+                unit: $unit->unit->name,
+                conversionFactor: $unit->conversion_factor,
                 quantity: $item->quantity,
                 price: $price,
-                moq: $sku->moq,
+                moq: $unit->moq,
                 available: $preorder ? 0 : $sku->inventory->available ?? 0,
                 expectedAt: $preorder ? $sku->product->expected_at?->toDateString() : null,
             );

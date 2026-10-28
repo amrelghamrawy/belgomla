@@ -13,6 +13,7 @@ use App\Modules\Catalog\Jobs\ImportCatalog;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Queries\CatalogExportQuery;
 use App\Modules\Catalog\Queries\PriceListExportQuery;
 use App\Modules\Catalog\Services\CatalogExporter;
@@ -30,17 +31,21 @@ beforeEach(function (): void {
 });
 
 /**
- * Every product as a flat comparable snapshot: product, SKU, tiers, stock.
+ * Every product as a flat comparable snapshot: product, SKU, every unit with its tiers (D91), stock.
  *
  * @return array<int, array<string, mixed>>
  */
 function exportSnapshot(): array
 {
-    return Product::query()->with(['sku.tiers', 'sku.inventory'])->orderBy('id')->get()->mapWithKeys(fn (Product $product): array => [$product->id => [
+    return Product::query()->with(['sku.units.tiers', 'sku.inventory'])->orderBy('id')->get()->mapWithKeys(fn (Product $product): array => [$product->id => [
         ...$product->only(['name', 'category_id', 'description', 'status', 'slug']),
         'custom_fields' => collect($product->custom_fields)->sortKeys()->all(),
-        'sku' => $product->sku?->only(['code', 'selling_unit_id', 'base_unit_id', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq']),
-        'tiers' => $product->sku?->tiers->sortBy('min_quantity')->map(fn (SkuPriceTier $tier): array => $tier->only(['min_quantity', 'unit_price', 'discount_percent']))->values()->all(),
+        'sku' => $product->sku?->only(['code', 'base_unit_id']),
+        'units' => $product->sku?->units->map(fn (SkuUnit $unit): array => [
+            ...$unit->only(['id', 'unit_id', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default', 'sort_order']),
+            'status' => $unit->status->value,
+            'tiers' => $unit->tiers->sortBy('min_quantity')->map(fn (SkuPriceTier $tier): array => $tier->only(['min_quantity', 'unit_price', 'discount_percent']))->values()->all(),
+        ])->all(),
         'on_hand' => $product->sku?->inventory?->on_hand,
     ]])->all();
 }
@@ -53,9 +58,11 @@ test('the export reads every product of the filter with its sku, units, tiers an
 
     expect(array_map(fn (Product $product): int => $product->id, $rows))->toBe([$kept->id])
         ->and($rows[0]->relationLoaded('sku'))->toBeTrue()
-        ->and($rows[0]->sku?->relationLoaded('tiers'))->toBeTrue()
+        ->and($rows[0]->sku?->relationLoaded('activeUnits'))->toBeTrue()
+        ->and($rows[0]->sku?->activeUnits->first()?->relationLoaded('tiers'))->toBeTrue()
+        ->and($rows[0]->sku?->activeUnits->first()?->relationLoaded('unit'))->toBeTrue()
         ->and($rows[0]->sku?->relationLoaded('inventory'))->toBeTrue()
-        ->and($rows[0]->sku?->relationLoaded('sellingUnit'))->toBeTrue()
+        ->and($rows[0]->sku?->relationLoaded('baseUnit'))->toBeTrue()
         ->and(app(CatalogExportQuery::class)->count(new ProductFilterData))->toBe(2)
         ->and($other->exists)->toBeTrue();
 });
@@ -78,11 +85,26 @@ test('the exported file has the format version, the arabic labels, the key row a
     app(CatalogExporter::class)->write($path, new ProductFilterData, SpreadsheetFormat::Xlsx);
     $rows = spreadsheetRows($path);
 
-    expect(app(App\Modules\Catalog\Services\Spreadsheet::class)->sheetName($path, SpreadsheetFormat::Xlsx))->toBe('products_v1')
+    expect(app(App\Modules\Catalog\Services\Spreadsheet::class)->sheetName($path, SpreadsheetFormat::Xlsx))->toBe('products_v2')
         ->and($rows[1][0])->toBe('كود الصنف')
         ->and($rows[2])->toBe(array_keys(app(CatalogRowMapper::class)->columns(app(CatalogRowMapper::class)->lookups())))
-        ->and(array_slice($rows[3], 0, 13))->toBe(['ADW-SCI-1', 'الأضواء علوم أولى إعدادي', 'كتب خارجية > أولى إعدادي', 'نشط', 'كتاب العلوم', 'كرتونة', 'قطعة', '20', '120', '90', '', '5', '10'])
+        ->and(array_slice($rows[3], 0, 13))->toBe(['ADW-SCI-1', 'الأضواء علوم أولى إعدادي', 'كتب خارجية > أولى إعدادي', 'نشط', 'كتاب العلوم', 'قطعة', 'كرتونة', 'نعم', '20', '120', '90', '', '5'])
         ->and(count($rows))->toBe(3);
+});
+
+test('D91 the exported file has a row per active unit of a SKU, the default first', function (): void {
+    $product = $this->importedProduct();
+    $this->addUnit($product->sku, ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10]);
+    $this->addUnit($product->sku, ['unit_id' => App\Modules\Catalog\Models\Unit::factory()->create(['name' => 'علبة'])->id])->update(['status' => 'archived']);
+    $path = sys_get_temp_dir().'/export-'.Str::uuid().'.csv';
+
+    app(CatalogExporter::class)->write($path, new ProductFilterData, SpreadsheetFormat::Csv);
+    $rows = spreadsheetRows($path, SpreadsheetFormat::Csv);
+
+    expect(array_map(fn (array $row): array => array_slice($row, 0, 9), array_slice($rows, 1)))->toBe([
+        ['ADW-SCI-1', 'الأضواء علوم أولى إعدادي', 'كتب خارجية > أولى إعدادي', 'نشط', 'كتاب العلوم', 'قطعة', 'كرتونة', 'نعم', '20'],
+        ['ADW-SCI-1', 'الأضواء علوم أولى إعدادي', 'كتب خارجية > أولى إعدادي', 'نشط', 'كتاب العلوم', 'قطعة', 'قطعة', 'لا', '1'],
+    ]);
 });
 
 test('the export follows the dashboard filter', function (): void {
@@ -95,12 +117,13 @@ test('the export follows the dashboard filter', function (): void {
     expect(array_column(spreadsheetRows($path, SpreadsheetFormat::Csv), 0))->toBe(['sku_code', 'ADW-SCI-1']);
 });
 
-test('export then import of the same file is an update of every row that changes nothing', function (SpreadsheetFormat $format): void {
+test('D91 D95 export then import of the same file is an update of every SKU that changes nothing, units included', function (SpreadsheetFormat $format): void {
     Queue::fake();
     ProductFieldDefinition::factory()->boolean()->forKind(CategoryKind::Books)->create(['key' => 'colored', 'label' => 'ملون']);
     $percent = $this->importedProduct(['code' => 'PCT-1', 'base_price' => '88.00', 'base_price_percent' => '25.00']);
     $percent->update(['custom_fields' => ['publisher' => $this->basics['moallem']->id, 'colored' => true, 'brand' => 'قديم']]);
-    SkuPriceTier::query()->where('sku_id', $percent->sku?->id)->update(['discount_percent' => '30.00']);
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($percent->sku))->update(['discount_percent' => '30.00']);
+    $this->addUnit($percent->sku, ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'cover_price' => '7.00', 'base_price' => '5.25', 'base_price_percent' => '25.00', 'moq' => 10], [50 => '4.90']);
     $this->importedProduct(['code' => 'PLAIN-1'], onHand: 0, status: ProductStatus::ComingSoon);
     Product::factory()->withSku(['code' => 'NO-STOCK-ROW', 'cover_price' => null])->inactive()->create(['category_id' => $this->basics['root']->id, 'custom_fields' => []]);
     $before = exportSnapshot();
@@ -113,6 +136,7 @@ test('export then import of the same file is an update of every row that changes
     runJob(new ImportCatalog($import->id));
 
     expect($preview->errors)->toBe([])
+        ->and(count(spreadsheetRows($path, $format)))->toBe($format === SpreadsheetFormat::Xlsx ? 6 : 5)
         ->and([$preview->total, $preview->update, $preview->create, $preview->skip])->toBe([3, 3, 0, 0])
         ->and($import->refresh()->only(['updated', 'created', 'skipped', 'failed']))->toBe(['updated' => 3, 'created' => 0, 'skipped' => 0, 'failed' => 0])
         ->and(exportSnapshot())->toEqual($before)

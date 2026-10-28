@@ -15,7 +15,7 @@ use App\Modules\Catalog\Enums\ImportRowAction;
 final readonly class ImportRowResult
 {
     /**
-     * @param  list<array{column: string, label: string, message: string}>  $errors
+     * @param  list<array{row?: int, column: string, label: string, message: string}>  $errors  `row` = the SKU's row the problem is on (its first row when left out)
      */
     public function __construct(
         public int $row,
@@ -31,6 +31,6 @@ final readonly class ImportRowResult
      */
     public function rowErrors(): array
     {
-        return array_map(fn (array $error): array => ['row' => $this->row, ...$error], $this->errors);
+        return array_map(fn (array $error): array => ['row' => $error['row'] ?? $this->row, 'column' => $error['column'], 'label' => $error['label'], 'message' => $error['message']], $this->errors);
     }
 }

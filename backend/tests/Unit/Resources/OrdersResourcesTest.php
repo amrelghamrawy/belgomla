@@ -64,7 +64,7 @@ test('the store order detail adds the lines and the history', function (): void 
     expect(rendered(new OrderResource($order), storeRequest('/api/store/orders/1024')))->toBe([
         ...($this->expectedBase)($order),
         'items' => [[
-            'id' => $item->id, 'sku_id' => $item->sku_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
+            'id' => $item->id, 'sku_id' => $item->sku_id, 'sku_unit_id' => $item->sku_unit_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
             'unit' => $item->unit_name, 'conversion_factor' => 1, 'quantity' => 2, 'cover_price' => null, 'list_unit_price' => '85.00',
             'manual_discount' => null, 'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => null, 'price_source' => 'base', 'line_total' => '170.00',
             'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0,
@@ -101,7 +101,7 @@ test('the order item resource is the line snapshot', function (): void {
     $item = OrderItem::query()->firstOrFail();
 
     expect(array_keys(rendered(new OrderItemResource($item), storeRequest())))->toBe([
-        'id', 'sku_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'list_unit_price',
+        'id', 'sku_id', 'sku_unit_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'list_unit_price',
         'manual_discount', 'unit_price', 'discount_percent', 'tier_min_quantity', 'price_source', 'line_total', 'delivered_quantity', 'removed_at',
         'converted_quantity',
     ]);
@@ -246,11 +246,11 @@ test('BR-O11 an order placed from the dashboard names the user who placed it', f
 test('BR-O11 the quote resource renders every line with its tiers and problem, the total, the mov and the credit', function (): void {
     $sku = $this->orderableSku(['code' => 'Q-1'], onHand: 60, name: 'كراسة');
     app(TenantContext::class)->set($this->tenant);
-    $quote = app(App\Modules\Orders\Services\OrderQuoter::class)->quote($this->customer->id, [['sku_id' => $sku->id, 'quantity' => 10]]);
+    $quote = app(App\Modules\Orders\Services\OrderQuoter::class)->quote($this->customer->id, [['sku_unit_id' => $this->defaultUnitId($sku), 'quantity' => 10]]);
 
     expect(rendered(new App\Modules\Orders\Http\Resources\OrderQuoteResource($quote), dashboardRequest('/api/dashboard/orders/quote')))->toBe([
         'lines' => [[
-            'sku_id' => $sku->id, 'product_name' => 'كراسة', 'sku_code' => 'Q-1', 'sku_name' => 'كراسة', 'unit' => 'كرتونة', 'conversion_factor' => 20,
+            'sku_id' => $sku->id, 'sku_unit_id' => $this->defaultUnitId($sku), 'product_name' => 'كراسة', 'sku_code' => 'Q-1', 'sku_name' => 'كراسة', 'unit' => 'كرتونة', 'conversion_factor' => 20,
             'quantity' => 10, 'moq' => 5, 'available' => 3, 'cover_price' => null, 'unit_price' => '85.00', 'discount_percent' => null,
             'tier_min_quantity' => 10, 'price_source' => 'tier', 'line_total' => '850.00', 'tiers' => [['min_quantity' => 10, 'unit_price' => '85.00']],
             'problem' => ['reason' => 'insufficient_stock', 'requested' => 10, 'available' => 3],
@@ -323,9 +323,9 @@ test('BR-O14 the pre-order list entry carries the lines but not the order page',
 test('BR-O14 the pre-order demand resource: the product\'s settings, the counts and what remains under the cap', function (): void {
     $product = App\Modules\Catalog\Models\Product::factory()->preorderable(limit: 50)->create()->refresh();
 
-    expect(rendered(new App\Modules\Orders\Http\Resources\PreorderDemandResource($product, ['quantity' => 60, 'customers' => 3, 'preorders' => 4]), dashboardRequest()))->toBe([
+    expect(rendered(new App\Modules\Orders\Http\Resources\PreorderDemandResource($product, ['quantity' => 60, 'quantity_base' => 60, 'customers' => 3, 'preorders' => 4], 0), dashboardRequest()))->toBe([
         'product_id' => $product->id, 'status' => 'coming_soon', 'preorder_enabled' => true, 'expected_at' => '2026-12-01',
-        'limit' => 50, 'remaining' => 0, 'quantity' => 60, 'customers' => 3, 'preorders' => 4,
+        'limit' => 50, 'remaining' => 0, 'quantity' => 60, 'quantity_base' => 60, 'customers' => 3, 'preorders' => 4,
     ]);
 });
 

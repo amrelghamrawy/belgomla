@@ -19,6 +19,7 @@ function item(overrides: Partial<OrderItem> = {}): OrderItem {
   return {
     id: 61,
     sku_id: 5,
+    sku_unit_id: 5,
     product_name: "أ",
     sku_code: "A-1",
     sku_name: "أ",
@@ -46,22 +47,22 @@ const order = {
     item(),
     item({
       id: 62,
-      sku_id: 6,
+      sku_unit_id: 6,
       product_name: "ب",
       sku_code: "B-1",
       quantity: 10,
       unit_price: "85.00",
       line_total: "850.00",
     }),
-    item({ id: 63, sku_id: 7, product_name: "ج", sku_code: "C-1", removed_at: "2026-10-20T08:00:00Z" }),
+    item({ id: 63, sku_unit_id: 7, product_name: "ج", sku_code: "C-1", removed_at: "2026-10-20T08:00:00Z" }),
   ],
 };
 
 describe("order edit (BR-O12)", () => {
   it("starts from the live lines only", () => {
     expect(editLinesOf(order)).toEqual([
-      { order_item_id: 61, sku_id: 5, quantity: 6, name: "أ", code: "A-1" },
-      { order_item_id: 62, sku_id: 6, quantity: 10, name: "ب", code: "B-1" },
+      { order_item_id: 61, sku_unit_id: 5, quantity: 6, name: "أ", code: "A-1" },
+      { order_item_id: 62, sku_unit_id: 6, quantity: 10, name: "ب", code: "B-1" },
     ]);
   });
 
@@ -71,14 +72,14 @@ describe("order edit (BR-O12)", () => {
 
   it("lists the removed lines first, then the changed and added ones", () => {
     const lines = [
-      { order_item_id: 61, sku_id: 5, quantity: 12, name: "أ", code: "A-1" },
-      { order_item_id: null, sku_id: 8, quantity: 5, name: "د", code: "D-1" },
+      { order_item_id: 61, sku_unit_id: 5, quantity: 12, name: "أ", code: "A-1" },
+      { order_item_id: null, sku_unit_id: 8, quantity: 5, name: "د", code: "D-1" },
     ];
 
     expect(lineChanges(order, lines)).toEqual([
-      { kind: "removed", sku_id: 6, name: "ب", from: 10, to: null },
-      { kind: "quantity", sku_id: 5, name: "أ", from: 6, to: 12 },
-      { kind: "added", sku_id: 8, name: "د", from: null, to: 5 },
+      { kind: "removed", sku_unit_id: 6, name: "ب", from: 10, to: null },
+      { kind: "quantity", sku_unit_id: 5, name: "أ", from: 6, to: 12 },
+      { kind: "added", sku_unit_id: 8, name: "د", from: null, to: 5 },
     ]);
   });
 
@@ -89,8 +90,8 @@ describe("order edit (BR-O12)", () => {
       customer_id: 7,
       order: 1001,
       lines: [
-        { sku_id: 5, quantity: 6 },
-        { sku_id: 6, quantity: 10 },
+        { sku_unit_id: 5, quantity: 6 },
+        { sku_unit_id: 6, quantity: 10 },
       ],
     });
     expect(editQuoteBody(7, 1001, [{ ...lines[0]!, quantity: 0 }])).toBeNull();
@@ -100,14 +101,14 @@ describe("order edit (BR-O12)", () => {
 
   it("sends existing lines with their id, new ones without, and the trimmed note only when there is one", () => {
     const lines = [
-      { order_item_id: 61, sku_id: 5, quantity: 12, name: "أ", code: "A-1" },
-      { order_item_id: null, sku_id: 8, quantity: 5, name: "د", code: "D-1" },
+      { order_item_id: 61, sku_unit_id: 5, quantity: 12, name: "أ", code: "A-1" },
+      { order_item_id: null, sku_unit_id: 8, quantity: 5, name: "د", code: "D-1" },
     ];
 
     expect(editBody(lines, "  نفد ")).toEqual({
       lines: [
-        { order_item_id: 61, sku_id: 5, quantity: 12 },
-        { sku_id: 8, quantity: 5 },
+        { order_item_id: 61, sku_unit_id: 5, quantity: 12 },
+        { sku_unit_id: 8, quantity: 5 },
       ],
       note: "نفد",
     });
@@ -117,22 +118,22 @@ describe("order edit (BR-O12)", () => {
   it("blocks on a problem of an added or changed line only", () => {
     const quote = orderQuote({
       lines: [
-        orderQuoteLine({ sku_id: 5, problem: { reason: "insufficient_stock", requested: 12, available: 8 } }),
-        orderQuoteLine({ sku_id: 6, problem: { reason: "product_inactive" } }),
+        orderQuoteLine({ sku_unit_id: 5, problem: { reason: "insufficient_stock", requested: 12, available: 8 } }),
+        orderQuoteLine({ sku_unit_id: 6, problem: { reason: "product_inactive" } }),
       ],
     });
 
-    expect(editHasProblems(quote, [{ kind: "quantity", sku_id: 5, name: "أ", from: 6, to: 12 }])).toBe(true);
-    expect(editHasProblems(quote, [{ kind: "removed", sku_id: 6, name: "ب", from: 10, to: null }])).toBe(false);
+    expect(editHasProblems(quote, [{ kind: "quantity", sku_unit_id: 5, name: "أ", from: 6, to: 12 }])).toBe(true);
+    expect(editHasProblems(quote, [{ kind: "removed", sku_unit_id: 6, name: "ب", from: 10, to: null }])).toBe(false);
     expect(editHasProblems(quote, [])).toBe(false);
   });
 
   it("previews the items total: unchanged lines at their snapshot, the others at the quote", () => {
     const lines = [
-      { order_item_id: 61, sku_id: 5, quantity: 12, name: "أ", code: "A-1" },
-      { order_item_id: 62, sku_id: 6, quantity: 10, name: "ب", code: "B-1" },
+      { order_item_id: 61, sku_unit_id: 5, quantity: 12, name: "أ", code: "A-1" },
+      { order_item_id: 62, sku_unit_id: 6, quantity: 10, name: "ب", code: "B-1" },
     ];
-    const quote = orderQuote({ lines: [orderQuoteLine({ sku_id: 5, line_total: "1020.00" })] });
+    const quote = orderQuote({ lines: [orderQuoteLine({ sku_unit_id: 5, line_total: "1020.00" })] });
 
     expect(editedItemsTotal(order, lines, quote)).toBe("1870.00");
     expect(editedItemsTotal(order, lines, undefined)).toBeNull();

@@ -44,7 +44,8 @@ test("BR-O12 BR-O13 the merchant edits an order, delivers a line short, then tak
 
   // Edit: one more carton of the line, and a second book at its MOQ.
   await page.getByRole("button", { name: "تعديل الأصناف" }).click();
-  const dialog = page.getByRole("dialog");
+  // By name: the product picker's popover is a dialog too, and stays mounted while this one closes.
+  const dialog = page.getByRole("dialog", { name: "تعديل أصناف الطلب" });
   const firstQuantity = dialog.getByLabel(/^كمية /).first();
   const ordered = Number(await firstQuantity.inputValue());
   await firstQuantity.fill(String(ordered + 1));

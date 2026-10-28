@@ -64,9 +64,9 @@ arch('pricing only touches the catalog product and sku it is handed, plus the sh
         'App\Modules\Catalog\Http',
     ]);
 
-arch('pricing models are used outside pricing only by the Sku tiers relation')
+arch('pricing models are used outside pricing only by the SkuUnit tiers relation')
     ->expect('App\Modules\Pricing\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Pricing', App\Modules\Catalog\Models\Sku::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Pricing', App\Modules\Catalog\Models\SkuUnit::class, 'Database\Factories']);
 
 arch('catalog reaches pricing only through its actions, data, services and request concern')
     ->expect('App\Modules\Catalog')

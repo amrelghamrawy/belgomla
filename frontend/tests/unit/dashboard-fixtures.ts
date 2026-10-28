@@ -3,6 +3,8 @@ import type {
   DashboardMe,
   DashboardProduct,
   DashboardSku,
+  DashboardSkuUnit,
+  DashboardTier,
   FieldDefinition,
   MerchantNotification,
   OrderQuote,
@@ -194,8 +196,13 @@ export function selectField(overrides: Partial<FieldDefinition> = {}): FieldDefi
   };
 }
 
-export function dashboardSku(overrides: Partial<DashboardSku> = {}): DashboardSku {
-  return {
+/**
+ * A SKU sold in one unit (V2 Task 13, D91): the default unit mirrors the flat fields and the tiers given, and has the
+ * SKU's id (so a line picked from it is `line-{sku id}`); a test that wants several units passes `units` itself.
+ */
+export function dashboardSku(overrides: Partial<DashboardSku> & { tiers?: DashboardTier[] } = {}): DashboardSku {
+  const { tiers = [{ min_quantity: 10, unit_price: "84.00", discount_percent: "30.00" }], units, ...flat } = overrides;
+  const sku: DashboardSku = {
     id: 5,
     code: "ADW-SCI-1",
     selling_unit: { id: 2, name: "كرتونة" },
@@ -205,8 +212,40 @@ export function dashboardSku(overrides: Partial<DashboardSku> = {}): DashboardSk
     base_price: "90.00",
     base_price_percent: "25.00",
     moq: 5,
-    tiers: [{ min_quantity: 10, unit_price: "84.00", discount_percent: "30.00" }],
     inventory: { on_hand: 400, reserved: 0, available: 400 },
+    ...flat,
+  };
+
+  return {
+    ...sku,
+    units: units ?? [
+      {
+        id: sku.id,
+        unit: sku.selling_unit,
+        conversion_factor: sku.conversion_factor ?? 1,
+        cover_price: sku.cover_price,
+        base_price: sku.base_price ?? "0.00",
+        base_price_percent: sku.base_price_percent,
+        moq: sku.moq ?? 1,
+        is_default: true,
+        tiers,
+      },
+    ],
+  };
+}
+
+/** A further unit of a SKU (D91): a carton of 12. */
+export function dashboardSkuUnit(overrides: Partial<DashboardSkuUnit> = {}): DashboardSkuUnit {
+  return {
+    id: 9,
+    unit: { id: 4, name: "كرتونة 12" },
+    conversion_factor: 12,
+    cover_price: null,
+    base_price: "1000.00",
+    base_price_percent: null,
+    moq: 1,
+    is_default: false,
+    tiers: [],
     ...overrides,
   };
 }
@@ -235,6 +274,7 @@ export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): Das
 export function orderQuoteLine(overrides: Partial<OrderQuoteLine> = {}): OrderQuoteLine {
   return {
     sku_id: 3,
+    sku_unit_id: overrides.sku_id ?? 3,
     product_name: "الأضواء علوم",
     sku_code: "ADW-SCI",
     sku_name: "الأضواء علوم",

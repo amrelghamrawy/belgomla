@@ -13,6 +13,7 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDay } from "@/lib/format/date";
 import { useAddToCart } from "@/lib/store/cart";
 import { canOrder, preorderBounds, quantityBounds } from "@/lib/store/quantity";
+import { skuInUnit, unitOf } from "@/lib/store/units";
 
 import { QuantityStepper } from "./QuantityStepper";
 
@@ -20,13 +21,15 @@ import { QuantityStepper } from "./QuantityStepper";
  * The product page's buy box, a sticky bar on phones (rules/03 §3). Starts at the MOQ; disabled for coming-soon
  * (D21) and out-of-stock products. A Coming Soon product that takes pre-orders (BR-O14, D88) is booked instead
  * ("احجز الآن"): no stock, up to what remains of the merchant's cap, with the expected day and the note that the final
- * price is set when it arrives. A guest is sent to log in first (BR-CU06: no guest carts).
+ * price is set when it arrives. A guest is sent to log in first (BR-CU06: no guest carts). It buys in one unit of the SKU
+ * (`unitId`, else the default; V2 Task 13, D91): that unit's MOQ and stock, sent as `sku_unit_id`.
  */
-export function AddToCartBar({ product }: { product: StoreProduct }) {
+export function AddToCartBar({ product, unitId }: { product: StoreProduct; unitId?: number }) {
   const router = useRouter();
   const { data: customer } = useCustomerSession();
   const add = useAddToCart();
-  const sku = product.sku;
+  const picked = product.sku === null ? undefined : unitOf(product.sku, unitId);
+  const sku = product.sku === null ? null : skuInUnit(product.sku, picked);
   const preorder = sku?.coming_soon === true && product.preorder?.enabled === true ? product.preorder : null;
   const bounds =
     sku === null
@@ -40,7 +43,7 @@ export function AddToCartBar({ product }: { product: StoreProduct }) {
   const login = `${loginPaths.store}?next=${encodeURIComponent(here)}`;
 
   const submit = () => {
-    if (sku === null) {
+    if (sku === null || picked === undefined) {
       return;
     }
 
@@ -50,7 +53,7 @@ export function AddToCartBar({ product }: { product: StoreProduct }) {
     }
 
     add.mutate(
-      { sku_id: sku.id, quantity, ...(preorder !== null ? { kind: "preorder" as const } : {}) },
+      { sku_unit_id: picked.id, quantity, ...(preorder !== null ? { kind: "preorder" as const } : {}) },
       {
         onSuccess: () =>
           toast.success(preorder !== null ? ar.product.preorderAdded : ar.product.added, {

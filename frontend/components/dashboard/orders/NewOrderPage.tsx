@@ -19,6 +19,7 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { type CustomerAddressInput, useCustomer, useUpdateCustomer } from "@/lib/dashboard/customers";
 import {
   addLine,
+  lineFromProduct,
   discountedQuote,
   type DraftLine,
   orderLinesBody,
@@ -26,6 +27,7 @@ import {
   quotePasses,
   removeLine,
   setQuantity,
+  setUnit,
   useOrderQuote,
   usePlaceOrder,
   useSettled,
@@ -84,7 +86,7 @@ export function NewOrderPage() {
   const canOverride = allowed("orders.override_mov");
   const canDiscount = allowed("orders.discount");
   const discounting =
-    canDiscount && (hasDiscount(orderDiscount) || lines.some((line) => hasDiscount(lineDiscounts[line.sku_id])));
+    canDiscount && (hasDiscount(orderDiscount) || lines.some((line) => hasDiscount(lineDiscounts[line.sku_unit_id])));
   const discounted = discounting ? discountedQuote(shownQuote, lines, lineDiscounts, orderDiscount) : null;
   const discountsValid =
     !discounting || (discounted?.order_total !== null && (!hasDiscount(orderDiscount) || discountReason.trim() !== ""));
@@ -108,7 +110,7 @@ export function NewOrderPage() {
         address_id: chosenAddress,
         lines: canDiscount
           ? orderLinesBody(lines, lineDiscounts)
-          : lines.map(({ sku_id, quantity }) => ({ sku_id, quantity })),
+          : lines.map(({ sku_unit_id, quantity }) => ({ sku_unit_id, quantity })),
         ...(canDiscount && hasDiscount(orderDiscount)
           ? { discount: { ...discountBody(orderDiscount), reason: discountReason.trim() } }
           : {}),
@@ -167,16 +169,13 @@ export function NewOrderPage() {
               <CardTitle>{copy.products}</CardTitle>
               <CardAction>
                 <ProductPicker
-                  onPick={(product) =>
-                    setLines((current) =>
-                      addLine(current, {
-                        sku_id: product.sku.id,
-                        quantity: product.sku.moq,
-                        name: product.name,
-                        code: product.sku.code,
-                      }),
-                    )
-                  }
+                  onPick={(product) => {
+                    const line = lineFromProduct(product);
+
+                    if (line !== null) {
+                      setLines((current) => addLine(current, line));
+                    }
+                  }}
                 />
               </CardAction>
             </CardHeader>
@@ -190,6 +189,7 @@ export function NewOrderPage() {
                   discounts={canDiscount ? lineDiscounts : null}
                   priced={discounted?.lines ?? null}
                   onDiscount={(skuId, draft) => setLineDiscounts((current) => ({ ...current, [skuId]: draft }))}
+                  onUnit={(from, to) => setLines((current) => setUnit(current, from, to))}
                   onQuantity={(skuId, quantity) => setLines((current) => setQuantity(current, skuId, quantity))}
                   onRemove={(skuId) => setLines((current) => removeLine(current, skuId))}
                 />

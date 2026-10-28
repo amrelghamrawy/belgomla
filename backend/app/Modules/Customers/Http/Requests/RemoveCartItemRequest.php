@@ -8,7 +8,7 @@ use App\Modules\Customers\Enums\CartLineKind;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/** DELETE /api/store/cart/items/{sku_id}?kind=: the order line (default) or the pre-order line of the SKU (BR-O14). */
+/** DELETE /api/store/cart/items/{sku_unit_id}?kind=: the order line (default) or the pre-order line of the SKU unit (BR-O14, D91). */
 final class RemoveCartItemRequest extends FormRequest
 {
     /**

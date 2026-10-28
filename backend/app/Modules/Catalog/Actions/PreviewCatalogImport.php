@@ -47,7 +47,7 @@ final readonly class PreviewCatalogImport
     private function dryRun(string $token, string $name, string $path, SpreadsheetFormat $format): ImportPreview
     {
         $lookups = $this->mapper->lookups();
-        $rows = $this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $this->spreadsheet->sheetName($path, $format));
+        $skus = $this->mapper->skus($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $this->spreadsheet->sheetName($path, $format)));
         $counts = array_fill_keys(array_map(fn (ImportRowAction $action): string => $action->value, ImportRowAction::cases()), 0);
         $limit = config()->integer('catalog.import_preview_errors');
         $errors = [];
@@ -57,9 +57,9 @@ final readonly class PreviewCatalogImport
         DB::beginTransaction();
 
         try {
-            foreach ($rows as $number => $row) {
-                $code = $row['sku_code'] ?? '';
-                $result = $this->importRow->handle($row, $number, $lookups, $code === '' ? null : ($seen[$code] ?? null));
+            foreach ($skus as $number => $rows) {
+                $code = $rows[$number]['sku_code'] ?? '';
+                $result = $this->importRow->handle($rows, $lookups, $code === '' ? null : ($seen[$code] ?? null));
                 $seen[$code] ??= $number;
                 $counts[$result->action->value]++;
 

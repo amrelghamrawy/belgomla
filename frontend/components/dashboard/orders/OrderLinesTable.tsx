@@ -5,6 +5,7 @@ import { TrashIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { OrderQuote, OrderQuoteLine } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
@@ -27,6 +28,7 @@ export function OrderLinesTable({
   priced,
   marks,
   onDiscount,
+  onUnit,
   onQuantity,
   onRemove,
 }: {
@@ -38,9 +40,11 @@ export function OrderLinesTable({
   priced: ({ unit_price: string; line_total: string } | null)[] | null;
   /** A label per SKU shown next to its name (an added or changed line of an edit, BR-O12). */
   marks?: Record<number, string>;
-  onDiscount?: (skuId: number, draft: DiscountDraft) => void;
-  onQuantity: (skuId: number, quantity: number) => void;
-  onRemove: (skuId: number) => void;
+  onDiscount?: (skuUnitId: number, draft: DiscountDraft) => void;
+  /** D91: moves a line to another unit of its SKU (shown when the line lists more than one). */
+  onUnit?: (from: number, to: number) => void;
+  onQuantity: (skuUnitId: number, quantity: number) => void;
+  onRemove: (skuUnitId: number) => void;
 }) {
   const orders = ar.dashboard.orders;
 
@@ -61,26 +65,40 @@ export function OrderLinesTable({
         </TableHeader>
         <TableBody>
           {lines.map((line, index) => {
-            const quoted = quotedLine(quote, line.sku_id);
+            const quoted = quotedLine(quote, line.sku_unit_id);
             const after = priced?.[index];
-            const draft = discounts?.[line.sku_id] ?? NO_DISCOUNT;
+            const draft = discounts?.[line.sku_unit_id] ?? NO_DISCOUNT;
             const shown = hasDiscount(draft) && after ? after : null;
 
             return (
-              <TableRow key={line.sku_id} data-testid={`line-${line.sku_id}`}>
+              <TableRow key={line.sku_unit_id} data-testid={`line-${line.sku_unit_id}`}>
                 <TableCell className="min-w-44 align-top">
                   <div className="flex flex-col gap-1">
                     <span className="font-medium">
                       {line.name}
-                      {marks?.[line.sku_id] !== undefined && (
+                      {marks?.[line.sku_unit_id] !== undefined && (
                         <Badge variant="secondary" className="ms-2 text-xs">
-                          {marks[line.sku_id]}
+                          {marks[line.sku_unit_id]}
                         </Badge>
                       )}
                     </span>
                     <bdi dir="ltr" className="text-muted-foreground text-start text-xs">
                       {line.code}
                     </bdi>
+                    {onUnit !== undefined && line.units !== undefined && line.units.length > 1 && (
+                      <NativeSelect
+                        aria-label={copy.unitOf(line.name)}
+                        className="w-36"
+                        value={line.sku_unit_id}
+                        onChange={(event) => onUnit(line.sku_unit_id, Number(event.target.value))}
+                      >
+                        {line.units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    )}
                     {quoted !== undefined && <LineHints line={quoted} />}
                   </div>
                 </TableCell>
@@ -93,7 +111,7 @@ export function OrderLinesTable({
                     aria-label={copy.quantityOf(line.name)}
                     className="w-24"
                     value={line.quantity === 0 ? "" : line.quantity}
-                    onChange={(event) => onQuantity(line.sku_id, Number(event.target.value))}
+                    onChange={(event) => onQuantity(line.sku_unit_id, Number(event.target.value))}
                   />
                 </TableCell>
                 <TableCell className="align-top whitespace-nowrap">
@@ -114,11 +132,11 @@ export function OrderLinesTable({
                 {discounts !== null && (
                   <TableCell className="align-top">
                     <DiscountInput
-                      id={`line-discount-${line.sku_id}`}
+                      id={`line-discount-${line.sku_unit_id}`}
                       label={line.name}
                       draft={draft}
                       invalid={hasDiscount(draft) && priced !== null && after === null}
-                      onChange={(next) => onDiscount?.(line.sku_id, next)}
+                      onChange={(next) => onDiscount?.(line.sku_unit_id, next)}
                     />
                   </TableCell>
                 )}
@@ -128,7 +146,7 @@ export function OrderLinesTable({
                     variant="ghost"
                     size="icon"
                     aria-label={`${copy.remove}: ${line.name}`}
-                    onClick={() => onRemove(line.sku_id)}
+                    onClick={() => onRemove(line.sku_unit_id)}
                   >
                     <TrashIcon />
                   </Button>
@@ -150,7 +168,7 @@ function LineHints({ line }: { line: OrderQuoteLine }) {
     <>
       <span className="text-muted-foreground text-xs">{copy.available(line.available, line.unit)}</span>
       {ar.dashboard.orders.priceSources[line.price_source] !== undefined && (
-        <span className="text-primary text-xs" data-testid={`price-source-${line.sku_id}`}>
+        <span className="text-primary text-xs" data-testid={`price-source-${line.sku_unit_id}`}>
           {ar.dashboard.orders.priceSources[line.price_source]}
         </span>
       )}
@@ -168,7 +186,7 @@ function LineHints({ line }: { line: OrderQuoteLine }) {
         </span>
       )}
       {problem !== null && (
-        <span className="text-destructive text-xs" role="status" data-testid={`problem-${line.sku_id}`}>
+        <span className="text-destructive text-xs" role="status" data-testid={`problem-${line.sku_unit_id}`}>
           {problem.reason === "insufficient_stock"
             ? reasons.insufficient_stock(problem.available ?? 0, line.unit)
             : problem.reason === "below_moq"

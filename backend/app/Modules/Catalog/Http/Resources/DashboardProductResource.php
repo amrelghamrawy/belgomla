@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Services\PriceResolver;
@@ -18,8 +19,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * Dashboard view of a product with its SKU (08-api-contract.md §6). The detail endpoint also loads
  * `images` and `relations`; the list leaves them out. `custom_fields` is the raw stored map
- * (select values are option ids) because the dashboard form edits it. `sku.tiers` (with the % each was
- * entered as) is present when the tiers are loaded, i.e. on the detail, and so is `sku.inventory`
+ * (select values are option ids) because the dashboard form edits it. `sku.units` lists the active units the SKU is
+ * sold in, the default first (V2 Task 13, D91), each with its tiers (with the % each was entered as) when they are
+ * loaded, i.e. on the detail; `selling_unit`, `conversion_factor`, the prices and `moq` next to them are the default
+ * unit's, for the lists. `sku.inventory`
  * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros). `preorder` holds the pre-order
  * settings (`enabled`, `expected_at` as Y-m-d, `limit`, D88).
  *
@@ -81,21 +84,20 @@ final class DashboardProductResource extends JsonResource
             return null;
         }
 
+        $units = $sku->relationLoaded('activeUnits') ? $sku->activeUnits : null;
+        $default = $units?->firstWhere('is_default', true);
+
         return [
             'id' => $sku->id,
             'code' => $sku->code,
-            'selling_unit' => $this->unit($sku, 'sellingUnit'),
-            'base_unit' => $this->unit($sku, 'baseUnit'),
-            'conversion_factor' => $sku->conversion_factor,
-            'cover_price' => $sku->cover_price,
-            'base_price' => $sku->base_price,
-            'base_price_percent' => $sku->base_price_percent,
-            'moq' => $sku->moq,
-            'tiers' => $this->when($sku->relationLoaded('tiers'), fn (): array => array_map(fn (TierData $tier): array => [
-                'min_quantity' => $tier->minQuantity,
-                'unit_price' => $tier->unitPrice,
-                'discount_percent' => $tier->discountPercent,
-            ], app(PriceResolver::class)->tiers($sku))),
+            'base_unit' => $this->unit($sku->relationLoaded('baseUnit') ? $sku->baseUnit : null),
+            'selling_unit' => $this->unit($default?->relationLoaded('unit') === true ? $default->unit : null),
+            'conversion_factor' => $default?->conversion_factor,
+            'cover_price' => $default?->cover_price,
+            'base_price' => $default?->base_price,
+            'base_price_percent' => $default?->base_price_percent,
+            'moq' => $default?->moq,
+            'units' => $this->when($units !== null, fn (): array => $units?->map($this->skuUnit(...))->values()->all() ?? []),
             'inventory' => $this->when($sku->relationLoaded('inventory'), fn (): array => [
                 'on_hand' => $sku->inventory->on_hand ?? 0,
                 'reserved' => $sku->inventory->reserved ?? 0,
@@ -105,12 +107,32 @@ final class DashboardProductResource extends JsonResource
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function skuUnit(SkuUnit $unit): array
+    {
+        return [
+            'id' => $unit->id,
+            'unit' => $this->unit($unit->relationLoaded('unit') ? $unit->unit : null),
+            'conversion_factor' => $unit->conversion_factor,
+            'cover_price' => $unit->cover_price,
+            'base_price' => $unit->base_price,
+            'base_price_percent' => $unit->base_price_percent,
+            'moq' => $unit->moq,
+            'is_default' => $unit->is_default,
+            'tiers' => $this->when($unit->relationLoaded('tiers'), fn (): array => array_map(fn (TierData $tier): array => [
+                'min_quantity' => $tier->minQuantity,
+                'unit_price' => $tier->unitPrice,
+                'discount_percent' => $tier->discountPercent,
+            ], app(PriceResolver::class)->tiers($unit))),
+        ];
+    }
+
+    /**
      * @return array{id: int, name: string}|null
      */
-    private function unit(Sku $sku, string $relation): ?array
+    private function unit(?Unit $unit): ?array
     {
-        $unit = $sku->relationLoaded($relation) ? $sku->getRelation($relation) : null;
-
         return $unit instanceof Unit ? ['id' => $unit->id, 'name' => $unit->name] : null;
     }
 }

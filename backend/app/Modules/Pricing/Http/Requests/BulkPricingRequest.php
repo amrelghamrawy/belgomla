@@ -32,6 +32,7 @@ final class BulkPricingRequest extends FormRequest
             'tiers.*.min_quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
             'tiers.*.discount_percent' => ['required', 'decimal:0,2', 'gt:0', 'lt:100'],
             'moq' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+            'unit_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -43,6 +44,12 @@ final class BulkPricingRequest extends FormRequest
     public function moq(): ?int
     {
         return $this->filled('moq') ? $this->integer('moq') : null;
+    }
+
+    /** D91: only the SKU units sold in this store unit; null = every unit. */
+    public function unitId(): ?int
+    {
+        return $this->filled('unit_id') ? $this->integer('unit_id') : null;
     }
 
     protected function filterPrefix(): string

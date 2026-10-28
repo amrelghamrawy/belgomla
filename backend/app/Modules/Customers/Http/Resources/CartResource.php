@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * The cart (08-api-contract.md §3, BR-CU06): lines with prices resolved now (BR-PR04), `removed_items` for
+ * The cart (08-api-contract.md §3, BR-CU06): lines with prices resolved now (BR-PR04), one per SKU unit (`sku_unit_id`,
+ * `unit`, `conversion_factor`; a SKU may be there in two units, D91), `removed_items` for
  * lines dropped because their product became inactive (BR-P04) or stopped taking pre-orders, `items_total` and the MOV
  * check (BR-MOV02). Each line says where its price came from (`price_source`: base, tier, group, customer or promotion, BR-PR14, BR-PR15) and, when a promotion set it, `promotion { id, name, discount_percent, ends_at }` (else null). `preorders` holds the pre-order lines (BR-O14) in the same shape plus `expected_at`, with their
  * indicative `items_total` (no MOV, D88). Money is a 2-decimal string; `available` is in base units (D37).
@@ -49,6 +50,7 @@ final class CartResource extends JsonResource
     {
         return [
             'sku_id' => $line->skuId,
+            'sku_unit_id' => $line->skuUnitId,
             'product_name' => $line->productName,
             'product_slug' => $line->productSlug,
             'unit' => $line->unit,

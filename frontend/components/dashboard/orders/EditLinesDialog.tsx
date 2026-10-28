@@ -29,7 +29,15 @@ import {
   lineChanges,
   liveItems,
 } from "@/lib/dashboard/edit-order";
-import { addLine, removeLine, setQuantity, useOrderQuote, useSettled } from "@/lib/dashboard/new-order";
+import {
+  addLine,
+  lineFromProduct,
+  removeLine,
+  setQuantity,
+  setUnit,
+  useOrderQuote,
+  useSettled,
+} from "@/lib/dashboard/new-order";
 import { useEditOrderLines } from "@/lib/dashboard/orders";
 import { formatMoney } from "@/lib/format/money";
 
@@ -76,7 +84,10 @@ function EditLinesForm({ order, onDone }: { order: DashboardOrderDetail; onDone:
   const marks = Object.fromEntries(
     changes
       .filter((change) => change.kind !== "removed")
-      .map((change) => [change.sku_id, change.kind === "added" ? copy.addedMark : ar.dashboard.orders.changedBadge]),
+      .map((change) => [
+        change.sku_unit_id,
+        change.kind === "added" ? copy.addedMark : ar.dashboard.orders.changedBadge,
+      ]),
   );
   const ready =
     changes.length > 0 && body !== null && shown !== undefined && !quote.isFetching && !editHasProblems(shown, changes);
@@ -103,16 +114,20 @@ function EditLinesForm({ order, onDone }: { order: DashboardOrderDetail; onDone:
       <div className="flex justify-end">
         <ProductPicker
           onPick={(product) => {
+            const line = lineFromProduct(product);
+
+            if (line === null) {
+              return;
+            }
+
             // A line of the order removed in this form and picked again is the same line, not a new one.
-            const existing = liveItems(order).find((item) => item.sku_id === product.sku.id);
+            const existing = liveItems(order).find((item) => item.sku_unit_id === line.sku_unit_id);
 
             setLines((current) =>
               addLine(current, {
+                ...line,
                 order_item_id: existing?.id ?? null,
-                sku_id: product.sku.id,
-                quantity: existing?.quantity ?? product.sku.moq,
-                name: product.name,
-                code: product.sku.code,
+                quantity: existing?.quantity ?? line.quantity,
               }),
             );
           }}
@@ -127,6 +142,7 @@ function EditLinesForm({ order, onDone }: { order: DashboardOrderDetail; onDone:
           discounts={null}
           priced={null}
           marks={marks}
+          onUnit={(from, to) => setLines((current) => setUnit(current, from, to))}
           onQuantity={(skuId, quantity) => setLines((current) => setQuantity(current, skuId, quantity))}
           onRemove={(skuId) => setLines((current) => removeLine(current, skuId))}
         />
@@ -143,7 +159,7 @@ function EditLinesForm({ order, onDone }: { order: DashboardOrderDetail; onDone:
         ) : (
           <ul className="flex flex-col gap-0.5">
             {changes.map((change) => (
-              <li key={`${change.kind}-${change.sku_id}`}>{describe(change)}</li>
+              <li key={`${change.kind}-${change.sku_unit_id}`}>{describe(change)}</li>
             ))}
           </ul>
         )}

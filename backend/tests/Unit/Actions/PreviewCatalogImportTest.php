@@ -8,6 +8,7 @@ use App\Modules\Catalog\Enums\SpreadsheetFormat;
 use App\Modules\Catalog\Exceptions\InvalidImportFile;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Services\CatalogFiles;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
@@ -40,15 +41,16 @@ test('the preview counts the rows that create and the rows that update a product
 
 test('the preview writes nothing: no product, price, stock, movement or audit record', function (): void {
     $product = $this->importedProduct();
-    $before = [Product::query()->count(), Sku::query()->count(), SkuPriceTier::query()->count(), InventoryMovement::query()->count(), AuditLog::query()->count()];
+    $before = [Product::query()->count(), Sku::query()->count(), SkuUnit::query()->count(), SkuPriceTier::query()->count(), InventoryMovement::query()->count(), AuditLog::query()->count()];
 
     app(PreviewCatalogImport::class)->handle(catalogUpload([
         $this->importRow(['base_price' => '80', 'on_hand' => '100', 'status' => 'غير نشط']),
         $this->importRow(['sku_code' => 'NEW-1']),
+        $this->importRow(['sku_code' => 'NEW-1', 'unit' => 'قطعة', 'unit_is_default' => '', 'conversion_factor' => '1', 'base_price' => '5', 'tier_1_min' => '', 'tier_1_price' => '']),
     ]));
 
-    expect([Product::query()->count(), Sku::query()->count(), SkuPriceTier::query()->count(), InventoryMovement::query()->count(), AuditLog::query()->count()])->toBe($before)
-        ->and($product->sku?->refresh()->base_price)->toBe('90.00')
+    expect([Product::query()->count(), Sku::query()->count(), SkuUnit::query()->count(), SkuPriceTier::query()->count(), InventoryMovement::query()->count(), AuditLog::query()->count()])->toBe($before)
+        ->and(SkuUnit::query()->sole()->base_price)->toBe('90.00')
         ->and(SkuInventory::query()->whereKey($product->sku?->id)->value('on_hand'))->toBe(400)
         ->and($product->refresh()->status->value)->toBe('active');
 });
@@ -79,12 +81,21 @@ test('the preview lists every row error with its row number and column', functio
     'BR-PR10 a percent without a reference price' => [fn () => $this->importRow(['cover_price' => '', 'base_price' => '', 'base_price_percent' => '25']), 'cover_price', 'أدخل سعر الغلاف أولًا لحساب السعر بنسبة الخصم'],
 ]);
 
-test('BR-P03 a code that appears twice in the file is an error on the second row', function (): void {
-    $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow(), $this->importRow(['product_name' => 'نسخة'])]));
+test('BR-P03 D91 a code that comes back after another code is an error on its row', function (): void {
+    $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow(), $this->importRow(['sku_code' => 'NEW-1']), $this->importRow(['product_name' => 'نسخة'])]));
 
-    expect($preview->create)->toBe(1)
+    expect($preview->create)->toBe(2)
         ->and($preview->skip)->toBe(1)
-        ->and($preview->errors)->toBe([['row' => 4, 'column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'الكود مكرر في الملف (الصف 3)']]);
+        ->and($preview->errors)->toBe([['row' => 5, 'column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'الكود مكرر في الملف (الصف 3)']]);
+});
+
+test('D91 consecutive rows of one code are one SKU in the counts', function (): void {
+    $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([
+        $this->importRow(),
+        $this->importRow(['unit' => 'قطعة', 'unit_is_default' => '', 'conversion_factor' => '1', 'base_price' => '5', 'tier_1_min' => '', 'tier_1_price' => '']),
+    ]));
+
+    expect([$preview->total, $preview->create, $preview->skip, $preview->errors])->toBe([1, 1, 0, []]);
 });
 
 test('BR-INV08 an on hand below what open orders reserve is an error on the stock column', function (): void {
@@ -101,7 +112,7 @@ test('only the first errors are returned, flagged as cut', function (): void {
     config(['catalog.import_preview_errors' => 2]);
 
     $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([
-        $this->importRow(['sku_code' => 'A', 'base_unit' => 'علبة', 'selling_unit' => 'علبة']),
+        $this->importRow(['sku_code' => 'A', 'base_unit' => 'علبة', 'unit' => 'علبة']),
         $this->importRow(['sku_code' => 'B', 'base_unit' => 'علبة']),
     ]));
 
@@ -118,8 +129,8 @@ test('a file without rows is refused as a whole and not kept', function (): void
 });
 
 test('a file of another format version is refused as a whole', function (): void {
-    expect(fn () => app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow()], sheetName: 'products_v2')))
+    expect(fn () => app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow()], sheetName: 'products_v3')))
         ->toThrow(function (InvalidImportFile $e): void {
-            expect($e->details)->toBe(['file' => ['إصدار الملف «products_v2» غير مدعوم، نزّل قالبًا جديدًا']]);
+            expect($e->details)->toBe(['file' => ['إصدار الملف «products_v3» غير مدعوم، نزّل قالبًا جديدًا']]);
         });
 });

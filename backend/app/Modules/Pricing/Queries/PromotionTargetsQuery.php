@@ -7,6 +7,7 @@ namespace App\Modules\Pricing\Queries;
 use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Queries\FilteredProductsQuery;
 use App\Modules\Pricing\Exceptions\InvalidPricingInput;
 use App\Modules\Pricing\Exceptions\PromotionRefused;
@@ -53,7 +54,8 @@ final readonly class PromotionTargetsQuery
     }
 
     /**
-     * D90 d: how many SKUs a promotion would cover and the first few, priced under `$percent` when given. Writes nothing.
+     * D90 d: how many SKUs a promotion would cover and the first few, priced under `$percent` when given (their default
+     * unit's price, D91: the promotion lowers every unit by the same %). Writes nothing.
      *
      * @param  list<int>|null  $skuIds
      * @return array{skus_count: int, sample: list<array{sku_id: int, code: string, product_name: string, base_price: string, promotion_price: string|null}>}
@@ -61,7 +63,7 @@ final readonly class PromotionTargetsQuery
     public function preview(?ProductFilterData $filter, ?array $skuIds, ?string $percent, int $limit): array
     {
         $ids = $this->skuIds($filter, $skuIds);
-        $sample = Sku::query()->whereKey(array_slice($ids, 0, $limit))->with('product')->orderBy('id')->get();
+        $sample = Sku::query()->whereKey(array_slice($ids, 0, $limit))->with(['product', 'defaultUnit'])->orderBy('id')->get();
 
         return [
             'skus_count' => count($ids),
@@ -69,8 +71,8 @@ final readonly class PromotionTargetsQuery
                 'sku_id' => $sku->id,
                 'code' => $sku->code,
                 'product_name' => $sku->product->name,
-                'base_price' => $sku->base_price,
-                'promotion_price' => $percent === null ? null : $this->prices->promotionPrice($sku, $percent),
+                'base_price' => $sku->defaultUnit->base_price ?? '0.00',
+                'promotion_price' => $percent === null || ! $sku->defaultUnit instanceof SkuUnit ? null : $this->prices->promotionPrice($sku->defaultUnit, $percent),
             ])->all()),
         ];
     }

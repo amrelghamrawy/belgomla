@@ -13,9 +13,9 @@ final readonly class ProductDetailQuery
     {
         return $product->load([
             'category',
-            'sku.sellingUnit',
+            'sku.activeUnits.unit',
+            'sku.activeUnits.tiers',
             'sku.baseUnit',
-            'sku.tiers',
             'sku.inventory',
             'images',
             'mainImage',

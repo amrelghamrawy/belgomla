@@ -23,15 +23,17 @@ final readonly class OrderSnapshots
     public function item(CheckoutLine $line): array
     {
         $sku = $line->sku;
+        $unit = $line->unit;
 
         return [
             'sku_id' => $sku->id,
+            'sku_unit_id' => $unit->id,
             'product_id' => $sku->product_id,
             'product_name' => $sku->product->name,
             'sku_code' => $sku->code,
             'sku_name' => $sku->name ?? $sku->product->name,
-            'unit_name' => $sku->sellingUnit->name,
-            'conversion_factor' => $sku->conversion_factor,
+            'unit_name' => $unit->unit->name, // D91: the unit the line is in
+            'conversion_factor' => $unit->conversion_factor,
             'quantity' => $line->quantity,
             'quantity_base' => $line->quantityBase(),
             'cover_price' => $line->price->coverPrice,

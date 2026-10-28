@@ -42,14 +42,14 @@ test('BR-O14 a pre-order line goes into the cart apart from the order lines, wit
         ->assertJsonPath('data.preorders.items.0.expected_at', '2026-12-01');
     expectDocumentedShape($response->json('data'), 'Cart');
     expectDocumentedShape($response->json('data.preorders.items.0'), 'PreorderCartItem');
-    $this->assertDatabaseHas('cart_items', ['sku_id' => $this->sku->id, 'quantity' => 12, 'kind' => 'preorder']);
+    $this->assertDatabaseHas('cart_items', ['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 12, 'kind' => 'preorder']);
 });
 
 test('BR-P04 the same coming soon product cannot go in as an order line', function (): void {
     ($this->add)(12, 'order')
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'cart_line_invalid')
-        ->assertJsonPath('error.items', [['sku_id' => $this->sku->id, 'reason' => 'product_inactive']]);
+        ->assertJsonPath('error.items', [['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'product_inactive']]);
 });
 
 test('BR-O14 an active product cannot be pre-ordered', function (): void {
@@ -68,9 +68,9 @@ test('BR-O14 the cart kind is order or preorder', function (): void {
 test('BR-O14 the pre-order line is changed and removed by its kind', function (): void {
     ($this->add)(5)->assertOk();
 
-    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->sku->id}", ['quantity' => 8, 'kind' => 'preorder'])->assertOk()->assertJsonPath('data.preorders.items.0.quantity', 8);
-    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->sku->id}", ['quantity' => 8])->assertNotFound();
-    $this->tenantJson('DELETE', "/api/store/cart/items/{$this->sku->id}?kind=preorder")->assertOk()->assertJsonPath('data.preorders.items', []);
+    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}", ['quantity' => 8, 'kind' => 'preorder'])->assertOk()->assertJsonPath('data.preorders.items.0.quantity', 8);
+    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}", ['quantity' => 8])->assertNotFound();
+    $this->tenantJson('DELETE', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}?kind=preorder")->assertOk()->assertJsonPath('data.preorders.items', []);
 
     $this->assertDatabaseCount('cart_items', 0);
 });
@@ -109,7 +109,7 @@ test('BR-O14 past the cap the confirmation answers 422 checkout_failed with what
     ($this->confirm)()
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'checkout_failed')
-        ->assertJsonPath('error.items', [['sku_id' => $this->sku->id, 'reason' => 'preorder_limit', 'requested' => 10, 'remaining' => 5]]);
+        ->assertJsonPath('error.items', [['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'preorder_limit', 'requested' => 10, 'remaining' => 5]]);
 
     $this->assertDatabaseHas('cart_items', ['sku_id' => $this->sku->id, 'kind' => 'preorder']);
 });

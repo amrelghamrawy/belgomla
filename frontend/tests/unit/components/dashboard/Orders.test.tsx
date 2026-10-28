@@ -128,6 +128,7 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
       {
         id: 61,
         sku_id: 5,
+        sku_unit_id: 5,
         product_name: "الأضواء علوم",
         sku_code: "ADW-SCI-1",
         sku_name: "الأضواء علوم",
@@ -403,7 +404,10 @@ describe("OrderDetail price source (BR-PR14)", () => {
     stubApi({});
     const base = order();
     const line = base.items[0];
-    const items = line === undefined ? [] : [line, { ...line, id: 62, sku_id: 6, price_source: "customer" as const }];
+    const items =
+      line === undefined
+        ? []
+        : [line, { ...line, id: 62, sku_id: 6, sku_unit_id: 6, price_source: "customer" as const }];
     renderWithQuery(<OrderDetail order={{ ...base, items }} />);
 
     expect(screen.getByTestId("price-source-62")).toHaveTextContent("سعر خاص بالعميل");
@@ -432,6 +436,7 @@ describe("OrderDetail discounts (BR-PR08, D85)", () => {
         {
           id: 61,
           sku_id: 5,
+          sku_unit_id: 5,
           product_name: "الأضواء علوم",
           sku_code: "ADW-SCI-1",
           sku_name: "الأضواء علوم",
@@ -565,6 +570,7 @@ describe("OrderDetail line editing (BR-O12, D87)", () => {
           ...line!,
           id: 62,
           sku_id: 6,
+          sku_unit_id: 6,
           product_name: "كتاب ب",
           sku_code: "B-1",
           quantity: 10,
@@ -580,6 +586,7 @@ describe("OrderDetail line editing (BR-O12, D87)", () => {
       lines: [
         orderQuoteLine({
           sku_id: 5,
+          sku_unit_id: 5,
           product_name: "الأضواء علوم",
           quantity,
           unit_price: "85.00",
@@ -628,7 +635,7 @@ describe("OrderDetail line editing (BR-O12, D87)", () => {
       expect(callsTo(fetchMock, "POST /api/dashboard/orders/quote").at(-1)?.body).toEqual({
         customer_id: 7,
         order: 1001,
-        lines: [{ sku_id: 5, quantity: 12 }],
+        lines: [{ sku_unit_id: 5, quantity: 12 }],
       }),
     );
 
@@ -638,7 +645,7 @@ describe("OrderDetail line editing (BR-O12, D87)", () => {
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم تعديل أصناف الطلب"));
     const call = callsTo(fetchMock, "PUT /api/dashboard/orders/1001/lines")[0];
-    expect(call?.body).toEqual({ lines: [{ order_item_id: 61, sku_id: 5, quantity: 12 }], note: "العميل اتصل" });
+    expect(call?.body).toEqual({ lines: [{ order_item_id: 61, sku_unit_id: 5, quantity: 12 }], note: "العميل اتصل" });
     expect(call?.headers["Idempotency-Key"]).toMatch(/^lines-1001-[0-9a-f]{32}$/);
   });
 
@@ -675,6 +682,7 @@ describe("OrderDetail line editing (BR-O12, D87)", () => {
           lines: [
             orderQuoteLine({
               sku_id: 5,
+              sku_unit_id: 5,
               quantity: 30,
               problem: { reason: "insufficient_stock", requested: 30, available: 20 },
             }),
@@ -725,7 +733,7 @@ describe("OrderDetail line editing (BR-O12, D87)", () => {
           ...base,
           items: [
             { ...line!, delivered_quantity: 3, line_total: "270.00" },
-            { ...line!, id: 62, sku_id: 6, product_name: "كتاب ب", removed_at: at },
+            { ...line!, id: 62, sku_id: 6, sku_unit_id: 6, product_name: "كتاب ب", removed_at: at },
           ],
           changes: [
             {

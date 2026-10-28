@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Concerns;
 
 use App\Modules\Pricing\Concerns\ReadsSkuPricing;
+use App\Modules\Pricing\Data\TierData;
 use Carbon\CarbonImmutable;
+use Closure;
+use Illuminate\Validation\Validator;
 
 /**
  * Rules and typed accessors shared by the product create and update requests (08-api-contract.md §6).
- * The SKU price set (`sku.cover_price`, `sku.base_price[_percent]`, `sku.moq`, `sku.tiers`) is read by
- * Pricing's ReadsSkuPricing under the "sku." prefix. `opening_stock` is create-only (StoreProductRequest).
+ * The SKU is sold in `sku.units[]` (V2 Task 13, D91): `{ id?, unit_id, conversion_factor, cover_price?, base_price |
+ * base_price_percent, moq?, tiers?, is_default? }`, at most one flagged default (none = the first), each unit at most once.
+ * Each unit's price set is read by Pricing's ReadsSkuPricing under its "sku.units.{i}." prefix. `opening_stock` is create-only (StoreProductRequest).
  * `preorder { enabled, expected_at?, limit? }` is optional on both (D88).
  */
 trait ProductPayloadRules
@@ -74,9 +78,49 @@ trait ProductPayloadRules
         return $this->filled("sku.{$key}") ? $this->integer("sku.{$key}") : $default;
     }
 
+    /**
+     * The units sent, in their order, each with the named arguments of its SkuPricingData.
+     *
+     * @return list<array{id: int|null, unitId: int, conversionFactor: int, isDefault: bool, pricing: array{basePrice: string|null, basePricePercent: string|null, moq: int, tiers: list<TierData>|null, coverPrice: string|null, coverPriceGiven: bool}}>
+     */
+    public function skuUnits(): array
+    {
+        $units = [];
+
+        foreach (array_keys($this->array('sku.units')) as $index) {
+            $prefix = "sku.units.{$index}.";
+
+            $units[] = [
+                'id' => $this->filled("{$prefix}id") ? $this->integer("{$prefix}id") : null,
+                'unitId' => $this->integer("{$prefix}unit_id"),
+                'conversionFactor' => $this->integer("{$prefix}conversion_factor", 1),
+                'isDefault' => $this->boolean("{$prefix}is_default"),
+                'pricing' => $this->pricingInput($prefix),
+            ];
+        }
+
+        return $units;
+    }
+
+    /**
+     * D91: one default unit at most.
+     *
+     * @return list<Closure(Validator): void>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $defaults = array_filter($this->array('sku.units'), fn (mixed $unit): bool => is_array($unit) && filter_var($unit['is_default'] ?? false, FILTER_VALIDATE_BOOLEAN));
+
+            if (count($defaults) > 1) {
+                $validator->errors()->add('sku.units', 'وحدة بيع افتراضية واحدة فقط');
+            }
+        }];
+    }
+
     protected function pricingPrefix(): string
     {
-        return 'sku.';
+        return 'sku.units.*.';
     }
 
     /**
@@ -95,9 +139,13 @@ trait ProductPayloadRules
             'preorder.limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:10000000'],
             'sku' => ['required', 'array'],
             'sku.code' => ['required', 'string', 'max:60', 'regex:/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/'],
-            'sku.selling_unit_id' => ['required', 'integer'],
             'sku.base_unit_id' => ['required', 'integer'],
-            'sku.conversion_factor' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'sku.units' => ['required', 'array', 'min:1', 'max:10'],
+            'sku.units.*' => ['array'],
+            'sku.units.*.id' => ['sometimes', 'nullable', 'integer', 'min:1', 'distinct'],
+            'sku.units.*.unit_id' => ['required', 'integer', 'distinct'],
+            'sku.units.*.conversion_factor' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'sku.units.*.is_default' => ['sometimes', 'boolean'],
             ...$this->pricingRules(),
         ];
     }

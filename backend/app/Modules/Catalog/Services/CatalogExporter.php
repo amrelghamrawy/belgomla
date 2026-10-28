@@ -50,7 +50,7 @@ final readonly class CatalogExporter
             $path,
             $format,
             $this->mapper->columns($lookups),
-            $this->query->get($filter)->map(fn (Product $product): array => $this->mapper->exportRow($product, $lookups)),
+            $this->query->get($filter)->flatMap(fn (Product $product): array => $this->mapper->exportRows($product, $lookups)),
             CatalogRowMapper::SHEET_NAME,
             withKeys: true,
         );

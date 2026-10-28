@@ -20,7 +20,7 @@ test('to array', function (): void {
         'id', 'tenant_id', 'order_id', 'sku_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name',
         'conversion_factor', 'quantity', 'quantity_base', 'cover_price', 'unit_price', 'discount_percent',
         'tier_min_quantity', 'line_total', 'created_at', 'updated_at', 'list_unit_price', 'manual_discount_type', 'manual_discount_value',
-        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity', 'price_source', 'promotion_id',
+        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity', 'price_source', 'promotion_id', 'sku_unit_id',
     ]);
 });
 
@@ -108,3 +108,10 @@ test('BR-O14 the database keeps the converted quantity within the line and off r
     'below zero' => [['reserved' => false, 'converted_quantity' => -1], 'order_items_converted_within_ordered'],
     'on a reserved line' => [['converted_quantity' => 1], 'order_items_converted_unreserved'],
 ]);
+
+test('D91 a line belongs to the SKU unit it was ordered in', function (): void {
+    $item = OrderItem::factory()->create();
+
+    expect($item->skuUnit?->id)->toBe($item->sku_unit_id)
+        ->and($item->skuUnit?->sku_id)->toBe($item->sku_id);
+});

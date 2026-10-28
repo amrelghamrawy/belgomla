@@ -8,6 +8,7 @@ use App\Modules\Catalog\Data\CatalogLookups;
 use App\Modules\Catalog\Data\ImportRowData;
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\SkuData;
+use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
@@ -20,38 +21,48 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\PriceResolver;
 use App\Support\ApiException;
 use App\Support\Money;
 use Generator;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * The catalog file format, version 1 (V2 Task 06): one row per SKU. Turns the tenant's catalog into rows for the
- * export and file rows back into what CreateProduct / UpdateProduct take.
+ * The catalog file format, version 2 (V2 Task 13; version 1 was V2 Task 06): one row per unit a SKU is sold in (D91).
+ * Turns the tenant's catalog into rows for the export and file rows back into what CreateProduct / UpdateProduct take.
  *
  *  - Header ↔ keys: the key row (`sku_code, product_name, …`) is the first or second row (the export puts the
- *    Arabic labels above it); a file with only the Arabic label row is read through the labels. Unknown columns are ignored; a missing required column
- *    fails the whole file. The XLSX sheet is named `products_v1` (the format version; Task 13 bumps it).
+ *    Arabic labels above it); a file with only the Arabic label row is read through the labels. Unknown columns are
+ *    ignored; a missing required column fails the whole file. The XLSX sheet is named `products_v2`; a `products_v1`
+ *    file (its `selling_unit` column read as `unit`) is still read, each row then being a SKU in one unit.
+ *  - A SKU's units are consecutive rows with its code; the first row holds the product, the SKU's base unit, its
+ *    stock and custom fields (they are read from it only), every row one unit: its name, factor, prices, MOQ, tiers and
+ *    `unit_is_default` (نعم on at most one row). A unit the SKU has but the file does not list is kept as it is; with no
+ *    default named, an existing SKU keeps its default and a new one takes its first row.
  *  - References are resolved by name: the category by its full path ("كتب خارجية > أولى إعدادي", D25; never
  *    created, archived only when the product already sits there), units by name (BR-U01), select fields by option
  *    label (BR-P08). A field of another section than the product's may only repeat the stored value (D69).
- *  - Every row is validated with StoreProductRequest's own rules through a Validator, and the product data comes
- *    from its typed accessors, so the file obeys exactly what the API does.
+ *  - Every SKU is validated with StoreProductRequest's own rules through a Validator, and the product data comes
+ *    from its typed accessors, so the file obeys exactly what the API does. Each error names its row and column.
  *  - Optional columns left out of the file keep what the product has; an empty cell in a column that is there
  *    clears the value (description, reference price, %, a custom field) or, for MOQ and On Hand, keeps it.
- *    When any tier column is there, the tiers in the row replace the SKU's (D34).
+ *    When any tier column is there, the tiers in a unit's row replace that unit's (D34).
  *  - A percentage wins over a price (BR-PR10), except that a row repeating the stored price and percentage keeps
  *    both, so exporting and importing the same file changes nothing (D95).
  *
  * @phpstan-type CellValue string|int|float|bool|null
- * @phpstan-type RowError array{column: string, label: string, message: string}
+ * @phpstan-type RowError array{row?: int, column: string, label: string, message: string}
  */
 final readonly class CatalogRowMapper
 {
-    public const string SHEET_NAME = 'products_v1';
+    public const string SHEET_NAME = 'products_v2';
+
+    /** The sheet names of the versions this mapper reads. */
+    public const array READABLE_SHEETS = ['products_v1', 'products_v2'];
 
     public const string FIELD_PREFIX = 'field:';
 
@@ -60,7 +71,7 @@ final readonly class CatalogRowMapper
     public const int TIER_COLUMNS = 5;
 
     /** The columns every file must have; `base_price` may be empty when `base_price_percent` is given. */
-    public const array REQUIRED = ['sku_code', 'product_name', 'category_path', 'selling_unit', 'base_unit', 'conversion_factor', 'base_price'];
+    public const array REQUIRED = ['sku_code', 'product_name', 'category_path', 'unit', 'base_unit', 'conversion_factor', 'base_price'];
 
     /** The fixed columns before the tiers, then after them `on_hand`, then one per custom field. */
     public const array LABELS = [
@@ -69,8 +80,9 @@ final readonly class CatalogRowMapper
         'category_path' => 'التصنيف',
         'status' => 'الحالة',
         'description' => 'الوصف',
-        'selling_unit' => 'وحدة البيع',
         'base_unit' => 'الوحدة الأساسية',
+        'unit' => 'وحدة البيع',
+        'unit_is_default' => 'الوحدة الافتراضية',
         'conversion_factor' => 'عدد الوحدات الأساسية في وحدة البيع',
         'cover_price' => 'السعر المرجعي (الغلاف أو القطاعي)',
         'base_price' => 'سعر الجملة',
@@ -83,7 +95,10 @@ final readonly class CatalogRowMapper
     /** Pseudo columns of row errors that belong to no single cell. */
     public const array OTHER_LABELS = ['tiers' => 'شرائح السعر', 'row' => 'الصف'];
 
-    /** Validation keys of the product request → file columns. */
+    /** Keys of format v1 read as today's. */
+    private const array ALIASES = ['selling_unit' => 'unit'];
+
+    /** Validation keys of the product request → file columns (the first row of the SKU). */
     private const array COLUMN_OF = [
         'name' => 'product_name',
         'category_id' => 'category_path',
@@ -91,15 +106,22 @@ final readonly class CatalogRowMapper
         'status' => 'status',
         'opening_stock' => 'on_hand',
         'sku.code' => 'sku_code',
-        'sku.selling_unit_id' => 'selling_unit',
         'sku.base_unit_id' => 'base_unit',
-        'sku.conversion_factor' => 'conversion_factor',
-        'sku.cover_price' => 'cover_price',
-        'sku.base_price' => 'base_price',
+        'sku.units' => 'unit',
         'base_price' => 'base_price',
-        'sku.base_price_percent' => 'base_price_percent',
-        'sku.moq' => 'moq',
-        'sku.tiers' => 'tiers',
+        'tiers' => 'tiers',
+    ];
+
+    /** Validation keys under `sku.units.{i}.` → the columns of unit i's row. */
+    private const array UNIT_COLUMN_OF = [
+        'id' => 'unit',
+        'unit_id' => 'unit',
+        'conversion_factor' => 'conversion_factor',
+        'cover_price' => 'cover_price',
+        'base_price' => 'base_price',
+        'base_price_percent' => 'base_price_percent',
+        'moq' => 'moq',
+        'is_default' => 'unit_is_default',
         'tiers' => 'tiers',
     ];
 
@@ -116,6 +138,8 @@ final readonly class CatalogRowMapper
     private const array TRUE_WORDS = ['نعم', 'true', '1', 'yes'];
 
     private const array FALSE_WORDS = ['لا', 'false', '0', 'no'];
+
+    public function __construct(private PriceResolver $prices) {}
 
     public function lookups(): CatalogLookups
     {
@@ -143,7 +167,7 @@ final readonly class CatalogRowMapper
             $units[$this->fold($unit->name)] ??= $unit;
         }
 
-        $mostTiers = Sku::query()->withCount('tiers')->orderByDesc('tiers_count')->first()?->getAttribute('tiers_count');
+        $mostTiers = SkuUnit::query()->withCount('tiers')->orderByDesc('tiers_count')->first()?->getAttribute('tiers_count');
 
         return new CatalogLookups(
             categories: $categories,
@@ -213,7 +237,7 @@ final readonly class CatalogRowMapper
      */
     public function rows(iterable $raw, CatalogLookups $lookups, ?string $sheetName = null): Generator
     {
-        if ($sheetName !== null && preg_match('/^products_v(\d+)$/', $sheetName, $match) === 1 && $match[1] !== '1') {
+        if ($sheetName !== null && preg_match('/^products_v\d+$/', $sheetName) === 1 && ! in_array($sheetName, self::READABLE_SHEETS, true)) {
             throw InvalidImportFile::unsupportedVersion($sheetName);
         }
 
@@ -223,7 +247,7 @@ final readonly class CatalogRowMapper
         foreach ($raw as $number => $cells) {
             if ($header === null) {
                 if ($this->isKeyRow($cells)) {
-                    $header = $this->checked(array_map(fn (string $cell): ?string => $this->isColumn($cell, $lookups) ? $cell : null, $cells), $lookups);
+                    $header = $this->checked(array_map(fn (string $cell): ?string => $this->isColumn($cell, $lookups) ? (self::ALIASES[$cell] ?? $cell) : null, $cells), $lookups);
 
                     continue;
                 }
@@ -258,77 +282,133 @@ final readonly class CatalogRowMapper
     }
 
     /**
-     * Resolves and validates one row. `$existing` is the product whose SKU has the row's code (an update).
+     * The rows of one SKU together (D91): consecutive rows with the same code are its units; a row without a code is
+     * alone. Keyed by the number of the SKU's first row.
      *
-     * @param  array<string, string>  $row
+     * @param  iterable<int, array<string, string>>  $rows
+     * @return Generator<int, non-empty-array<int, array<string, string>>> first row number => (row number => row)
+     */
+    public function skus(iterable $rows): Generator
+    {
+        $group = [];
+        $code = '';
+
+        foreach ($rows as $number => $row) {
+            $rowCode = $row['sku_code'] ?? '';
+
+            if ($group !== [] && ($rowCode === '' || $rowCode !== $code)) {
+                yield array_key_first($group) => $group;
+                $group = [];
+            }
+
+            $group[$number] = $row;
+            $code = $rowCode;
+        }
+
+        if ($group !== []) {
+            yield array_key_first($group) => $group;
+        }
+    }
+
+    /**
+     * Resolves and validates the rows of one SKU (row number => row, the product on the first). `$existing` is the
+     * product whose SKU has the rows' code (an update), with `sku.activeUnits.tiers` loaded.
+     *
+     * @param  non-empty-array<int, array<string, string>>  $rows
      *
      * @throws InvalidImportRow
      */
-    public function map(array $row, CatalogLookups $lookups, ?Product $existing = null): ImportRowData
+    public function map(array $rows, CatalogLookups $lookups, ?Product $existing = null): ImportRowData
     {
+        $numbers = array_keys($rows);
+        $first = $rows[$numbers[0]];
         $errors = [];
         $sku = $existing?->sku;
-        $category = $this->category($row['category_path'] ?? '', $lookups, $existing?->category_id, $errors);
-        $sellingUnit = $this->unit($row, 'selling_unit', $lookups, $sku?->selling_unit_id, $errors);
-        $baseUnit = $this->unit($row, 'base_unit', $lookups, $sku?->base_unit_id, $errors);
+        $category = $this->category($first['category_path'] ?? '', $lookups, $existing?->category_id, $errors);
+        $baseUnit = $this->unit($first, 'base_unit', $lookups, $sku?->base_unit_id, $errors);
         $kind = $category->kind ?? $existing?->category->kind;
+        $customFields = $this->customFields($first, $lookups, $kind, $existing, $errors);
+        $errors = $errors === [] ? [] : [$numbers[0] => $errors];
 
-        $tiers = $this->tiers($row);
+        $units = [];
+        $tierNumbers = [];
+
+        foreach (array_values($rows) as $index => $row) {
+            $unitErrors = [];
+            $units[] = $this->unitPayload($row, $lookups, $sku, $unitErrors);
+            $tierNumbers[$index] = array_keys($this->tiers($row) ?? []);
+
+            if ($unitErrors !== []) {
+                $errors[$numbers[$index]] = [...($errors[$numbers[$index]] ?? []), ...$unitErrors];
+            }
+        }
+
         $payload = [
-            'name' => $row['product_name'] ?? '',
+            'name' => $first['product_name'] ?? '',
             'category_id' => $category?->id,
-            'description' => array_key_exists('description', $row) ? $this->blankToNull($row['description']) : $existing?->description,
-            'custom_fields' => $this->customFields($row, $lookups, $kind, $existing, $errors),
+            'description' => array_key_exists('description', $first) ? $this->blankToNull($first['description']) : $existing?->description,
+            'custom_fields' => $customFields,
             'sku' => [
-                'code' => $row['sku_code'] ?? '',
-                'selling_unit_id' => $sellingUnit?->id,
+                'code' => $first['sku_code'] ?? '',
                 'base_unit_id' => $baseUnit?->id,
-                'conversion_factor' => $row['conversion_factor'] ?? '',
-                'cover_price' => array_key_exists('cover_price', $row) ? $this->blankToNull($row['cover_price']) : $sku?->cover_price,
-                'base_price' => $this->blankToNull($row['base_price'] ?? ''),
-                'base_price_percent' => $this->blankToNull($row['base_price_percent'] ?? ''),
-                'moq' => ($row['moq'] ?? '') !== '' ? $row['moq'] : ($sku->moq ?? 1),
-                ...($tiers === null ? [] : ['tiers' => array_values($tiers)]),
+                'units' => $units,
             ],
-            ...(($row['status'] ?? '') !== '' ? ['status' => $this->status($row['status'])] : []),
-            ...(($row['on_hand'] ?? '') !== '' ? ['opening_stock' => $row['on_hand']] : []),
+            ...(($first['status'] ?? '') !== '' ? ['status' => $this->status($first['status'])] : []),
+            ...(($first['on_hand'] ?? '') !== '' ? ['opening_stock' => $first['on_hand']] : []),
         ];
 
         $request = new StoreProductRequest($payload);
-        $tierNumbers = array_keys($tiers ?? []);
         $validator = Validator::make($payload, $request->rules(), [], $this->attributes($lookups, $tierNumbers));
 
         foreach ($validator->errors()->messages() as $key => $messages) {
-            $errors[$this->columnOf($key, $tierNumbers)] ??= array_values(array_filter($messages, is_string(...)));
+            [$index, $column] = $this->columnOf($key, $tierNumbers);
+            $errors[$numbers[$index] ?? $numbers[0]][$column] ??= array_values(array_filter($messages, is_string(...)));
+        }
+
+        $defaults = array_keys(array_filter($units, fn (array $unit): bool => $unit['is_default'] === true));
+
+        if (count($defaults) > 1) {
+            $errors[$numbers[$defaults[1]]]['unit_is_default'] = ['وحدة افتراضية واحدة فقط لكل صنف'];
         }
 
         if ($errors !== []) {
-            throw InvalidImportRow::withErrors($errors);
+            throw InvalidImportRow::inRows($errors);
         }
 
         return new ImportRowData(
-            product: $this->keepStoredPrices(ProductData::fromRequest($request), $row, $sku),
+            product: $this->withStoredUnits(ProductData::fromRequest($request), array_values($rows), $sku, $defaults !== []),
             status: $request->status(),
             onHand: array_key_exists('opening_stock', $payload) ? $request->openingStock() : null,
         );
     }
 
     /**
-     * The row errors an exception stands for, each pointed at a column of the file.
+     * The row errors an exception stands for, each pointed at a row and a column of the file. `$rows` are the numbers of
+     * the SKU's rows, unit by unit (an error about unit i is on its row; any other on the first).
      *
+     * @param  non-empty-list<int>  $rows
      * @return list<RowError>
      */
-    public function errors(ApiException $e, CatalogLookups $lookups): array
+    public function errors(ApiException $e, CatalogLookups $lookups, array $rows = [0]): array
     {
         $errors = [];
 
-        if (in_array($e->errorCode, ['validation_failed', 'invalid_tiers'], true) && $e->details !== null) {
+        if ($e instanceof InvalidImportRow && $e->items !== null) {
+            foreach ($e->items as $item) {
+                $column = is_string($item['column'] ?? null) ? $item['column'] : 'row';
+                $errors[] = ['row' => is_int($item['row'] ?? null) ? $item['row'] : $rows[0], 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => is_string($item['message'] ?? null) ? $item['message'] : ''];
+            }
+
+            return $errors;
+        }
+
+        if (in_array($e->errorCode, ['validation_failed', 'invalid_tiers', 'cover_price_required'], true) && $e->details !== null) {
             foreach ($e->details as $key => $messages) {
-                $column = $e instanceof InvalidImportRow ? $key : $this->columnOf($key, []);
+                [$index, $column] = $this->columnOf($key, []);
 
                 foreach (is_array($messages) ? $messages : [$messages] as $message) {
                     if (is_string($message)) {
-                        $errors[] = ['column' => $column, 'label' => $this->label($column, $lookups), 'message' => $message];
+                        $errors[] = ['row' => $rows[$index] ?? $rows[0], 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => $message];
                     }
                 }
             }
@@ -336,19 +416,31 @@ final readonly class CatalogRowMapper
 
         if ($errors === []) {
             $column = self::COLUMN_OF_CODE[$e->errorCode] ?? 'row';
-            $errors[] = ['column' => $column, 'label' => $this->label($column, $lookups), 'message' => $e->getMessage()];
+            $errors[] = ['row' => $rows[0], 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => $e->getMessage()];
         }
 
         return $errors;
     }
 
     /**
-     * One export row: the product, its SKU, prices, tiers, stock and custom fields as the file shows them. Money is
-     * written as numbers so the sheet can compute with it.
+     * The export rows of a product: one per active unit of its SKU, the default first (D91), each with the product, its
+     * SKU, stock and custom fields, and the unit's prices and tiers. Money is written as numbers so the sheet can compute
+     * with it.
      *
+     * @return list<array<string, CellValue>>
+     */
+    public function exportRows(Product $product, CatalogLookups $lookups): array
+    {
+        $sku = $product->sku;
+        $units = $sku instanceof Sku ? $sku->activeUnits->all() : [];
+
+        return array_map(fn (?SkuUnit $unit): array => $this->exportRow($product, $unit, $lookups), $units === [] ? [null] : array_values($units));
+    }
+
+    /**
      * @return array<string, CellValue>
      */
-    public function exportRow(Product $product, CatalogLookups $lookups): array
+    private function exportRow(Product $product, ?SkuUnit $unit, CatalogLookups $lookups): array
     {
         $sku = $product->sku;
         $row = [
@@ -357,19 +449,20 @@ final readonly class CatalogRowMapper
             'category_path' => $lookups->paths[$product->category_id] ?? '',
             'status' => $product->status->label(),
             'description' => $product->description,
-            'selling_unit' => $sku?->sellingUnit->name,
             'base_unit' => $sku?->baseUnit->name,
-            'conversion_factor' => $sku?->conversion_factor,
-            'cover_price' => $this->number($sku?->cover_price),
-            'base_price' => $this->number($sku?->base_price),
-            'base_price_percent' => $this->number($sku?->base_price_percent),
-            'moq' => $sku?->moq,
+            'unit' => $unit?->unit->name,
+            'unit_is_default' => $unit instanceof SkuUnit ? $unit->is_default ? 'نعم' : 'لا' : (null),
+            'conversion_factor' => $unit?->conversion_factor,
+            'cover_price' => $this->number($unit?->cover_price),
+            'base_price' => $this->number($unit?->base_price),
+            'base_price_percent' => $this->number($unit?->base_price_percent),
+            'moq' => $unit?->moq,
             'on_hand' => $sku->inventory->on_hand ?? 0,
         ];
 
         $tier = 0;
 
-        foreach ($sku instanceof Sku ? $sku->tiers->sortBy('min_quantity') : [] as $stored) {
+        foreach ($unit instanceof SkuUnit ? $unit->tiers->sortBy('min_quantity') : [] as $stored) {
             $tier++;
             $row["tier_{$tier}_min"] = $stored->min_quantity;
             $row["tier_{$tier}_price"] = $this->number($stored->unit_price);
@@ -383,6 +476,39 @@ final readonly class CatalogRowMapper
     }
 
     /**
+     * One unit of the SKU as the product request takes it, from its row: the unit by name (an archived one only when the
+     * SKU already sells in it), the stored unit's id when the SKU has it, and the cells.
+     *
+     * @param  array<string, string>  $row
+     * @param  array<string, list<string>>  $errors
+     * @return array<string, mixed>
+     */
+    private function unitPayload(array $row, CatalogLookups $lookups, ?Sku $sku, array &$errors): array
+    {
+        $named = $lookups->units[$this->fold($row['unit'] ?? '')] ?? null;
+        $stored = $named instanceof Unit ? $sku?->activeUnits->firstWhere('unit_id', $named->id) : null;
+        $unit = $this->unit($row, 'unit', $lookups, $stored?->unit_id, $errors);
+        $tiers = $this->tiers($row);
+        $default = $this->yesNo($row['unit_is_default'] ?? '');
+
+        if (($row['unit_is_default'] ?? '') !== '' && $default === null) {
+            $errors['unit_is_default'] = ['اكتب نعم أو لا'];
+        }
+
+        return [
+            'id' => $stored?->id,
+            'unit_id' => $unit?->id,
+            'conversion_factor' => $row['conversion_factor'] ?? '',
+            'cover_price' => array_key_exists('cover_price', $row) ? $this->blankToNull($row['cover_price']) : $stored?->cover_price,
+            'base_price' => $this->blankToNull($row['base_price'] ?? ''),
+            'base_price_percent' => $this->blankToNull($row['base_price_percent'] ?? ''),
+            'moq' => ($row['moq'] ?? '') !== '' ? $row['moq'] : ($stored->moq ?? 1),
+            'is_default' => $default === true,
+            ...($tiers === null ? [] : ['tiers' => array_values($tiers)]),
+        ];
+    }
+
+    /**
      * @param  list<string>  $cells
      */
     private function isKeyRow(array $cells): bool
@@ -393,10 +519,11 @@ final readonly class CatalogRowMapper
             && array_all($filled, fn (string $cell): bool => preg_match(self::KEY_PATTERN, $cell) === 1);
     }
 
-    /** A key of the format: a fixed column, a tier column (any number) or an active custom field. */
+    /** A key of the format: a fixed column (or its v1 name), a tier column (any number) or an active custom field. */
     private function isColumn(string $key, CatalogLookups $lookups): bool
     {
         return array_key_exists($key, self::LABELS)
+            || array_key_exists($key, self::ALIASES)
             || $key === 'on_hand'
             || preg_match('/^tier_\d+_(min|price)$/', $key) === 1
             || (str_starts_with($key, self::FIELD_PREFIX) && array_key_exists(mb_substr($key, mb_strlen(self::FIELD_PREFIX)), $lookups->fields));
@@ -577,13 +704,19 @@ final readonly class CatalogRowMapper
     {
         return match ($definition->type) {
             FieldType::Select => $definition->options->first(fn (ProductFieldOption $option): bool => $this->fold($option->label) === $this->fold($cell))?->id,
-            FieldType::Boolean => match (true) {
-                in_array($this->fold($cell), self::TRUE_WORDS, true) => true,
-                in_array($this->fold($cell), self::FALSE_WORDS, true) => false,
-                default => $cell,
-            },
+            FieldType::Boolean => $this->yesNo($cell) ?? $cell,
             FieldType::Number => is_numeric($cell) ? (filter_var($cell, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE) ?? (float) $cell) : $cell,
             FieldType::Text => $cell,
+        };
+    }
+
+    /** نعم / لا (or true/false, 1/0, yes/no) → bool; anything else null. */
+    private function yesNo(string $cell): ?bool
+    {
+        return match (true) {
+            in_array($this->fold($cell), self::TRUE_WORDS, true) => true,
+            in_array($this->fold($cell), self::FALSE_WORDS, true) => false,
+            default => null,
         };
     }
 
@@ -609,43 +742,39 @@ final readonly class CatalogRowMapper
     }
 
     /**
-     * BR-PR10 / D95: a row that repeats the stored base price and percentage, or a tier's stored price, keeps the
-     * percentage that price was entered with instead of re-deriving the price from today's reference price.
+     * The SKU the import writes: the file's units, each keeping the percentage its stored price was entered with when
+     * the row repeats it (BR-PR10 / D95), then the SKU's other active units as they are (a file never drops a unit, D91).
+     * Without a default named in the file, an existing SKU keeps its default; a new one takes its first row.
      *
-     * @param  array<string, string>  $row
+     * @param  list<array<string, string>>  $rows
      */
-    private function keepStoredPrices(ProductData $data, array $row, ?Sku $sku): ProductData
+    private function withStoredUnits(ProductData $data, array $rows, ?Sku $sku, bool $defaultNamed): ProductData
     {
-        if (! $sku instanceof Sku) {
-            return $data;
+        $units = [];
+        $named = [];
+
+        foreach ($data->sku->units as $index => $unit) {
+            $stored = $sku?->activeUnits->firstWhere('unit_id', $unit->unitId);
+            $named[] = $unit->unitId;
+            $units[] = new SkuUnitData(
+                id: $stored?->id,
+                unitId: $unit->unitId,
+                conversionFactor: $unit->conversionFactor,
+                isDefault: $defaultNamed ? $unit->isDefault : ($sku instanceof Sku ? $stored?->is_default === true : $index === 0),
+                pricing: $stored instanceof SkuUnit ? $this->keepStoredPrices($unit->pricing, $rows[$index] ?? [], $stored) : $unit->pricing,
+            );
         }
 
-        $pricing = $data->sku->pricing;
-        $basePrice = $pricing->basePrice;
-        $cell = $row['base_price'] ?? '';
-
-        if ($pricing->basePricePercent !== null && $pricing->basePricePercent === $sku->base_price_percent && is_numeric($cell) && Money::compare($cell, $sku->base_price) === 0) {
-            $basePrice = $sku->base_price;
+        foreach ($sku->activeUnits ?? [] as $stored) {
+            if (! in_array($stored->unit_id, $named, true)) {
+                $units[] = new SkuUnitData($stored->id, $stored->unit_id, $stored->conversion_factor, ! $defaultNamed && $stored->is_default, $this->storedPricing($stored));
+            }
         }
-
-        $tiers = $pricing->tiers === null ? null : array_map(function (TierData $tier) use ($sku): TierData {
-            $stored = $sku->tiers->firstWhere('min_quantity', $tier->minQuantity);
-
-            return $stored !== null && $stored->discount_percent !== null && $tier->unitPrice !== null && Money::compare($tier->unitPrice, $stored->unit_price) === 0
-                ? new TierData($tier->minQuantity, $stored->unit_price, $stored->discount_percent)
-                : $tier;
-        }, $pricing->tiers);
 
         return new ProductData(
             name: $data->name,
             categoryId: $data->categoryId,
-            sku: new SkuData(
-                code: $data->sku->code,
-                sellingUnitId: $data->sku->sellingUnitId,
-                baseUnitId: $data->sku->baseUnitId,
-                conversionFactor: $data->sku->conversionFactor,
-                pricing: new SkuPricingData($basePrice, $pricing->basePricePercent, $pricing->moq, $tiers, $pricing->coverPrice, $pricing->coverPriceGiven),
-            ),
+            sku: new SkuData($data->sku->code, $data->sku->baseUnitId, $this->oneDefault($units)),
             description: $data->description,
             customFields: $data->customFields,
             status: $data->status,
@@ -654,9 +783,64 @@ final readonly class CatalogRowMapper
     }
 
     /**
+     * Exactly one default: the first flagged, else the first unit.
+     *
+     * @param  non-empty-list<SkuUnitData>  $units
+     * @return non-empty-list<SkuUnitData>
+     */
+    private function oneDefault(array $units): array
+    {
+        $default = array_key_first(array_filter($units, fn (SkuUnitData $unit): bool => $unit->isDefault)) ?? 0;
+
+        return array_map(
+            fn (SkuUnitData $unit, int $index): SkuUnitData => new SkuUnitData($unit->id, $unit->unitId, $unit->conversionFactor, $index === $default, $unit->pricing),
+            $units,
+            array_keys($units),
+        );
+    }
+
+    /** A unit the file does not list, copied as stored. */
+    private function storedPricing(SkuUnit $unit): SkuPricingData
+    {
+        return new SkuPricingData(
+            basePrice: $unit->base_price,
+            basePricePercent: $unit->base_price_percent,
+            moq: $unit->moq,
+            tiers: $this->prices->tiers($unit),
+            coverPrice: $unit->cover_price,
+        );
+    }
+
+    /**
+     * BR-PR10 / D95: a row that repeats the stored base price and percentage, or a tier's stored price, keeps the
+     * percentage that price was entered with instead of re-deriving the price from today's reference price.
+     *
+     * @param  array<string, string>  $row
+     */
+    private function keepStoredPrices(SkuPricingData $pricing, array $row, SkuUnit $stored): SkuPricingData
+    {
+        $basePrice = $pricing->basePrice;
+        $cell = $row['base_price'] ?? '';
+
+        if ($pricing->basePricePercent !== null && $pricing->basePricePercent === $stored->base_price_percent && is_numeric($cell) && Money::compare($cell, $stored->base_price) === 0) {
+            $basePrice = $stored->base_price;
+        }
+
+        $tiers = $pricing->tiers === null ? null : array_map(function (TierData $tier) use ($stored): TierData {
+            $match = $stored->tiers->firstWhere('min_quantity', $tier->minQuantity);
+
+            return $match !== null && $match->discount_percent !== null && $tier->unitPrice !== null && Money::compare($tier->unitPrice, $match->unit_price) === 0
+                ? new TierData($tier->minQuantity, $match->unit_price, $match->discount_percent)
+                : $tier;
+        }, $pricing->tiers);
+
+        return new SkuPricingData($basePrice, $pricing->basePricePercent, $pricing->moq, $tiers, $pricing->coverPrice, $pricing->coverPriceGiven);
+    }
+
+    /**
      * Validation keys → the Arabic header of their column, so messages read "سعر الجملة مطلوب.".
      *
-     * @param  list<int>  $tierNumbers  the file's tier number of each sent tier, by position
+     * @param  array<int, list<int>>  $tierNumbers  per unit, the file's tier number of each sent tier, by position
      * @return array<string, string>
      */
     private function attributes(CatalogLookups $lookups, array $tierNumbers): array
@@ -667,9 +851,15 @@ final readonly class CatalogRowMapper
             $attributes[$key] = $this->label($column, $lookups);
         }
 
-        foreach ($tierNumbers as $index => $number) {
-            $attributes["sku.tiers.{$index}.min_quantity"] = $this->label("tier_{$number}_min", $lookups);
-            $attributes["sku.tiers.{$index}.unit_price"] = $this->label("tier_{$number}_price", $lookups);
+        foreach (self::UNIT_COLUMN_OF as $key => $column) {
+            $attributes["sku.units.*.{$key}"] = $this->label($column, $lookups);
+        }
+
+        foreach ($tierNumbers as $unit => $numbers) {
+            foreach ($numbers as $index => $number) {
+                $attributes["sku.units.{$unit}.tiers.{$index}.min_quantity"] = $this->label("tier_{$number}_min", $lookups);
+                $attributes["sku.units.{$unit}.tiers.{$index}.unit_price"] = $this->label("tier_{$number}_price", $lookups);
+            }
         }
 
         foreach ($lookups->fields as $key => $definition) {
@@ -680,21 +870,28 @@ final readonly class CatalogRowMapper
     }
 
     /**
-     * @param  list<int>  $tierNumbers
+     * A validation key → [the index of the unit whose row it is about (0 = the first row), the column].
+     *
+     * @param  array<int, list<int>>  $tierNumbers
+     * @return array{0: int, 1: string}
      */
-    private function columnOf(string $key, array $tierNumbers): string
+    private function columnOf(string $key, array $tierNumbers): array
     {
         if (str_starts_with($key, 'custom_fields.')) {
-            return self::FIELD_PREFIX.mb_substr($key, mb_strlen('custom_fields.'));
+            return [0, self::FIELD_PREFIX.mb_substr($key, mb_strlen('custom_fields.'))];
         }
 
-        if (preg_match('/^sku\.tiers\.(\d+)\.(min_quantity|unit_price|discount_percent)$/', $key, $match) === 1) {
-            $number = $tierNumbers[(int) $match[1]] ?? null;
+        if (preg_match('/^sku\.units\.(\d+)\.tiers\.(\d+)\.(min_quantity|unit_price|discount_percent)$/', $key, $match) === 1) {
+            $number = $tierNumbers[(int) $match[1]][(int) $match[2]] ?? null;
 
-            return $number === null ? 'tiers' : ($match[2] === 'min_quantity' ? "tier_{$number}_min" : "tier_{$number}_price");
+            return [(int) $match[1], $number === null ? 'tiers' : ($match[3] === 'min_quantity' ? "tier_{$number}_min" : "tier_{$number}_price")];
         }
 
-        return self::COLUMN_OF[$key] ?? 'row';
+        if (preg_match('/^sku\.units\.(\d+)(?:\.([a-z_]+))?/', $key, $match) === 1) {
+            return [(int) $match[1], self::UNIT_COLUMN_OF[$match[2] ?? 'unit_id'] ?? 'unit'];
+        }
+
+        return [0, self::COLUMN_OF[$key] ?? 'row'];
     }
 
     private function blankToNull(string $cell): ?string

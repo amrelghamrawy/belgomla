@@ -51,7 +51,7 @@ Route::middleware(['auth:customer', 'session.tenant:customer'])->group(function 
 
         Route::get('cart', [CartController::class, 'show'])->name('cart.show');
         Route::delete('cart', [CartController::class, 'destroy'])->name('cart.destroy');
-        Route::patch('cart/items/{sku}', [CartItemController::class, 'update'])->whereNumber('sku')->name('cart.items.update');
-        Route::delete('cart/items/{sku}', [CartItemController::class, 'destroy'])->whereNumber('sku')->name('cart.items.destroy');
+        Route::patch('cart/items/{skuUnit}', [CartItemController::class, 'update'])->whereNumber('skuUnit')->name('cart.items.update');
+        Route::delete('cart/items/{skuUnit}', [CartItemController::class, 'destroy'])->whereNumber('skuUnit')->name('cart.items.destroy');
     });
 });

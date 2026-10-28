@@ -7,7 +7,7 @@ namespace App\Modules\Orders\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * POST /api/dashboard/orders/quote: `{ customer_id, lines: [{ sku_id, quantity }], order? }` (BR-O11). The merchant's
+ * POST /api/dashboard/orders/quote: `{ customer_id, lines: [{ sku_unit_id, quantity }], order? }` (BR-O11). The merchant's
  * order form asks it after every change; nothing is saved. `order` (an order number) quotes an edit of that order
  * (BR-O12): what it holds counts as available and its total is not counted twice against the credit limit.
  */
@@ -16,7 +16,8 @@ final class QuoteOrderRequest extends FormRequest
     public const int MAX_LINES = 200;
 
     /**
-     * The customer and lines rules shared with StoreMerchantOrderRequest. Quantities in selling units; a SKU once.
+     * The customer and lines rules shared with StoreMerchantOrderRequest. A line is a SKU unit (D91) and a quantity in it;
+     * a unit once (the same SKU may come in two units).
      *
      * @return array<string, list<string>>
      */
@@ -25,20 +26,20 @@ final class QuoteOrderRequest extends FormRequest
         return [
             'customer_id' => ['required', 'integer', 'min:1'],
             'lines' => ['required', 'array', 'min:1', 'max:'.self::MAX_LINES],
-            'lines.*' => ['array:sku_id,quantity'],
-            'lines.*.sku_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'lines.*' => ['array:sku_unit_id,quantity'],
+            'lines.*.sku_unit_id' => ['required', 'integer', 'min:1', 'distinct'],
             'lines.*.quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
         ];
     }
 
     /**
      * @param  array<mixed>  $lines  validated `lines`
-     * @return list<array{sku_id: int, quantity: int}>
+     * @return list<array{sku_unit_id: int, quantity: int}>
      */
     public static function linesOf(array $lines): array
     {
-        /** @var list<array{sku_id: int|string, quantity: int|string}> $lines */
-        return array_map(fn (array $line): array => ['sku_id' => (int) $line['sku_id'], 'quantity' => (int) $line['quantity']], $lines);
+        /** @var list<array{sku_unit_id: int|string, quantity: int|string}> $lines */
+        return array_map(fn (array $line): array => ['sku_unit_id' => (int) $line['sku_unit_id'], 'quantity' => (int) $line['quantity']], $lines);
     }
 
     /**
@@ -60,7 +61,7 @@ final class QuoteOrderRequest extends FormRequest
     }
 
     /**
-     * @return list<array{sku_id: int, quantity: int}>
+     * @return list<array{sku_unit_id: int, quantity: int}>
      */
     public function lines(): array
     {

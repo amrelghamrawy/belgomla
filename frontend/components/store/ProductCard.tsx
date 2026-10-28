@@ -9,8 +9,7 @@ import { formatPercent } from "@/lib/format/money";
 import { unitSummary } from "@/lib/store/quantity";
 
 import { GeneratedCover } from "./GeneratedCover";
-import { PriceBlock } from "./PriceBlock";
-import { QuickAdd } from "./QuickAdd";
+import { CardPricing } from "./CardPricing";
 
 /**
  * One product in a grid or rail (D67): the photo or a generated cover with the retailer's margin as a badge,
@@ -81,18 +80,7 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
               : `${ar.catalog.expectedAt(formatDay(preorder.expected_at))} · ${ar.catalog.finalPriceNote}`}
           </p>
         )}
-        <div className="bg-brand-soft mt-1 rounded-xl px-2 py-2 sm:px-3 sm:py-2.5">
-          <PriceBlock
-            sku={product.sku}
-            pricesHidden={product.prices_hidden === true}
-            kind={product.category?.kind ?? null}
-            loginNext={href}
-            showMargin={false}
-          />
-        </div>
-        <div className="mt-auto pt-2">
-          <QuickAdd product={product} />
-        </div>
+        <CardPricing product={product} href={href} />
       </div>
     </article>
   );

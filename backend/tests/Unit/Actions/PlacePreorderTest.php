@@ -43,8 +43,8 @@ test('BR-O14 the pre-order lines of the cart become a pending pre-order, priced 
         'kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending, 'items_total' => '1020.00', 'order_total' => '1020.00',
         'customer_note' => 'قبل المدارس', 'placed_by_type' => ActorType::Customer,
     ])
-        ->and(OrderItem::query()->where('order_id', $order->id)->sole()->only(['sku_id', 'quantity', 'unit_price', 'reserved', 'converted_quantity']))
-        ->toBe(['sku_id' => $this->sku->id, 'quantity' => 12, 'unit_price' => '85.00', 'reserved' => false, 'converted_quantity' => 0]);
+        ->and(OrderItem::query()->where('order_id', $order->id)->sole()->only(['sku_unit_id', 'quantity', 'unit_price', 'reserved', 'converted_quantity']))
+        ->toBe(['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 12, 'unit_price' => '85.00', 'reserved' => false, 'converted_quantity' => 0]);
 });
 
 test('BR-O14 BR-INV01 a pre-order reserves nothing and needs no stock', function (): void {
@@ -79,7 +79,7 @@ test('BR-O14 the product must still take pre-orders when the customer confirms',
     ($this->product)($attributes);
 
     expect(fn (): Order => ($this->place)())->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'preorder_unavailable']]);
+        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'preorder_unavailable']]);
     })
         ->and(Order::query()->count())->toBe(0)
         ->and(CartItem::query()->count())->toBe(1);
@@ -93,7 +93,7 @@ test('BR-MOQ01 a pre-order line below the MOQ is refused', function (): void {
     $this->fillPreorderCart($this->customer, [$this->sku->id => 4]);
 
     expect(fn (): Order => ($this->place)())->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'below_moq', 'moq' => 5]]);
+        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'below_moq', 'moq' => 5]]);
     });
 });
 
@@ -105,7 +105,7 @@ test('BR-O14 the cap counts every open pre-order: at the cap passes, one more is
     $refused = fn (): Order => ($this->place)();
 
     expect($refused)->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'reason' => 'preorder_limit', 'requested' => 9, 'remaining' => 8]]);
+        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'preorder_limit', 'requested' => 9, 'remaining' => 8]]);
     });
 
     $this->fillPreorderCart($this->customer, [$this->sku->id => 8]);

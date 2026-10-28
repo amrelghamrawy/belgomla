@@ -126,8 +126,8 @@ test('BR-R03 every returned line goes back into stock in base units as a return 
 });
 
 test('D74 a return is priced at the line\'s snapshot price, a tier price staying the tier price even after the catalog changed', function (): void {
-    $this->b->forceFill(['base_price' => '120.00'])->save();
-    SkuPriceTier::query()->where('sku_id', $this->b->id)->delete();
+    App\Modules\Catalog\Models\SkuUnit::query()->whereKey($this->defaultUnitId($this->b))->update(['base_price' => '120.00']);
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($this->b))->delete();
 
     $return = ($this->record)([[$this->lineB, 2]]);
 

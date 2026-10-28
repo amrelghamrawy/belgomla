@@ -16,7 +16,7 @@ test('BR-P13 the price list returns compact rows for the selection, by name, unp
     $this->tenantJson('GET', '/api/store/price-list')
         ->assertOk()
         ->assertExactJsonStructure([
-            'data' => ['*' => ['id', 'name', 'slug', 'kind', 'code', 'unit', 'moq', 'cover_price', 'base_price', 'availability']],
+            'data' => ['*' => ['id', 'sku_unit_id', 'name', 'slug', 'kind', 'code', 'unit', 'conversion_factor', 'is_default', 'moq', 'cover_price', 'base_price', 'availability']],
             'meta' => ['count', 'truncated', 'prices_hidden'],
         ])
         ->assertJsonPath('meta', ['count' => 2, 'truncated' => false, 'prices_hidden' => false])
@@ -28,6 +28,21 @@ test('BR-P13 the price list returns compact rows for the selection, by name, unp
         ->assertJsonPath('data.1.base_price', '90.00')
         ->assertJsonPath('data.1.moq', 5)
         ->assertJsonPath('data.1.availability', 'available');
+});
+
+test('BR-P13 D91 a product sold in two units has a row per unit, the default first', function (): void {
+    $product = $this->inTenant(fn (): Product => Product::factory()->withSku(['code' => 'N-1', 'base_price' => '10.00'])->create(['name' => 'كشكول']));
+    $carton = $this->addUnit($this->inTenant(fn () => $product->sku()->sole()), ['conversion_factor' => 24, 'base_price' => '220.00']);
+
+    $this->tenantJson('GET', '/api/store/price-list')
+        ->assertOk()
+        ->assertJsonPath('meta.count', 2)
+        ->assertJsonPath('data.0.id', $product->id)
+        ->assertJsonPath('data.0.is_default', true)
+        ->assertJsonPath('data.0.base_price', '10.00')
+        ->assertJsonPath('data.1.sku_unit_id', $carton->id)
+        ->assertJsonPath('data.1.conversion_factor', 24)
+        ->assertJsonPath('data.1.base_price', '220.00');
 });
 
 test('BR-P13 the price list uses the same facet filters as the product list', function (): void {

@@ -77,11 +77,12 @@ test('BR-PR07 every order line snapshots the product, sku, unit and the price ap
     $order = ($this->checkout)();
 
     expect(OrderItem::query()->sole()->only([
-        'order_id', 'sku_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name', 'conversion_factor',
+        'order_id', 'sku_id', 'sku_unit_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name', 'conversion_factor',
         'quantity', 'quantity_base', 'cover_price', 'unit_price', 'discount_percent', 'tier_min_quantity', 'line_total',
     ]))->toBe([
         'order_id' => $order->id,
         'sku_id' => $this->sku->id,
+        'sku_unit_id' => $this->defaultUnitId($this->sku),
         'product_id' => $this->sku->product_id,
         'product_name' => 'الأضواء علوم',
         'sku_code' => 'ADW-SCI',
@@ -186,16 +187,17 @@ test('BR-PR07 BR-O05 later catalog and price changes never rewrite the order', f
     $order = ($this->checkout)();
 
     Product::query()->whereKey($this->sku->product_id)->update(['name' => 'اسم جديد']);
-    $this->sku->forceFill(['code' => 'NEW-CODE', 'base_price' => '200.00'])->save();
-    SkuPriceTier::query()->where('sku_id', $this->sku->id)->update(['unit_price' => '150.00']);
+    $this->sku->forceFill(['code' => 'NEW-CODE'])->save();
+    App\Modules\Catalog\Models\SkuUnit::query()->whereKey($this->defaultUnitId($this->sku))->update(['base_price' => '200.00', 'conversion_factor' => 24]);
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($this->sku))->update(['unit_price' => '150.00']);
 
-    expect(OrderItem::query()->sole()->only(['product_name', 'sku_code', 'unit_price', 'line_total']))->toBe(['product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'unit_price' => '85.00', 'line_total' => '1020.00'])
+    expect(OrderItem::query()->sole()->only(['product_name', 'sku_code', 'conversion_factor', 'quantity_base', 'unit_price', 'line_total']))->toBe(['product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'conversion_factor' => 20, 'quantity_base' => 240, 'unit_price' => '85.00', 'line_total' => '1020.00'])
         ->and($order->refresh()->order_total)->toBe('1020.00');
 });
 
 test('BR-PR06 the price comes from the current tiers, not what the cart showed', function (): void {
     $this->fillCart($this->customer, [$this->sku->id => 12]);
-    SkuPriceTier::query()->where('sku_id', $this->sku->id)->update(['unit_price' => '80.00']);
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($this->sku))->update(['unit_price' => '80.00']);
 
     expect(($this->checkout)()->order_total)->toBe('960.00');
 });
@@ -208,14 +210,14 @@ test('BR-PR06 a failing line rolls everything back and names the sku', function 
     expect(fn () => ($this->checkout)())->toThrow(function (CheckoutFailed $e) use ($item): void {
         expect($e->errorCode)->toBe('checkout_failed')
             ->and($e->status)->toBe(422)
-            ->and($e->items)->toBe([['sku_id' => $this->sku->id, ...$item]]);
+            ->and($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), ...$item]]);
     });
 
     ($this->expectNothingWritten)($reserved);
 })->with([
     'product inactive' => [fn ($sku) => Product::query()->whereKey($sku->product_id)->update(['status' => ProductStatus::Inactive]), ['reason' => 'product_inactive']],
     'product coming soon' => [fn ($sku) => Product::query()->whereKey($sku->product_id)->update(['status' => ProductStatus::ComingSoon]), ['reason' => 'product_inactive']],
-    'moq raised above the quantity' => [fn ($sku) => $sku->forceFill(['moq' => 15])->save(), ['reason' => 'below_moq', 'moq' => 15]],
+    'moq raised above the quantity' => [fn ($sku) => App\Modules\Catalog\Models\SkuUnit::query()->where('sku_id', $sku->id)->update(['moq' => 15]), ['reason' => 'below_moq', 'moq' => 15]],
     'stock dropped below the quantity' => [fn ($sku) => SkuInventory::query()->whereKey($sku->id)->update(['on_hand' => 230]), ['reason' => 'insufficient_stock', 'requested' => 12, 'available' => 11]],
     'stock reserved by others' => [fn ($sku) => SkuInventory::query()->whereKey($sku->id)->update(['reserved' => 300]), ['reason' => 'insufficient_stock', 'requested' => 12, 'available' => 5]],
 ]);
@@ -356,4 +358,52 @@ test('BR-PR15 a cancelled promotion is not applied at checkout', function (): vo
     ($this->checkout)();
 
     expect(OrderItem::query()->sole()->price_source)->toBe(PriceSource::Base);
+});
+
+/*
+| D91 (V2 Task 13): the SKU is sold by the carton of 20 (default) and by the piece (factor 1, 4.50, MOQ 10).
+*/
+
+test('D91 BR-PR07 a line snapshots its own unit: name, factor and sku_unit_id, quantity_base = quantity × that factor', function (): void {
+    $piece = $this->addUnit($this->sku, ['unit_id' => App\Modules\Catalog\Models\Unit::factory()->create(['name' => 'قطعة'])->id, 'conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 10]);
+    CartItem::factory()->create(['cart_id' => App\Modules\Customers\Models\Cart::factory()->create(['customer_id' => $this->customer->id])->id, 'sku_id' => $this->sku->id, 'sku_unit_id' => $piece->id, 'quantity' => 15]);
+
+    ($this->checkout)();
+
+    expect(OrderItem::query()->sole()->only(['sku_id', 'sku_unit_id', 'unit_name', 'conversion_factor', 'quantity', 'quantity_base', 'unit_price', 'line_total']))->toBe([
+        'sku_id' => $this->sku->id,
+        'sku_unit_id' => $piece->id,
+        'unit_name' => 'قطعة',
+        'conversion_factor' => 1,
+        'quantity' => 15,
+        'quantity_base' => 15,
+        'unit_price' => '4.50',
+        'line_total' => '67.50',
+    ]);
+});
+
+test('D91 BR-INV03 two units of one SKU in one order reserve the sum of their base units', function (): void {
+    $piece = $this->addUnit($this->sku, ['conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 10]);
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+    CartItem::factory()->create(['cart_id' => App\Modules\Customers\Models\Cart::query()->sole()->id, 'sku_id' => $this->sku->id, 'sku_unit_id' => $piece->id, 'quantity' => 15]);
+
+    $order = ($this->checkout)();
+
+    expect(($this->reserved)())->toBe(115)
+        ->and(OrderItem::query()->where('order_id', $order->id)->orderBy('id')->pluck('quantity_base')->all())->toBe([100, 15])
+        ->and(InventoryMovement::query()->count())->toBe(0)
+        ->and($order->order_total)->toBe('517.50');
+});
+
+test('D91 BR-U03 two units of one SKU that pass the stock only one by one are refused together', function (): void {
+    SkuInventory::query()->whereKey($this->sku->id)->update(['on_hand' => 110]);
+    $piece = $this->addUnit($this->sku, ['conversion_factor' => 1, 'base_price' => '4.50', 'moq' => 10]);
+    $this->fillCart($this->customer, [$this->sku->id => 5]);
+    CartItem::factory()->create(['cart_id' => App\Modules\Customers\Models\Cart::query()->sole()->id, 'sku_id' => $this->sku->id, 'sku_unit_id' => $piece->id, 'quantity' => 11]);
+
+    expect(fn (): Order => ($this->checkout)())->toThrow(function (CheckoutFailed $e) use ($piece): void {
+        expect($e->items)->toBe([['sku_id' => $this->sku->id, 'sku_unit_id' => $piece->id, 'reason' => 'insufficient_stock', 'requested' => 11, 'available' => 10]]);
+    })
+        ->and(Order::query()->count())->toBe(0)
+        ->and(($this->reserved)())->toBe(0);
 });

@@ -55,7 +55,7 @@ dataset('dashboard authenticated routes', [
     'product relations list' => ['GET', '/api/dashboard/products/1/relations'],
     'product relations add' => ['POST', '/api/dashboard/products/1/relations'],
     'product relations delete' => ['DELETE', '/api/dashboard/products/1/relations/1'],
-    'product pricing update' => ['PUT', '/api/dashboard/products/1/pricing'],
+    'product pricing update' => ['PUT', '/api/dashboard/products/1/units/1/pricing'],
     'product pricing recompute' => ['POST', '/api/dashboard/products/1/pricing/recompute'],
     'bulk pricing apply' => ['POST', '/api/dashboard/pricing/bulk'],
     'bulk pricing preview' => ['POST', '/api/dashboard/pricing/bulk/preview'],

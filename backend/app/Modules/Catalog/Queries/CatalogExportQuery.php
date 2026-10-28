@@ -25,7 +25,7 @@ final readonly class CatalogExportQuery
     public function get(ProductFilterData $filter): LazyCollection
     {
         return $this->filtered->builder($filter)
-            ->with(['sku.sellingUnit', 'sku.baseUnit', 'sku.tiers', 'sku.inventory'])
+            ->with(['sku.activeUnits.unit', 'sku.activeUnits.tiers', 'sku.baseUnit', 'sku.inventory'])
             ->lazyById(self::CHUNK, 'products.id', 'id');
     }
 

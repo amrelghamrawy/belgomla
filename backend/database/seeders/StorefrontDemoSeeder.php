@@ -15,6 +15,7 @@ use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\SkuData;
+use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
@@ -225,6 +226,7 @@ final class StorefrontDemoSeeder extends Seeder
             factor: 1,
             moq: 6,
             description: 'كشكول روتو A4 سلك، 4 مواضيع بفواصل ملونة، غلاف أسود مقوى.',
+            carton: [$carton, 24], // D91: the piece and the carton of 24 draw on the same stock
         ));
     }
 
@@ -298,15 +300,19 @@ final class StorefrontDemoSeeder extends Seeder
             categoryId: $categoryId,
             sku: new SkuData(
                 code: sprintf('BK-%03d', $n),
-                sellingUnitId: $byCarton ? $cartonId : $copyId,
                 baseUnitId: $copyId,
-                conversionFactor: $factor,
-                pricing: new SkuPricingData(
-                    basePrice: number_format($base, 2, '.', ''),
-                    moq: $byCarton ? 2 : 1,
-                    tiers: $tiers,
-                    coverPrice: number_format($cover, 2, '.', ''),
-                ),
+                units: [new SkuUnitData(
+                    id: null,
+                    unitId: $byCarton ? $cartonId : $copyId,
+                    conversionFactor: $factor,
+                    isDefault: true,
+                    pricing: new SkuPricingData(
+                        basePrice: number_format($base, 2, '.', ''),
+                        moq: $byCarton ? 2 : 1,
+                        tiers: $tiers,
+                        coverPrice: number_format($cover, 2, '.', ''),
+                    ),
+                )],
             ),
             description: $this->description($name, $grade, $subject, $publisher),
             customFields: [
@@ -322,11 +328,12 @@ final class StorefrontDemoSeeder extends Seeder
 
     /**
      * A non-book item: the retail price per piece (null = none) is the reference price; wholesale is 25% below
-     * it, or a flat 45.00 per piece when there is none.
+     * it, or a flat 45.00 per piece when there is none. `$carton` (`[unit id, pieces]`) also sells it by the carton (D91).
      *
      * @param  array<string, int>  $fields
+     * @param  array{0: int, 1: int}|null  $carton
      */
-    private function item(string $code, string $name, int $categoryId, array $fields, ?int $retail, int $sellingUnitId, int $baseUnitId, int $factor, int $moq, string $description): ProductData
+    private function item(string $code, string $name, int $categoryId, array $fields, ?int $retail, int $sellingUnitId, int $baseUnitId, int $factor, int $moq, string $description, ?array $carton = null): ProductData
     {
         $retailPerUnit = $retail === null ? null : $retail * $factor;
         $base = $retailPerUnit === null ? 45 * $factor : $retailPerUnit * 0.75;
@@ -336,19 +343,48 @@ final class StorefrontDemoSeeder extends Seeder
             categoryId: $categoryId,
             sku: new SkuData(
                 code: $code,
-                sellingUnitId: $sellingUnitId,
                 baseUnitId: $baseUnitId,
-                conversionFactor: $factor,
-                pricing: new SkuPricingData(
-                    basePrice: number_format($base, 2, '.', ''),
-                    moq: $moq,
-                    coverPrice: $retailPerUnit === null ? null : number_format($retailPerUnit, 2, '.', ''),
-                ),
+                units: [
+                    new SkuUnitData(
+                        id: null,
+                        unitId: $sellingUnitId,
+                        conversionFactor: $factor,
+                        isDefault: true,
+                        pricing: new SkuPricingData(
+                            basePrice: number_format($base, 2, '.', ''),
+                            moq: $moq,
+                            coverPrice: $retailPerUnit === null ? null : number_format($retailPerUnit, 2, '.', ''),
+                        ),
+                    ),
+                    ...($carton === null ? [] : [$this->carton($carton, $retail, $base)]),
+                ],
             ),
             description: $description,
             customFields: $fields,
             status: ProductStatus::Active,
             openingStock: 1000,
+        );
+    }
+
+    /**
+     * D91: the carton of an item sold by the piece, cheaper per piece than the piece price (10% off it), one carton MOQ.
+     *
+     * @param  array{0: int, 1: int}  $carton
+     */
+    private function carton(array $carton, ?int $retail, float $piecePrice): SkuUnitData
+    {
+        [$unitId, $pieces] = $carton;
+
+        return new SkuUnitData(
+            id: null,
+            unitId: $unitId,
+            conversionFactor: $pieces,
+            isDefault: false,
+            pricing: new SkuPricingData(
+                basePrice: number_format($piecePrice * $pieces * 0.9, 2, '.', ''),
+                moq: 1,
+                coverPrice: $retail === null ? null : number_format($retail * $pieces, 2, '.', ''),
+            ),
         );
     }
 

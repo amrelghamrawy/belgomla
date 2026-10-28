@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Orders\Models\OrderItem;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * A line snapshotting its SKU as it is now; quantity_base and line_total follow quantity, the SKU's conversion
- * factor and unit_price unless given.
+ * A line snapshotting its SKU and unit (the default unit unless `sku_unit_id` is given) as they are now; quantity_base and
+ * line_total follow quantity, the unit's conversion factor and unit_price unless given.
  *
  * @extends Factory<OrderItem>
  */
@@ -27,12 +28,13 @@ final class OrderItemFactory extends Factory
         return [
             'order_id' => OrderFactory::new(),
             'sku_id' => SkuFactory::new(),
+            'sku_unit_id' => fn (array $attributes): int => SkuFactory::defaultUnitIdOf($attributes['sku_id']),
             'product_id' => fn (array $attributes): int => $this->sku($attributes)->product_id,
             'product_name' => fn (array $attributes): string => $this->sku($attributes)->product->name,
             'sku_code' => fn (array $attributes): string => $this->sku($attributes)->code,
             'sku_name' => fn (array $attributes): string => $this->sku($attributes)->name ?? $this->sku($attributes)->product->name,
-            'unit_name' => fn (array $attributes): string => $this->sku($attributes)->sellingUnit->name,
-            'conversion_factor' => fn (array $attributes): int => $this->sku($attributes)->conversion_factor,
+            'unit_name' => fn (array $attributes): string => $this->skuUnit($attributes)->unit->name,
+            'conversion_factor' => fn (array $attributes): int => $this->skuUnit($attributes)->conversion_factor,
             'quantity' => 1,
             'quantity_base' => fn (array $attributes): int => $this->int($attributes['quantity']) * $this->int($attributes['conversion_factor']),
             'cover_price' => null,
@@ -67,7 +69,15 @@ final class OrderItemFactory extends Factory
      */
     private function sku(array $attributes): Sku
     {
-        return Sku::query()->with(['product', 'sellingUnit'])->findOrFail($this->int($attributes['sku_id']));
+        return Sku::query()->with('product')->findOrFail($this->int($attributes['sku_id']));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $attributes
+     */
+    private function skuUnit(array $attributes): SkuUnit
+    {
+        return SkuUnit::query()->with('unit')->findOrFail($this->int($attributes['sku_unit_id']));
     }
 
     private function int(mixed $value): int

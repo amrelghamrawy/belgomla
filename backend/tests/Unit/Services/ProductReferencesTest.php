@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\SkuData;
+use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Exceptions\CatalogConflict;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Pricing\Data\SkuPricingData;
@@ -18,9 +20,9 @@ beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
 });
 
-function referenceData(int $categoryId, int $sellingUnitId, int $baseUnitId, string $code = 'PEN-1'): ProductData
+function referenceData(int $categoryId, int $sellingUnitId, int $baseUnitId, string $code = 'PEN-1', ?int $skuUnitId = null): ProductData
 {
-    return new ProductData('قلم', $categoryId, new SkuData($code, $sellingUnitId, $baseUnitId, 1, new SkuPricingData('10.00')));
+    return new ProductData('قلم', $categoryId, new SkuData($code, $baseUnitId, [new SkuUnitData($skuUnitId, $sellingUnitId, 1, true, new SkuPricingData('10.00'))]));
 }
 
 test('valid references pass', function (): void {
@@ -42,7 +44,7 @@ test('BR-T04 unknown references are reported on their field', function (array $i
     }
 })->with([
     'category' => [['category' => 999_999], 'category_id'],
-    'selling unit' => [['selling' => 999_999], 'sku.selling_unit_id'],
+    'D91 a unit sold in' => [['selling' => 999_999], 'sku.units.0.unit_id'],
     'base unit' => [['base' => 999_999], 'sku.base_unit_id'],
 ]);
 
@@ -67,6 +69,28 @@ test('an archived unit cannot be newly chosen', function (): void {
     $archived = Unit::factory()->archived()->create();
 
     app(ProductReferences::class)->check(referenceData($basics['category']->id, $basics['carton']->id, $archived->id));
+})->throws(InvalidCatalogInput::class);
+
+test('D91 a unit id that is not one of the product sku units is reported on its line', function (): void {
+    $basics = $this->catalogBasics();
+    $product = Product::factory()->withSku(['code' => 'PEN-1'])->create();
+    $foreign = Sku::factory()->create();
+
+    try {
+        app(ProductReferences::class)->check(referenceData($basics['category']->id, $basics['carton']->id, $basics['piece']->id, skuUnitId: $this->defaultUnitId($foreign)), $product->load('sku'));
+        $this->fail('Expected InvalidCatalogInput');
+    } catch (InvalidCatalogInput $e) {
+        expect($e->details)->toBe(['sku.units.0.id' => ['العنصر المختار غير موجود']]);
+    }
+});
+
+test('D91 an archived store unit the sku only sold in an archived unit cannot be chosen again', function (): void {
+    $basics = $this->catalogBasics();
+    $unit = Unit::factory()->archived()->create();
+    $product = Product::factory()->withSku(['code' => 'PEN-1'])->create();
+    SkuUnit::factory()->archived()->create(['sku_id' => $product->sku()->sole()->id, 'unit_id' => $unit->id]);
+
+    app(ProductReferences::class)->check(referenceData($basics['category']->id, $unit->id, $basics['piece']->id), $product->load('sku'));
 })->throws(InvalidCatalogInput::class);
 
 test('BR-P03 a taken sku code conflicts unless it is the product own sku', function (): void {

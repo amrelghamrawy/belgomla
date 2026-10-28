@@ -51,15 +51,17 @@ test("a merchant builds a category, unit, custom field and product, sees it on t
   await page.getByPlaceholder("ابحث باسم القسم").fill(category);
   await page.getByRole("option", { name: category }).click();
   await page.getByLabel("كود الصنف (SKU)").fill(`E2E-${run}`);
-  await page.getByLabel("وحدة البيع *", { exact: true }).selectOption({ label: unit });
   await page.getByLabel("الوحدة الأساسية *", { exact: true }).selectOption({ label: unit });
   await page.getByLabel("الرصيد الافتتاحي (بالوحدة الأساسية)").fill("50");
   await page.getByRole("tab", { name: "الحقول" }).click();
   await page.getByLabel(field).selectOption({ label: "أحمد" });
+  // D91: the selling units (one here) with their prices sit on the pricing tab.
   await page.getByRole("tab", { name: "التسعير" }).click();
-  await page.getByLabel("سعر الغلاف (اختياري)", { exact: true }).fill("100.00");
-  await page.getByLabel("سعر الجملة *", { exact: true }).fill("80.00");
-  await expect(page.getByTestId("product-base_value-hint")).toHaveText("خصم 20.00% من سعر الغلاف");
+  const firstUnit = page.getByTestId("sku-unit-0");
+  await firstUnit.getByLabel("وحدة البيع *", { exact: true }).selectOption({ label: unit });
+  await firstUnit.getByLabel("سعر الغلاف (اختياري)", { exact: true }).fill("100.00");
+  await firstUnit.getByLabel("سعر الجملة *", { exact: true }).fill("80.00");
+  await expect(firstUnit.getByText("خصم 20.00% من سعر الغلاف")).toBeVisible();
   await page.getByRole("button", { name: "حفظ" }).first().click();
   await expect(page).toHaveURL(/\/dashboard\/products\/\d+$/);
   await expect(page.getByRole("heading", { level: 1, name: product })).toBeVisible();

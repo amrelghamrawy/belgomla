@@ -23,13 +23,13 @@ final readonly class CartItemController
         return new CartResource($add->handle($customer, CartLineData::fromRequest($request)));
     }
 
-    public function update(UpdateCartItemRequest $request, #[CurrentUser('customer')] Customer $customer, int $sku, UpdateCartItem $update): CartResource
+    public function update(UpdateCartItemRequest $request, #[CurrentUser('customer')] Customer $customer, int $skuUnit, UpdateCartItem $update): CartResource
     {
-        return new CartResource($update->handle($customer, $sku, $request->quantity(), $request->kind()));
+        return new CartResource($update->handle($customer, $skuUnit, $request->quantity(), $request->kind()));
     }
 
-    public function destroy(RemoveCartItemRequest $request, #[CurrentUser('customer')] Customer $customer, int $sku, RemoveCartItem $remove): CartResource
+    public function destroy(RemoveCartItemRequest $request, #[CurrentUser('customer')] Customer $customer, int $skuUnit, RemoveCartItem $remove): CartResource
     {
-        return new CartResource($remove->handle($customer, $sku, $request->kind()));
+        return new CartResource($remove->handle($customer, $skuUnit, $request->kind()));
     }
 }

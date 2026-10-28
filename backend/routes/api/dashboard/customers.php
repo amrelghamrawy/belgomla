@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 /*
 | Dashboard customers (08-api-contract.md §8). Mounted under /api/dashboard with the tenant middleware.
 | {customer} binds the tenant-scoped Customer, so another tenant's id is 404 (BR-T04, BR-CU02). V2 Task 11: customer groups
-| ({group}) and the prices negotiated per customer and SKU ({sku}), both `pricing.customers` (BR-PR12, BR-PR13).
+| ({group}) and the prices negotiated per customer and SKU unit ({skuUnit}, V2 Task 13), both `pricing.customers` (BR-PR12, BR-PR13).
 */
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
@@ -34,6 +34,6 @@ Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(fun
     Route::post('customer-groups/{group}/archive', [CustomerGroupArchiveController::class, 'store'])->whereNumber('group')->middleware('permission:pricing.customers')->name('customer-groups.archive');
     Route::post('customer-groups/{group}/assign', [CustomerGroupAssignmentController::class, 'store'])->whereNumber('group')->middleware('permission:pricing.customers')->name('customer-groups.assign');
     Route::get('customers/{customer}/prices', [CustomerPriceController::class, 'index'])->whereNumber('customer')->middleware('permission:pricing.customers')->name('customers.prices.index');
-    Route::put('customers/{customer}/prices/{sku}', [CustomerPriceController::class, 'update'])->whereNumber(['customer', 'sku'])->middleware('permission:pricing.customers')->name('customers.prices.update');
-    Route::delete('customers/{customer}/prices/{sku}', [CustomerPriceController::class, 'destroy'])->whereNumber(['customer', 'sku'])->middleware('permission:pricing.customers')->name('customers.prices.destroy');
+    Route::put('customers/{customer}/prices/{skuUnit}', [CustomerPriceController::class, 'update'])->whereNumber(['customer', 'skuUnit'])->middleware('permission:pricing.customers')->name('customers.prices.update');
+    Route::delete('customers/{customer}/prices/{skuUnit}', [CustomerPriceController::class, 'destroy'])->whereNumber(['customer', 'skuUnit'])->middleware('permission:pricing.customers')->name('customers.prices.destroy');
 });

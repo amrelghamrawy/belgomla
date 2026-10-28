@@ -21,12 +21,15 @@ use Illuminate\Support\Collection;
 
 /**
  * BR-PR06 steps 2–7 for every line, against the stock rows given: product active (BR-P04), price resolved from the
- * current tiers at the customer's own prices (BR-PR04, BR-PR14: the caller hands in their PricingContext), MOQ (BR-MOQ01), Available ≥ quantity × conversion factor (BR-INV01, BR-U03), the minimum
+ * current tiers at the customer's own prices (BR-PR04, BR-PR14: the caller hands in their PricingContext), all in the
+ * line's SKU unit (V2 Task 13, D91), MOQ (BR-MOQ01), Available ≥ quantity × the unit's factor (BR-INV01, BR-U03) summed over
+ * the order's lines of one SKU in order (piece and carton share the stock; a line that does not fit is refused and the
+ * next ones are checked against what is left), the minimum
  * order value on the items total (BR-MOV02), and the customer's credit limit against what they already owe or have on
  * order (BR-C05, D77). Every failure is collected, so the customer sees all of them at once; nothing is written here.
  * `check()` reports (the merchant's quote, on unlocked rows), `validate()` refuses (checkout, on locked rows).
  *
- * Expects the lines' `sku.product`, `sku.tiers` and `sku.sellingUnit` loaded (Catalog's CartSkuQuery::RELATIONS).
+ * Expects the lines' units loaded with Catalog's CartSkuQuery::RELATIONS.
  */
 final readonly class CheckoutValidator
 {
@@ -73,18 +76,22 @@ final readonly class CheckoutValidator
         $priced = [];
         $problems = [];
         $total = '0.00';
+        $taken = []; // D91: base units the earlier lines take of each SKU (piece and carton share the stock)
 
         foreach ($lines as $line) {
-            $sku = $line->sku;
-            $price = $this->prices->resolve($sku, $line->quantity, $pricing);
+            $unit = $line->unit;
+            $price = $this->prices->resolve($unit, $line->quantity, $pricing);
             $total = Money::add($total, $price->lineTotal);
-            $priced[] = new CheckoutLine($sku, $line->quantity, $price);
+            $priced[] = new CheckoutLine($unit, $line->quantity, $price);
 
-            $row = $stock->get($sku->id);
-            $problem = $this->problem($line, $row instanceof SkuInventory ? $row->available : 0);
+            $row = $stock->get($unit->sku_id);
+            $available = ($row instanceof SkuInventory ? $row->available : 0) - ($taken[$unit->sku_id] ?? 0);
+            $problem = $this->problem($line, $available);
 
             if ($problem instanceof CheckoutProblem) {
-                $problems[$sku->id] = $problem;
+                $problems[$unit->id] = $problem;
+            } else {
+                $taken[$unit->sku_id] = ($taken[$unit->sku_id] ?? 0) + $line->quantityBase();
             }
         }
 
@@ -93,11 +100,12 @@ final readonly class CheckoutValidator
 
     /**
      * BR-O14, D88: the checks of a pre-order, which holds no stock: the product is Coming Soon with pre-orders on, the MOQ,
-     * the merchant's cap on what every open pre-order adds up to (`$open` = what is already pre-ordered per sku_id, read
-     * under the product lock) and the credit limit. The minimum order value does not apply.
+     * the merchant's cap on what every open pre-order adds up to (`$open` = what is already pre-ordered per sku_id in base
+     * units, read under the product lock; the cap is in the SKU's default unit, D91) and the credit limit. The minimum order
+     * value does not apply.
      *
      * @param  list<CartLineInput>  $lines
-     * @param  array<int, int>  $open  sku_id => open pre-ordered selling units
+     * @param  array<int, int>  $open  sku_id => open pre-ordered base units
      */
     public function checkPreorder(array $lines, Customer $customer, array $open, ?PricingContext $pricing): CheckoutReport
     {
@@ -106,14 +114,16 @@ final readonly class CheckoutValidator
         $total = '0.00';
 
         foreach ($lines as $line) {
-            $sku = $line->sku;
-            $price = $this->prices->resolve($sku, $line->quantity, $pricing);
+            $unit = $line->unit;
+            $price = $this->prices->resolve($unit, $line->quantity, $pricing);
             $total = Money::add($total, $price->lineTotal);
-            $priced[] = new CheckoutLine($sku, $line->quantity, $price);
-            $problem = $this->preorderProblem($line, $open[$sku->id] ?? 0);
+            $priced[] = new CheckoutLine($unit, $line->quantity, $price);
+            $problem = $this->preorderProblem($line, $open[$unit->sku_id] ?? 0);
 
             if ($problem instanceof CheckoutProblem) {
-                $problems[$sku->id] = $problem;
+                $problems[$unit->id] = $problem;
+            } else {
+                $open[$unit->sku_id] = ($open[$unit->sku_id] ?? 0) + $line->quantityBase();
             }
         }
 
@@ -122,38 +132,43 @@ final readonly class CheckoutValidator
 
     private function preorderProblem(CartLineInput $line, int $open): ?CheckoutProblem
     {
-        $sku = $line->sku;
-        $product = $sku->product;
+        $unit = $line->unit;
+        $product = $line->sku->product;
 
-        if ($product->status !== ProductStatus::ComingSoon || ! $product->preorder_enabled) {
-            return CheckoutProblem::preorderUnavailable($sku->id);
+        if ($product->status !== ProductStatus::ComingSoon || ! $product->preorder_enabled || ! $unit->isActive()) {
+            return CheckoutProblem::preorderUnavailable($unit->sku_id, $unit->id);
         }
 
-        if ($line->quantity < $sku->moq) {
-            return CheckoutProblem::belowMoq($sku->id, $sku->moq);
+        if ($line->quantity < $unit->moq) {
+            return CheckoutProblem::belowMoq($unit->sku_id, $unit->id, $unit->moq);
         }
 
-        if ($product->preorder_limit !== null && $open + $line->quantity > $product->preorder_limit) {
-            return CheckoutProblem::preorderLimit($sku->id, $line->quantity, max(0, $product->preorder_limit - $open));
+        if ($product->preorder_limit === null) {
+            return null;
         }
 
-        return null;
+        $limit = $product->preorder_limit * ($line->sku->defaultUnit->conversion_factor ?? 1);
+
+        return $open + $line->quantityBase() > $limit
+            ? CheckoutProblem::preorderLimit($unit->sku_id, $unit->id, $line->quantity, intdiv(max(0, $limit - $open), $unit->conversion_factor))
+            : null;
     }
 
+    /** `$available`: base units left for this line after the order's earlier lines of the same SKU (D91). */
     private function problem(CartLineInput $line, int $available): ?CheckoutProblem
     {
-        $sku = $line->sku;
+        $unit = $line->unit;
 
-        if ($sku->product->status !== ProductStatus::Active) {
-            return CheckoutProblem::productInactive($sku->id);
+        if ($line->sku->product->status !== ProductStatus::Active || ! $unit->isActive()) {
+            return CheckoutProblem::productInactive($unit->sku_id, $unit->id);
         }
 
-        if ($line->quantity < $sku->moq) {
-            return CheckoutProblem::belowMoq($sku->id, $sku->moq);
+        if ($line->quantity < $unit->moq) {
+            return CheckoutProblem::belowMoq($unit->sku_id, $unit->id, $unit->moq);
         }
 
-        if ($line->quantity * $sku->conversion_factor > $available) {
-            return CheckoutProblem::insufficientStock($sku->id, $line->quantity, intdiv(max(0, $available), $sku->conversion_factor));
+        if ($line->quantityBase() > $available) {
+            return CheckoutProblem::insufficientStock($unit->sku_id, $unit->id, $line->quantity, intdiv(max(0, $available), $unit->conversion_factor));
         }
 
         return null;

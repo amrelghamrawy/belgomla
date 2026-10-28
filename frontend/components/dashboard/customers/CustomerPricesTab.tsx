@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CustomerSkuPrice, DashboardProduct } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
@@ -21,10 +22,11 @@ import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
 
 const copy = ar.dashboard.customerPrices;
 
-type Picked = { skuId: number; name: string; code: string; basePrice: string };
+type PickedUnit = { id: number; name: string; basePrice: string };
+type Picked = { name: string; code: string; units: PickedUnit[] };
 
 /**
- * «أسعار خاصة» (BR-PR13, V2 Task 11): the prices negotiated with this customer. Pick a product, type its price (it may be
+ * «أسعار خاصة» (BR-PR13, V2 Task 11): the prices negotiated with this customer, per SKU unit (D91). Pick a product and its\n * unit, type its price (it may be
  * above the normal price, D89) and an optional note; each row can be changed in place or removed.
  */
 export function CustomerPricesTab({ customerId }: { customerId: number }) {
@@ -76,7 +78,7 @@ export function CustomerPricesTab({ customerId }: { customerId: number }) {
             <TableBody>
               {prices.data.data.map((price) => (
                 <PriceRow
-                  key={`${price.sku_id}-${price.unit_price}-${price.note ?? ""}`}
+                  key={`${price.sku_unit_id}-${price.unit_price}-${price.note ?? ""}`}
                   customerId={customerId}
                   price={price}
                 />
@@ -101,18 +103,27 @@ export function negotiatedPrice(value: string): string | null {
 function AddPrice({ customerId }: { customerId: number }) {
   const set = useSetCustomerPrice(customerId);
   const [picked, setPicked] = useState<Picked | null>(null);
+  const [unitId, setUnitId] = useState<number | null>(null);
   const [price, setPrice] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const pick = (product: DashboardProduct & { sku: NonNullable<DashboardProduct["sku"]> }) =>
-    setPicked({ skuId: product.sku.id, name: product.name, code: product.sku.code, basePrice: product.sku.base_price });
+  const pick = (product: DashboardProduct & { sku: NonNullable<DashboardProduct["sku"]> }) => {
+    const units = (product.sku.units ?? []).map((unit) => ({
+      id: unit.id,
+      name: unit.unit?.name ?? "",
+      basePrice: unit.base_price,
+    }));
+    setPicked({ name: product.name, code: product.sku.code, units });
+    setUnitId((product.sku.units ?? []).find((unit) => unit.is_default)?.id ?? units[0]?.id ?? null);
+  };
+  const unit = picked?.units.find((option) => option.id === unitId) ?? null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const unitPrice = negotiatedPrice(price);
 
-    if (picked === null) {
+    if (picked === null || unit === null) {
       setError(copy.pickProduct);
       return;
     }
@@ -124,7 +135,7 @@ function AddPrice({ customerId }: { customerId: number }) {
 
     setError(null);
     set.mutate(
-      { skuId: picked.skuId, unit_price: unitPrice, note: note.trim() === "" ? null : note.trim() },
+      { skuUnitId: unit.id, unit_price: unitPrice, note: note.trim() === "" ? null : note.trim() },
       {
         onSuccess: () => {
           toast.success(copy.saved);
@@ -143,8 +154,27 @@ function AddPrice({ customerId }: { customerId: number }) {
         <ProductPicker onPick={pick} />
         {picked !== null && (
           <span className="text-sm">
-            {picked.name} · <bdi dir="ltr">{picked.code}</bdi> · {copy.basePrice}: {formatMoney(picked.basePrice)}
+            {picked.name} · <bdi dir="ltr">{picked.code}</bdi>
+            {unit !== null && (
+              <>
+                {" "}
+                · {copy.basePrice}: {formatMoney(unit.basePrice)} / {unit.name}
+              </>
+            )}
           </span>
+        )}
+        {picked !== null && picked.units.length > 1 && (
+          <NativeSelect
+            aria-label={copy.unit}
+            value={unitId ?? ""}
+            onChange={(event) => setUnitId(Number(event.target.value))}
+          >
+            {picked.units.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </NativeSelect>
         )}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -192,13 +222,13 @@ function PriceRow({ customerId, price }: { customerId: number; price: CustomerSk
     }
 
     set.mutate(
-      { skuId: price.sku_id, unit_price: unitPrice, note: price.note },
+      { skuUnitId: price.sku_unit_id, unit_price: unitPrice, note: price.note },
       { onSuccess: () => toast.success(copy.saved), onError: (failure) => toast.error(messageFor(failure)) },
     );
   };
 
   return (
-    <TableRow data-testid={`price-${price.sku_id}`}>
+    <TableRow data-testid={`price-${price.sku_unit_id}`}>
       <TableCell className="font-medium">{price.product_name}</TableCell>
       <TableCell>
         <bdi dir="ltr">{price.sku_code}</bdi>
@@ -231,7 +261,7 @@ function PriceRow({ customerId, price }: { customerId: number; price: CustomerSk
           aria-label={`${copy.remove} ${price.product_name}`}
           disabled={remove.isPending}
           onClick={() =>
-            remove.mutate(price.sku_id, {
+            remove.mutate(price.sku_unit_id, {
               onSuccess: () => toast.success(copy.removed),
               onError: (failure) => toast.error(messageFor(failure)),
             })

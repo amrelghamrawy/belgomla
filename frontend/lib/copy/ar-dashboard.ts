@@ -191,6 +191,7 @@ export const dashboard = {
       "سعر متفق عليه لهذا العميل على صنف بعينه. يطبق على أي كمية ويسبق سعر الكمية وسعر المستوى حتى لو كان أعلى.",
     add: "إضافة سعر خاص",
     product: "المنتج",
+    unit: "الوحدة",
     code: "الكود",
     basePrice: "السعر الأساسي",
     price: "السعر الخاص",
@@ -283,6 +284,8 @@ export const dashboard = {
     bulkPricingTitle: "تسعير جماعي بنسبة من السعر المرجعي (الغلاف / القطاعي)",
     basePercent: "خصم السعر الأساسي %",
     bulkMoq: "الحد الأدنى للطلب (اختياري)",
+    bulkUnit: "الوحدات",
+    bulkAllUnits: "كل وحدات البيع",
     preview: "معاينة",
     apply: "تطبيق",
     previewResult: (affected: number) => `سيتم تحديث ${affected} منتج`,
@@ -343,6 +346,19 @@ export const dashboard = {
     baseUnit: "الوحدة الأساسية",
     chooseUnit: "اختر الوحدة",
     conversion: "عدد الوحدات الأساسية في وحدة البيع",
+    // V2 Task 13, D91: one SKU sold in several units (piece, carton, ...), each with its own prices.
+    units: {
+      title: "وحدات البيع",
+      hint: "بِع الصنف بأكثر من وحدة (قطعة، كرتونة…). لكل وحدة سعرها وحدها الأدنى وشرائحها، والمخزون واحد بالوحدة الأساسية.",
+      unit: (n: number) => `الوحدة ${n}`,
+      isDefault: "الوحدة الافتراضية",
+      defaultHint: "تظهر أولًا في المتجر وقائمة الأسعار",
+      add: "إضافة وحدة",
+      remove: "حذف الوحدة",
+      duplicate: "هذه الوحدة مكررة",
+      atLeastOne: "أضف وحدة بيع واحدة على الأقل",
+      atMost: (max: number) => `${max} وحدات على الأكثر`,
+    },
     openingStock: "الرصيد الافتتاحي (بالوحدة الأساسية)",
     noFields: "لا توجد حقول مخصصة. أضفها من صفحة الحقول المخصصة.",
     fieldsFollowCategory: "الحقول تتبع قسم المنتج: اختر القسم أولًا لتظهر حقوله.",
@@ -631,6 +647,7 @@ export const dashboard = {
       noLines: "أضف صنفًا واحدًا على الأقل",
       remove: "حذف الصنف",
       quantityOf: (name: string) => `كمية ${name}`,
+      unitOf: (name: string) => `وحدة ${name}`,
       available: (count: number, unit: string) => `المتاح ${count} ${unit}`,
       tiers: "أسعار الكميات",
       tier: (min: number, price: string) => `من ${min}: ${price}`,
@@ -760,7 +777,10 @@ export const dashboard = {
     discountTotal: "خصم الطلب",
     listPrice: "قبل الخصم",
     // BR-PR14 (V2 Task 11): where a line's list price came from, when it is the customer's own.
-    priceSources: { group: "سعر المستوى", customer: "سعر خاص بالعميل", promotion: "سعر العرض" } as Record<string, string>,
+    priceSources: { group: "سعر المستوى", customer: "سعر خاص بالعميل", promotion: "سعر العرض" } as Record<
+      string,
+      string
+    >,
     // BR-O12, D87: editing the lines of a pending or confirmed order.
     edit: {
       button: "تعديل الأصناف",

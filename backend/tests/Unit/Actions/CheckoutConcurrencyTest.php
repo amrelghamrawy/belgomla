@@ -83,7 +83,7 @@ test('BR-INV03 two checkouts for the last units: the second waits on the row loc
 
     expect($blocked)->toBe('55P03')
         ->and(fn () => ($this->on)('pgsql_session_b', fn (): Order => ($this->checkout)('b')))->toThrow(function (CheckoutFailed $e): void {
-            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
+            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
         })
         ->and(($this->on)('pgsql_session_a', fn (): array => [
             Order::query()->pluck('number')->all(),

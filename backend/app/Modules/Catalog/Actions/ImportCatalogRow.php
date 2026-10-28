@@ -19,7 +19,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * One row of a catalog file (V2 Task 06), in its own transaction: a SKU code the tenant does not have creates the
+ * One SKU of a catalog file (V2 Task 06; its rows, one per unit, since V2 Task 13), in its own transaction: a SKU code the tenant does not have creates the
  * product through CreateProduct (`on_hand` becomes its opening stock), a known code updates it through
  * UpdateProduct (which prices through UpdateSkuPricing), then moves it to the row's status (SetProductStatus, BR-P04)
  * and sets On Hand through Inventory's AdjustStock with the reason «استيراد» (BR-INV08; the same value is a no-op,
@@ -42,25 +42,28 @@ final readonly class ImportCatalogRow
     ) {}
 
     /**
-     * @param  array<string, string>  $row  the row by column key (CatalogRowMapper::rows)
+     * @param  non-empty-array<int, array<string, string>>  $rows  the SKU's rows, row number => row by column key (CatalogRowMapper::skus)
      * @param  int|null  $duplicateOf  the earlier row of the file with the same SKU code
      */
-    public function handle(array $row, int $number, CatalogLookups $lookups, ?int $duplicateOf = null, ?string $batchId = null, ?int $actorId = null): ImportRowResult
+    public function handle(array $rows, CatalogLookups $lookups, ?int $duplicateOf = null, ?string $batchId = null, ?int $actorId = null): ImportRowResult
     {
+        $numbers = array_keys($rows);
+        $number = $numbers[0];
+
         if ($duplicateOf !== null) {
             return $this->skipped($number, 'sku_code', "الكود مكرر في الملف (الصف {$duplicateOf})", $lookups);
         }
 
-        $sku = $this->existing($row['sku_code'] ?? '');
+        $sku = $this->existing($rows[$number]['sku_code'] ?? '');
 
         try {
-            $data = $this->mapper->map($row, $lookups, $sku?->product);
+            $data = $this->mapper->map($rows, $lookups, $sku?->product);
 
             DB::transaction(fn (): Product => $sku instanceof Sku
                 ? $this->updateRow($sku, $data, $batchId, $actorId)
                 : $this->create->handle($data->product, $actorId, $batchId));
         } catch (ApiException $e) {
-            return new ImportRowResult($number, ImportRowAction::Skip, $this->mapper->errors($e, $lookups));
+            return new ImportRowResult($number, ImportRowAction::Skip, $this->mapper->errors($e, $lookups, $numbers));
         } catch (QueryException $e) {
             report($e);
 
@@ -76,7 +79,7 @@ final readonly class ImportCatalogRow
             return null;
         }
 
-        return Sku::query()->with(['product.category', 'product.sku.tiers', 'inventory'])->where('code', $code)->first();
+        return Sku::query()->with(['product.category', 'product.sku.activeUnits.tiers', 'inventory'])->where('code', $code)->first();
     }
 
     private function updateRow(Sku $sku, ImportRowData $data, ?string $batchId, ?int $actorId): Product

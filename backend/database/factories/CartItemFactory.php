@@ -21,6 +21,7 @@ final class CartItemFactory extends Factory
         return [
             'cart_id' => CartFactory::new(),
             'sku_id' => SkuFactory::new(),
+            'sku_unit_id' => fn (array $attributes): int => SkuFactory::defaultUnitIdOf($attributes['sku_id']), // D91: the default unit unless given
             'quantity' => 1,
             'kind' => CartLineKind::Order,
         ];

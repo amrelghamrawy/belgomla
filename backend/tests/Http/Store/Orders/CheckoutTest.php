@@ -49,7 +49,7 @@ test('BR-PR06 checkout answers 201 with the order detail', function (): void {
         'cancel_reason' => null,
         'cancelled_by' => null,
         'items' => [[
-            'id' => $itemId, 'sku_id' => $this->sku->id, 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
+            'id' => $itemId, 'sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
             'conversion_factor' => 20, 'quantity' => 12, 'cover_price' => null, 'list_unit_price' => '85.00', 'manual_discount' => null,
             'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => 10, 'price_source' => 'tier', 'line_total' => '1020.00',
             'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0,
@@ -80,7 +80,7 @@ test('BR-PR06 a failing line answers 422 checkout_failed with the sku and leaves
         ->assertExactJson(['error' => [
             'code' => 'checkout_failed',
             'message' => 'تعذر إتمام الطلب، راجع العناصر التالية',
-            'items' => [['sku_id' => $this->sku->id, 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 7]],
+            'items' => [['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 7]],
         ]]);
 
     $this->assertDatabaseCount('orders', 0);

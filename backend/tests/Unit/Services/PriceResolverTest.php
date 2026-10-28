@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Enums\PriceSource;
@@ -11,16 +11,16 @@ use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Database\Eloquent\Collection;
 
 /*
-| The resolver is pure: every SKU here is built in memory with its tiers set as a loaded relation,
+| The resolver is pure: every SKU unit here (V2 Task 13, D91) is built in memory with its tiers set as a loaded relation,
 | no database row exists.
 */
 
 /**
  * @param  list<array{0: int, 1: string, 2?: string}>  $tiers  [min_quantity, unit_price, discount_percent?]
  */
-function resolverSku(string $basePrice = '100.00', array $tiers = [], ?string $coverPrice = null, ?string $basePricePercent = null, int $moq = 1): Sku
+function resolverSku(string $basePrice = '100.00', array $tiers = [], ?string $coverPrice = null, ?string $basePricePercent = null, int $moq = 1): SkuUnit
 {
-    $sku = new Sku(['base_price' => $basePrice, 'cover_price' => $coverPrice, 'base_price_percent' => $basePricePercent, 'moq' => $moq]);
+    $sku = new SkuUnit(['base_price' => $basePrice, 'cover_price' => $coverPrice, 'base_price_percent' => $basePricePercent, 'moq' => $moq]);
 
     return $sku->setRelation('tiers', new Collection(array_map(
         fn (array $tier): SkuPriceTier => new SkuPriceTier(['min_quantity' => $tier[0], 'unit_price' => $tier[1], 'discount_percent' => $tier[2] ?? null]),
@@ -97,7 +97,7 @@ test('BR-U05 a quantity below 1 is refused', function (): void {
 })->throws(InvalidArgumentException::class, 'at least 1');
 
 test('the resolver never queries: tiers must be loaded first', function (): void {
-    app(PriceResolver::class)->resolve(new Sku(['base_price' => '10.00']), 1);
+    app(PriceResolver::class)->resolve(new SkuUnit(['base_price' => '10.00']), 1);
 })->throws(LogicException::class, 'Load the SKU tiers');
 
 test('tiers() lists the stored tiers lowest threshold first', function (): void {
@@ -110,14 +110,15 @@ test('tiers() lists the stored tiers lowest threshold first', function (): void 
 });
 
 /*
-| BR-PR14 (V2 Task 11, D89): the customer's PricingContext on top of BR-PR04. The SKU below: base 100.00, 10+ → 90.00,
-| 100+ → 80.00, cover 125.00, id 7.
+| BR-PR14 (V2 Task 11, D89): the customer's PricingContext on top of BR-PR04. The SKU unit below: base 100.00, 10+ → 90.00,
+| 100+ → 80.00, cover 125.00, unit id 7 of SKU 7.
 */
 
-function contextSku(): Sku
+function contextSku(): SkuUnit
 {
     $sku = resolverSku('100.00', [[10, '90.00'], [100, '80.00']], coverPrice: '125.00');
     $sku->id = 7;
+    $sku->sku_id = 7;
 
     return $sku;
 }
@@ -145,8 +146,9 @@ test('BR-PR14 D89 price precedence: negotiated price, else the lower of the norm
 ]);
 
 test('BR-PR12 D27 the group price is the base price less the % rounded half-up to the piaster', function (): void {
-    $price = app(PriceResolver::class)->resolve(tap(resolverSku('10.10'), function (Sku $sku): void {
+    $price = app(PriceResolver::class)->resolve(tap(resolverSku('10.10'), function (SkuUnit $sku): void {
         $sku->id = 1;
+        $sku->sku_id = 1;
     }), 1, new PricingContext('25.00'));
 
     expect($price->unitPrice)->toBe('7.58')
@@ -154,8 +156,9 @@ test('BR-PR12 D27 the group price is the base price less the % rounded half-up t
 });
 
 test('BR-PR12 a group price never goes below 0.01', function (): void {
-    expect(app(PriceResolver::class)->resolve(tap(resolverSku('0.02'), function (Sku $sku): void {
+    expect(app(PriceResolver::class)->resolve(tap(resolverSku('0.02'), function (SkuUnit $sku): void {
         $sku->id = 1;
+        $sku->sku_id = 1;
     }), 1, new PricingContext('90.00'))->unitPrice)->toBe('0.01');
 });
 
@@ -240,6 +243,7 @@ test('BR-PR15 D90 price precedence with a promotion: negotiated wins, else the l
 test('BR-PR15 D27 the promotion price is the base price less the % rounded half-up, never below 0.01', function (string $base, string $percent, string $expected): void {
     $sku = resolverSku($base);
     $sku->id = 1;
+    $sku->sku_id = 1;
 
     expect(app(PriceResolver::class)->resolve($sku, 1, new PricingContext(promotions: [1 => promoOff($percent)]))->unitPrice)->toBe($expected);
 })->with([
@@ -269,7 +273,56 @@ test('BR-PR15 listed() keeps the group price and no promotion when the group is 
 });
 
 test('BR-PR15 promotionPrice() prices a sku under a % without tiers loaded', function (): void {
-    $sku = new Sku(['base_price' => '10.10']);
+    $sku = new SkuUnit(['base_price' => '10.10']);
 
     expect(app(PriceResolver::class)->promotionPrice($sku, '25.00'))->toBe('7.58');
+});
+
+/*
+| D91 (V2 Task 13): every unit of a SKU is priced on its own. The carton below is unit 9 of SKU 7 (the piece above is
+| unit 7): 12 pieces, base 1100.00, 5+ cartons → 1050.00, cover 1500.00.
+*/
+
+function cartonUnit(): SkuUnit
+{
+    $unit = resolverSku('1100.00', [[5, '1050.00']], coverPrice: '1500.00');
+    $unit->id = 9;
+    $unit->sku_id = 7;
+
+    return $unit;
+}
+
+test('D91 BR-PR04 each unit resolves on its own tiers', function (int $quantity, string $piece, string $carton): void {
+    $resolver = app(PriceResolver::class);
+
+    expect($resolver->resolve(contextSku(), $quantity)->unitPrice)->toBe($piece)
+        ->and($resolver->resolve(cartonUnit(), $quantity)->unitPrice)->toBe($carton);
+})->with([
+    'one' => [1, '100.00', '1100.00'],
+    'the carton tier, below the piece tier' => [5, '100.00', '1050.00'],
+    'the piece tier' => [10, '90.00', '1050.00'],
+]);
+
+test('D91 BR-PR12 a group % takes off each unit\'s own base price', function (): void {
+    $context = new PricingContext('10.00');
+
+    expect(app(PriceResolver::class)->resolve(contextSku(), 1, $context)->unitPrice)->toBe('90.00')
+        ->and(app(PriceResolver::class)->resolve(cartonUnit(), 1, $context)->unitPrice)->toBe('990.00');
+});
+
+test('D91 BR-PR15 a promotion on the SKU takes off every unit\'s base price', function (): void {
+    $context = new PricingContext(promotions: [7 => promoOff('15.00')]);
+
+    expect(app(PriceResolver::class)->resolve(contextSku(), 1, $context)->unitPrice)->toBe('85.00')
+        ->and(app(PriceResolver::class)->resolve(cartonUnit(), 1, $context)->unitPrice)->toBe('935.00')
+        ->and(app(PriceResolver::class)->resolve(cartonUnit(), 1, $context)->source)->toBe(PriceSource::Promotion);
+});
+
+test('D91 BR-PR13 a price negotiated for one unit leaves the other units at their own prices', function (): void {
+    $context = new PricingContext(null, [9 => '1000.00']);
+
+    expect(app(PriceResolver::class)->resolve(cartonUnit(), 1, $context)->unitPrice)->toBe('1000.00')
+        ->and(app(PriceResolver::class)->resolve(cartonUnit(), 1, $context)->source)->toBe(PriceSource::Customer)
+        ->and(app(PriceResolver::class)->resolve(contextSku(), 1, $context)->unitPrice)->toBe('100.00')
+        ->and(app(PriceResolver::class)->resolve(contextSku(), 1, $context)->source)->toBe(PriceSource::Base);
 });

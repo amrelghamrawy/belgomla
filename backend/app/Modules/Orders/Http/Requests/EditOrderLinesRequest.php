@@ -8,9 +8,9 @@ use App\Modules\Orders\Data\OrderEditLineData;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PUT /api/dashboard/orders/{number}/lines (BR-O12): `{ lines: [{ order_item_id?, sku_id, quantity }], note? }`, every
- * line the order should have after the edit: an existing line by its `order_item_id` (its own SKU), a new one without.
- * Quantities in selling units like the new-order form (QuoteOrderRequest); a SKU once.
+ * PUT /api/dashboard/orders/{number}/lines (BR-O12): `{ lines: [{ order_item_id?, sku_unit_id, quantity }], note? }`,
+ * every line the order should have after the edit: an existing line by its `order_item_id` (its own SKU unit), a new one
+ * without. Quantities in the line's unit like the new-order form (QuoteOrderRequest); a SKU unit once (D91).
  */
 final class EditOrderLinesRequest extends FormRequest
 {
@@ -21,9 +21,9 @@ final class EditOrderLinesRequest extends FormRequest
     {
         return [
             'lines' => ['required', 'array', 'min:1', 'max:'.QuoteOrderRequest::MAX_LINES],
-            'lines.*' => ['array:order_item_id,sku_id,quantity'],
+            'lines.*' => ['array:order_item_id,sku_unit_id,quantity'],
             'lines.*.order_item_id' => ['nullable', 'integer', 'min:1', 'distinct'],
-            'lines.*.sku_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'lines.*.sku_unit_id' => ['required', 'integer', 'min:1', 'distinct'],
             'lines.*.quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
             'note' => ['nullable', 'string', 'max:250'],
         ];
@@ -34,12 +34,12 @@ final class EditOrderLinesRequest extends FormRequest
      */
     public function lines(): array
     {
-        /** @var list<array{order_item_id?: int|string|null, sku_id: int|string, quantity: int|string}> $lines */
+        /** @var list<array{order_item_id?: int|string|null, sku_unit_id: int|string, quantity: int|string}> $lines */
         $lines = $this->array('lines');
 
         return array_map(fn (array $line): OrderEditLineData => new OrderEditLineData(
             isset($line['order_item_id']) ? (int) $line['order_item_id'] : null,
-            (int) $line['sku_id'],
+            (int) $line['sku_unit_id'],
             (int) $line['quantity'],
         ), $lines);
     }

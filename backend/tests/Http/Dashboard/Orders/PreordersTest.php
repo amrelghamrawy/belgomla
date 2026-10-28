@@ -59,7 +59,7 @@ test('BR-O14 the demand of a product: quantity, customers, pre-orders and what r
         ->assertOk()
         ->assertExactJson(['data' => [
             'product_id' => $this->product->id, 'status' => 'coming_soon', 'preorder_enabled' => true, 'expected_at' => '2026-12-01',
-            'limit' => 100, 'remaining' => 80, 'quantity' => 20, 'customers' => 2, 'preorders' => 2,
+            'limit' => 100, 'remaining' => 80, 'quantity' => 20, 'quantity_base' => 400, 'customers' => 2, 'preorders' => 2,
         ]]);
 
     expectDocumentedShape($response->json('data'), 'PreorderDemand');
@@ -69,7 +69,7 @@ test('BR-O14 going active answers the product with its pre-order demand; nothing
     $this->tenantJson('PATCH', "/api/dashboard/products/{$this->product->id}/status", ['status' => 'active'])
         ->assertOk()
         ->assertJsonPath('data.status', 'active')
-        ->assertJsonPath('meta.preorder_demand', ['quantity' => 20, 'customers' => 2, 'preorders' => 2]);
+        ->assertJsonPath('meta.preorder_demand', ['quantity' => 20, 'quantity_base' => 400, 'customers' => 2, 'preorders' => 2]);
 
     $this->assertDatabaseMissing('orders', ['kind' => 'order']);
 });

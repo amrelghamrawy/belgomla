@@ -11,9 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * POST /api/dashboard/orders/quote (BR-O11): every line priced as checkout would price it now, with its MOQ, the stock
- * left in selling units, where its price came from (`price_source`, BR-PR14), its tiers (the hint next to the quantity) and its `problem` (the checkout_failed entry without
- * `sku_id`, or null); the items total; the store's minimum order value (BR-MOV02); and `credit` when the order would
+ * POST /api/dashboard/orders/quote (BR-O11): every line (a SKU unit, D91) priced as checkout would price it now, with its
+ * unit's MOQ, the SKU's stock in that unit, where its price came from (`price_source`, BR-PR14), its tiers (the hint next to the quantity) and its `problem` (the checkout_failed entry without
+ * `sku_id` and `sku_unit_id`, or null); the items total; the store's minimum order value (BR-MOV02); and `credit` when the order would
  * pass the customer's credit limit (BR-C05), else null. Nothing was saved.
  *
  * @property-read OrderQuote $resource
@@ -41,26 +41,28 @@ final class OrderQuoteResource extends JsonResource
     private function line(CheckoutLine $line): array
     {
         $sku = $line->sku;
-        $problem = $this->resource->report->problemFor($sku->id)?->toArray();
-        unset($problem['sku_id']);
+        $unit = $line->unit;
+        $problem = $this->resource->report->problemFor($unit->id)?->toArray();
+        unset($problem['sku_id'], $problem['sku_unit_id']);
 
         return [
             'sku_id' => $sku->id,
+            'sku_unit_id' => $unit->id,
             'product_name' => $sku->product->name,
             'sku_code' => $sku->code,
             'sku_name' => $sku->name ?? $sku->product->name,
-            'unit' => $sku->sellingUnit->name,
-            'conversion_factor' => $sku->conversion_factor,
+            'unit' => $unit->unit->name,
+            'conversion_factor' => $unit->conversion_factor,
             'quantity' => $line->quantity,
-            'moq' => $sku->moq,
-            'available' => intdiv(max(0, $sku->inventory->available ?? 0), $sku->conversion_factor),
+            'moq' => $unit->moq,
+            'available' => intdiv(max(0, $sku->inventory->available ?? 0), $unit->conversion_factor),
             'cover_price' => $line->price->coverPrice,
             'unit_price' => $line->price->unitPrice,
             'discount_percent' => $line->price->discountPercent,
             'tier_min_quantity' => $line->price->tierMinQuantity,
             'price_source' => $line->price->source->value,
             'line_total' => $line->price->lineTotal,
-            'tiers' => array_map(fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice], $this->resource->tiers[$sku->id] ?? []),
+            'tiers' => array_map(fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice], $this->resource->tiers[$unit->id] ?? []),
             'problem' => $problem === [] ? null : $problem,
         ];
     }

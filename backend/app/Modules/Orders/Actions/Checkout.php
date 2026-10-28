@@ -32,7 +32,7 @@ final readonly class Checkout
     public function handle(Customer $customer, CheckoutData $data): Order
     {
         return DB::transaction(function () use ($customer, $data): Order {
-            $lines = array_values($this->cart->linesOf($customer, CartLineKind::Order)->map(fn (CartItem $line): CartLineInput => new CartLineInput($line->sku, $line->quantity))->all());
+            $lines = array_values($this->cart->linesOf($customer, CartLineKind::Order)->map(fn (CartItem $line): CartLineInput => new CartLineInput($line->skuUnit, $line->quantity))->all());
 
             $order = $this->place->handle(new OrderPlacementData($customer, $data->addressId, $lines, ActorType::Customer, $customer->id, $data->customerNote));
             $this->clearCart->handle($customer, CartLineKind::Order);

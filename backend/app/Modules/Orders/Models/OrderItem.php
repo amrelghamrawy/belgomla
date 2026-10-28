@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Models;
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $tenant_id
  * @property int $order_id
  * @property int $sku_id
+ * @property int|null $sku_unit_id
  * @property int $product_id
  * @property string $product_name
  * @property string $sku_code
@@ -49,6 +51,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $updated_at
  * @property-read Order $order
  * @property-read Sku $sku
+ * @property-read SkuUnit|null $skuUnit
  */
 final class OrderItem extends Model
 {
@@ -84,6 +87,16 @@ final class OrderItem extends Model
     public function sku(): BelongsTo
     {
         return $this->belongsTo(Sku::class);
+    }
+
+    /**
+     * The unit the line was ordered in (D91), reference only like `sku_id`; null on lines older than units.
+     *
+     * @return BelongsTo<SkuUnit, $this>
+     */
+    public function skuUnit(): BelongsTo
+    {
+        return $this->belongsTo(SkuUnit::class);
     }
 
     /** BR-O14: what is left of a pre-order line to convert (the whole quantity on a normal order line). */

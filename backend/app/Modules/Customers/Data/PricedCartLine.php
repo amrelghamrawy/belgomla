@@ -7,7 +7,7 @@ namespace App\Modules\Customers\Data;
 use App\Modules\Pricing\Data\ResolvedPrice;
 
 /**
- * One cart line priced now (BR-PR04): quantity and MOQ in selling units, `available` in base units like the
+ * One cart line priced now (BR-PR04), in its SKU unit (D91): quantity and MOQ in that unit, `available` in base units like the
  * storefront (D37). A pre-order line (BR-O14) has `available` 0 and the day its product is expected. Read model built by
  * CartPricer, not request input.
  */
@@ -15,6 +15,7 @@ final readonly class PricedCartLine
 {
     public function __construct(
         public int $skuId,
+        public int $skuUnitId,
         public string $productName,
         public string $productSlug,
         public string $unit,

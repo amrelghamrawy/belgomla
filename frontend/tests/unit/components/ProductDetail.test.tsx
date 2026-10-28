@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProductDetail } from "@/components/store/ProductDetail";
 
-import { cart, comingSoonSku, customer, storeProduct, storeSku } from "../fixtures";
+import { cart, comingSoonSku, customer, storeProduct, storeSku, storeSkuUnit } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { params, renderWithQuery, router } from "../render";
 
@@ -63,7 +63,53 @@ describe("ProductDetail", () => {
     await user.click(screen.getByRole("button", { name: "أضف إلى السلة" }));
 
     await waitFor(() => expect(success).toHaveBeenCalled());
-    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_id: 501, quantity: 3 });
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_unit_id: 601, quantity: 3 });
+  });
+
+  it("D91 switches the price, MOQ and tiers to the unit picked and adds that unit", async () => {
+    vi.spyOn(toast, "success").mockImplementation(() => "t");
+    const piece = storeSku({
+      unit: "قطعة",
+      conversion_factor: 1,
+      moq: 5,
+      base_price: "10.00",
+      tiers: [],
+      available: 100,
+    });
+    const carton = storeSkuUnit({
+      unit: "كرتونة",
+      conversion_factor: 12,
+      moq: 1,
+      base_price: "110.00",
+      tiers: [{ min_quantity: 5, unit_price: "105.00" }],
+    });
+    const fetchMock = stubProduct(storeProduct({ sku: { ...piece, units: [...(piece.units ?? []), carton] } }));
+    const user = userEvent.setup();
+    renderWithQuery(<ProductDetail />);
+
+    expect(await screen.findByText("10.00 ج.م")).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "الكمية" })).toHaveValue(5);
+    await user.click(screen.getByRole("radio", { name: "كرتونة (12)" }));
+
+    expect(screen.getByRole("radio", { name: "كرتونة (12)" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("110.00 ج.م")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "أسعار الكميات" })).toHaveTextContent("من 5 كرتونة105.00 ج.م");
+    expect(screen.getByRole("spinbutton", { name: "الكمية" })).toHaveValue(1);
+    expect(screen.getByText("الإجمالي 12 نسخة")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "زيادة الكمية" }));
+    await user.click(screen.getByRole("button", { name: "أضف إلى السلة" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_unit_id: 602, quantity: 2 }),
+    );
+  });
+
+  it("D91 shows no unit picker for a SKU sold in one unit", async () => {
+    stubProduct();
+    renderWithQuery(<ProductDetail />);
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("radiogroup", { name: "اختر وحدة البيع" })).toBeNull();
   });
 
   it("D21 a coming-soon product cannot be added", async () => {
@@ -157,7 +203,7 @@ describe("pre-ordering on the product page (BR-O14)", () => {
 
     await waitFor(() => expect(success).toHaveBeenCalledWith("أضيف إلى حجوزاتك في السلة", expect.anything()));
     expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({
-      sku_id: 501,
+      sku_unit_id: 601,
       quantity: 2,
       kind: "preorder",
     });

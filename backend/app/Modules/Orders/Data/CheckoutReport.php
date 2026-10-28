@@ -8,7 +8,7 @@ use App\Modules\Orders\Exceptions\CheckoutFailed;
 
 /**
  * What CheckoutValidator found for a list of lines (BR-PR06 steps 2–7), before anything is written: every line priced
- * (failing ones too, so a quote can show them), the problem of each failing SKU, the items total, the minimum order
+ * (failing ones too, so a quote can show them), the problem of each failing line (by SKU unit), the items total, the minimum order
  * value shortfall (BR-MOV02) and the credit limit shortfall (BR-C05). Checkout and PlaceOrder turn it into the order
  * or a `CheckoutFailed`; the merchant's quote shows it as is.
  */
@@ -16,7 +16,7 @@ final readonly class CheckoutReport
 {
     /**
      * @param  list<CheckoutLine>  $lines  every line, in the order given
-     * @param  array<int, CheckoutProblem>  $problems  keyed by sku_id
+     * @param  array<int, CheckoutProblem>  $problems  keyed by sku_unit_id (D91)
      * @param  array{required: string, current: string}|null  $mov
      * @param  array{limit: string, exposure: string, order_total: string}|null  $credit
      */
@@ -29,10 +29,10 @@ final readonly class CheckoutReport
         public ?array $credit,
     ) {}
 
-    /** The problem of a SKU, if it has one. */
-    public function problemFor(int $skuId): ?CheckoutProblem
+    /** The problem of a line's SKU unit, if it has one. */
+    public function problemFor(int $skuUnitId): ?CheckoutProblem
     {
-        return $this->problems[$skuId] ?? null;
+        return $this->problems[$skuUnitId] ?? null;
     }
 
     /**

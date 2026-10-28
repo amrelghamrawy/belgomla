@@ -523,16 +523,18 @@ paths:
     post:
       operationId: storeAddCartItem
       tags: [store-cart]
-      summary: Adds a SKU (or adds to its quantity); guests get 403 prices_hidden or 401 (D53)
+      summary: Puts a SKU unit in the cart with this quantity; guests get 403 prices_hidden or 401 (D53)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [sku_id, quantity]
+              description: 'Send sku_unit_id (V2 Task 13, D91), or sku_id alone for the SKU''s default unit'
+              required: [quantity]
               properties:
-                sku_id: { type: integer, minimum: 1 }
+                sku_unit_id: { type: [integer, 'null'], minimum: 1 }
+                sku_id: { type: [integer, 'null'], minimum: 1 }
                 quantity: { type: integer, minimum: 1, maximum: 100000 }
                 kind: { $ref: '#/components/schemas/CartLineKind' }
       responses:
@@ -542,12 +544,9 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
 
-  /api/store/cart/items/{sku}:
+  /api/store/cart/items/{skuUnit}:
     parameters:
-      - name: sku
-        in: path
-        required: true
-        schema: { type: integer }
+      - $ref: '#/components/parameters/SkuUnitId'
     patch:
       operationId: storeUpdateCartItem
       tags: [store-cart]
@@ -1898,13 +1897,14 @@ paths:
 
   # ---- Dashboard: pricing (08 §6, BR-PR10/PR11) ----
 
-  /api/dashboard/products/{product}/pricing:
+  /api/dashboard/products/{product}/units/{skuUnit}/pricing:
     parameters:
       - $ref: '#/components/parameters/ProductId'
+      - $ref: '#/components/parameters/SkuUnitId'
     put:
       operationId: dashboardUpdatePricing
       tags: [dashboard-pricing]
-      summary: Replaces the SKU's price set; tiers is required and replaces all tiers
+      summary: Replaces the price set of one active unit of the product's SKU (D91); tiers is required and replaces all its tiers
       requestBody:
         required: true
         content:
@@ -1923,9 +1923,19 @@ paths:
     post:
       operationId: dashboardRecomputePricing
       tags: [dashboard-pricing]
-      summary: Recomputes percentage-based prices from the current cover price (BR-PR10, audited)
+      summary: Recomputes percentage-based prices from the current cover price of every unit (BR-PR10, D91, audited)
       responses:
-        '200': { $ref: '#/components/responses/SkuPricing' }
+        '200':
+          description: Every active unit's price set
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SkuPricing' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -2466,14 +2476,14 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
 
-  /api/dashboard/customers/{customer}/prices/{sku}:
+  /api/dashboard/customers/{customer}/prices/{skuUnit}:
     parameters:
       - $ref: '#/components/parameters/CustomerId'
-      - $ref: '#/components/parameters/SkuId'
+      - $ref: '#/components/parameters/SkuUnitId'
     put:
       operationId: dashboardSetCustomerPrice
       tags: [dashboard-customers]
-      summary: 'Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU; it may be above the normal price (D89)'
+      summary: 'Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU unit (D91); it may be above the normal price (D89)'
       requestBody:
         required: true
         content:
@@ -2482,7 +2492,7 @@ paths:
               type: object
               required: [unit_price]
               properties:
-                unit_price: { type: [string, number], description: 'In the SKU''s selling unit, at least 0.01' }
+                unit_price: { type: [string, number], description: 'In that unit, at least 0.01' }
                 note: { type: [string, 'null'], maxLength: 300 }
       responses:
         '201':
@@ -3476,6 +3486,12 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    SkuUnitId:
+      name: skuUnit
+      in: path
+      required: true
+      description: A SKU unit id (V2 Task 13, D91)
+      schema: { type: integer }
     CustomerId:
       name: customer
       in: path
@@ -4024,7 +4040,7 @@ components:
         Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price,
         `promotion` only when a live promotion sets the price (BR-PR15, guests too).
       type: object
-      required: [id, code, unit, conversion_factor, moq, in_stock]
+      required: [id, code, unit, conversion_factor, moq, units, in_stock]
       properties:
         id: { type: integer }
         code: { type: string }
@@ -4045,9 +4061,39 @@ components:
           items: { $ref: '#/components/schemas/PriceTier' }
         price_source: { $ref: '#/components/schemas/CustomerPriceSource' }
         promotion: { $ref: '#/components/schemas/PromotionSummary' }
+        units:
+          description: 'Every unit the SKU is sold in, the default first (V2 Task 13, D91); the flat unit, factor, MOQ and prices above are the default unit''s'
+          type: array
+          items: { $ref: '#/components/schemas/StoreSkuUnit' }
         available: { type: integer }
-        in_stock: { type: boolean }
+        in_stock: { type: boolean, description: 'At least one unit can be ordered' }
         coming_soon: { type: boolean, const: true }
+
+    StoreSkuUnit:
+      description: 'One unit of a SKU (D91), priced on its own at the shopper''s prices; price keys follow the SKU''s rules'
+      type: object
+      required: [id, unit, conversion_factor, moq, is_default, in_stock]
+      properties:
+        id: { type: integer }
+        unit: { type: [string, 'null'] }
+        conversion_factor: { type: integer }
+        moq: { type: integer }
+        cover_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        base_price: { $ref: '#/components/schemas/Money' }
+        discount_percent:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        tiers:
+          type: array
+          items: { $ref: '#/components/schemas/PriceTier' }
+        price_source: { $ref: '#/components/schemas/CustomerPriceSource' }
+        promotion: { $ref: '#/components/schemas/PromotionSummary' }
+        is_default: { type: boolean }
+        in_stock: { type: boolean, description: 'The product is active and at least one of this unit can be ordered' }
 
     StorePreorder:
       description: 'A Coming Soon product''s pre-order offer (BR-O14, D88); `remaining` is what is left under the merchant''s cap in selling units, null = no cap'
@@ -4126,10 +4172,14 @@ components:
               items: { $ref: '#/components/schemas/RelatedProduct' }
 
     PriceListRow:
+      description: 'One row per unit the product is sold in, the default first (D91)'
       type: object
-      required: [id, name, slug, kind, code, unit, moq, availability]
+      required: [id, sku_unit_id, name, slug, kind, code, unit, conversion_factor, is_default, moq, availability]
       properties:
-        id: { type: integer }
+        id: { type: integer, description: The product }
+        sku_unit_id: { type: [integer, 'null'] }
+        conversion_factor: { type: [integer, 'null'] }
+        is_default: { type: boolean }
         name: { type: string }
         slug: { type: string }
         kind:
@@ -4242,9 +4292,10 @@ components:
 
     CartItem:
       type: object
-      required: [sku_id, product_name, product_slug, unit, conversion_factor, quantity, unit_price, tier_min_quantity, price_source, promotion, line_total, moq, available]
+      required: [sku_id, sku_unit_id, product_name, product_slug, unit, conversion_factor, quantity, unit_price, tier_min_quantity, price_source, promotion, line_total, moq, available]
       properties:
         sku_id: { type: integer }
+        sku_unit_id: { type: integer, description: 'The unit of the line (D91); a SKU may be in the cart in two units' }
         product_name: { type: string }
         product_slug: { type: string }
         unit: { type: string }
@@ -4320,9 +4371,10 @@ components:
     LineProblem:
       description: One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units.
       type: object
-      required: [sku_id, reason]
+      required: [sku_id, sku_unit_id, reason]
       properties:
         sku_id: { type: integer }
+        sku_unit_id: { type: integer, description: 'The line''s SKU unit (D91)' }
         reason:
           type: string
           enum: [insufficient_stock, below_moq, product_inactive, preorder_unavailable, preorder_limit]
@@ -4337,10 +4389,11 @@ components:
 
     OrderItem:
       type: object
-      required: [id, sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, price_source, line_total, delivered_quantity, removed_at, converted_quantity]
+      required: [id, sku_id, sku_unit_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, cover_price, list_unit_price, manual_discount, unit_price, discount_percent, tier_min_quantity, price_source, line_total, delivered_quantity, removed_at, converted_quantity]
       properties:
         id: { type: integer, description: 'The order line, as PUT …/discount names it (D85)' }
         sku_id: { type: integer }
+        sku_unit_id: { type: [integer, 'null'], description: 'The unit the line was ordered in (D91)' }
         product_name: { type: string }
         sku_code: { type: string }
         sku_name: { type: string }
@@ -4783,17 +4836,13 @@ components:
         reserved: { type: integer }
         available: { type: integer }
 
-    DashboardSku:
+    DashboardSkuUnit:
+      description: 'One active unit of a SKU (D91), the default first; tiers on the detail only'
       type: object
-      required: [id, code, selling_unit, base_unit, conversion_factor, cover_price, base_price, base_price_percent, moq]
+      required: [id, unit, conversion_factor, cover_price, base_price, base_price_percent, moq, is_default]
       properties:
         id: { type: integer }
-        code: { type: string }
-        selling_unit:
-          oneOf:
-            - $ref: '#/components/schemas/IdName'
-            - type: 'null'
-        base_unit:
+        unit:
           oneOf:
             - $ref: '#/components/schemas/IdName'
             - type: 'null'
@@ -4808,9 +4857,43 @@ components:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
         moq: { type: integer }
+        is_default: { type: boolean }
         tiers:
           type: array
           items: { $ref: '#/components/schemas/DashboardTier' }
+
+    DashboardSku:
+      description: 'selling_unit, conversion_factor, prices and moq are the default unit''s (for lists); units lists them all (D91)'
+      type: object
+      required: [id, code, selling_unit, base_unit, conversion_factor, cover_price, base_price, base_price_percent, moq]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        selling_unit:
+          oneOf:
+            - $ref: '#/components/schemas/IdName'
+            - type: 'null'
+        base_unit:
+          oneOf:
+            - $ref: '#/components/schemas/IdName'
+            - type: 'null'
+        conversion_factor: { type: [integer, 'null'] }
+        cover_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        base_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        base_price_percent:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        moq: { type: [integer, 'null'] }
+        units:
+          type: array
+          items: { $ref: '#/components/schemas/DashboardSkuUnit' }
         inventory: { $ref: '#/components/schemas/StockLevels' }
 
     DashboardProduct:
@@ -4900,9 +4983,10 @@ components:
 
     PreorderDemandCounts:
       type: object
-      required: [quantity, customers, preorders]
+      required: [quantity, quantity_base, customers, preorders]
       properties:
-        quantity: { type: integer, description: 'Open pre-ordered selling units, not yet converted' }
+        quantity: { type: integer, description: 'Open pre-ordered units (in the units ordered), not yet converted' }
+        quantity_base: { type: integer, description: 'The same in base units (D91)' }
         customers: { type: integer }
         preorders: { type: integer }
 
@@ -4955,15 +5039,28 @@ components:
           type: object
           additionalProperties: { type: [string, integer, number, boolean, 'null'] }
         sku:
-          allOf:
-            - $ref: '#/components/schemas/PriceSetRequest'
-            - type: object
-              required: [code, selling_unit_id, base_unit_id, conversion_factor]
-              properties:
-                code: { type: string, maxLength: 60, pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]*$' }
-                selling_unit_id: { type: integer }
-                base_unit_id: { type: integer }
-                conversion_factor: { type: integer, minimum: 1, maximum: 1000000 }
+          type: object
+          required: [code, base_unit_id, units]
+          properties:
+            code: { type: string, maxLength: 60, pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]*$' }
+            base_unit_id: { type: integer }
+            units:
+              type: array
+              minItems: 1
+              maxItems: 10
+              description: 'The units the SKU is sold in (D91), each unit_id once; at most one is_default (none = the first). A unit left out is archived; sending its unit_id again restores it.'
+              items: { $ref: '#/components/schemas/SkuUnitRequest' }
+
+    SkuUnitRequest:
+      allOf:
+        - $ref: '#/components/schemas/PriceSetRequest'
+        - type: object
+          required: [unit_id, conversion_factor]
+          properties:
+            id: { type: [integer, 'null'], minimum: 1, description: 'An existing unit of the SKU; omitted for a new one' }
+            unit_id: { type: integer }
+            conversion_factor: { type: integer, minimum: 1, maximum: 1000000 }
+            is_default: { type: boolean }
 
     PricingRequest:
       allOf:
@@ -5049,11 +5146,14 @@ components:
 
     SkuPricing:
       type: object
-      required: [product_id, sku_id, code, cover_price, base_price, base_price_percent, discount_percent, moq, tiers]
+      required: [product_id, sku_id, sku_unit_id, code, unit, conversion_factor, cover_price, base_price, base_price_percent, discount_percent, moq, tiers]
       properties:
         product_id: { type: integer }
         sku_id: { type: integer }
+        sku_unit_id: { type: integer }
         code: { type: string }
+        unit: { type: string }
+        conversion_factor: { type: integer }
         cover_price:
           oneOf:
             - $ref: '#/components/schemas/Money'
@@ -5089,15 +5189,18 @@ components:
               min_quantity: { type: integer, minimum: 1, maximum: 1000000 }
               discount_percent: { type: string }
         moq: { type: integer, minimum: 1, maximum: 1000000 }
+        unit_id: { type: [integer, 'null'], minimum: 1, description: 'Only the SKU units sold in this store unit (D91); left out = every unit' }
 
     SkippedNoCoverPrice:
       type: object
-      required: [product_id, sku_id, code, name]
+      required: [product_id, sku_id, sku_unit_id, code, name, unit]
       properties:
         product_id: { type: integer }
         sku_id: { type: integer }
+        sku_unit_id: { type: integer }
         code: { type: string }
         name: { type: string }
+        unit: { type: string }
 
     BulkPricingResult:
       type: object
@@ -5373,13 +5476,15 @@ components:
     CustomerSkuPrice:
       description: 'A price negotiated with one customer for one SKU (BR-PR13, D89)'
       type: object
-      required: [sku_id, sku_code, product_name, unit, base_price, unit_price, note, updated_at]
+      required: [sku_id, sku_unit_id, sku_code, product_name, unit, conversion_factor, base_price, unit_price, note, updated_at]
       properties:
         sku_id: { type: integer }
+        sku_unit_id: { type: integer, description: 'Negotiated per unit (D91)' }
         sku_code: { type: string }
         product_name: { type: string }
         unit: { type: string }
-        base_price: { $ref: '#/components/schemas/Money', description: 'The SKU''s own base price, to compare' }
+        conversion_factor: { type: integer }
+        base_price: { $ref: '#/components/schemas/Money', description: 'The unit''s own base price, to compare' }
         unit_price: { $ref: '#/components/schemas/Money' }
         note: { type: [string, 'null'] }
         updated_at: { type: string, format: date-time }
@@ -5439,13 +5544,13 @@ components:
           type: array
           minItems: 1
           maxItems: 200
-          description: Every line the order should have; each SKU once, quantity in selling units
+          description: Every line the order should have; each SKU unit once (D91), quantity in that unit
           items:
             type: object
-            required: [sku_id, quantity]
+            required: [sku_unit_id, quantity]
             properties:
               order_item_id: { type: [integer, 'null'], minimum: 1, description: 'An existing live line; omitted or null for a new one' }
-              sku_id: { type: integer, minimum: 1 }
+              sku_unit_id: { type: integer, minimum: 1 }
               quantity: { type: integer, minimum: 1, maximum: 1000000 }
         note: { type: [string, 'null'], maxLength: 250, description: 'Goes to the history after «تعديل الطلب»' }
 
@@ -5488,12 +5593,12 @@ components:
           type: array
           minItems: 1
           maxItems: 200
-          description: Each SKU once; quantity in selling units
+          description: Each SKU unit once (D91; one SKU may come in two units); quantity in that unit
           items:
             type: object
-            required: [sku_id, quantity]
+            required: [sku_unit_id, quantity]
             properties:
-              sku_id: { type: integer, minimum: 1 }
+              sku_unit_id: { type: integer, minimum: 1 }
               quantity: { type: integer, minimum: 1, maximum: 1000000 }
 
     MerchantOrderRequest:
@@ -5528,9 +5633,10 @@ components:
 
     OrderQuoteLine:
       type: object
-      required: [sku_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, price_source, line_total, tiers, problem]
+      required: [sku_id, sku_unit_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, price_source, line_total, tiers, problem]
       properties:
         sku_id: { type: integer }
+        sku_unit_id: { type: integer }
         product_name: { type: string }
         sku_code: { type: string }
         sku_name: { type: string }
@@ -5560,7 +5666,7 @@ components:
                   - $ref: '#/components/schemas/Money'
                   - type: 'null'
         problem:
-          description: 'The checkout_failed entry of this SKU without sku_id, or null'
+          description: 'The checkout_failed entry of this line without sku_id and sku_unit_id, or null'
           oneOf:
             - type: object
               required: [reason]

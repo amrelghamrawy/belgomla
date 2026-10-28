@@ -14,9 +14,10 @@ use App\Modules\Catalog\Models\Product;
 interface PreorderDemand
 {
     /**
-     * The open pre-ordered quantity (selling units), how many customers and how many pre-orders hold it.
+     * The open pre-ordered quantity (`quantity` in the units ordered, `quantity_base` in base units, D91), how many customers
+     * and how many pre-orders hold it.
      *
-     * @return array{quantity: int, customers: int, preorders: int}
+     * @return array{quantity: int, quantity_base: int, customers: int, preorders: int}
      */
     public function of(Product $product): array;
 }

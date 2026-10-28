@@ -27,8 +27,8 @@ beforeEach(function (): void {
     // +1 SKU (C), −1 line (B), a quantity change (A 6 → 12).
     $this->body = fn (array $overrides = []): array => [
         'lines' => [
-            ['order_item_id' => $this->lineA->id, 'sku_id' => $this->skuA->id, 'quantity' => 12],
-            ['sku_id' => $this->skuC->id, 'quantity' => 5],
+            ['order_item_id' => $this->lineA->id, 'sku_unit_id' => $this->defaultUnitId($this->skuA), 'quantity' => 12],
+            ['sku_unit_id' => $this->defaultUnitId($this->skuC), 'quantity' => 5],
         ],
         'note' => 'العميل اتصل',
         ...$overrides,
@@ -101,31 +101,31 @@ test('edit validation', function (array $body, string $field): void {
 })->with([
     'lines missing' => [[], 'lines'],
     'no lines' => [['lines' => []], 'lines'],
-    'a line without a sku' => [['lines' => [['quantity' => 5]]], 'lines.0.sku_id'],
-    'a line without a quantity' => [['lines' => [['sku_id' => 1]]], 'lines.0.quantity'],
-    'a zero quantity' => [['lines' => [['sku_id' => 1, 'quantity' => 0]]], 'lines.0.quantity'],
-    'a fraction' => [['lines' => [['sku_id' => 1, 'quantity' => 1.5]]], 'lines.0.quantity'],
-    'a sku twice' => [['lines' => [['sku_id' => 1, 'quantity' => 5], ['sku_id' => 1, 'quantity' => 6]]], 'lines.0.sku_id'],
-    'a line id twice' => [['lines' => [['order_item_id' => 1, 'sku_id' => 1, 'quantity' => 5], ['order_item_id' => 1, 'sku_id' => 2, 'quantity' => 6]]], 'lines.0.order_item_id'],
-    'an unknown line key' => [['lines' => [['sku_id' => 1, 'quantity' => 5, 'unit_price' => '1']]], 'lines.0'],
-    'too many lines' => [['lines' => array_map(fn (int $i): array => ['sku_id' => $i, 'quantity' => 5], range(1, 201))], 'lines'],
-    'a note too long' => [['lines' => [['sku_id' => 1, 'quantity' => 5]], 'note' => str_repeat('س', 251)], 'note'],
+    'a line without a sku' => [['lines' => [['quantity' => 5]]], 'lines.0.sku_unit_id'],
+    'a line without a quantity' => [['lines' => [['sku_unit_id' => 1]]], 'lines.0.quantity'],
+    'a zero quantity' => [['lines' => [['sku_unit_id' => 1, 'quantity' => 0]]], 'lines.0.quantity'],
+    'a fraction' => [['lines' => [['sku_unit_id' => 1, 'quantity' => 1.5]]], 'lines.0.quantity'],
+    'a sku twice' => [['lines' => [['sku_unit_id' => 1, 'quantity' => 5], ['sku_unit_id' => 1, 'quantity' => 6]]], 'lines.0.sku_unit_id'],
+    'a line id twice' => [['lines' => [['order_item_id' => 1, 'sku_unit_id' => 1, 'quantity' => 5], ['order_item_id' => 1, 'sku_unit_id' => 2, 'quantity' => 6]]], 'lines.0.order_item_id'],
+    'an unknown line key' => [['lines' => [['sku_unit_id' => 1, 'quantity' => 5, 'unit_price' => '1']]], 'lines.0'],
+    'too many lines' => [['lines' => array_map(fn (int $i): array => ['sku_unit_id' => $i, 'quantity' => 5], range(1, 201))], 'lines'],
+    'a note too long' => [['lines' => [['sku_unit_id' => 1, 'quantity' => 5]], 'note' => str_repeat('س', 251)], 'note'],
 ]);
 
 test('BR-O12 a line that is not a live line of the order is a validation error on its field', function (): void {
     $other = $this->inTenant(fn () => OrderItem::factory()->create());
 
-    ($this->put)(['lines' => [['order_item_id' => $other->id, 'sku_id' => $other->sku_id, 'quantity' => 5]]])
+    ($this->put)(['lines' => [['order_item_id' => $other->id, 'sku_unit_id' => $other->sku_unit_id, 'quantity' => 5]]])
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'validation_failed')
         ->assertJsonPath('error.details', ['lines.0.order_item_id' => ['البند غير موجود في هذا الطلب']]);
 });
 
 test('BR-PR06 a stock shortfall answers checkout_failed and changes nothing', function (): void {
-    ($this->put)(['lines' => [['order_item_id' => $this->lineA->id, 'sku_id' => $this->skuA->id, 'quantity' => 21]]])
+    ($this->put)(['lines' => [['order_item_id' => $this->lineA->id, 'sku_unit_id' => $this->defaultUnitId($this->skuA), 'quantity' => 21]]])
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'checkout_failed')
-        ->assertJsonPath('error.items', [['sku_id' => $this->skuA->id, 'reason' => 'insufficient_stock', 'requested' => 21, 'available' => 20]]);
+        ->assertJsonPath('error.items', [['sku_id' => $this->skuA->id, 'sku_unit_id' => $this->defaultUnitId($this->skuA), 'reason' => 'insufficient_stock', 'requested' => 21, 'available' => 20]]);
 
     expect(($this->reserved)())->toBe([120, 200, 0]);
 });
@@ -139,7 +139,7 @@ test('BR-O12 an order being prepared is locked', function (): void {
 test('BR-C03 a total below what was collected is refused', function (): void {
     $this->inTenant(fn () => $this->order->forceFill(['collected_amount' => '1450.00', 'collection_status' => 'partially_collected'])->save());
 
-    ($this->put)(['lines' => [['order_item_id' => $this->lineA->id, 'sku_id' => $this->skuA->id, 'quantity' => 6]]])
+    ($this->put)(['lines' => [['order_item_id' => $this->lineA->id, 'sku_unit_id' => $this->defaultUnitId($this->skuA), 'quantity' => 6]]])
         ->assertConflict()
         ->assertJsonPath('error.code', 'below_collected');
 });
@@ -170,7 +170,7 @@ test('BR-T04 an order number of another tenant is 404 and unchanged there', func
     $theirs = $this->placeOrder($this->makeCustomer(tenant: $other), [$this->orderableSku(tenant: $other)->id => 6]);
     $this->inTenant(fn () => $this->order->forceFill(['number' => 99])->save());
 
-    ($this->put)(['lines' => [['sku_id' => $this->skuC->id, 'quantity' => 5]]], $theirs->number)->assertNotFound();
+    ($this->put)(['lines' => [['sku_unit_id' => $this->defaultUnitId($this->skuC), 'quantity' => 5]]], $theirs->number)->assertNotFound();
 
     $this->assertDatabaseHas('orders', ['id' => $theirs->id, 'order_total' => $theirs->order_total]);
     $this->assertDatabaseCount('order_item_changes', 0);
@@ -196,7 +196,7 @@ test('BR-O12 the quote of an edit counts what the order holds as available', fun
     $this->tenantJson('POST', '/api/dashboard/orders/quote', [
         'customer_id' => $this->order->customer_id,
         'order' => $this->order->number,
-        'lines' => [['sku_id' => $this->skuA->id, 'quantity' => 20]],
+        'lines' => [['sku_unit_id' => $this->defaultUnitId($this->skuA), 'quantity' => 20]],
     ])
         ->assertOk()
         ->assertJsonPath('data.lines.0.available', 20)
@@ -207,7 +207,7 @@ test('BR-O12 the quote of an edit refuses an order of another customer', functio
     $this->tenantJson('POST', '/api/dashboard/orders/quote', [
         'customer_id' => $this->makeCustomer(['phone' => '+201099999999'])->id,
         'order' => $this->order->number,
-        'lines' => [['sku_id' => $this->skuA->id, 'quantity' => 5]],
+        'lines' => [['sku_unit_id' => $this->defaultUnitId($this->skuA), 'quantity' => 5]],
     ])
         ->assertUnprocessable()
         ->assertJsonPath('error.details', ['order' => ['الطلب غير موجود']]);

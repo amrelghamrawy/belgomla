@@ -24,6 +24,8 @@ export type FacetOption = Schemas["FacetOption"];
 export type CustomFieldValue = Schemas["CustomFieldValue"];
 export type PriceTier = Schemas["PriceTier"];
 export type StoreSku = Schemas["StoreSku"];
+/** One unit a SKU is sold in (V2 Task 13, D91). */
+export type StoreSkuUnit = Schemas["StoreSkuUnit"];
 export type StoreProduct = Schemas["StoreProduct"];
 export type StoreProductDetail = Schemas["StoreProductDetail"];
 export type ProductImage = Schemas["ProductImage"];
@@ -65,6 +67,8 @@ export type FieldOption = Schemas["FieldOption"];
 export type FieldRequest = Schemas["FieldRequest"];
 export type DashboardTier = Schemas["DashboardTier"];
 export type DashboardSku = Schemas["DashboardSku"];
+export type DashboardSkuUnit = Schemas["DashboardSkuUnit"];
+export type SkuUnitRequest = Schemas["SkuUnitRequest"];
 export type DashboardProduct = Schemas["DashboardProduct"];
 export type ProductRelation = Schemas["ProductRelation"];
 export type ProductRequest = Schemas["ProductRequest"];

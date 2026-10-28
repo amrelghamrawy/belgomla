@@ -8,7 +8,7 @@ use App\Modules\Pricing\Concerns\ReadsSkuPricing;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PUT /api/dashboard/products/{id}/pricing: `{ cover_price?, base_price | base_price_percent, moq, tiers }`.
+ * PUT /api/dashboard/products/{id}/units/{sku_unit_id}/pricing (one SKU unit, V2 Task 13): `{ cover_price?, base_price | base_price_percent, moq, tiers }`.
  * `tiers` replaces every tier (an empty list removes them); a missing `cover_price` keeps the current one.
  */
 final class UpdateSkuPricingRequest extends FormRequest

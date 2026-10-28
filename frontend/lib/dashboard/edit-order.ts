@@ -15,7 +15,7 @@ export type EditLine = DraftLine & { order_item_id: number | null };
 
 export type LineChange = {
   kind: "added" | "removed" | "quantity";
-  sku_id: number;
+  sku_unit_id: number;
   name: string;
   from: number | null;
   to: number | null;
@@ -25,7 +25,7 @@ export type LineChange = {
 export function editLinesOf(order: { items: OrderItem[] }): EditLine[] {
   return liveItems(order).map((item) => ({
     order_item_id: item.id,
-    sku_id: item.sku_id,
+    sku_unit_id: item.sku_unit_id ?? 0,
     quantity: item.quantity,
     name: item.product_name,
     code: item.sku_code,
@@ -38,16 +38,28 @@ export function lineChanges(order: { items: OrderItem[] }, lines: EditLine[]): L
   const kept = new Set(lines.map((line) => line.order_item_id));
   const removed: LineChange[] = live
     .filter((item) => !kept.has(item.id))
-    .map((item) => ({ kind: "removed", sku_id: item.sku_id, name: item.product_name, from: item.quantity, to: null }));
+    .map((item) => ({
+      kind: "removed",
+      sku_unit_id: item.sku_unit_id ?? 0,
+      name: item.product_name,
+      from: item.quantity,
+      to: null,
+    }));
   const rest: LineChange[] = [];
 
   for (const line of lines) {
     const item = live.find((current) => current.id === line.order_item_id);
 
     if (item === undefined) {
-      rest.push({ kind: "added", sku_id: line.sku_id, name: line.name, from: null, to: line.quantity });
+      rest.push({ kind: "added", sku_unit_id: line.sku_unit_id, name: line.name, from: null, to: line.quantity });
     } else if (item.quantity !== line.quantity) {
-      rest.push({ kind: "quantity", sku_id: line.sku_id, name: line.name, from: item.quantity, to: line.quantity });
+      rest.push({
+        kind: "quantity",
+        sku_unit_id: line.sku_unit_id,
+        name: line.name,
+        from: item.quantity,
+        to: line.quantity,
+      });
     }
   }
 
@@ -63,7 +75,7 @@ export function editQuoteBody(customerId: number | null, orderNumber: number, li
   return {
     customer_id: customerId,
     order: orderNumber,
-    lines: lines.map(({ sku_id, quantity }) => ({ sku_id, quantity })),
+    lines: lines.map(({ sku_unit_id, quantity }) => ({ sku_unit_id, quantity })),
   };
 }
 
@@ -71,8 +83,8 @@ export function editBody(lines: EditLine[], note: string): OrderLinesRequest {
   const trimmed = note.trim();
 
   return {
-    lines: lines.map(({ order_item_id, sku_id, quantity }) =>
-      order_item_id === null ? { sku_id, quantity } : { order_item_id, sku_id, quantity },
+    lines: lines.map(({ order_item_id, sku_unit_id, quantity }) =>
+      order_item_id === null ? { sku_unit_id, quantity } : { order_item_id, sku_unit_id, quantity },
     ),
     ...(trimmed === "" ? {} : { note: trimmed }),
   };
@@ -80,7 +92,7 @@ export function editBody(lines: EditLine[], note: string): OrderLinesRequest {
 
 /** Whether an added or changed line has a problem in the quote (unchanged lines are not checked again, BR-O05). */
 export function editHasProblems(quote: OrderQuote | undefined, changes: LineChange[]): boolean {
-  return changes.some((change) => change.kind !== "removed" && quotedLine(quote, change.sku_id)?.problem != null);
+  return changes.some((change) => change.kind !== "removed" && quotedLine(quote, change.sku_unit_id)?.problem != null);
 }
 
 /**
@@ -100,7 +112,7 @@ export function editedItemsTotal(
     const amount =
       item !== undefined && item.quantity === line.quantity
         ? item.line_total
-        : quotedLine(quote, line.sku_id)?.line_total;
+        : quotedLine(quote, line.sku_unit_id)?.line_total;
 
     if (amount === undefined) {
       return null;

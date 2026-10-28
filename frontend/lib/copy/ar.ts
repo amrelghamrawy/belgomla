@@ -324,6 +324,9 @@ export const ar = {
     moq: "الحد الأدنى للطلب",
     unit: "وحدة البيع",
     conversion: (unit: string, factor: number) => `${unit} = ${factor} نسخة`,
+    // V2 Task 13 (D91): the units a SKU is sold in.
+    unitPicker: "اختر وحدة البيع",
+    unitWithFactor: (unit: string, factor: number) => `${unit} (${factor})`,
     code: "الكود",
     details: "تفاصيل المنتج",
     related: "نسخ أخرى من هذا الكتاب",
@@ -457,6 +460,8 @@ export const ar = {
     browse: "تصفح المنتجات",
     itemsTotal: "إجمالي الأصناف",
     unitPrice: (price: string) => `${price} للوحدة`,
+    // V2 Task 13 (D91): a line is one unit of the SKU; the same product may be there in two units.
+    unitLine: (unit: string, factor: number) => (factor > 1 ? `الوحدة: ${unit} (${factor})` : `الوحدة: ${unit}`),
     tierApplied: (min: number) => `سعر الكمية من ${min}`,
     remove: "حذف من السلة",
     removedTitle: "تم حذف بعض الأصناف من سلتك لأنها لم تعد متاحة:",

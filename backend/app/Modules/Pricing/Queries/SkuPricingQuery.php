@@ -5,16 +5,33 @@ declare(strict_types=1);
 namespace App\Modules\Pricing\Queries;
 
 use App\Modules\Catalog\Models\Product;
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
- * The SKU of a product (V1: exactly one, BR-P02) with its tiers, for the dashboard pricing endpoints.
- * The product comes from route binding, already scoped to the tenant (BR-T04).
+ * The SKU units of a product (V1: exactly one SKU, BR-P02; V2 Task 13, D91: sold in several units) with their tiers, unit
+ * and SKU, for the dashboard pricing endpoints. The product and unit come from route binding, already scoped to the
+ * tenant (BR-T04); a unit of another product is not found.
  */
 final readonly class SkuPricingQuery
 {
-    public function forProduct(Product $product): Sku
+    public function forUnit(Product $product, SkuUnit $unit): SkuUnit
     {
-        return $product->sku()->with('tiers')->firstOrFail()->setRelation('product', $product);
+        if ($unit->sku->product_id !== $product->id || ! $unit->isActive()) {
+            throw new ModelNotFoundException()->setModel(SkuUnit::class, [$unit->id]);
+        }
+
+        return $unit->load(['tiers', 'unit'])->setRelation('sku', $unit->sku->setRelation('product', $product));
+    }
+
+    /**
+     * @return Collection<int, SkuUnit>
+     */
+    public function forProduct(Product $product): Collection
+    {
+        $sku = $product->sku()->with(['activeUnits.tiers', 'activeUnits.unit'])->firstOrFail()->setRelation('product', $product);
+
+        return $sku->activeUnits->each(fn (SkuUnit $unit): SkuUnit => $unit->setRelation('sku', $sku));
     }
 }

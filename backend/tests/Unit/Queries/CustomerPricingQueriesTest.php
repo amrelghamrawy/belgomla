@@ -37,7 +37,7 @@ test('BR-PR14 a customer without a group or prices gets an empty context', funct
     expect(app(PricingContextQuery::class)->for($this->makeCustomer()))->toEqual(new PricingContext(null, []));
 });
 
-test('BR-PR14 the context holds the active group % and the negotiated prices, read in one query', function (): void {
+test('BR-PR14 D91 the context holds the active group % and the negotiated prices by sku unit, read in one query', function (): void {
     $group = CustomerGroup::factory()->create(['discount_percent' => '12.50']);
     $customer = $this->makeCustomer(['customer_group_id' => $group->id]);
     [$a, $b] = [pricingQuerySku('أ', 'A-1'), pricingQuerySku('ب', 'B-1')];
@@ -50,7 +50,7 @@ test('BR-PR14 the context holds the active group % and the negotiated prices, re
 
     expect(DB::getQueryLog())->toHaveCount(1)
         ->and($context?->groupDiscountPercent)->toBe('12.50')
-        ->and($context?->customerPrices)->toEqual([$a->id => '70.00', $b->id => '15.25']);
+        ->and($context?->customerPrices)->toEqual([$this->defaultUnitId($a) => '70.00', $this->defaultUnitId($b) => '15.25']);
 });
 
 test('D89 an archived group no longer applies, the customer keeps it', function (): void {

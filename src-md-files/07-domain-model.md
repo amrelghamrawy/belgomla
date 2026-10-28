@@ -199,15 +199,28 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 | product_id         | FK            |                                                       |
 | code               | varchar(60)   | **unique (tenant_id, code)** (BR-P03)                 |
 | name               | varchar(200)  | nullable; V1 = product name                           |
-| selling_unit_id    | FK units      | BR-U02                                                |
-| base_unit_id       | FK units      |                                                       |
-| conversion_factor  | int           | **check ≥ 1**; base units per selling unit            |
-| cover_price        | numeric(12,2) | nullable; the reference price: سعر الغلاف for `books`, سعر القطاعي otherwise (D68) |
-| base_price         | numeric(12,2) | **check > 0**, per selling unit                       |
-| base_price_percent | numeric(5,2)  | nullable; % off cover price used to derive base_price |
-| moq                | int           | **check ≥ 1**, default 1 (BR-MOQ01)                   |
+| base_unit_id       | FK units      | the unit stock is kept in (BR-U03)                    |
+
+V2 Task 13 (D91) moved `selling_unit_id, conversion_factor, cover_price, base_price, base_price_percent, moq` to `sku_units` (backfilled as each SKU's default unit, then dropped in a second migration).
 
 V1 invariant (app-enforced): exactly one SKU per product. V2 lifts it.
+
+### `sku_units` (V2 Task 13, BR-U02, BR-U04, D91)
+
+| Column             | Type          | Notes                                                 |
+| ------------------ | ------------- | ----------------------------------------------------- |
+| id                 | bigint PK     |                                                       |
+| tenant_id          | FK            |                                                       |
+| sku_id             | FK skus       | cascade; **unique (sku_id, unit_id)**                 |
+| unit_id            | FK units      | the selling unit (BR-U01)                             |
+| conversion_factor  | int           | **check ≥ 1**; base units in one of this unit (BR-U03) |
+| base_price         | numeric(12,2) | **check > 0**, per this unit (BR-PR01)                |
+| base_price_percent | numeric(5,2)  | nullable; % off cover price used to derive base_price (BR-PR10) |
+| cover_price        | numeric(12,2) | nullable; the reference price: سعر الغلاف for `books`, سعر القطاعي otherwise (D68) |
+| moq                | int           | **check ≥ 1**, default 1 (BR-MOQ01)                   |
+| is_default         | boolean       | **partial unique (sku_id) where is_default**; **check** a default is active |
+| sort_order         | int           | the form's order                                      |
+| status             | varchar(10)   | `active` \| `archived` (check); a unit left out of the form is archived, never deleted |
 
 ### `imports` (V2 Task 06)
 
@@ -240,21 +253,21 @@ The uploaded file waits in `storage/app/private/imports/{tenant}/{uuid}.{xlsx|cs
 | ---------------- | ------------- | ------------------------------------------------ |
 | id               | bigint PK     |                                                  |
 | tenant_id        | FK            |                                                  |
-| sku_id           | FK            |                                                  |
-| min_quantity     | int           | **check ≥ 1**; **unique (sku_id, min_quantity)** |
+| sku_unit_id      | FK sku_units  | cascade; the unit the tier belongs to (V2 Task 13; `sku_id` until then) |
+| min_quantity     | int           | **check ≥ 1**; **unique (sku_unit_id, min_quantity)** |
 | unit_price       | numeric(12,2) | **check > 0**                                    |
 | discount_percent | numeric(5,2)  | nullable, **check > 0 and < 100**, display only  |
 
 **Price resolution** (pure function, used by cart display and checkout):
 
 ```
-resolve(sku, qty, context = null):          # context: the customer's group % and negotiated prices (V2 Task 11)
+resolve(unit, qty, context = null):        # unit: the SKU unit (V2 Task 13, D91)          # context: the customer's group % and negotiated prices (V2 Task 11)
                                              #          + the live promotion of each SKU priced (V2 Task 12)
-  if context has a negotiated price for sku: return it            (source customer, BR-PR13)
+  if context has a negotiated price for unit: return it           (source customer, BR-PR13; per unit, D91)
   tier = max(min_quantity) among tiers where min_quantity <= qty
-  normal = tier ? tier.unit_price : sku.base_price               (source tier | base, BR-PR04)
-  group = context.group% ? round_half_up(sku.base_price × (100 − group%) / 100) : null
-  promo = context.promotion(sku) ? round_half_up(sku.base_price × (100 − promo%) / 100) : null
+  normal = tier ? tier.unit_price : unit.base_price              (source tier | base, BR-PR04)
+  group = context.group% ? round_half_up(unit.base_price × (100 − group%) / 100) : null
+  promo = context.promotion(unit.sku) ? round_half_up(unit.base_price × (100 − promo%) / 100) : null
   return the lowest of normal, group, promo (ties: that order)   (source group | promotion, BR-PR12, BR-PR15)
 ```
 
@@ -275,9 +288,10 @@ resolve(sku, qty, context = null):          # context: the customer's group % an
 | ----------- | ------------- | -------------------------------------------------- |
 | id          | bigint PK     |                                                    |
 | tenant_id   | FK            | index (tenant_id, sku_id)                          |
-| customer_id | FK            | **unique (customer_id, sku_id)**                   |
+| customer_id | FK            | **unique (customer_id, sku_unit_id)** (V2 Task 13; was (customer_id, sku_id)) |
 | sku_id      | FK            |                                                    |
-| unit_price  | numeric(12,2) | **check > 0**; in the selling unit, may be above the normal price |
+| sku_unit_id | FK sku_units  | V2 Task 13, D91: the price is negotiated per unit (backfilled to the default unit) |
+| unit_price  | numeric(12,2) | **check > 0**; in that unit, may be above the normal price |
 | note        | varchar(300)  | nullable                                           |
 
 ---
@@ -410,7 +424,7 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 
 `carts`: `id, tenant_id, customer_id` with **unique (customer_id)**.
 
-`cart_items`: `id, tenant_id, cart_id, sku_id, quantity (check ≥ 1), kind varchar(10) default 'order' (check `order` | `preorder`, V2 Task 10)` with **unique (cart_id, sku_id, kind)** (was (cart_id, sku_id) before V2 Task 10). No prices are stored in the cart; they are resolved on read (BR-PR06). Pre-order lines (BR-O14) are confirmed apart from the order lines.
+`cart_items`: `id, tenant_id, cart_id, sku_id, sku_unit_id (V2 Task 13, D91; the unit the line is in), quantity (check ≥ 1, in that unit), kind varchar(10) default 'order' (check `order` | `preorder`, V2 Task 10)` with **unique (cart_id, sku_unit_id, kind)** (was (cart_id, sku_id, kind) before V2 Task 13, (cart_id, sku_id) before V2 Task 10). A SKU may be in the cart in two units. No prices are stored in the cart; they are resolved on read (BR-PR06). Pre-order lines (BR-O14) are confirmed apart from the order lines.
 
 ---
 
@@ -462,12 +476,13 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | tenant_id         | FK            |                                        |
 | order_id          | FK            |                                        |
 | sku_id            | FK            | reference only; never used to re-price |
+| sku_unit_id       | FK sku_units  | V2 Task 13: nullable, reference only; the unit ordered in (backfilled to the default unit) |
 | product_id        | FK            | reference only                         |
 | product_name      | varchar(200)  | snapshot                               |
 | sku_code          | varchar(60)   | snapshot                               |
 | sku_name          | varchar(200)  | snapshot                               |
-| unit_name         | varchar(50)   | snapshot of selling unit               |
-| conversion_factor | int           | snapshot                               |
+| unit_name         | varchar(50)   | snapshot of the line's selling unit (D91) |
+| conversion_factor | int           | snapshot of the unit's factor          |
 | quantity          | int           | selling units, **check ≥ 1**           |
 | quantity_base     | int           | = quantity × conversion_factor         |
 | cover_price       | numeric(12,2) | snapshot, nullable                     |
@@ -676,10 +691,10 @@ BEGIN
   lock sku_inventory rows FOR UPDATE (ordered by sku_id to avoid deadlocks)
   for each item:
     assert product.status = active                      → else error "المنتج غير متاح"
-    unit_price = resolve(sku, qty)                      (section 4)
-    assert qty ≥ sku.moq                                → "الحد الأدنى للطلب"
-    qty_base = qty × conversion_factor
-    assert available ≥ qty_base                         → "الكمية غير متوفرة"
+    unit_price = resolve(unit, qty)                     (section 4; each line is a SKU unit, D91)
+    assert qty ≥ unit.moq                               → "الحد الأدنى للطلب"
+    qty_base = qty × unit.conversion_factor
+    assert available − base taken by earlier lines of the SKU ≥ qty_base → "الكمية غير متوفرة"
     line_total = qty × unit_price
   items_total = Σ line_total
   if settings.mov_enabled: assert items_total ≥ mov_amount
@@ -744,7 +759,6 @@ Each module exposes services; cross-module calls go through those services, neve
 | V2 feature             | Hook already present                                   |
 | ---------------------- | ------------------------------------------------------ |
 | Variants               | products 1:N skus                                      |
-| Multiple selling units | `selling_unit_id` on SKU → becomes a `sku_units` table |
 | Roles                  | `tenant_users.role` enum                               |
 | Pre-orders             | Built in V2 Task 10: `products.preorder_*`, `orders.kind` / `converted_from_id` / `converted_at`, `order_items.reserved` / `converted_quantity`, `cart_items.kind` (BR-O14, D88) |
 | Order notifications    | `outbound_messages.purpose` enum                       |

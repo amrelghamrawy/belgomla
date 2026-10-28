@@ -67,12 +67,12 @@ final class CheckoutFailed extends ApiException
         return new self(422, 'validation_failed', $message, ['customer_id' => [$message]]);
     }
 
-    /** BR-O11: a line of a merchant's order names a SKU this store does not have (`lines.{index}.sku_id`). */
+    /** BR-O11: a line of a merchant's order names a SKU unit this store does not have (`lines.{index}.sku_unit_id`, D91). */
     public static function skuUnavailable(int $index): self
     {
         $message = 'المنتج غير موجود';
 
-        return new self(422, 'validation_failed', $message, ["lines.{$index}.sku_id" => [$message]]);
+        return new self(422, 'validation_failed', $message, ["lines.{$index}.sku_unit_id" => [$message]]);
     }
 
     /** BR-O12: the order a quote edits is not one of this customer's orders in this store (`order`). */

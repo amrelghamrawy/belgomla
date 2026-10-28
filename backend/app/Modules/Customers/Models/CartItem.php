@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Customers\Models;
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
@@ -21,12 +22,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $tenant_id
  * @property int $cart_id
  * @property int $sku_id
+ * @property int $sku_unit_id
  * @property int $quantity
  * @property CartLineKind $kind
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Cart $cart
  * @property-read Sku $sku
+ * @property-read SkuUnit $skuUnit
  */
 final class CartItem extends Model
 {
@@ -61,6 +64,16 @@ final class CartItem extends Model
     public function sku(): BelongsTo
     {
         return $this->belongsTo(Sku::class);
+    }
+
+    /**
+     * The unit of the SKU this line is in (D91).
+     *
+     * @return BelongsTo<SkuUnit, $this>
+     */
+    public function skuUnit(): BelongsTo
+    {
+        return $this->belongsTo(SkuUnit::class);
     }
 
     /**

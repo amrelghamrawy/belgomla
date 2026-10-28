@@ -156,7 +156,7 @@ V2 should focus on increasing merchant flexibility and operational capability af
 ### Catalog
 
 - Product variants (color/size) exposed in the UI.
-- Multiple selling units per SKU.
+- Multiple selling units per SKU. **Done (V2 Task 13, BR-U02, D91).**
 - Bulk catalog import/export.
 
 ### Pricing

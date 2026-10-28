@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Pricing\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Data\BulkPricingData;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
@@ -16,15 +16,15 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * BR-PR11 bulk pricing by filter: every SKU of the matching products gets base price = X% off its own
- * cover price and the given % tiers (replacing its tiers), plus the MOQ when one is given. SKUs without
- * a cover price are skipped and reported.
+ * BR-PR11 bulk pricing by filter: every active unit of the SKU of the matching products (or only the units sold in the
+ * given store unit, V2 Task 13, D91) gets base price = X% off its own cover price and the given % tiers (replacing its
+ * tiers), plus the MOQ when one is given. Units without a cover price are skipped and reported.
  *
  * Preview (`$apply = false`) plans every SKU, so invalid tiers fail the same way, and writes nothing.
  * Apply writes everything in one transaction (owned here) under one audit batch: the per-SKU records of
  * UpdateSkuPricing plus one `pricing.bulk_applied` record. An empty filter is refused.
  *
- * @phpstan-type Skipped array{product_id: int, sku_id: int, code: string, name: string}
+ * @phpstan-type Skipped array{product_id: int, sku_id: int, sku_unit_id: int, code: string, name: string, unit: string}
  */
 final readonly class BulkApplyPricing
 {
@@ -51,16 +51,17 @@ final readonly class BulkApplyPricing
         $batchId = $this->audit->newBatchId();
 
         return DB::transaction(function () use ($data, $batchId): array {
-            [$priced, $skipped] = $this->split($this->targets->get($data->filter));
+            [$priced, $skipped] = $this->split($this->targets->get($data->filter, $data->unitId));
 
-            foreach ($priced as $sku) {
-                $this->update->handle($sku, $this->pricingFor($sku, $data), $batchId);
+            foreach ($priced as $unit) {
+                $this->update->handle($unit, $this->pricingFor($unit, $data), $batchId);
             }
 
             $this->audit->log('pricing.bulk_applied', 'skus', null, [
                 'base_price_percent' => $data->basePricePercent,
                 'tiers' => array_map(fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'discount_percent' => $tier->discountPercent], $data->tiers),
                 'moq' => $data->moq,
+                'unit_id' => $data->unitId,
                 'affected' => $priced->count(),
                 'skipped_no_cover_price' => count($skipped),
             ], $batchId);
@@ -74,43 +75,44 @@ final readonly class BulkApplyPricing
      */
     private function preview(BulkPricingData $data): array
     {
-        [$priced, $skipped] = $this->split($this->targets->get($data->filter));
+        [$priced, $skipped] = $this->split($this->targets->get($data->filter, $data->unitId));
 
-        foreach ($priced as $sku) {
-            $this->planner->plan($sku, $this->pricingFor($sku, $data));
+        foreach ($priced as $unit) {
+            $this->planner->plan($unit, $this->pricingFor($unit, $data));
         }
 
         return ['affected' => $priced->count(), 'skipped_no_cover_price' => $skipped, 'batch_id' => null];
     }
 
     /**
-     * @param  Collection<int, Sku>  $skus
-     * @return array{0: Collection<int, Sku>, 1: list<Skipped>}
+     * @param  Collection<int, SkuUnit>  $units
+     * @return array{0: Collection<int, SkuUnit>, 1: list<Skipped>}
      */
-    private function split(Collection $skus): array
+    private function split(Collection $units): array
     {
         $priced = new Collection;
         $skipped = [];
 
-        foreach ($skus as $sku) {
-            if ($sku->cover_price !== null) {
-                $priced->push($sku);
+        foreach ($units as $unit) {
+            if ($unit->cover_price !== null) {
+                $priced->push($unit);
 
                 continue;
             }
 
-            $skipped[] = ['product_id' => $sku->product_id, 'sku_id' => $sku->id, 'code' => $sku->code, 'name' => $sku->product->name];
+            $sku = $unit->sku;
+            $skipped[] = ['product_id' => $sku->product_id, 'sku_id' => $sku->id, 'sku_unit_id' => $unit->id, 'code' => $sku->code, 'name' => $sku->product->name, 'unit' => $unit->unit->name];
         }
 
         return [$priced, $skipped];
     }
 
-    private function pricingFor(Sku $sku, BulkPricingData $data): SkuPricingData
+    private function pricingFor(SkuUnit $unit, BulkPricingData $data): SkuPricingData
     {
         return new SkuPricingData(
             basePrice: null,
             basePricePercent: $data->basePricePercent,
-            moq: $data->moq ?? $sku->moq,
+            moq: $data->moq ?? $unit->moq,
             tiers: $data->tiers,
             coverPriceGiven: false,
         );

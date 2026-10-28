@@ -44,9 +44,9 @@ beforeEach(function (): void {
             $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1], onHand: 200)->create()->sku()->sole();
             $phoned = Customer::factory()->create();
             $shopper = Customer::factory()->create();
-            CartItem::factory()->for(Cart::factory()->for($phoned))->create(['sku_id' => $sku->id, 'quantity' => 5]);
+            CartItem::factory()->for(Cart::factory()->for($phoned))->create(['sku_unit_id' => $this->defaultUnitId($sku), 'quantity' => 5]);
             $order = app(Checkout::class)->handle($phoned, new CheckoutData(CustomerAddress::factory()->for($phoned)->default()->create()->id));
-            CartItem::factory()->for(Cart::factory()->for($shopper))->create(['sku_id' => $sku->id, 'quantity' => 5]);
+            CartItem::factory()->for(Cart::factory()->for($shopper))->create(['sku_unit_id' => $this->defaultUnitId($sku), 'quantity' => 5]);
 
             return [
                 'tenant' => $tenant,
@@ -63,7 +63,7 @@ beforeEach(function (): void {
 
     $this->edit = fn (): EditedOrder => app(EditOrderLines::class)->handle(
         $this->race['order'],
-        new OrderEditData([new OrderEditLineData($this->race['line']->id, $this->race['sku']->id, 10)]),
+        new OrderEditData([new OrderEditLineData($this->race['line']->id, $this->defaultUnitId($this->race['sku']), 10)]),
         $this->race['user']->id,
     );
     $this->checkout = fn (): Order => app(Checkout::class)->handle($this->race['shopper'][0], new CheckoutData($this->race['shopper'][1]->id));
@@ -100,7 +100,7 @@ test('BR-O12 BR-INV03 an edit and a checkout race for the last units: the checko
 
     expect($blocked)->toBe('55P03')
         ->and(fn (): mixed => onSession('pgsql_session_b', fn (): Order => ($this->checkout)()))->toThrow(function (CheckoutFailed $e): void {
-            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
+            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
         })
         ->and(($this->stock)())->toBe(['on_hand' => 200, 'reserved' => 200]);
 });
@@ -112,7 +112,7 @@ test('BR-O12 BR-INV03 a checkout first leaves the edit refused and the order as 
     $a->commit();
 
     expect(fn (): mixed => onSession('pgsql_session_b', fn (): EditedOrder => ($this->edit)()))->toThrow(function (CheckoutFailed $e): void {
-        expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'insufficient_stock', 'requested' => 10, 'available' => 5]]);
+        expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'insufficient_stock', 'requested' => 10, 'available' => 5]]);
     })
         ->and(($this->stock)())->toBe(['on_hand' => 200, 'reserved' => 200])
         ->and(onSession('pgsql_session_a', fn (): int => OrderItem::query()->findOrFail($this->race['line']->id)->quantity))->toBe(5);

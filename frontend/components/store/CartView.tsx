@@ -99,7 +99,7 @@ export function CartView() {
           <MovProgress cart={cart.data} />
           <ul className="flex flex-col gap-3">
             {cart.data.items.map((item) => (
-              <CartLine key={item.sku_id} item={item} />
+              <CartLine key={item.sku_unit_id} item={item} />
             ))}
           </ul>
           <div className="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t p-3 backdrop-blur md:static md:rounded-xl md:border">
@@ -137,7 +137,7 @@ function PreorderSection({ cart }: { cart: Cart }) {
       </div>
       <ul className="flex flex-col gap-3">
         {cart.preorders.items.map((item) => (
-          <CartLine key={item.sku_id} item={item} kind="preorder" />
+          <CartLine key={item.sku_unit_id} item={item} kind="preorder" />
         ))}
       </ul>
       <div className="flex items-center gap-3">
@@ -179,7 +179,9 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
     timer.current = setTimeout(
       () =>
         update.mutate(
-          preorder ? { sku_id: item.sku_id, quantity: next, kind } : { sku_id: item.sku_id, quantity: next },
+          preorder
+            ? { sku_unit_id: item.sku_unit_id, quantity: next, kind }
+            : { sku_unit_id: item.sku_unit_id, quantity: next },
           {
             onError: (error) => {
               setQuantity(item.quantity);
@@ -198,6 +200,9 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
           <Link href={`/p/${encodeURIComponent(item.product_slug)}`} className="font-medium hover:underline">
             {item.product_name}
           </Link>
+          <span className="text-sm font-semibold" data-testid={`cart-unit-${item.sku_unit_id}`}>
+            {ar.cart.unitLine(item.unit, item.conversion_factor)}
+          </span>
           <span className="text-muted-foreground text-sm">
             {ar.cart.unitPrice(formatMoney(item.unit_price))} / {item.unit}
             {item.tier_min_quantity !== null && ` · ${ar.cart.tierApplied(item.tier_min_quantity)}`}
@@ -218,7 +223,7 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
           aria-label={`${ar.cart.remove}: ${item.product_name}`}
           disabled={remove.isPending}
           onClick={() =>
-            remove.mutate(preorder ? { sku_id: item.sku_id, kind } : item.sku_id, {
+            remove.mutate(preorder ? { sku_unit_id: item.sku_unit_id, kind } : item.sku_unit_id, {
               onError: (error) => toast.error(messageFor(error)),
             })
           }
@@ -228,7 +233,7 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
       </div>
       <div className="flex items-center justify-between gap-2">
         <QuantityStepper
-          id={preorder ? `quantity-preorder-${item.sku_id}` : `quantity-${item.sku_id}`}
+          id={preorder ? `quantity-preorder-${item.sku_unit_id}` : `quantity-${item.sku_unit_id}`}
           value={quantity}
           bounds={bounds}
           onChange={change}

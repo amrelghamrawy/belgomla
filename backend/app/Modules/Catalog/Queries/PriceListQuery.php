@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Collection;
 
 /**
  * BR-P13 printable price list: every visible product of the selection, by name, unpaginated but capped
- * at `catalog.price_list_limit` rows (one extra row is read to know whether the list was cut).
+ * at `catalog.price_list_limit` products (each shows one row per unit it is sold in, D91) (one extra row is read to know whether the list was cut).
  */
 final readonly class PriceListQuery
 {
@@ -39,7 +39,7 @@ final readonly class PriceListQuery
     {
         return $this->filtered->builder($filter)
             ->tap(new VisibleOnStore)
-            ->with(['category', 'sku.sellingUnit', 'sku.tiers']) // tiers: a group price shows only when below them (BR-PR14)
+            ->with(['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers']) // tiers: a group price shows only when below them (BR-PR14)
             ->orderBy('products.name')
             ->orderBy('products.id');
     }

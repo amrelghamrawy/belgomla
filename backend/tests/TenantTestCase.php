@@ -11,6 +11,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\Cart;
@@ -93,8 +94,8 @@ abstract class TenantTestCase extends TestCase
     }
 
     /**
-     * A valid row of the catalog file (format v1, by column key) for a new book in "كتب خارجية > أولى إعدادي";
-     * overrides replace cells, a null removes the column.
+     * A valid row of the catalog file (format v2, by column key: one row per SKU unit) for a new book in
+     * "كتب خارجية > أولى إعدادي", sold by the carton of 20; overrides replace cells, a null removes the column.
      *
      * @param  array<string, string|null>  $overrides
      * @return array<string, string>
@@ -109,8 +110,9 @@ abstract class TenantTestCase extends TestCase
             'category_path' => 'كتب خارجية > أولى إعدادي',
             'status' => 'نشط',
             'description' => 'كتاب العلوم',
-            'selling_unit' => 'كرتونة',
             'base_unit' => 'قطعة',
+            'unit' => 'كرتونة',
+            'unit_is_default' => 'نعم',
             'conversion_factor' => '20',
             'cover_price' => '120',
             'base_price' => '90',
@@ -165,7 +167,7 @@ abstract class TenantTestCase extends TestCase
             ]);
             SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
 
-            return $product->refresh()->load('sku.tiers');
+            return $product->refresh()->load('sku.activeUnits.tiers');
         });
     }
 
@@ -186,13 +188,15 @@ abstract class TenantTestCase extends TestCase
             'custom_fields' => [],
             'sku' => [
                 'code' => 'ADW-SCI-P1-T1',
-                'selling_unit_id' => $basics['carton']->id,
                 'base_unit_id' => $basics['piece']->id,
-                'conversion_factor' => 20,
-                'cover_price' => '120.00',
-                'base_price' => '90.00',
-                'base_price_percent' => null,
-                'moq' => 5,
+                'units' => [[
+                    'unit_id' => $basics['carton']->id,
+                    'conversion_factor' => 20,
+                    'cover_price' => '120.00',
+                    'base_price' => '90.00',
+                    'base_price_percent' => null,
+                    'moq' => 5,
+                ]],
             ],
         ], $overrides);
 
@@ -335,7 +339,7 @@ abstract class TenantTestCase extends TestCase
     }
 
     /**
-     * Puts lines in a customer's cart, as `[sku_id => quantity]`.
+     * Puts lines in a customer's cart, as `[sku_id => quantity]` in each SKU's default unit (D91).
      *
      * @param  array<int, int>  $lines
      */
@@ -345,8 +349,37 @@ abstract class TenantTestCase extends TestCase
             $cart = Cart::query()->firstOrCreate(['customer_id' => $customer->id]);
 
             foreach ($lines as $skuId => $quantity) {
-                CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_id' => $skuId], ['quantity' => $quantity]);
+                CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_unit_id' => $this->defaultUnitId($skuId), 'kind' => CartLineKind::Order], ['sku_id' => $skuId, 'quantity' => $quantity]);
             }
+        });
+    }
+
+    /** D91: the id of a SKU's default unit (what a line naming only the SKU is in). */
+    protected function defaultUnitId(Sku|int $sku): int
+    {
+        $skuId = $sku instanceof Sku ? $sku->id : $sku;
+
+        return app(TenantContext::class)->has()
+            ? SkuUnit::query()->where('sku_id', $skuId)->where('is_default', true)->sole()->id
+            : SkuUnit::query()->withoutGlobalScopes()->where('sku_id', $skuId)->where('is_default', true)->sole()->id; // a test may ask outside any tenant context
+    }
+
+    /**
+     * D91: a further unit of a SKU (a carton of 12 at 1000.00 by default), optionally with tiers `[min => price]`.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<int, string>  $tiers
+     */
+    protected function addUnit(Sku $sku, array $attributes = [], array $tiers = []): SkuUnit
+    {
+        return $this->asTenant(Tenant::query()->findOrFail($sku->tenant_id), function () use ($sku, $attributes, $tiers): SkuUnit {
+            $unit = SkuUnit::factory()->create(['sku_id' => $sku->id, 'conversion_factor' => 12, 'base_price' => '1000.00', ...$attributes]);
+
+            foreach ($tiers as $min => $price) {
+                SkuPriceTier::factory()->create(['sku_unit_id' => $unit->id, 'min_quantity' => $min, 'unit_price' => $price]);
+            }
+
+            return $unit->refresh();
         });
     }
 
@@ -403,7 +436,7 @@ abstract class TenantTestCase extends TestCase
             $cart = Cart::query()->firstOrCreate(['customer_id' => $customer->id]);
 
             foreach ($lines as $skuId => $quantity) {
-                CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_id' => $skuId, 'kind' => CartLineKind::Preorder], ['quantity' => $quantity]);
+                CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_unit_id' => $this->defaultUnitId($skuId), 'kind' => CartLineKind::Preorder], ['sku_id' => $skuId, 'quantity' => $quantity]);
             }
         });
     }

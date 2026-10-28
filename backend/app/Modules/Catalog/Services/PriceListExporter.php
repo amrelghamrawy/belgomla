@@ -10,6 +10,7 @@ use App\Modules\Catalog\Enums\SpreadsheetFormat;
 use App\Modules\Catalog\Exceptions\PricesHidden;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Queries\PriceListExportQuery;
 use App\Modules\Catalog\Queries\PriceVisibilityQuery;
 use App\Modules\Pricing\Contracts\CustomerPricing;
@@ -74,28 +75,30 @@ final readonly class PriceListExporter
             ->flatMap(function (LazyCollection $chunk) use ($customer): array {
                 $pricing = $this->pricing->for($customer, array_values($chunk->map(fn (Product $product): ?int => $product->sku?->id)->filter()->all()));
 
-                return $chunk->map(fn (Product $product): array => $this->row($product, $pricing))->values()->all();
+                return $chunk->flatMap(fn (Product $product): array => $this->rows($product, $pricing))->values()->all();
             });
 
         $this->spreadsheet->write($path, SpreadsheetFormat::Xlsx, self::COLUMNS, $rows, 'قائمة الأسعار');
     }
 
     /**
-     * @return array<string, string|int|float|null>
+     * One row per unit the product is sold in, the default first (D91).
+     *
+     * @return list<array<string, string|int|float|null>>
      */
-    private function row(Product $product, ?PricingContext $pricing): array
+    private function rows(Product $product, ?PricingContext $pricing): array
     {
-        $sku = $product->sku;
+        $units = $product->sku instanceof Sku ? $product->sku->activeUnits->all() : [];
 
-        return [
+        return array_values(array_map(fn (?SkuUnit $unit): array => [
             'name' => $product->name,
             'section' => $product->category->kind->label(),
-            'code' => $sku?->code,
-            'unit' => $sku instanceof Sku ? $sku->sellingUnit->name : null,
-            'moq' => $sku?->moq,
-            'cover_price' => $sku?->cover_price === null ? null : (float) $sku->cover_price,
-            'base_price' => $sku instanceof Sku ? (float) $this->resolver->listed($sku, $pricing)->basePrice : null,
+            'code' => $product->sku?->code,
+            'unit' => $unit?->unit->name,
+            'moq' => $unit?->moq,
+            'cover_price' => $unit?->cover_price === null ? null : (float) $unit->cover_price,
+            'base_price' => $unit instanceof SkuUnit ? (float) $this->resolver->listed($unit, $pricing)->basePrice : null,
             'availability' => $product->status === ProductStatus::ComingSoon ? 'قريبًا' : 'متاح',
-        ];
+        ], $units === [] ? [null] : $units));
     }
 }

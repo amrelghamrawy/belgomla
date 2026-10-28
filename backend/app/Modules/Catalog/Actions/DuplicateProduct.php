@@ -15,8 +15,8 @@ use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * BR-P11 / D30: copies name, category, description, custom fields, units, prices, tiers and MOQ into a new
- * `inactive` product with a new SKU code ("{code}-COPY", "-COPY-2", ...) and its own slug. Images,
+ * BR-P11 / D30: copies name, category, description, custom fields, the active units with their prices, tiers and MOQ
+ * (D91) into a new `inactive` product with a new SKU code ("{code}-COPY", "-COPY-2", ...) and its own slug. Images,
  * relations and stock are not copied: the copy gets an empty stock row through Inventory's
  * RecordOpeningStock. Prices and tiers are copied as stored, through Pricing's UpdateSkuPricing. Owns its
  * transaction.
@@ -34,7 +34,7 @@ final readonly class DuplicateProduct
 
     public function handle(Product $source, ?int $createdBy = null): Product
     {
-        $source->loadMissing('sku.tiers');
+        $source->loadMissing('sku.activeUnits.tiers');
 
         return DB::transaction(function () use ($source, $createdBy): Product {
             $copy = Product::query()->create([
@@ -60,18 +60,20 @@ final readonly class DuplicateProduct
 
     private function copySku(Sku $source, Product $copy): void
     {
-        $sku = $copy->skus()->make([
-            ...$source->only(['name', 'selling_unit_id', 'base_unit_id', 'conversion_factor']),
+        $sku = $copy->skus()->create([
+            ...$source->only(['name', 'base_unit_id']),
             'code' => $this->nextCode($source->code),
         ]);
 
-        $sku = $this->pricing->handle($sku, new SkuPricingData(
-            basePrice: $source->base_price,
-            basePricePercent: $source->base_price_percent,
-            moq: $source->moq,
-            tiers: $this->prices->tiers($source),
-            coverPrice: $source->cover_price,
-        ));
+        foreach ($source->activeUnits as $unit) {
+            $this->pricing->handle($sku->units()->make($unit->only(['unit_id', 'conversion_factor', 'is_default', 'sort_order'])), new SkuPricingData(
+                basePrice: $unit->base_price,
+                basePricePercent: $unit->base_price_percent,
+                moq: $unit->moq,
+                tiers: $this->prices->tiers($unit),
+                coverPrice: $unit->cover_price,
+            ));
+        }
 
         $this->openingStock->handle($sku, 0);
     }

@@ -8,7 +8,7 @@ use App\Modules\Customers\Enums\CartLineKind;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/** PATCH /api/store/cart/items/{sku_id}: `{ quantity, kind? }` (BR-U05); `kind` names the order (default) or pre-order line. */
+/** PATCH /api/store/cart/items/{sku_unit_id}: `{ quantity, kind? }` (BR-U05); `kind` names the order (default) or pre-order line. */
 final class UpdateCartItemRequest extends FormRequest
 {
     /**

@@ -27,6 +27,7 @@ function demand(overrides: Partial<PreorderDemand> = {}): PreorderDemand {
     limit: 100,
     remaining: 80,
     quantity: 20,
+    quantity_base: 20,
     customers: 2,
     preorders: 3,
     ...overrides,

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Validator;
 
 /**
- * POST /api/dashboard/orders: `{ customer_id, address_id, lines: [{ sku_id, quantity, discount? }], note?,
+ * POST /api/dashboard/orders: `{ customer_id, address_id, lines: [{ sku_unit_id, quantity, discount? }], note?,
  * notify_customer?, override_mov?, discount? }` (BR-O11). Waiving the minimum order value needs `orders.override_mov`
  * (owner and manager, D84); anyone else sending `override_mov: true` gets 403. A line `discount` (`{ type, value }`)
  * and the order `discount` (`{ type, value, reason }`) follow PUT …/discount (D85): every role with `orders.create`
@@ -31,7 +31,7 @@ final class StoreMerchantOrderRequest extends FormRequest
     {
         return [
             ...QuoteOrderRequest::lineRules(),
-            'lines.*' => ['array:sku_id,quantity,discount'],
+            'lines.*' => ['array:sku_unit_id,quantity,discount'],
             'lines.*.discount' => ['sometimes', 'nullable', 'array:type,value'],
             ...ApplyOrderDiscountRequest::discountRules('lines.*.discount', false),
             'address_id' => ['required', 'integer', 'min:1'],
@@ -80,7 +80,7 @@ final class StoreMerchantOrderRequest extends FormRequest
     }
 
     /**
-     * @return list<array{sku_id: int, quantity: int}>
+     * @return list<array{sku_unit_id: int, quantity: int}>
      */
     public function lines(): array
     {
@@ -88,7 +88,7 @@ final class StoreMerchantOrderRequest extends FormRequest
     }
 
     /**
-     * D85: sku id => the line's discount, for the lines that have one.
+     * D85: SKU unit id => the line's discount, for the lines that have one.
      *
      * @return array<int, array{type: DiscountType, value: string}>
      */
@@ -97,14 +97,14 @@ final class StoreMerchantOrderRequest extends FormRequest
         $discounts = [];
 
         foreach ($this->array('lines') as $line) {
-            if (! is_array($line) || ! is_numeric($line['sku_id'] ?? null)) {
+            if (! is_array($line) || ! is_numeric($line['sku_unit_id'] ?? null)) {
                 continue;
             }
 
             [$type, $value] = ApplyOrderDiscountRequest::discountOf($line['discount'] ?? null);
 
             if ($type !== null && $value !== null) {
-                $discounts[(int) $line['sku_id']] = ['type' => $type, 'value' => $value];
+                $discounts[(int) $line['sku_unit_id']] = ['type' => $type, 'value' => $value];
             }
         }
 

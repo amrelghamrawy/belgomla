@@ -35,10 +35,10 @@ test('every customers exception fixes its status, code and arabic message', func
     'login rate limited' => [LoginRejected::tooManyAttempts(), 429, 'rate_limited', 'محاولات كثيرة، حاول بعد دقيقة'],
     'login not stateful' => [LoginRejected::statefulRequestRequired(), 400, 'stateful_request_required', 'يجب إرسال الطلب من واجهة المتجر'],
     'invitation invalid' => [InvitationInvalid::make(), 404, 'not_found', 'رابط الدعوة غير صالح أو منتهي الصلاحية'],
-    'below moq' => [CartLineInvalid::belowMoq(5, 10), 422, 'cart_line_invalid', 'الحد الأدنى للطلب 10'],
-    'insufficient stock' => [CartLineInvalid::insufficientStock(5, 3), 422, 'cart_line_invalid', 'الكمية غير متوفرة'],
-    'product inactive' => [CartLineInvalid::productInactive(5), 422, 'cart_line_invalid', 'المنتج غير متاح للطلب'],
-    'pre-order unavailable' => [CartLineInvalid::preorderUnavailable(5), 422, 'cart_line_invalid', 'الحجز المسبق غير متاح لهذا المنتج'],
+    'below moq' => [CartLineInvalid::belowMoq(5, 9, 10), 422, 'cart_line_invalid', 'الحد الأدنى للطلب 10'],
+    'insufficient stock' => [CartLineInvalid::insufficientStock(5, 9, 3), 422, 'cart_line_invalid', 'الكمية غير متوفرة'],
+    'product inactive' => [CartLineInvalid::productInactive(5, 9), 422, 'cart_line_invalid', 'المنتج غير متاح للطلب'],
+    'pre-order unavailable' => [CartLineInvalid::preorderUnavailable(5, 9), 422, 'cart_line_invalid', 'الحجز المسبق غير متاح لهذا المنتج'],
     'prices hidden' => [PricesHidden::make(), 403, 'prices_hidden', 'سجّل الدخول لعرض الأسعار والإضافة إلى السلة'],
     'transition' => [InvalidCustomerTransition::from(CustomerStatus::Active, CustomerStatus::Active), 409, 'invalid_transition', 'لا يمكن تغيير حالة العميل من «نشط» إلى «نشط»'],
     'not blocked' => [InvalidCustomerTransition::notBlocked(CustomerStatus::Active), 409, 'invalid_transition', 'العميل غير محظور، حالته «نشط»'],
@@ -47,10 +47,10 @@ test('every customers exception fixes its status, code and arabic message', func
 ]);
 
 test('cart line failures carry the sku in items like checkout failures', function (): void {
-    expect(CartLineInvalid::belowMoq(5, 10)->items)->toBe([['sku_id' => 5, 'reason' => 'below_moq', 'moq' => 10]])
-        ->and(CartLineInvalid::insufficientStock(5, 3)->items)->toBe([['sku_id' => 5, 'reason' => 'insufficient_stock', 'available' => 3]])
-        ->and(CartLineInvalid::productInactive(5)->items)->toBe([['sku_id' => 5, 'reason' => 'product_inactive']])
-        ->and(CartLineInvalid::preorderUnavailable(5)->items)->toBe([['sku_id' => 5, 'reason' => 'preorder_unavailable']]);
+    expect(CartLineInvalid::belowMoq(5, 9, 10)->items)->toBe([['sku_id' => 5, 'sku_unit_id' => 9, 'reason' => 'below_moq', 'moq' => 10]])
+        ->and(CartLineInvalid::insufficientStock(5, 9, 3)->items)->toBe([['sku_id' => 5, 'sku_unit_id' => 9, 'reason' => 'insufficient_stock', 'available' => 3]])
+        ->and(CartLineInvalid::productInactive(5, 9)->items)->toBe([['sku_id' => 5, 'sku_unit_id' => 9, 'reason' => 'product_inactive']])
+        ->and(CartLineInvalid::preorderUnavailable(5, 9)->items)->toBe([['sku_id' => 5, 'sku_unit_id' => 9, 'reason' => 'preorder_unavailable']]);
 });
 
 test('otp send limits tell how long to wait', function (): void {

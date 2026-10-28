@@ -130,11 +130,11 @@ final readonly class ConvertPreorders
             return null;
         }
 
-        $skus = $this->skus->findMany(array_values(array_unique($items->map(fn (OrderItem $item): int => $item->sku_id)->all())));
+        $units = $this->skus->findMany(array_values(array_unique($items->map(fn (OrderItem $item): int => $item->sku_unit_id ?? 0)->all())));
         $lines = [];
 
         foreach ($taken as $itemId => $quantity) {
-            $lines[] = new CartLineInput($skus->get($items->firstWhere('id', $itemId)?->sku_id) ?? throw new RuntimeException('Pre-order line without its SKU.'), $quantity);
+            $lines[] = new CartLineInput($units->get($items->firstWhere('id', $itemId)->sku_unit_id ?? 0) ?? throw new RuntimeException('Pre-order line without its SKU unit.'), $quantity);
         }
 
         $order = $this->place->handle(new OrderPlacementData($customer, null, $lines, ActorType::TenantUser, $actorId, $preorder->customer_note, skipMov: true, convertedFrom: $preorder));
@@ -149,7 +149,8 @@ final readonly class ConvertPreorders
     }
 
     /**
-     * What each line can have now: the stock of its SKU locked, up to what is left of the line, in whole selling units.
+     * What each line can have now: the stock of its SKU locked, up to what is left of the line, in whole units of the line;
+     * lines of one SKU in several units share its stock, oldest line first (D91).
      *
      * @param  Collection<int, OrderItem>  $items
      * @return array<int, int> order item id => selling units
@@ -158,14 +159,15 @@ final readonly class ConvertPreorders
     {
         $stock = $this->ledger->lock(array_values($items->map(fn (OrderItem $item): int => $item->sku_id)->all()));
         $taken = [];
+        $left = []; // sku_id => base units still free
 
         foreach ($items as $item) {
-            $row = $stock->get($item->sku_id);
-            $units = $row === null ? 0 : intdiv(max(0, $row->available), $item->conversion_factor);
-            $quantity = min($item->remainingQuantity(), $units);
+            $left[$item->sku_id] ??= max(0, $stock->get($item->sku_id)->available ?? 0);
+            $quantity = min($item->remainingQuantity(), intdiv($left[$item->sku_id], $item->conversion_factor));
 
             if ($quantity > 0) {
                 $taken[$item->id] = $quantity;
+                $left[$item->sku_id] -= $quantity * $item->conversion_factor;
             }
         }
 
@@ -181,7 +183,7 @@ final readonly class ConvertPreorders
      */
     private function keepRemainder(Order $preorder, Collection $items, array $taken, Order $order, int $actorId): void
     {
-        $newPrices = OrderItem::query()->where('order_id', $order->id)->pluck('unit_price', 'sku_id');
+        $newPrices = OrderItem::query()->where('order_id', $order->id)->pluck('unit_price', 'sku_unit_id');
         $changes = [];
 
         foreach ($items as $item) {
@@ -194,7 +196,7 @@ final readonly class ConvertPreorders
             $before = $item->remainingQuantity();
             $converted = $item->converted_quantity + $quantity;
             $item->forceFill(['converted_quantity' => $converted, 'line_total' => Money::times($item->unit_price, $item->quantity - $converted)])->save();
-            $price = $newPrices->get($item->sku_id);
+            $price = $newPrices->get($item->sku_unit_id);
 
             OrderItemChange::query()->create([
                 'order_id' => $preorder->id, 'order_item_id' => $item->id, 'change' => OrderItemChangeType::Converted,

@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 import { NewOrderPage } from "@/components/dashboard/orders/NewOrderPage";
 import type { DashboardCustomer, OrderQuote } from "@/lib/api/types";
 
-import { dashboardProduct, dashboardSku, orderQuote, orderQuoteLine, signedInAs } from "../../dashboard-fixtures";
+import {
+  dashboardProduct,
+  dashboardSku,
+  dashboardSkuUnit,
+  orderQuote,
+  orderQuoteLine,
+  signedInAs,
+} from "../../dashboard-fixtures";
 import { address, page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderWithQuery as renderBare, router, searchParams } from "../../render";
@@ -65,6 +72,45 @@ async function pickProduct(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("option", { name: /الأضواء علوم/ }));
 }
 
+describe("NewOrderPage units (D91)", () => {
+  it("picks a product in its default unit and switches the line to another unit of the SKU", async () => {
+    const sku = dashboardSku({ id: 3, code: "ADW-SCI", moq: 5 });
+    const twoUnits = dashboardProduct({
+      id: 3,
+      name: "الأضواء علوم",
+      sku: { ...sku, units: [...(sku.units ?? []), dashboardSkuUnit({ id: 9, moq: 2 })] },
+    });
+    const fetchMock = stubForm(orderQuote(), { "GET /api/dashboard/products": json(200, page([twoUnits])) });
+    const user = userEvent.setup();
+    renderWithQuery(<NewOrderPage />);
+
+    await screen.findByLabelText("عنوان التوصيل");
+    await pickProduct(user);
+    await screen.findByTestId("line-3");
+    await user.selectOptions(screen.getByLabelText("وحدة الأضواء علوم"), "9");
+
+    expect(await screen.findByTestId("line-9")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "POST /api/dashboard/orders/quote").at(-1)?.body).toEqual({
+        customer_id: 7,
+        lines: [{ sku_unit_id: 9, quantity: 2 }],
+      }),
+    );
+  });
+
+  it("shows no unit select for a SKU sold in one unit", async () => {
+    stubForm();
+    const user = userEvent.setup();
+    renderWithQuery(<NewOrderPage />);
+
+    await screen.findByLabelText("عنوان التوصيل");
+    await pickProduct(user);
+
+    await screen.findByTestId("line-3");
+    expect(screen.queryByLabelText("وحدة الأضواء علوم")).toBeNull();
+  });
+});
+
 describe("NewOrderPage", () => {
   it("BR-O11 quotes the lines live and places the order for the customer, then opens it", async () => {
     const fetchMock = stubForm(orderQuote(), {
@@ -85,7 +131,7 @@ describe("NewOrderPage", () => {
     await waitFor(() =>
       expect(callsTo(fetchMock, "POST /api/dashboard/orders/quote").at(-1)?.body).toEqual({
         customer_id: 7,
-        lines: [{ sku_id: 3, quantity: 12 }],
+        lines: [{ sku_unit_id: 3, quantity: 12 }],
       }),
     );
     await user.type(screen.getByLabelText("ملاحظة على الطلب (يراها العميل)"), " بالتليفون ");
@@ -97,7 +143,7 @@ describe("NewOrderPage", () => {
     expect(placed?.body).toEqual({
       customer_id: 7,
       address_id: 22,
-      lines: [{ sku_id: 3, quantity: 12 }],
+      lines: [{ sku_unit_id: 3, quantity: 12 }],
       note: "بالتليفون",
       notify_customer: true,
       override_mov: false,
@@ -302,7 +348,7 @@ describe("NewOrderPage", () => {
 
     await waitFor(() =>
       expect(callsTo(fetchMock, "POST /api/dashboard/orders")[0]?.body).toMatchObject({
-        lines: [{ sku_id: 3, quantity: 12, discount: { type: "percent", value: "10" } }],
+        lines: [{ sku_unit_id: 3, quantity: 12, discount: { type: "percent", value: "10" } }],
         discount: { type: "amount", value: "18", reason: "طلب بالتليفون" },
       }),
     );
