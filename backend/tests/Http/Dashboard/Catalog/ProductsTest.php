@@ -11,30 +11,39 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 
+const DASHBOARD_SKU_KEYS = [
+    'id', 'code', 'base_unit' => ['id', 'name'], 'selling_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
+    'units' => ['*' => ['id', 'unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default']],
+    'label', 'status', 'sort_order', 'option_values',
+];
+
 const DASHBOARD_PRODUCT_KEYS = [
     'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name', 'kind'], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
-    'sku' => [
-        'id', 'code', 'base_unit' => ['id', 'name'], 'selling_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
-        'units' => ['*' => ['id', 'unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default']],
-    ],
+    'sku' => DASHBOARD_SKU_KEYS,
+    'skus' => ['*' => DASHBOARD_SKU_KEYS],
+    'options',
     'main_image_url', 'created_at', 'updated_at',
 ];
 
 /** The detail (show, create, update) also carries each unit's tiers and the stock (08-api-contract.md §6, D91). */
+const DASHBOARD_SKU_DETAIL_KEYS = [
+    'id', 'code', 'base_unit' => ['id', 'name'], 'selling_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
+    'units' => ['*' => ['id', 'unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default', 'tiers']],
+    'inventory' => ['on_hand', 'reserved', 'available'],
+    'label', 'status', 'sort_order', 'option_values',
+];
+
 const DASHBOARD_PRODUCT_DETAIL_KEYS = [
     ...DASHBOARD_PRODUCT_KEYS,
-    'sku' => [
-        'id', 'code', 'base_unit' => ['id', 'name'], 'selling_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
-        'units' => ['*' => ['id', 'unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default', 'tiers']],
-        'inventory' => ['on_hand', 'reserved', 'available'],
-    ],
+    'sku' => DASHBOARD_SKU_DETAIL_KEYS,
+    'skus' => ['*' => DASHBOARD_SKU_DETAIL_KEYS],
 ];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
 });
 
-test('BR-P02 creating a product creates exactly one sku in the same call, audited', function (): void {
+test('BR-P02 BR-P14 creating a product without options creates exactly one sku in the same call, audited', function (): void {
     $response = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload())
         ->assertCreated()
         ->assertExactJsonStructure(['data' => [...DASHBOARD_PRODUCT_DETAIL_KEYS, 'images', 'relations']])

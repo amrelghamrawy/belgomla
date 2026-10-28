@@ -28,7 +28,7 @@ final readonly class SaveSkuUnits
     /**
      * @param  non-empty-list<SkuUnitData>  $units
      */
-    public function handle(Sku $sku, array $units, ?string $batchId = null): void
+    public function handle(Sku $sku, array $units, ?string $batchId = null, string $path = 'sku'): void
     {
         SkuUnit::query()->where('sku_id', $sku->id)->where('is_default', true)->update(['is_default' => false]);
 
@@ -40,7 +40,7 @@ final readonly class SaveSkuUnits
             $unit = $this->match($existing, $data, $named) ?? $sku->units()->make();
             $unit->fill($data->attributes($index));
 
-            $kept[] = $this->priced($unit, $data, $index, $batchId)->id;
+            $kept[] = $this->priced($unit, $data, "{$path}.units.{$index}.", $batchId)->id;
         }
 
         SkuUnit::query()
@@ -51,10 +51,10 @@ final readonly class SaveSkuUnits
     }
 
     /**
-     * A pricing refusal names the unit it is about: its keys move under `sku.units.{index}.` (a refusal without
+     * A pricing refusal names the unit it is about: its keys move under `{path}.units.{index}.` (`path` = "sku" or "skus.{i}", V2 Task 14) (a refusal without
      * details, `cover_price_required`, gets the unit's `cover_price`), so the form and the import point at the right unit.
      */
-    private function priced(SkuUnit $unit, SkuUnitData $data, int $index, ?string $batchId): SkuUnit
+    private function priced(SkuUnit $unit, SkuUnitData $data, string $prefix, ?string $batchId): SkuUnit
     {
         try {
             return $this->pricing->handle($unit, $data->pricing, $batchId);
@@ -62,7 +62,7 @@ final readonly class SaveSkuUnits
             $details = [];
 
             foreach ($e->details ?? ['cover_price' => [$e->getMessage()]] as $key => $messages) {
-                $details["sku.units.{$index}.{$key}"] = $messages;
+                $details["{$prefix}{$key}"] = $messages;
             }
 
             throw new ApiException($e->status, $e->errorCode, $e->getMessage(), $details, $e->items);

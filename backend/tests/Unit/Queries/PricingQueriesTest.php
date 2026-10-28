@@ -17,7 +17,7 @@ beforeEach(function (): void {
 
 test('D91 the pricing query returns the active units of the product sku with tiers, unit and product loaded', function (): void {
     $product = Product::factory()->withSku()->create();
-    $sku = $product->sku()->sole();
+    $sku = $product->skus()->sole();
     SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10]);
     $carton = $this->addUnit($sku);
     SkuUnit::factory()->archived()->create(['sku_id' => $sku->id]);
@@ -31,7 +31,7 @@ test('D91 the pricing query returns the active units of the product sku with tie
 
 test('D91 the pricing query finds a unit of the product with its tiers and unit', function (): void {
     $product = Product::factory()->withSku()->create();
-    $carton = $this->addUnit($product->sku()->sole(), tiers: [5 => '950.00']);
+    $carton = $this->addUnit($product->skus()->sole(), tiers: [5 => '950.00']);
 
     $unit = app(SkuPricingQuery::class)->forUnit($product, SkuUnit::query()->findOrFail($carton->id));
 
@@ -43,27 +43,36 @@ test('D91 the pricing query finds a unit of the product with its tiers and unit'
 
 test('D91 a unit of another product is not found for the product', function (): void {
     $product = Product::factory()->withSku()->create();
-    $other = Product::factory()->withSku()->create()->sku()->sole();
+    $other = Product::factory()->withSku()->create()->skus()->sole();
 
     app(SkuPricingQuery::class)->forUnit($product, SkuUnit::query()->where('sku_id', $other->id)->sole());
 })->throws(ModelNotFoundException::class);
 
 test('D91 an archived unit of the product is not found', function (): void {
     $product = Product::factory()->withSku()->create();
-    $archived = SkuUnit::factory()->archived()->create(['sku_id' => $product->sku()->sole()->id]);
+    $archived = SkuUnit::factory()->archived()->create(['sku_id' => $product->skus()->sole()->id]);
 
     app(SkuPricingQuery::class)->forUnit($product, $archived);
 })->throws(ModelNotFoundException::class);
 
 test('BR-P02 a product without a sku has no pricing to show', function (): void {
-    app(SkuPricingQuery::class)->forProduct(Product::factory()->create());
-})->throws(ModelNotFoundException::class);
+    expect(app(SkuPricingQuery::class)->forProduct(Product::factory()->create()))->toBeEmpty();
+});
+
+test('BR-P14 the pricing of a product lists the active units of every variant, in variant order', function (): void {
+    $product = Product::factory()->withSku(['code' => 'PEN-1', 'sort_order' => 1])->withSku(['code' => 'PEN-2', 'sort_order' => 0])->create();
+
+    $units = app(SkuPricingQuery::class)->forProduct($product);
+
+    expect($units->map(fn (SkuUnit $unit): string => $unit->sku->code)->all())->toBe(['PEN-2', 'PEN-1'])
+        ->and($units->every(fn (SkuUnit $unit): bool => $unit->sku->relationLoaded('product')))->toBeTrue();
+});
 
 test('BR-PR11 D91 bulk targets are the active units of the matching products, in product order, with tiers, unit and product', function (): void {
     $first = Product::factory()->withSku()->create(['name' => 'علوم أولى']);
     $second = Product::factory()->withSku()->create(['name' => 'علوم ثانية']);
-    $carton = $this->addUnit($first->sku()->sole());
-    SkuUnit::factory()->archived()->create(['sku_id' => $second->sku()->sole()->id]);
+    $carton = $this->addUnit($first->skus()->sole());
+    SkuUnit::factory()->archived()->create(['sku_id' => $second->skus()->sole()->id]);
     Product::factory()->withSku()->create(['name' => 'رياضيات']);
     Product::factory()->create(['name' => 'علوم بلا كود']);
 
@@ -77,7 +86,7 @@ test('BR-PR11 D91 bulk targets are the active units of the matching products, in
 
 test('D91 bulk targets can be only the units sold in one store unit', function (): void {
     $product = Product::factory()->withSku()->create(['name' => 'علوم أولى']);
-    $carton = $this->addUnit($product->sku()->sole());
+    $carton = $this->addUnit($product->skus()->sole());
 
     $units = app(BulkPricingTargetsQuery::class)->get(new ProductFilterData(q: 'علوم'), $carton->unit_id);
 

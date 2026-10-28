@@ -13,6 +13,7 @@ use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Exceptions\InvalidImportFile;
 use App\Modules\Catalog\Exceptions\InvalidImportRow;
 use App\Modules\Catalog\Http\Requests\StoreProductRequest;
@@ -20,6 +21,8 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
@@ -27,42 +30,57 @@ use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Services\PriceResolver;
 use App\Support\ApiException;
+use App\Support\ArabicText;
 use App\Support\Money;
 use Generator;
 use Illuminate\Support\Facades\Validator;
+use LogicException;
 
 /**
- * The catalog file format, version 2 (V2 Task 13; version 1 was V2 Task 06): one row per unit a SKU is sold in (D91).
+ * The catalog file format, version 3 (V2 Task 14; version 2 was V2 Task 13, version 1 V2 Task 06): one row per unit a
+ * SKU is sold in (D91), the SKUs of one product (its variants, BR-P14) on consecutive rows sharing a `product_key`.
  * Turns the tenant's catalog into rows for the export and file rows back into what CreateProduct / UpdateProduct take.
  *
- *  - Header ↔ keys: the key row (`sku_code, product_name, …`) is the first or second row (the export puts the
- *    Arabic labels above it); a file with only the Arabic label row is read through the labels. Unknown columns are
- *    ignored; a missing required column fails the whole file. The XLSX sheet is named `products_v2`; a `products_v1`
- *    file (its `selling_unit` column read as `unit`) is still read, each row then being a SKU in one unit.
- *  - A SKU's units are consecutive rows with its code; the first row holds the product, the SKU's base unit, its
- *    stock and custom fields (they are read from it only), every row one unit: its name, factor, prices, MOQ, tiers and
- *    `unit_is_default` (نعم on at most one row). A unit the SKU has but the file does not list is kept as it is; with no
- *    default named, an existing SKU keeps its default and a new one takes its first row.
+ *  - Header ↔ keys: the key row (`product_key, sku_code, product_name, …`) is the first or second row (the export puts
+ *    the Arabic labels above it); a file with only the Arabic label row is read through the labels. Unknown columns are
+ *    ignored; a missing required column fails the whole file. The XLSX sheet is named `products_v3`; `products_v1` (its
+ *    `selling_unit` column read as `unit`, each row a SKU in one unit) and `products_v2` files are still read.
+ *  - Products (D95, V2 Task 14): consecutive rows with the same `product_key` are one product; an empty key is the row's
+ *    SKU code, and a row with an empty key and the code of the row above stays with it, so a v1/v2 file (no key column)
+ *    is one product per SKU as before. The product (name, category, status, description, custom fields) is read from
+ *    its first row. A key or a code that comes back after another one is a duplicate (the whole product is skipped).
+ *  - SKUs: inside a product, consecutive rows with the same code are one SKU; its first row holds its base unit, its
+ *    stock, its variant cells (`variant_option_1/value_1`, `variant_option_2/value_2`) and `sku_status`, every row
+ *    one unit: its name, factor, prices, MOQ, tiers and `unit_is_default` (نعم on at most one row). A unit the SKU has
+ *    but the file does not list is kept as it is; with no default named, an existing SKU keeps its default and a new one
+ *    takes its first row.
+ *  - Variants (BR-P14, D92): option names and values are matched to the product's own folded (D32); a new name or
+ *    value is added (values in first-seen order). A SKU of a product with options names a value of every option, or
+ *    names none and keeps its stored ones. The import never removes a SKU, an option or a value the file does not list
+ *    (same spirit as D91's units): the product's other SKUs are sent back as stored, in their order, new SKUs after them.
  *  - References are resolved by name: the category by its full path ("كتب خارجية > أولى إعدادي", D25; never
  *    created, archived only when the product already sits there), units by name (BR-U01), select fields by option
  *    label (BR-P08). A field of another section than the product's may only repeat the stored value (D69).
- *  - Every SKU is validated with StoreProductRequest's own rules through a Validator, and the product data comes
- *    from its typed accessors, so the file obeys exactly what the API does. Each error names its row and column.
+ *  - Every product is validated with StoreProductRequest's own rules through a Validator (the `sku` shape without
+ *    options, `options` + `skus` with them), and the product data comes from its typed accessors, so the file obeys
+ *    exactly what the API does. Each error names its row and column.
  *  - Optional columns left out of the file keep what the product has; an empty cell in a column that is there
- *    clears the value (description, reference price, %, a custom field) or, for MOQ and On Hand, keeps it.
- *    When any tier column is there, the tiers in a unit's row replace that unit's (D34).
+ *    clears the value (description, reference price, %, a custom field) or, for MOQ, On Hand and the SKU status, keeps
+ *    it. When any tier column is there, the tiers in a unit's row replace that unit's (D34).
  *  - A percentage wins over a price (BR-PR10), except that a row repeating the stored price and percentage keeps
  *    both, so exporting and importing the same file changes nothing (D95).
  *
  * @phpstan-type CellValue string|int|float|bool|null
  * @phpstan-type RowError array{row?: int, column: string, label: string, message: string}
+ * @phpstan-type OptionPayload array{id: int|null, name: string, values: list<array{id: int|null, value: string, image_id: int|null}>}
+ * @phpstan-type VariantPlan array{options: list<OptionPayload>, values: array<int, list<string>>, cells: array<int|string, array{0: int, 1: string}>}
  */
 final readonly class CatalogRowMapper
 {
-    public const string SHEET_NAME = 'products_v2';
+    public const string SHEET_NAME = 'products_v3';
 
     /** The sheet names of the versions this mapper reads. */
-    public const array READABLE_SHEETS = ['products_v1', 'products_v2'];
+    public const array READABLE_SHEETS = ['products_v1', 'products_v2', 'products_v3'];
 
     public const string FIELD_PREFIX = 'field:';
 
@@ -70,16 +88,25 @@ final readonly class CatalogRowMapper
 
     public const int TIER_COLUMNS = 5;
 
+    /** D92: a product has at most two options, one column pair each. */
+    public const int MAX_OPTIONS = 2;
+
     /** The columns every file must have; `base_price` may be empty when `base_price_percent` is given. */
     public const array REQUIRED = ['sku_code', 'product_name', 'category_path', 'unit', 'base_unit', 'conversion_factor', 'base_price'];
 
     /** The fixed columns before the tiers, then after them `on_hand`, then one per custom field. */
     public const array LABELS = [
+        'product_key' => 'مفتاح المنتج',
         'sku_code' => 'كود الصنف',
         'product_name' => 'اسم المنتج',
         'category_path' => 'التصنيف',
         'status' => 'الحالة',
         'description' => 'الوصف',
+        'variant_option_1' => 'الخيار 1',
+        'variant_value_1' => 'القيمة 1',
+        'variant_option_2' => 'الخيار 2',
+        'variant_value_2' => 'القيمة 2',
+        'sku_status' => 'حالة الصنف',
         'base_unit' => 'الوحدة الأساسية',
         'unit' => 'وحدة البيع',
         'unit_is_default' => 'الوحدة الافتراضية',
@@ -95,24 +122,37 @@ final readonly class CatalogRowMapper
     /** Pseudo columns of row errors that belong to no single cell. */
     public const array OTHER_LABELS = ['tiers' => 'شرائح السعر', 'row' => 'الصف'];
 
+    /** The variant cells of a SKU's first row (D92: two option / value pairs). */
+    private const array VARIANT_COLUMNS = ['variant_option_1', 'variant_value_1', 'variant_option_2', 'variant_value_2'];
+
     /** Keys of format v1 read as today's. */
     private const array ALIASES = ['selling_unit' => 'unit'];
 
-    /** Validation keys of the product request → file columns (the first row of the SKU). */
+    /** Product-level validation keys → file columns (the product's first row). */
     private const array COLUMN_OF = [
         'name' => 'product_name',
         'category_id' => 'category_path',
         'description' => 'description',
         'status' => 'status',
         'opening_stock' => 'on_hand',
-        'sku.code' => 'sku_code',
-        'sku.base_unit_id' => 'base_unit',
-        'sku.units' => 'unit',
+        'options' => 'variant_option_1',
+        'skus' => 'sku_code',
         'base_price' => 'base_price',
         'tiers' => 'tiers',
     ];
 
-    /** Validation keys under `sku.units.{i}.` → the columns of unit i's row. */
+    /** Validation keys under `sku.` / `skus.{i}.` → the columns of the SKU's first row. */
+    private const array SKU_COLUMN_OF = [
+        'id' => 'sku_code',
+        'code' => 'sku_code',
+        'base_unit_id' => 'base_unit',
+        'units' => 'unit',
+        'status' => 'sku_status',
+        'option_values' => 'variant_value_1',
+        'opening_stock' => 'on_hand',
+    ];
+
+    /** Validation keys under `…units.{i}.` → the columns of unit i's row. */
     private const array UNIT_COLUMN_OF = [
         'id' => 'unit',
         'unit_id' => 'unit',
@@ -132,6 +172,9 @@ final readonly class CatalogRowMapper
         'inventory_below_reserved' => 'on_hand',
         'cover_price_required' => 'cover_price',
     ];
+
+    /** Error codes whose details name the payload keys they are about. */
+    private const array DETAILED_CODES = ['validation_failed', 'invalid_tiers', 'cover_price_required', 'duplicate_code'];
 
     private const string KEY_PATTERN = '/^[a-z][a-z0-9_]*(:[a-z0-9_]+)?$/';
 
@@ -177,23 +220,6 @@ final readonly class CatalogRowMapper
             fields: $this->activeFields(),
             tierColumns: max(self::TIER_COLUMNS, is_int($mostTiers) ? $mostTiers : 0),
         );
-    }
-
-    /**
-     * The active custom field definitions with their options, in form order, by key.
-     *
-     * @return array<string, ProductFieldDefinition>
-     */
-    private function activeFields(): array
-    {
-        $fields = [];
-        $definitions = ProductFieldDefinition::query()->with('options')->where('status', ArchiveStatus::Active)->orderBy('sort_order')->orderBy('id')->get();
-
-        foreach ($definitions as $definition) {
-            $fields[$definition->key] = $definition;
-        }
-
-        return $fields;
     }
 
     /**
@@ -282,6 +308,46 @@ final readonly class CatalogRowMapper
     }
 
     /**
+     * The rows of one product together (V2 Task 14): consecutive rows with the same product key (the SKU code when the
+     * key is empty; a row with an empty key and the code of the row above stays with it). Keyed by the number of the
+     * product's first row, with `duplicates` (row number => column => messages) when the file already had its key or
+     * one of its codes: such a product is skipped whole.
+     *
+     * @param  iterable<int, array<string, string>>  $rows
+     * @return Generator<int, array{rows: non-empty-array<int, array<string, string>>, duplicates: array<int, array<string, list<string>>>}>
+     */
+    public function products(iterable $rows): Generator
+    {
+        $group = [];
+        $key = '';
+        $code = '';
+        $seenKeys = [];
+        $seenCodes = [];
+
+        foreach ($rows as $number => $row) {
+            $rowCode = $row['sku_code'] ?? '';
+            $rowKey = mb_trim($row['product_key'] ?? '');
+            $continues = ($rowKey !== '' && $rowKey === $key) || ($rowKey === '' && $rowCode !== '' && $rowCode === $code);
+
+            if ($group !== [] && ! $continues) {
+                yield array_key_first($group) => $this->product($group, $seenKeys, $seenCodes);
+                $group = [];
+            }
+
+            if ($group === []) {
+                $key = $rowKey !== '' ? $rowKey : $rowCode;
+            }
+
+            $group[$number] = $row;
+            $code = $rowCode;
+        }
+
+        if ($group !== []) {
+            yield array_key_first($group) => $this->product($group, $seenKeys, $seenCodes);
+        }
+    }
+
+    /**
      * The rows of one SKU together (D91): consecutive rows with the same code are its units; a row without a code is
      * alone. Keyed by the number of the SKU's first row.
      *
@@ -311,8 +377,8 @@ final readonly class CatalogRowMapper
     }
 
     /**
-     * Resolves and validates the rows of one SKU (row number => row, the product on the first). `$existing` is the
-     * product whose SKU has the rows' code (an update), with `sku.activeUnits.tiers` loaded.
+     * Resolves and validates the rows of one product (row number => row, the product on the first; its SKUs on
+     * consecutive rows by code). `$existing` is the product that has the rows' codes (an update).
      *
      * @param  non-empty-array<int, array<string, string>>  $rows
      *
@@ -320,95 +386,97 @@ final readonly class CatalogRowMapper
      */
     public function map(array $rows, CatalogLookups $lookups, ?Product $existing = null): ImportRowData
     {
-        $numbers = array_keys($rows);
-        $first = $rows[$numbers[0]];
+        $existing?->loadMissing(['category', 'options.values', 'skus.activeUnits.tiers', 'skus.optionValues']);
+        $skus = array_values(iterator_to_array($this->skus($rows)));
+        $first = array_key_first($rows);
+        $head = $rows[$first];
         $errors = [];
-        $sku = $existing?->sku;
-        $category = $this->category($first['category_path'] ?? '', $lookups, $existing?->category_id, $errors);
-        $baseUnit = $this->unit($first, 'base_unit', $lookups, $sku?->base_unit_id, $errors);
+        $productErrors = [];
+        $category = $this->category($head['category_path'] ?? '', $lookups, $existing?->category_id, $productErrors);
         $kind = $category->kind ?? $existing?->category->kind;
-        $customFields = $this->customFields($first, $lookups, $kind, $existing, $errors);
-        $errors = $errors === [] ? [] : [$numbers[0] => $errors];
+        $customFields = $this->customFields($head, $lookups, $kind, $existing, $productErrors);
+        $errors = $productErrors === [] ? [] : [$first => $productErrors];
 
-        $units = [];
+        $stored = array_map(fn (array $skuRows): ?Sku => $this->storedSku($existing, $skuRows[array_key_first($skuRows)]['sku_code'] ?? ''), $skus);
+        $variants = $this->hasVariants($skus, $existing);
+        $plan = $variants ? $this->variantPlan($skus, $stored, $existing, $errors) : ['options' => [], 'values' => [], 'cells' => []];
+
+        $entries = [];
+        $fileRows = [];
         $tierNumbers = [];
+        $defaults = [];
+        $statuses = [];
 
-        foreach (array_values($rows) as $index => $row) {
-            $unitErrors = [];
-            $units[] = $this->unitPayload($row, $lookups, $sku, $unitErrors);
-            $tierNumbers[$index] = array_keys($this->tiers($row) ?? []);
+        foreach ($skus as $index => $skuRows) {
+            $fileRows[$index] = array_keys($skuRows);
+            [$entries[$index], $tierNumbers[$index], $defaults[$index], $statuses[$index]] = $this->skuPayload($skuRows, $lookups, $stored[$index], $variants, $plan['values'][$index] ?? [], $errors);
+        }
 
-            if ($unitErrors !== []) {
-                $errors[$numbers[$index]] = [...($errors[$numbers[$index]] ?? []), ...$unitErrors];
-            }
+        if ($variants) {
+            $this->checkVariants($skus, $stored, $statuses, $plan, $existing, $first, $errors);
         }
 
         $payload = [
-            'name' => $first['product_name'] ?? '',
+            'name' => $head['product_name'] ?? '',
             'category_id' => $category?->id,
-            'description' => array_key_exists('description', $first) ? $this->blankToNull($first['description']) : $existing?->description,
+            'description' => array_key_exists('description', $head) ? $this->blankToNull($head['description']) : $existing?->description,
             'custom_fields' => $customFields,
-            'sku' => [
-                'code' => $first['sku_code'] ?? '',
-                'base_unit_id' => $baseUnit?->id,
-                'units' => $units,
-            ],
-            ...(($first['status'] ?? '') !== '' ? ['status' => $this->status($first['status'])] : []),
-            ...(($first['on_hand'] ?? '') !== '' ? ['opening_stock' => $first['on_hand']] : []),
+            ...($variants ? ['options' => $plan['options'], 'skus' => $entries] : ['sku' => $entries[0] ?? []]),
+            ...(($head['status'] ?? '') !== '' ? ['status' => $this->status($head['status'])] : []),
+            ...(! $variants && ($head['on_hand'] ?? '') !== '' ? ['opening_stock' => $head['on_hand']] : []),
         ];
 
         $request = new StoreProductRequest($payload);
-        $validator = Validator::make($payload, $request->rules(), [], $this->attributes($lookups, $tierNumbers));
+        $validator = Validator::make($payload, $request->rules(), [], $this->attributes($lookups, $tierNumbers, $variants));
 
         foreach ($validator->errors()->messages() as $key => $messages) {
-            [$index, $column] = $this->columnOf($key, $tierNumbers);
-            $errors[$numbers[$index] ?? $numbers[0]][$column] ??= array_values(array_filter($messages, is_string(...)));
+            [$row, $column] = $this->cell($key, $fileRows, $tierNumbers, $plan['cells']);
+            $errors[$row][$column] ??= array_values(array_filter($messages, is_string(...)));
         }
 
-        $defaults = array_keys(array_filter($units, fn (array $unit): bool => $unit['is_default'] === true));
-
-        if (count($defaults) > 1) {
-            $errors[$numbers[$defaults[1]]]['unit_is_default'] = ['وحدة افتراضية واحدة فقط لكل صنف'];
+        foreach ($defaults as $index => $flagged) {
+            if (count($flagged) > 1) {
+                $errors[$fileRows[$index][$flagged[1]] ?? $first]['unit_is_default'] = ['وحدة افتراضية واحدة فقط لكل صنف'];
+            }
         }
 
         if ($errors !== []) {
             throw InvalidImportRow::inRows($errors);
         }
 
-        return new ImportRowData(
-            product: $this->withStoredUnits(ProductData::fromRequest($request), array_values($rows), $sku, $defaults !== []),
-            status: $request->status(),
-            onHand: array_key_exists('opening_stock', $payload) ? $request->openingStock() : null,
-        );
+        return $this->data($request, $skus, $stored, $defaults, $plan, $existing, $variants, $first);
     }
 
     /**
-     * The row errors an exception stands for, each pointed at a row and a column of the file. `$rows` are the numbers of
-     * the SKU's rows, unit by unit (an error about unit i is on its row; any other on the first).
+     * The row errors an exception stands for, each pointed at a row and a column of the file. `$rows` are, per SKU of
+     * the product data (the index its error keys carry, `sku.` being 0), the numbers of its rows unit by unit; an error
+     * about unit i is on its row, one about the SKU on its first row, any other on the product's first row.
      *
-     * @param  non-empty-list<int>  $rows
+     * @param  array<int, list<int>>  $rows
      * @return list<RowError>
      */
-    public function errors(ApiException $e, CatalogLookups $lookups, array $rows = [0]): array
+    public function errors(ApiException $e, CatalogLookups $lookups, array $rows = [[0]]): array
     {
+        $all = array_merge(...$rows);
+        $first = $all === [] ? 0 : min($all);
         $errors = [];
 
         if ($e instanceof InvalidImportRow && $e->items !== null) {
             foreach ($e->items as $item) {
                 $column = is_string($item['column'] ?? null) ? $item['column'] : 'row';
-                $errors[] = ['row' => is_int($item['row'] ?? null) ? $item['row'] : $rows[0], 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => is_string($item['message'] ?? null) ? $item['message'] : ''];
+                $errors[] = ['row' => is_int($item['row'] ?? null) ? $item['row'] : $first, 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => is_string($item['message'] ?? null) ? $item['message'] : ''];
             }
 
             return $errors;
         }
 
-        if (in_array($e->errorCode, ['validation_failed', 'invalid_tiers', 'cover_price_required'], true) && $e->details !== null) {
+        if (in_array($e->errorCode, self::DETAILED_CODES, true) && $e->details !== null) {
             foreach ($e->details as $key => $messages) {
-                [$index, $column] = $this->columnOf($key, []);
+                [$row, $column] = $this->cell((string) $key, $rows);
 
                 foreach (is_array($messages) ? $messages : [$messages] as $message) {
                     if (is_string($message)) {
-                        $errors[] = ['row' => $rows[$index] ?? $rows[0], 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => $message];
+                        $errors[] = ['row' => $row, 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => $message];
                     }
                 }
             }
@@ -416,39 +484,542 @@ final readonly class CatalogRowMapper
 
         if ($errors === []) {
             $column = self::COLUMN_OF_CODE[$e->errorCode] ?? 'row';
-            $errors[] = ['row' => $rows[0], 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => $e->getMessage()];
+            $errors[] = ['row' => $first, 'column' => $column, 'label' => $this->label($column, $lookups), 'message' => $e->getMessage()];
         }
 
         return $errors;
     }
 
     /**
-     * The export rows of a product: one per active unit of its SKU, the default first (D91), each with the product, its
-     * SKU, stock and custom fields, and the unit's prices and tiers. Money is written as numbers so the sheet can compute
-     * with it.
+     * The export rows of a product: per SKU in its order (inactive variants included, BR-P14), one row per active unit,
+     * the default first (D91), each with the product key (its first SKU's code), the product, the SKU's variant cells,
+     * status, base unit and stock, the unit's prices and tiers, and the custom fields. Money is written as numbers so the
+     * sheet can compute with it.
      *
      * @return list<array<string, CellValue>>
      */
     public function exportRows(Product $product, CatalogLookups $lookups): array
     {
-        $sku = $product->sku;
-        $units = $sku instanceof Sku ? $sku->activeUnits->all() : [];
+        $key = $product->skus->first()?->code;
+        $rows = [];
 
-        return array_map(fn (?SkuUnit $unit): array => $this->exportRow($product, $unit, $lookups), $units === [] ? [null] : array_values($units));
+        foreach ($product->skus as $sku) {
+            $units = $sku->activeUnits->all();
+
+            foreach ($units === [] ? [null] : array_values($units) as $unit) {
+                $rows[] = $this->exportRow($product, $key, $sku, $unit, $lookups);
+            }
+        }
+
+        return $rows === [] ? [$this->exportRow($product, $key, null, null, $lookups)] : $rows;
+    }
+
+    /**
+     * The active custom field definitions with their options, in form order, by key.
+     *
+     * @return array<string, ProductFieldDefinition>
+     */
+    private function activeFields(): array
+    {
+        $fields = [];
+        $definitions = ProductFieldDefinition::query()->with('options')->where('status', ArchiveStatus::Active)->orderBy('sort_order')->orderBy('id')->get();
+
+        foreach ($definitions as $definition) {
+            $fields[$definition->key] = $definition;
+        }
+
+        return $fields;
+    }
+
+    /**
+     * One product group with the duplicates of the file in it: its key (when the file names it) or a code of it seen in
+     * an earlier product, or a code that comes back after another code inside it.
+     *
+     * @param  non-empty-array<int, array<string, string>>  $group
+     * @param  array<string, int>  $seenKeys  "k:{key}" => first row
+     * @param  array<string, int>  $seenCodes  "c:{code}" => first row
+     * @return array{rows: non-empty-array<int, array<string, string>>, duplicates: array<int, array<string, list<string>>>}
+     */
+    private function product(array $group, array &$seenKeys, array &$seenCodes): array
+    {
+        $first = array_key_first($group);
+        $key = mb_trim($group[$first]['product_key'] ?? '');
+        $duplicates = [];
+
+        if ($key !== '') {
+            $previous = $seenKeys["k:{$key}"] ?? null;
+
+            if ($previous !== null) {
+                $duplicates[$first] = ['product_key' => ["مفتاح المنتج مكرر في الملف (الصف {$previous})"]];
+            }
+
+            $seenKeys["k:{$key}"] ??= $first;
+        }
+
+        foreach ($this->skus($group) as $number => $rows) {
+            $code = $rows[$number]['sku_code'] ?? '';
+
+            if ($code === '') {
+                continue;
+            }
+
+            $previous = $seenCodes["c:{$code}"] ?? null;
+
+            if ($previous !== null) {
+                $duplicates[$number]['sku_code'] = ["الكود مكرر في الملف (الصف {$previous})"];
+            }
+
+            $seenCodes["c:{$code}"] ??= $number;
+        }
+
+        return ['rows' => $group, 'duplicates' => $duplicates];
+    }
+
+    private function storedSku(?Product $existing, string $code): ?Sku
+    {
+        return $code === '' ? null : $existing?->skus->first(fn (Sku $sku): bool => $sku->code === $code);
+    }
+
+    /**
+     * The `options` + `skus` shape is needed when the product has (or gets) options, or has more than one SKU.
+     *
+     * @param  list<non-empty-array<int, array<string, string>>>  $skus
+     */
+    private function hasVariants(array $skus, ?Product $existing): bool
+    {
+        if (count($skus) > 1 || $existing?->options->isNotEmpty() === true) {
+            return true;
+        }
+
+        foreach ($skus as $rows) {
+            $head = $rows[array_key_first($rows)];
+
+            foreach (self::VARIANT_COLUMNS as $column) {
+                if (mb_trim($head[$column] ?? '') !== '') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * BR-P14: the product's options (stored ones first, by id, then names new to the product) with their values (stored
+     * ones, then new ones in first-seen order), each file SKU's values in option order, and the cell that first named
+     * each new option ("i") or value ("i.j") for its errors.
+     *
+     * @param  list<non-empty-array<int, array<string, string>>>  $skus
+     * @param  list<Sku|null>  $stored
+     * @param  array<int, array<string, list<string>>>  $errors
+     * @return VariantPlan
+     */
+    private function variantPlan(array $skus, array $stored, ?Product $existing, array &$errors): array
+    {
+        $heads = [];
+        $lists = [];
+        $cells = [];
+
+        foreach ($existing->options ?? [] as $option) {
+            $heads[] = ['id' => $option->id, 'name' => $option->name];
+            $lists[] = array_values(array_map(fn (ProductOptionValue $value): array => ['id' => $value->id, 'value' => $value->value, 'image_id' => $value->image_id], $option->values->all()));
+        }
+
+        $named = [];
+
+        foreach ($skus as $index => $rows) {
+            $number = array_key_first($rows);
+            $named[$index] = [];
+
+            for ($n = 1; $n <= self::MAX_OPTIONS; $n++) {
+                $name = $this->squish($rows[$number]["variant_option_{$n}"] ?? '');
+                $value = $this->squish($rows[$number]["variant_value_{$n}"] ?? '');
+
+                if ($name === '' && $value === '') {
+                    continue;
+                }
+
+                if ($name === '' || $value === '') {
+                    $errors[$number][$name === '' ? "variant_option_{$n}" : "variant_value_{$n}"] ??= [$name === '' ? 'اكتب اسم الخيار' : 'اكتب قيمة الخيار'];
+
+                    continue;
+                }
+
+                $optionIndex = $this->matching(array_column($heads, 'name'), $name);
+
+                if ($optionIndex === null && count($heads) >= self::MAX_OPTIONS) {
+                    $errors[$number]["variant_option_{$n}"] ??= ['للمنتج خياران على الأكثر'];
+
+                    continue;
+                }
+
+                if ($optionIndex === null) {
+                    $optionIndex = count($heads);
+                    $heads[] = ['id' => null, 'name' => $name];
+                    $lists[] = [];
+                    $cells["{$optionIndex}"] = [$number, "variant_option_{$n}"];
+                }
+
+                if (array_key_exists($optionIndex, $named[$index])) {
+                    $errors[$number]["variant_option_{$n}"] ??= ['الخيار مكرر في هذا الصنف'];
+
+                    continue;
+                }
+
+                $list = $lists[$optionIndex] ?? [];
+                $valueIndex = $this->matching(array_column($list, 'value'), $value);
+
+                if ($valueIndex === null) {
+                    $valueIndex = count($list);
+                    $lists[$optionIndex] = [...$list, ['id' => null, 'value' => $value, 'image_id' => null]];
+                    $cells["{$optionIndex}.{$valueIndex}"] = [$number, "variant_value_{$n}"];
+                }
+
+                $named[$index][$optionIndex] = $lists[$optionIndex][$valueIndex]['value'] ?? $value;
+            }
+        }
+
+        $options = [];
+
+        foreach ($heads as $optionIndex => $head) {
+            $options[] = [...$head, 'values' => $lists[$optionIndex] ?? []];
+        }
+
+        $values = [];
+
+        foreach ($skus as $index => $rows) {
+            $sku = $stored[$index] ?? null;
+            $given = $named[$index] === [] && $sku instanceof Sku ? array_filter($this->storedValues($sku, $options), is_string(...)) : $named[$index];
+            $values[$index] = [];
+
+            foreach ($options as $optionIndex => $option) {
+                $values[$index][] = $given[$optionIndex] ?? '';
+
+                if (! isset($given[$optionIndex])) {
+                    $errors[array_key_first($rows)]['variant_value_'.min($optionIndex + 1, self::MAX_OPTIONS)] ??= ["اكتب قيمة «{$option['name']}» لهذا الصنف"];
+                }
+            }
+        }
+
+        return ['options' => $options, 'values' => $values, 'cells' => $cells];
+    }
+
+    /**
+     * BR-P14 checks the request rules leave to the form (ProductPayloadRules::after): without options one SKU only; each
+     * combination once; at least one SKU active; and the product's SKUs the file does not list must have a value of
+     * every option and a unit to be sent back as they are.
+     *
+     * @param  list<non-empty-array<int, array<string, string>>>  $skus
+     * @param  list<Sku|null>  $stored
+     * @param  array<int, string>  $statuses
+     * @param  VariantPlan  $plan
+     * @param  array<int, array<string, list<string>>>  $errors
+     */
+    private function checkVariants(array $skus, array $stored, array $statuses, array $plan, ?Product $existing, int $first, array &$errors): void
+    {
+        $listed = array_values(array_filter(array_map(fn (?Sku $sku): ?int => $sku?->id, $stored)));
+        $others = $existing instanceof Product ? array_values($existing->skus->reject(fn (Sku $sku): bool => in_array($sku->id, $listed, true))->all()) : [];
+
+        if ($plan['options'] === [] && count($skus) + count($others) > 1) {
+            $errors[isset($skus[1]) ? array_key_first($skus[1]) : $first]['variant_option_1'] ??= ['المنتج بأكثر من صنف يحتاج خيارًا وقيمة لكل صنف'];
+
+            return;
+        }
+
+        $combinations = [];
+        $active = false;
+
+        foreach ($skus as $index => $rows) {
+            $active = $active || ($statuses[$index] ?? '') === SkuStatus::Active->value;
+            $combination = $this->combination($plan['values'][$index] ?? []);
+
+            if ($combination !== null && in_array($combination, $combinations, true)) {
+                $errors[array_key_first($rows)]['variant_value_1'] ??= ['هذه التركيبة مكررة في المنتج'];
+            }
+
+            $combinations[] = $combination;
+        }
+
+        foreach ($others as $sku) {
+            $values = $this->storedValues($sku, $plan['options']);
+            $missing = array_search(null, $values, true);
+            $active = $active || $sku->isActive();
+
+            if (is_int($missing)) {
+                $errors[$first]['variant_option_'.min($missing + 1, self::MAX_OPTIONS)] ??= ["اذكر في الملف كل أصناف المنتج بقيمة «{$plan['options'][$missing]['name']}»"];
+            } elseif (in_array($this->combination(array_values(array_filter($values, is_string(...)))), $combinations, true)) {
+                $errors[$first]['variant_value_1'] ??= ["تركيبة الصنف {$sku->code} مكررة في المنتج"];
+            }
+
+            if ($sku->activeUnits->isEmpty()) {
+                $errors[$first]['row'] ??= ["الصنف {$sku->code} ليس له وحدة بيع نشطة، اذكره في الملف بوحداته"];
+            }
+        }
+
+        if (! $active) {
+            $errors[$first]['sku_status'] ??= ['صنف واحد نشط على الأقل'];
+        }
+    }
+
+    /**
+     * The value of each option (by its id) a stored SKU has, null where it has none.
+     *
+     * @param  list<OptionPayload>  $options
+     * @return list<string|null>
+     */
+    private function storedValues(Sku $sku, array $options): array
+    {
+        return array_map(
+            fn (array $option): ?string => $option['id'] === null ? null : $sku->optionValues->first(fn (ProductOptionValue $value): bool => $value->product_option_id === $option['id'])?->value,
+            $options,
+        );
+    }
+
+    /**
+     * The folded key of a combination, null while a value is missing (that is an error of its own).
+     *
+     * @param  list<string>  $values
+     */
+    private function combination(array $values): ?string
+    {
+        return in_array('', $values, true) ? null : implode('|', array_map(ArabicText::normalize(...), $values));
+    }
+
+    /**
+     * The position of the text among the given ones, compared folded (D32), or null.
+     *
+     * @param  list<string>  $texts
+     */
+    private function matching(array $texts, string $text): ?int
+    {
+        $folded = ArabicText::normalize($text);
+
+        foreach ($texts as $index => $candidate) {
+            if (ArabicText::normalize($candidate) === $folded) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * One SKU as the product request takes it, from its rows: [payload, tier numbers per unit, the indexes of the units
+     * flagged default, the status value]. Variant SKUs also carry their id, status, option values and opening stock.
+     *
+     * @param  non-empty-array<int, array<string, string>>  $rows
+     * @param  list<string>  $values
+     * @param  array<int, array<string, list<string>>>  $errors
+     * @return array{0: array<string, mixed>, 1: list<list<int>>, 2: list<int>, 3: string}
+     */
+    private function skuPayload(array $rows, CatalogLookups $lookups, ?Sku $sku, bool $variants, array $values, array &$errors): array
+    {
+        $numbers = array_keys($rows);
+        $head = $rows[$numbers[0]];
+        $headErrors = [];
+        $baseUnit = $this->unit($head, 'base_unit', $lookups, $sku?->base_unit_id, $headErrors);
+        $status = $this->skuStatus($head['sku_status'] ?? '', $sku);
+
+        if (! $variants && $status !== SkuStatus::Active->value) {
+            $headErrors['sku_status'] = ['صنف المنتج بدون خيارات نشط دائمًا'];
+        }
+
+        $this->addErrors($errors, $numbers[0], $headErrors);
+
+        $units = [];
+        $tierNumbers = [];
+        $sold = [];
+
+        foreach (array_values($rows) as $index => $row) {
+            $unitErrors = [];
+            $unit = $this->unitPayload($row, $lookups, $sku, $unitErrors);
+
+            if ($unit['unit_id'] !== null && in_array($unit['unit_id'], $sold, true)) {
+                $unitErrors['unit'] ??= ['الوحدة مكررة في هذا الصنف'];
+            }
+
+            $sold[] = $unit['unit_id'];
+            $units[] = $unit;
+            $tierNumbers[] = array_keys($this->tiers($row) ?? []);
+            $this->addErrors($errors, $numbers[$index], $unitErrors);
+        }
+
+        $entry = ['code' => $head['sku_code'] ?? '', 'base_unit_id' => $baseUnit?->id, 'units' => $units];
+
+        if ($variants) {
+            $entry = [
+                'id' => $sku?->id,
+                ...$entry,
+                'status' => $status,
+                'option_values' => $values,
+                ...(($head['on_hand'] ?? '') !== '' ? ['opening_stock' => $head['on_hand']] : []),
+            ];
+        }
+
+        $defaults = array_keys(array_filter($units, fn (array $unit): bool => $unit['is_default'] === true));
+
+        return [$entry, $tierNumbers, $defaults, $status];
+    }
+
+    /**
+     * The SKU status cell as a value (its Arabic label is accepted); empty keeps the stored status, active for a new SKU.
+     */
+    private function skuStatus(string $cell, ?Sku $sku): string
+    {
+        if ($cell === '') {
+            return $sku->status->value ?? SkuStatus::Active->value;
+        }
+
+        return array_flip(SkuStatus::toArray())[$cell] ?? $cell;
+    }
+
+    /**
+     * @param  array<int, array<string, list<string>>>  $errors
+     * @param  array<string, list<string>>  $new
+     */
+    private function addErrors(array &$errors, int $row, array $new): void
+    {
+        foreach ($new as $column => $messages) {
+            $errors[$row][$column] ??= $messages;
+        }
+    }
+
+    /**
+     * The validated product as the actions take it: the file's SKUs with their stored units kept (D91) and, for a product
+     * with variants, the product's SKUs the file does not list sent back as stored, everything in the product's order
+     * with new SKUs last; with the file rows and the On Hand of each SKU.
+     *
+     * @param  list<non-empty-array<int, array<string, string>>>  $skus
+     * @param  list<Sku|null>  $stored
+     * @param  array<int, list<int>>  $defaults
+     * @param  VariantPlan  $plan
+     */
+    private function data(StoreProductRequest $request, array $skus, array $stored, array $defaults, array $plan, ?Product $existing, bool $variants, int $first): ImportRowData
+    {
+        $data = ProductData::fromRequest($request);
+        $fromFile = [];
+
+        foreach ($data->skus as $index => $sku) {
+            $rows = $skus[$index] ?? [];
+            $head = reset($rows) ?: [];
+            $onHand = ($head['on_hand'] ?? '') !== '' ? ($variants ? $request->skuInt('opening_stock', 0, "skus.{$index}") : $request->openingStock()) : null;
+            $fromFile[$index] = [$this->withStoredUnits($sku, array_values($rows), $stored[$index] ?? null, ($defaults[$index] ?? []) !== []), array_keys($rows), $onHand];
+        }
+
+        $ordered = [];
+        $placed = [];
+
+        foreach ($variants ? $existing->skus ?? [] : [] as $sku) {
+            $index = array_search($sku->id, array_map(fn (?Sku $listed): ?int => $listed?->id, $stored), true);
+
+            if (is_int($index) && isset($fromFile[$index])) {
+                $ordered[] = $fromFile[$index];
+                $placed[] = $index;
+            } else {
+                $ordered[] = [$this->copied($sku, $plan['options']), [$first], null];
+            }
+        }
+
+        foreach ($fromFile as $index => $entry) {
+            if (! in_array($index, $placed, true)) {
+                $ordered[] = $entry;
+            }
+        }
+
+        $final = [];
+        $rows = [];
+        $onHand = [];
+
+        foreach ($ordered as $position => [$sku, $numbers, $stock]) {
+            $final[] = $variants ? $this->withPath($sku, "skus.{$position}") : $sku;
+            $rows[] = $numbers;
+
+            if ($stock !== null) {
+                $onHand[$position] = $stock;
+            }
+        }
+
+        return new ImportRowData(
+            product: new ProductData(
+                name: $data->name,
+                categoryId: $data->categoryId,
+                skus: $final,
+                options: $data->options,
+                description: $data->description,
+                customFields: $data->customFields,
+                status: $data->status,
+            ),
+            status: $request->status(),
+            onHand: $onHand,
+            rows: $rows,
+        );
+    }
+
+    /**
+     * A SKU of the product the file does not list, sent back as stored: its active units, status and option values.
+     *
+     * @param  list<OptionPayload>  $options
+     */
+    private function copied(Sku $sku, array $options): SkuData
+    {
+        $units = array_values(array_map(fn (SkuUnit $unit): SkuUnitData => new SkuUnitData($unit->id, $unit->unit_id, $unit->conversion_factor, $unit->is_default, $this->storedPricing($unit)), $sku->activeUnits->all()));
+
+        if ($units === []) {
+            throw new LogicException('checkVariants() refuses a product whose unlisted SKU has no active unit.');
+        }
+
+        return new SkuData(
+            code: $sku->code,
+            baseUnitId: $sku->base_unit_id,
+            units: $this->oneDefault($units),
+            id: $sku->id,
+            status: $sku->status,
+            optionValues: array_values(array_filter($this->storedValues($sku, $options), is_string(...))),
+        );
+    }
+
+    private function withPath(SkuData $sku, string $path): SkuData
+    {
+        return new SkuData($sku->code, $sku->baseUnitId, $sku->units, $sku->id, $sku->status, $sku->optionValues, $sku->openingStock, $path);
+    }
+
+    /**
+     * @param  array<string, CellValue>  $row
+     * @return array<string, CellValue>
+     */
+    private function variantCells(Product $product, ?Sku $sku, array $row): array
+    {
+        $options = array_values($product->options->all());
+
+        for ($n = 1; $n <= self::MAX_OPTIONS; $n++) {
+            $option = $options[$n - 1] ?? null;
+            $row["variant_option_{$n}"] = $option?->name;
+            $row["variant_value_{$n}"] = $option instanceof ProductOption
+                ? $sku?->optionValues->first(fn (ProductOptionValue $value): bool => $value->product_option_id === $option->id)?->value
+                : null;
+        }
+
+        $row['sku_status'] = $options === [] ? null : $sku?->status->label();
+
+        return $row;
     }
 
     /**
      * @return array<string, CellValue>
      */
-    private function exportRow(Product $product, ?SkuUnit $unit, CatalogLookups $lookups): array
+    private function exportRow(Product $product, ?string $key, ?Sku $sku, ?SkuUnit $unit, CatalogLookups $lookups): array
     {
-        $sku = $product->sku;
-        $row = [
+        $row = $this->variantCells($product, $sku, [
+            'product_key' => $key,
             'sku_code' => $sku?->code,
             'product_name' => $product->name,
             'category_path' => $lookups->paths[$product->category_id] ?? '',
             'status' => $product->status->label(),
             'description' => $product->description,
+        ]);
+
+        $row = [
+            ...$row,
             'base_unit' => $sku?->baseUnit->name,
             'unit' => $unit?->unit->name,
             'unit_is_default' => $unit instanceof SkuUnit ? $unit->is_default ? 'نعم' : 'لا' : (null),
@@ -457,7 +1028,6 @@ final readonly class CatalogRowMapper
             'base_price' => $this->number($unit?->base_price),
             'base_price_percent' => $this->number($unit?->base_price_percent),
             'moq' => $unit?->moq,
-            'on_hand' => $sku->inventory->on_hand ?? 0,
         ];
 
         $tier = 0;
@@ -468,8 +1038,10 @@ final readonly class CatalogRowMapper
             $row["tier_{$tier}_price"] = $this->number($stored->unit_price);
         }
 
-        foreach ($lookups->fields as $key => $definition) {
-            $row[self::FIELD_PREFIX.$key] = $this->exportField($definition, $product->custom_fields[$key] ?? null);
+        $row['on_hand'] = $sku->inventory->on_hand ?? 0;
+
+        foreach ($lookups->fields as $fieldKey => $definition) {
+            $row[self::FIELD_PREFIX.$fieldKey] = $this->exportField($definition, $product->custom_fields[$fieldKey] ?? null);
         }
 
         return $row;
@@ -742,18 +1314,18 @@ final readonly class CatalogRowMapper
     }
 
     /**
-     * The SKU the import writes: the file's units, each keeping the percentage its stored price was entered with when
+     * A SKU the import writes: the file's units, each keeping the percentage its stored price was entered with when
      * the row repeats it (BR-PR10 / D95), then the SKU's other active units as they are (a file never drops a unit, D91).
      * Without a default named in the file, an existing SKU keeps its default; a new one takes its first row.
      *
      * @param  list<array<string, string>>  $rows
      */
-    private function withStoredUnits(ProductData $data, array $rows, ?Sku $sku, bool $defaultNamed): ProductData
+    private function withStoredUnits(SkuData $data, array $rows, ?Sku $sku, bool $defaultNamed): SkuData
     {
         $units = [];
         $named = [];
 
-        foreach ($data->sku->units as $index => $unit) {
+        foreach ($data->units as $index => $unit) {
             $stored = $sku?->activeUnits->firstWhere('unit_id', $unit->unitId);
             $named[] = $unit->unitId;
             $units[] = new SkuUnitData(
@@ -771,15 +1343,7 @@ final readonly class CatalogRowMapper
             }
         }
 
-        return new ProductData(
-            name: $data->name,
-            categoryId: $data->categoryId,
-            sku: new SkuData($data->sku->code, $data->sku->baseUnitId, $this->oneDefault($units)),
-            description: $data->description,
-            customFields: $data->customFields,
-            status: $data->status,
-            openingStock: $data->openingStock,
-        );
+        return new SkuData($data->code, $data->baseUnitId, $this->oneDefault($units), $data->id, $data->status, $data->optionValues, $data->openingStock, $data->path);
     }
 
     /**
@@ -840,26 +1404,44 @@ final readonly class CatalogRowMapper
     /**
      * Validation keys → the Arabic header of their column, so messages read "سعر الجملة مطلوب.".
      *
-     * @param  array<int, list<int>>  $tierNumbers  per unit, the file's tier number of each sent tier, by position
+     * @param  array<int, list<list<int>>>  $tierNumbers  per SKU and unit, the file's tier number of each sent tier, by position
      * @return array<string, string>
      */
-    private function attributes(CatalogLookups $lookups, array $tierNumbers): array
+    private function attributes(CatalogLookups $lookups, array $tierNumbers, bool $variants): array
     {
         $attributes = [];
+        $prefix = $variants ? 'skus.*' : 'sku';
 
         foreach (self::COLUMN_OF as $key => $column) {
             $attributes[$key] = $this->label($column, $lookups);
         }
 
-        foreach (self::UNIT_COLUMN_OF as $key => $column) {
-            $attributes["sku.units.*.{$key}"] = $this->label($column, $lookups);
+        foreach (self::SKU_COLUMN_OF as $key => $column) {
+            $attributes["{$prefix}.{$key}"] = $this->label($column, $lookups);
         }
 
-        foreach ($tierNumbers as $unit => $numbers) {
-            foreach ($numbers as $index => $number) {
-                $attributes["sku.units.{$unit}.tiers.{$index}.min_quantity"] = $this->label("tier_{$number}_min", $lookups);
-                $attributes["sku.units.{$unit}.tiers.{$index}.unit_price"] = $this->label("tier_{$number}_price", $lookups);
+        $attributes["{$prefix}.option_values.*"] = $this->label('variant_value_1', $lookups);
+
+        foreach (self::UNIT_COLUMN_OF as $key => $column) {
+            $attributes["{$prefix}.units.*.{$key}"] = $this->label($column, $lookups);
+        }
+
+        foreach ($tierNumbers as $sku => $units) {
+            $skuPrefix = $variants ? "skus.{$sku}" : 'sku';
+
+            foreach ($units as $unit => $numbers) {
+                foreach ($numbers as $index => $number) {
+                    $attributes["{$skuPrefix}.units.{$unit}.tiers.{$index}.min_quantity"] = $this->label("tier_{$number}_min", $lookups);
+                    $attributes["{$skuPrefix}.units.{$unit}.tiers.{$index}.unit_price"] = $this->label("tier_{$number}_price", $lookups);
+                }
             }
+        }
+
+        for ($n = 1; $n <= self::MAX_OPTIONS; $n++) {
+            $index = $n - 1;
+            $attributes["options.{$index}.name"] = $this->label("variant_option_{$n}", $lookups);
+            $attributes["options.{$index}.values"] = $this->label("variant_value_{$n}", $lookups);
+            $attributes["options.{$index}.values.*.value"] = $this->label("variant_value_{$n}", $lookups);
         }
 
         foreach ($lookups->fields as $key => $definition) {
@@ -870,28 +1452,61 @@ final readonly class CatalogRowMapper
     }
 
     /**
-     * A validation key → [the index of the unit whose row it is about (0 = the first row), the column].
+     * A validation or action error key → [its row, its column]. `$skuRows` are, per SKU index of the key (`sku.` = 0),
+     * the rows of its units; `$optionCells` the cells that named each option ("i") and value ("i.j").
      *
-     * @param  array<int, list<int>>  $tierNumbers
+     * @param  array<int, list<int>>  $skuRows
+     * @param  array<int, list<list<int>>>  $tierNumbers
+     * @param  array<int|string, array{0: int, 1: string}>  $optionCells
      * @return array{0: int, 1: string}
      */
-    private function columnOf(string $key, array $tierNumbers): array
+    private function cell(string $key, array $skuRows, array $tierNumbers = [], array $optionCells = []): array
     {
-        if (str_starts_with($key, 'custom_fields.')) {
-            return [0, self::FIELD_PREFIX.mb_substr($key, mb_strlen('custom_fields.'))];
+        $all = array_merge(...$skuRows);
+        $first = $all === [] ? 0 : min($all);
+
+        if (preg_match('/^(?:sku|skus\.(\d+))\.(.+)$/', $key, $match) === 1) {
+            $sku = (int) $match[1];
+            $rows = $skuRows[$sku] ?? [];
+
+            return $this->skuCell($match[2], $rows === [] ? [$first] : $rows, $tierNumbers[$sku] ?? []);
         }
 
-        if (preg_match('/^sku\.units\.(\d+)\.tiers\.(\d+)\.(min_quantity|unit_price|discount_percent)$/', $key, $match) === 1) {
+        if (str_starts_with($key, 'custom_fields.')) {
+            return [$first, self::FIELD_PREFIX.mb_substr($key, mb_strlen('custom_fields.'))];
+        }
+
+        if (preg_match('/^options\.(\d+)(?:\.values\.(\d+))?/', $key, $match) === 1) {
+            return $optionCells[isset($match[2]) ? "{$match[1]}.{$match[2]}" : $match[1]] ?? $optionCells[$match[1]] ?? [$first, 'variant_option_'.min((int) $match[1] + 1, self::MAX_OPTIONS)];
+        }
+
+        return [$first, self::COLUMN_OF[$key] ?? 'row'];
+    }
+
+    /**
+     * A key under one SKU (`code`, `units.1.base_price`, `units.0.tiers.2.unit_price`, `option_values.1`) → its cell.
+     *
+     * @param  non-empty-list<int>  $rows
+     * @param  list<list<int>>  $tierNumbers
+     * @return array{0: int, 1: string}
+     */
+    private function skuCell(string $key, array $rows, array $tierNumbers): array
+    {
+        if (preg_match('/^units\.(\d+)\.tiers\.(\d+)\.(min_quantity|unit_price|discount_percent)$/', $key, $match) === 1) {
             $number = $tierNumbers[(int) $match[1]][(int) $match[2]] ?? null;
 
-            return [(int) $match[1], $number === null ? 'tiers' : ($match[3] === 'min_quantity' ? "tier_{$number}_min" : "tier_{$number}_price")];
+            return [$rows[(int) $match[1]] ?? $rows[0], $number === null ? 'tiers' : ($match[3] === 'min_quantity' ? "tier_{$number}_min" : "tier_{$number}_price")];
         }
 
-        if (preg_match('/^sku\.units\.(\d+)(?:\.([a-z_]+))?/', $key, $match) === 1) {
-            return [(int) $match[1], self::UNIT_COLUMN_OF[$match[2] ?? 'unit_id'] ?? 'unit'];
+        if (preg_match('/^units\.(\d+)(?:\.([a-z_]+))?/', $key, $match) === 1) {
+            return [$rows[(int) $match[1]] ?? $rows[0], self::UNIT_COLUMN_OF[$match[2] ?? 'unit_id'] ?? 'unit'];
         }
 
-        return [0, self::COLUMN_OF[$key] ?? 'row'];
+        if (preg_match('/^option_values\.(\d+)$/', $key, $match) === 1) {
+            return [$rows[0], 'variant_value_'.min((int) $match[1] + 1, self::MAX_OPTIONS)];
+        }
+
+        return [$rows[0], self::SKU_COLUMN_OF[explode('.', $key)[0]] ?? 'row'];
     }
 
     private function blankToNull(string $cell): ?string
@@ -912,7 +1527,13 @@ final readonly class CatalogRowMapper
 
     private function fold(string $text): string
     {
-        return mb_strtolower((string) preg_replace('/\s+/u', ' ', mb_trim($text)));
+        return mb_strtolower($this->squish($text));
+    }
+
+    /** Trimmed, every run of white space one space (case kept): how option names and values are stored. */
+    private function squish(string $text): string
+    {
+        return mb_trim((string) preg_replace('/\s+/u', ' ', $text));
     }
 
     private function foldPath(string $path): string

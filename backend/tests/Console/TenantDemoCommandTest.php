@@ -23,7 +23,7 @@ test('tenant:demo creates a school-books store with its owner, the demo catalog 
 
     expect($tenant->vertical)->toBe(Vertical::SchoolBooks)
         ->and($tenant->name)->toBe('مكتبة النور')
-        ->and($products)->toBe(44)
+        ->and($products)->toBe(45)
         ->and($customers)->toBe(14)
         ->and($orders)->toBeGreaterThan(0);
     $this->assertDatabaseHas('tenant_users', ['tenant_id' => $tenant->id, 'email' => 'owner@showroom.test', 'role' => 'owner']);

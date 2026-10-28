@@ -44,7 +44,7 @@ test('BR-CU06 the cart query loads a customer\'s lines oldest first with what pr
 });
 
 test('D91 the cart sku query loads a sku unit with its unit, tiers and its sku\'s product, stock and default unit', function (): void {
-    $sku = Product::factory()->withSku(onHand: 5)->create()->sku()->sole();
+    $sku = Product::factory()->withSku(onHand: 5)->create()->skus()->sole();
 
     $found = app(CartSkuQuery::class)->find($this->defaultUnitId($sku));
 
@@ -53,7 +53,7 @@ test('D91 the cart sku query loads a sku unit with its unit, tiers and its sku\'
 });
 
 test('D91 the cart sku query finds the default unit of a sku, archived units too by id', function (): void {
-    $sku = Product::factory()->withSku()->create()->sku()->sole();
+    $sku = Product::factory()->withSku()->create()->skus()->sole();
     $archived = App\Modules\Catalog\Models\SkuUnit::factory()->archived()->create(['sku_id' => $sku->id]);
 
     expect(app(CartSkuQuery::class)->findDefault($sku->id)->id)->toBe($this->defaultUnitId($sku))
@@ -61,7 +61,7 @@ test('D91 the cart sku query finds the default unit of a sku, archived units too
 });
 
 test('BR-T04 the cart sku query does not find another tenant\'s sku', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->sku()->sole(), $this->otherTenant());
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->skus()->sole(), $this->otherTenant());
     app(TenantContext::class)->set($this->tenant);
 
     app(CartSkuQuery::class)->findDefault($foreign->id);
@@ -171,9 +171,9 @@ test('BR-CU08 the settings query reads the store invitation text, null by defaul
 });
 
 test('BR-O11 the cart sku query finds several skus keyed by id, leaving out unknown and other tenants\' ones', function (): void {
-    $a = Product::factory()->withSku()->create()->sku()->sole();
-    $b = Product::factory()->withSku()->create()->sku()->sole();
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->sku()->sole(), $this->otherTenant());
+    $a = Product::factory()->withSku()->create()->skus()->sole();
+    $b = Product::factory()->withSku()->create()->skus()->sole();
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->skus()->sole(), $this->otherTenant());
     app(TenantContext::class)->set($this->tenant);
 
     [$unitA, $unitB, $foreignUnit] = [$this->defaultUnitId($a), $this->defaultUnitId($b), $this->asTenant(App\Modules\Tenancy\Models\Tenant::query()->findOrFail($foreign->tenant_id), fn (): int => $this->defaultUnitId($foreign))];

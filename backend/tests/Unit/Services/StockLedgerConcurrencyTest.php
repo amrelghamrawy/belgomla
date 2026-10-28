@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function (): void {
     [$this->raceTenant, $this->sku] = onSession('pgsql_session_a', function (): array {
         $tenant = Tenant::factory()->create(['subdomain' => 'race'.random_int(1000, 999999)]);
-        $sku = app(TenantContext::class)->runAs($tenant, fn (): Sku => Product::factory()->withSku(onHand: 5)->create()->sku()->sole());
+        $sku = app(TenantContext::class)->runAs($tenant, fn (): Sku => Product::factory()->withSku(onHand: 5)->create()->skus()->sole());
 
         return [$tenant, $sku];
     });

@@ -135,7 +135,7 @@ final readonly class CheckoutValidator
         $unit = $line->unit;
         $product = $line->sku->product;
 
-        if ($product->status !== ProductStatus::ComingSoon || ! $product->preorder_enabled || ! $unit->isActive()) {
+        if ($product->status !== ProductStatus::ComingSoon || ! $product->preorder_enabled || ! $line->sku->isActive() || ! $unit->isActive()) {
             return CheckoutProblem::preorderUnavailable($unit->sku_id, $unit->id);
         }
 
@@ -159,7 +159,7 @@ final readonly class CheckoutValidator
     {
         $unit = $line->unit;
 
-        if ($line->sku->product->status !== ProductStatus::Active || ! $unit->isActive()) {
+        if ($line->sku->product->status !== ProductStatus::Active || ! $line->sku->isActive() || ! $unit->isActive()) {
             return CheckoutProblem::productInactive($unit->sku_id, $unit->id);
         }
 

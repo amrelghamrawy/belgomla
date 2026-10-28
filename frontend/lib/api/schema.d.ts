@@ -2330,7 +2330,7 @@ export interface components {
             children: components["schemas"]["Category"][];
         };
         FacetOption: {
-            /** @description Select option id, or "true"/"false" for a boolean field; sent back as `f[<key>]=<id>`. */
+            /** @description Select option id, "true"/"false" for a boolean field, or the folded value of a variant option (type `option`); sent back as `f[<key>]=<id>`. */
             id: number | string;
             label: string;
             count: number;
@@ -2338,8 +2338,11 @@ export interface components {
         Facet: {
             key: string;
             label: string;
-            /** @enum {string} */
-            type: "select" | "boolean";
+            /**
+             * @description `option` = a variant option (BR-P14) whose key is `o:<folded name>`; select and boolean are custom fields
+             * @enum {string}
+             */
+            type: "select" | "boolean" | "option";
             options: components["schemas"]["FacetOption"][];
         };
         CustomFieldValue: {
@@ -2389,6 +2392,26 @@ export interface components {
             in_stock: boolean;
             /** @constant */
             coming_soon?: true;
+            /** @description The variant label, the SKU's option values in option order joined by " / " («أزرق / M»); null for a product without options (BR-P14) */
+            label?: string | null;
+            /** @description The SKU's option value ids in option order (one per option of the product; empty without options) */
+            option_value_ids?: number[];
+        };
+        /** @description A variant option (BR-P14, D92) with the values at least one active SKU uses, in the merchant's order */
+        StoreProductOption: {
+            id: number;
+            name: string;
+            values: {
+                id: number;
+                value: string;
+                /** @description The swatch: one product image chosen for the value */
+                image_url: string | null;
+            }[];
+        };
+        /** @description The lowest and highest default-unit price over the active SKUs, at the shopper's prices («من … إلى …») */
+        PriceRange: {
+            min: components["schemas"]["Money"];
+            max: components["schemas"]["Money"];
         };
         /** @description One unit of a SKU (D91), priced on its own at the shopper's prices; price keys follow the SKU's rules */
         StoreSkuUnit: {
@@ -2425,7 +2448,14 @@ export interface components {
             preorder: components["schemas"]["StorePreorder"] | null;
             category: components["schemas"]["CategoryRef"] | null;
             custom_fields: components["schemas"]["CustomFieldValue"][];
+            /** @description The SKU standing for the product on cards and lists: the first active SKU that is in stock, else the first active one (V2 Task 14); null when no SKU is active */
             sku: components["schemas"]["StoreSku"] | null;
+            /** @description Every active SKU (variant) in the merchant's order, each priced like `sku` (BR-P14); one entry for a product without options */
+            skus: components["schemas"]["StoreSku"][];
+            /** @description The variant options (at most 2, D92); empty for a product without options */
+            options: components["schemas"]["StoreProductOption"][];
+            /** @description Left out when prices are hidden (D1); null when no SKU is active */
+            price_range?: components["schemas"]["PriceRange"] | null;
             /**
              * @description Present (true) only when the tenant hides prices from guests (BR-CU04).
              * @constant
@@ -2449,10 +2479,13 @@ export interface components {
             gallery: components["schemas"]["ProductImage"][];
             related: components["schemas"]["RelatedProduct"][];
         };
-        /** @description One row per unit the product is sold in, the default first (D91) */
+        /** @description One row per unit of every active SKU (variant) of the product, SKUs in the merchant's order, the default unit first (D91, BR-P14) */
         PriceListRow: {
             /** @description The product */
             id: number;
+            sku_id: number | null;
+            /** @description The variant label («أزرق / M»), null without options */
+            variant: string | null;
             sku_unit_id: number | null;
             conversion_factor: number | null;
             is_default: boolean;
@@ -2533,6 +2566,8 @@ export interface components {
             /** @description The unit of the line (D91); a SKU may be in the cart in two units */
             sku_unit_id: number;
             product_name: string;
+            /** @description The variant label («أزرق / M», BR-P14), null without options */
+            variant: string | null;
             product_slug: string;
             unit: string;
             conversion_factor: number;
@@ -2940,6 +2975,30 @@ export interface components {
             moq: number | null;
             units?: components["schemas"]["DashboardSkuUnit"][];
             inventory?: components["schemas"]["StockLevels"];
+            /** @description The variant label («أزرق / M»), null without options (BR-P14) */
+            label?: string | null;
+            status?: components["schemas"]["SkuStatus"];
+            sort_order?: number;
+            /** @description The SKU's option values in option order, as sent in `skus[].option_values`; empty without options */
+            option_values?: string[];
+        };
+        /**
+         * @description An inactive SKU (variant) is hidden from the storefront and cannot be ordered (BR-P14)
+         * @enum {string}
+         */
+        SkuStatus: "active" | "inactive";
+        /** @description A variant option (BR-P14, D92) with every value, in the merchant's order */
+        DashboardProductOption: {
+            id: number;
+            name: string;
+            sort_order: number;
+            values: {
+                id: number;
+                value: string;
+                sort_order: number;
+                image_id: number | null;
+                image_url: string | null;
+            }[];
         };
         DashboardProduct: {
             id: number;
@@ -2953,7 +3012,12 @@ export interface components {
                 [key: string]: string | number | boolean;
             };
             preorder: components["schemas"]["ProductPreorder"];
+            /** @description The SKU standing for the product in lists: the first active SKU, else the first (V2 Task 14) */
             sku: components["schemas"]["DashboardSku"] | null;
+            /** @description Every SKU (variant), active and inactive, in the merchant's order (BR-P14); one for a product without options */
+            skus: components["schemas"]["DashboardSku"][];
+            /** @description The variant options (at most 2, D92); empty without options */
+            options: components["schemas"]["DashboardProductOption"][];
             main_image_url: string | null;
             /** @description Detail responses only */
             images?: components["schemas"]["ProductImage"][];
@@ -3030,7 +3094,11 @@ export interface components {
             /** @description Open pre-orders that got nothing (no stock left, or the customer cannot order) */
             untouched: number;
         };
+        /** @description Send either `sku` (a product without options: its one SKU, the V1 shape) or `skus` (BR-P14, V2 Task 14). With `options`, `skus` is required: one SKU per combination sold, each naming one value of every option in `option_values` (in option order); a combination at most once; at least one SKU active. A SKU left out of `skus` is deleted when nothing points at it (no orders, stock movements, negotiated prices or promotions), otherwise it is set inactive (BR-P05). An option or value left out is deleted. A SKU sent without `id` takes the place of the product's SKU with the same code, else with the same combination, else it is created. */
         ProductRequest: {
+            /** @description At most two options with up to 20 values each (D92); names distinct, values distinct within an option */
+            options?: components["schemas"]["ProductOptionRequest"][];
+            skus?: components["schemas"]["SkuRequest"][];
             name: string;
             category_id: number;
             description?: string | null;
@@ -3044,12 +3112,35 @@ export interface components {
             custom_fields?: {
                 [key: string]: string | number | boolean | null;
             };
-            sku: {
+            sku?: {
                 code: string;
                 base_unit_id: number;
                 /** @description The units the SKU is sold in (D91), each unit_id once; at most one is_default (none = the first). A unit left out is archived; sending its unit_id again restores it. */
                 units: components["schemas"]["SkuUnitRequest"][];
             };
+        };
+        ProductOptionRequest: {
+            /** @description An existing option of the product; omitted for a new one (matched by name then) */
+            id?: number | null;
+            name: string;
+            values: {
+                id?: number | null;
+                value: string;
+                /** @description One of the product's images, shown as the swatch */
+                image_id?: number | null;
+            }[];
+        };
+        SkuRequest: {
+            /** @description An existing SKU of the product */
+            id?: number | null;
+            code: string;
+            base_unit_id: number;
+            status?: components["schemas"]["SkuStatus"];
+            /** @description One value of every option, in option order (the value text); empty or left out without options */
+            option_values?: string[];
+            /** @description Base units; applied only to a SKU this call creates */
+            opening_stock?: number;
+            units: components["schemas"]["SkuUnitRequest"][];
         };
         SkuUnitRequest: components["schemas"]["PriceSetRequest"] & {
             /** @description An existing unit of the SKU; omitted for a new one */
@@ -3178,6 +3269,8 @@ export interface components {
             product_id: number;
             code: string;
             name: string | null;
+            /** @description The variant label («أزرق / M»), null without options (BR-P14) */
+            variant: string | null;
             status: components["schemas"]["ProductStatus"] | null;
             on_hand: number;
             reserved: number;
@@ -4067,7 +4160,7 @@ export interface components {
     parameters: {
         /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
         Category: string;
-        /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+        /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
         Facets: {
             [key: string]: string;
         };
@@ -4297,7 +4390,7 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -4327,7 +4420,7 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -4389,7 +4482,7 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -4420,7 +4513,7 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -5763,7 +5856,7 @@ export interface operations {
             query?: {
                 /** @description Category id; its descendants are included */
                 category?: components["parameters"]["CategoryIdFilter"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -5858,7 +5951,7 @@ export interface operations {
             query?: {
                 /** @description Category id; its descendants are included */
                 category?: components["parameters"]["CategoryIdFilter"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];

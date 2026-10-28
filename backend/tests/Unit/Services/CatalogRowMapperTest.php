@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Data\ImportRowData;
+use App\Modules\Catalog\Data\ProductOptionData;
+use App\Modules\Catalog\Data\ProductOptionValueData;
+use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Exceptions\CatalogConflict;
 use App\Modules\Catalog\Exceptions\InvalidCustomFields;
 use App\Modules\Catalog\Exceptions\InvalidImportFile;
@@ -27,6 +31,12 @@ beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->basics = $this->importBasics();
     $this->mapper = app(CatalogRowMapper::class);
+    $this->penRow = fn (string $code, string $color, array $overrides = []): array => $this->importRow([
+        'product_key' => 'PEN', 'sku_code' => $code, 'product_name' => 'قلم جاف',
+        'variant_option_1' => 'اللون', 'variant_value_1' => $color, 'variant_option_2' => 'المقاس', 'variant_value_2' => 'M', 'sku_status' => '',
+        'unit' => 'قطعة', 'conversion_factor' => '1', 'cover_price' => '7', 'base_price' => '5', 'moq' => '10', 'tier_1_min' => '', 'tier_1_price' => '', 'on_hand' => '100',
+        ...$overrides,
+    ]);
 });
 
 /**
@@ -94,11 +104,17 @@ test('the columns are the fixed ones, five tier pairs, on hand, then the active 
     $columns = $this->mapper->columns($this->mapper->lookups());
 
     expect(array_keys($columns))->toBe([
-        'sku_code', 'product_name', 'category_path', 'status', 'description', 'base_unit', 'unit', 'unit_is_default', 'conversion_factor',
+        'product_key', 'sku_code', 'product_name', 'category_path', 'status', 'description',
+        'variant_option_1', 'variant_value_1', 'variant_option_2', 'variant_value_2', 'sku_status',
+        'base_unit', 'unit', 'unit_is_default', 'conversion_factor',
         'cover_price', 'base_price', 'base_price_percent', 'moq',
         'tier_1_min', 'tier_1_price', 'tier_2_min', 'tier_2_price', 'tier_3_min', 'tier_3_price', 'tier_4_min', 'tier_4_price', 'tier_5_min', 'tier_5_price',
         'on_hand', 'field:publisher', 'field:brand',
     ])->and($columns['sku_code'])->toBe('كود الصنف')
+        ->and($columns['product_key'])->toBe('مفتاح المنتج')
+        ->and($columns['variant_option_2'])->toBe('الخيار 2')
+        ->and($columns['variant_value_2'])->toBe('القيمة 2')
+        ->and($columns['sku_status'])->toBe('حالة الصنف')
         ->and($columns['unit_is_default'])->toBe('الوحدة الافتراضية')
         ->and($columns['tier_2_price'])->toBe('شريحة 2: السعر')
         ->and($columns['field:publisher'])->toBe('الشركة');
@@ -107,7 +123,7 @@ test('the columns are the fixed ones, five tier pairs, on hand, then the active 
 test('a sku unit with more than five tiers gets a tier column pair for each', function (): void {
     $product = $this->importedProduct();
     foreach ([20, 30, 40, 50, 60] as $min) {
-        SkuPriceTier::factory()->create(['sku_id' => $product->sku?->id, 'min_quantity' => $min, 'unit_price' => '80.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->skus->first()?->id, 'min_quantity' => $min, 'unit_price' => '80.00']);
     }
 
     expect($this->mapper->lookups()->tierColumns)->toBe(6)
@@ -180,15 +196,104 @@ test('a file is refused as a whole when its header is wrong', function (array $c
     'no header at all' => [[['A-1', 'كتاب'], ['A-2', 'قلم']], 'لم يتم التعرف على صف العناوين، استخدم القالب', null],
     'one unknown row' => [[['A-1', 'كتاب']], 'لم يتم التعرف على صف العناوين، استخدم القالب', null],
     'nothing in it' => [[], 'الملف لا يحتوي على منتجات', null],
-    'a newer format version' => [[['sku_code']], 'إصدار الملف «products_v3» غير مدعوم، نزّل قالبًا جديدًا', 'products_v3'],
+    'a newer format version' => [[['sku_code']], 'إصدار الملف «products_v4» غير مدعوم، نزّل قالبًا جديدًا', 'products_v4'],
 ]);
 
-test('D91 the sheets of format v1 and v2 are both read', function (string $sheet): void {
+test('D91 BR-P14 the sheets of format v1, v2 and v3 are all read', function (string $sheet): void {
     expect(mapperRows($this->mapper, [['sku_code', 'product_name', 'category_path', 'unit', 'base_unit', 'conversion_factor', 'base_price']], $sheet))->toBe([]);
-})->with(['v1' => ['products_v1'], 'v2' => ['products_v2']]);
+})->with(['v1' => ['products_v1'], 'v2' => ['products_v2'], 'v3' => ['products_v3']]);
 
 test('a key row without data rows yields nothing', function (): void {
     expect(mapperRows($this->mapper, [['sku_code', 'product_name', 'category_path', 'unit', 'base_unit', 'conversion_factor', 'base_price']], 'Sheet1'))->toBe([]);
+});
+
+test('BR-P14 consecutive rows sharing a product key are one product, an empty key being the code, so a unit row may leave it empty', function (): void {
+    $products = iterator_to_array($this->mapper->products([
+        2 => ['product_key' => 'PEN', 'sku_code' => 'PEN-BLUE'],
+        3 => ['product_key' => '', 'sku_code' => 'PEN-BLUE'],
+        4 => ['product_key' => ' PEN ', 'sku_code' => 'PEN-RED'],
+        5 => ['product_key' => '', 'sku_code' => 'BOOK-1'],
+        6 => ['product_key' => '', 'sku_code' => 'BOOK-1'],
+        7 => ['product_key' => '', 'sku_code' => ''],
+        8 => ['product_key' => '', 'sku_code' => ''],
+        9 => ['sku_code' => 'V2-1'],
+    ]));
+
+    expect(array_map(fn (array $product): array => array_keys($product['rows']), $products))->toBe([2 => [2, 3, 4], 5 => [5, 6], 7 => [7], 8 => [8], 9 => [9]])
+        ->and(array_filter(array_column($products, 'duplicates')))->toBe([]);
+});
+
+test('BR-P14 a product key or a code that comes back after another product, or a code after another code, is a duplicate', function (): void {
+    $products = iterator_to_array($this->mapper->products([
+        2 => ['product_key' => 'PEN', 'sku_code' => 'PEN-BLUE'],
+        3 => ['product_key' => 'BOOK', 'sku_code' => 'BOOK-1'],
+        4 => ['product_key' => 'PEN', 'sku_code' => 'PEN-RED'],
+        5 => ['product_key' => 'BAG', 'sku_code' => 'BOOK-1'],
+        6 => ['product_key' => 'CUP', 'sku_code' => 'CUP-1'],
+        7 => ['product_key' => 'CUP', 'sku_code' => 'CUP-2'],
+        8 => ['product_key' => 'CUP', 'sku_code' => 'CUP-1'],
+        9 => ['product_key' => '', 'sku_code' => 'CUP-2'],
+    ]));
+
+    expect(array_map(fn (array $product): array => $product['duplicates'], $products))->toBe([
+        2 => [],
+        3 => [],
+        4 => [4 => ['product_key' => ['مفتاح المنتج مكرر في الملف (الصف 2)']]],
+        5 => [5 => ['sku_code' => ['الكود مكرر في الملف (الصف 3)']]],
+        6 => [8 => ['sku_code' => ['الكود مكرر في الملف (الصف 6)']]],
+        9 => [9 => ['sku_code' => ['الكود مكرر في الملف (الصف 7)']]],
+    ]);
+});
+
+test('BR-P14 the rows of a product with variants become its options and one SKU per variant, each with its rows and stock', function (): void {
+    $data = $this->mapper->map([
+        2 => ($this->penRow)('PEN-BLUE', 'أزرق'),
+        3 => ($this->penRow)('PEN-RED', ' أحمر ', ['variant_option_1' => 'اللّون', 'sku_status' => 'غير نشط', 'on_hand' => '50']),
+        4 => ($this->penRow)('PEN-RED', 'أحمر', ['product_key' => '', 'unit' => 'كرتونة', 'unit_is_default' => '', 'conversion_factor' => '12', 'base_price' => '55']),
+    ], $this->mapper->lookups());
+
+    expect(array_map(fn (ProductOptionData $option): array => [$option->id, $option->name, array_map(fn (ProductOptionValueData $value): string => $value->value, $option->values)], $data->product->options))
+        ->toBe([[null, 'اللون', ['أزرق', 'أحمر']], [null, 'المقاس', ['M']]])
+        ->and(array_map(fn (SkuData $sku): array => [$sku->code, $sku->optionValues, $sku->status, $sku->openingStock, $sku->path, count($sku->units)], $data->product->skus))->toBe([
+            ['PEN-BLUE', ['أزرق', 'M'], SkuStatus::Active, 100, 'skus.0', 1],
+            ['PEN-RED', ['أحمر', 'M'], SkuStatus::Inactive, 50, 'skus.1', 2],
+        ])
+        ->and($data->onHand)->toBe([0 => 100, 1 => 50])
+        ->and($data->rows)->toBe([[2], [3, 4]]);
+});
+
+test('BR-P14 a variant error names its own row and cell', function (array $blue, array $red, array $errors): void {
+    expect(mapperRowErrors($this->mapper, [2 => ($this->penRow)('PEN-BLUE', 'أزرق', $blue), 3 => ($this->penRow)('PEN-RED', 'أحمر', $red)]))->toBe($errors);
+})->with([
+    'an option without a value' => [[], ['variant_value_1' => ''], [3 => ['variant_value_1' => ['اكتب قيمة الخيار']]]],
+    'a value without an option' => [[], ['variant_option_2' => ''], [3 => ['variant_option_2' => ['اكتب اسم الخيار'], 'variant_value_2' => ['اكتب قيمة «المقاس» لهذا الصنف']]]],
+    'the same option twice' => [[], ['variant_option_2' => 'اللون'], [3 => ['variant_option_2' => ['الخيار مكرر في هذا الصنف'], 'variant_value_2' => ['اكتب قيمة «المقاس» لهذا الصنف']]]],
+    'D92 a third option' => [[], ['variant_option_2' => 'الخامة', 'variant_value_2' => 'معدن'], [3 => ['variant_option_2' => ['للمنتج خياران على الأكثر'], 'variant_value_2' => ['اكتب قيمة «المقاس» لهذا الصنف']]]],
+    'the same combination twice' => [[], ['variant_value_1' => 'ازرق'], [3 => ['variant_value_1' => ['هذه التركيبة مكررة في المنتج']]]],
+    'two SKUs without options' => [
+        ['variant_option_1' => '', 'variant_value_1' => '', 'variant_option_2' => '', 'variant_value_2' => ''],
+        ['variant_option_1' => '', 'variant_value_1' => '', 'variant_option_2' => '', 'variant_value_2' => ''],
+        [3 => ['variant_option_1' => ['المنتج بأكثر من صنف يحتاج خيارًا وقيمة لكل صنف']]],
+    ],
+    'no active SKU' => [['sku_status' => 'غير نشط'], ['sku_status' => 'inactive'], [2 => ['sku_status' => ['صنف واحد نشط على الأقل']]]],
+    'an unknown SKU status' => [['sku_status' => 'مخفي'], [], [2 => ['sku_status' => ['قيمة حالة الصنف غير صالحة.']]]],
+    'a unit of the second variant' => [[], ['base_price' => '0'], [3 => ['base_price' => ['يجب أن تكون قيمة سعر الجملة أكبر من 0.']]]],
+    'a code of the second variant' => [[], ['sku_code' => 'PEN RED'], [3 => ['sku_code' => ['صيغة كود الصنف غير صالحة.']]]],
+]);
+
+test('BR-P14 the SKU of a product without options is always active', function (): void {
+    expect(mapperErrors($this->mapper, $this->importRow(['sku_status' => 'غير نشط'])))->toBe(['sku_status' => ['صنف المنتج بدون خيارات نشط دائمًا']])
+        ->and(mapperRow($this->mapper, $this->importRow(['sku_status' => 'نشط']))->product->skus[0]->path)->toBe('sku');
+});
+
+test('BR-P14 errors of the actions about a variant point at that variant\'s rows', function (): void {
+    $errors = $this->mapper->errors(
+        new ApiException(422, 'validation_failed', 'بعض البيانات غير صحيحة', ['skus.1.units.1.unit_id' => ['العنصر المختار مؤرشف'], 'skus.0.code' => ['خطأ'], 'options.0.values.1.id' => ['خطأ']]),
+        $this->mapper->lookups(),
+        [[9], [7, 8]],
+    );
+
+    expect(array_map(fn (array $error): array => [$error['row'] ?? null, $error['column']], $errors))->toBe([[8, 'unit'], [9, 'sku_code'], [7, 'variant_option_1']]);
 });
 
 test('D91 consecutive rows of one code are one SKU, a row without a code stands alone', function (): void {
@@ -212,16 +317,16 @@ test('D91 consecutive rows of one code are one SKU, a row without a code stands 
 
 test('a valid row becomes the product data the actions take', function (): void {
     $data = mapperRow($this->mapper, $this->importRow());
-    $unit = $data->product->sku->units[0];
+    $unit = $data->product->skus[0]->units[0];
 
     expect($data)->toBeInstanceOf(ImportRowData::class)
         ->and($data->product->name)->toBe('الأضواء علوم أولى إعدادي')
         ->and($data->product->categoryId)->toBe($this->basics['grade']->id)
         ->and($data->product->description)->toBe('كتاب العلوم')
         ->and($data->product->customFields)->toBe(['publisher' => $this->basics['adwaa']->id])
-        ->and($data->product->sku->code)->toBe('ADW-SCI-1')
-        ->and($data->product->sku->baseUnitId)->toBe($this->basics['piece']->id)
-        ->and($data->product->sku->units)->toHaveCount(1)
+        ->and($data->product->skus[0]->code)->toBe('ADW-SCI-1')
+        ->and($data->product->skus[0]->baseUnitId)->toBe($this->basics['piece']->id)
+        ->and($data->product->skus[0]->units)->toHaveCount(1)
         ->and($unit->id)->toBeNull()
         ->and($unit->unitId)->toBe($this->basics['carton']->id)
         ->and($unit->conversionFactor)->toBe(20)
@@ -231,9 +336,9 @@ test('a valid row becomes the product data the actions take', function (): void 
         ->and($unit->pricing->moq)->toBe(5)
         ->and($unit->pricing->tiers)->toEqual([new TierData(10, '85.00')])
         ->and($data->product->status)->toBe(ProductStatus::Active)
-        ->and($data->product->openingStock)->toBe(400)
+        ->and($data->product->skus[0]->openingStock)->toBe(400)
         ->and($data->status)->toBe(ProductStatus::Active)
-        ->and($data->onHand)->toBe(400);
+        ->and($data->onHand)->toBe([0 => 400]);
 });
 
 test('D91 a format v1 row is a SKU in its one unit, the default', function (): void {
@@ -242,7 +347,7 @@ test('D91 a format v1 row is a SKU in its one unit, the default', function (): v
     $raw = [1 => array_keys($row), 2 => array_values($row)];
 
     $rows = iterator_to_array($this->mapper->rows($raw, $this->mapper->lookups(), 'products_v1'));
-    $units = $this->mapper->map($rows, $this->mapper->lookups())->product->sku->units;
+    $units = $this->mapper->map($rows, $this->mapper->lookups())->product->skus[0]->units;
 
     expect($units)->toHaveCount(1)
         ->and($units[0]->unitId)->toBe($this->basics['carton']->id)
@@ -255,7 +360,7 @@ test('D91 the rows of a SKU are its units, each with its own factor, prices, MOQ
         3 => $this->importRow(['unit' => 'قطعة', 'unit_is_default' => 'نعم', 'conversion_factor' => '1', 'cover_price' => '7', 'base_price' => '5', 'moq' => '10', 'tier_1_min' => '50', 'tier_1_price' => '4.5', 'product_name' => 'اسم آخر يتجاهل']),
     ], $this->mapper->lookups());
 
-    [$carton, $piece] = $data->product->sku->units;
+    [$carton, $piece] = $data->product->skus[0]->units;
 
     expect($data->product->name)->toBe('الأضواء علوم أولى إعدادي')
         ->and($carton->unitId)->toBe($this->basics['carton']->id)
@@ -275,19 +380,19 @@ test('D91 a new SKU without a default named takes its first row as the default',
     $units = $this->mapper->map([
         2 => $this->importRow(['unit_is_default' => '']),
         3 => $this->importRow(['unit' => 'قطعة', 'unit_is_default' => '', 'conversion_factor' => '1', 'base_price' => '5']),
-    ], $this->mapper->lookups())->product->sku->units;
+    ], $this->mapper->lookups())->product->skus[0]->units;
 
     expect(array_map(fn (SkuUnitData $unit): bool => $unit->isDefault, $units))->toBe([true, false]);
 });
 
 test('D91 a unit the SKU has and the file does not list is kept as stored, and the SKU keeps its default', function (): void {
     $product = $this->importedProduct();
-    $piece = $this->addUnit($product->sku, ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10], [50 => '4.50']);
+    $piece = $this->addUnit($product->skus->first(), ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10], [50 => '4.50']);
 
-    $units = mapperRow($this->mapper, $this->importRow(['unit_is_default' => '', 'base_price' => '88']), $product->load('sku.activeUnits.tiers'))->product->sku->units;
+    $units = mapperRow($this->mapper, $this->importRow(['unit_is_default' => '', 'base_price' => '88']), $product->load('skus.activeUnits.tiers'))->product->skus[0]->units;
 
     expect($units)->toHaveCount(2)
-        ->and($units[0]->id)->toBe($this->defaultUnitId($product->sku))
+        ->and($units[0]->id)->toBe($this->defaultUnitId($product->skus->first()))
         ->and($units[0]->isDefault)->toBeTrue()
         ->and($units[0]->pricing->basePrice)->toBe('88.00')
         ->and($units[1]->id)->toBe($piece->id)
@@ -300,10 +405,10 @@ test('D91 a unit the SKU has and the file does not list is kept as stored, and t
 
 test('D91 a default named in the file moves it away from a unit the file does not list', function (): void {
     $product = $this->importedProduct();
-    $this->addUnit($product->sku, ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00']);
+    $this->addUnit($product->skus->first(), ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00']);
     $box = Unit::factory()->create(['name' => 'علبة']);
 
-    $units = mapperRow($this->mapper, $this->importRow(['unit' => 'علبة', 'unit_is_default' => 'نعم', 'conversion_factor' => '10', 'base_price' => '45']), $product->load('sku.activeUnits.tiers'))->product->sku->units;
+    $units = mapperRow($this->mapper, $this->importRow(['unit' => 'علبة', 'unit_is_default' => 'نعم', 'conversion_factor' => '10', 'base_price' => '45']), $product->load('skus.activeUnits.tiers'))->product->skus[0]->units;
 
     expect(array_map(fn (SkuUnitData $unit): array => [$unit->unitId, $unit->isDefault], $units))->toBe([
         [$box->id, true],
@@ -391,7 +496,7 @@ test('D91 a SKU may keep selling in an archived unit it already sells in', funct
     $product = $this->importedProduct();
     $this->basics['carton']->update(['status' => 'archived']);
 
-    expect(mapperRow($this->mapper, $this->importRow(), $product)->product->sku->units[0]->unitId)->toBe($this->basics['carton']->id);
+    expect(mapperRow($this->mapper, $this->importRow(), $product)->product->skus[0]->units[0]->unitId)->toBe($this->basics['carton']->id);
 });
 
 test('BR-P08 a select field is set by its option label', function (): void {
@@ -436,9 +541,9 @@ test('BR-PR03 tier pairs become tiers, empty pairs are left out, no tier column 
     $none = mapperRow($this->mapper, $this->importRow(['tier_1_min' => '', 'tier_1_price' => '']));
     $kept = mapperRow($this->mapper, $this->importRow(['tier_1_min' => null, 'tier_1_price' => null, 'tier_2_min' => null, 'tier_2_price' => null]));
 
-    expect($two->product->sku->units[0]->pricing->tiers)->toEqual([new TierData(10, '85.00'), new TierData(50, '80.00')])
-        ->and($none->product->sku->units[0]->pricing->tiers)->toBe([])
-        ->and($kept->product->sku->units[0]->pricing->tiers)->toBeNull();
+    expect($two->product->skus[0]->units[0]->pricing->tiers)->toEqual([new TierData(10, '85.00'), new TierData(50, '80.00')])
+        ->and($none->product->skus[0]->units[0]->pricing->tiers)->toBe([])
+        ->and($kept->product->skus[0]->units[0]->pricing->tiers)->toBeNull();
 });
 
 test('a half filled tier points at its own column', function (): void {
@@ -468,8 +573,8 @@ test('an empty status and stock leave them alone', function (): void {
     $data = mapperRow($this->mapper, $this->importRow(['status' => '', 'on_hand' => '']));
 
     expect($data->status)->toBeNull()
-        ->and($data->onHand)->toBeNull()
-        ->and($data->product->openingStock)->toBe(0);
+        ->and($data->onHand)->toBe([])
+        ->and($data->product->skus[0]->openingStock)->toBe(0);
 });
 
 test('optional columns left out of the file keep what the product has', function (): void {
@@ -478,8 +583,8 @@ test('optional columns left out of the file keep what the product has', function
     $data = mapperRow($this->mapper, $this->importRow(['description' => null, 'cover_price' => null, 'moq' => null, 'field:publisher' => null]), $product);
 
     expect($data->product->description)->toBe('كتاب العلوم')
-        ->and($data->product->sku->units[0]->pricing->coverPrice)->toBe('120.00')
-        ->and($data->product->sku->units[0]->pricing->moq)->toBe(7)
+        ->and($data->product->skus[0]->units[0]->pricing->coverPrice)->toBe('120.00')
+        ->and($data->product->skus[0]->units[0]->pricing->moq)->toBe(7)
         ->and($data->product->customFields)->toBe(['publisher' => $this->basics['adwaa']->id]);
 });
 
@@ -487,11 +592,11 @@ test('an empty description or reference price clears it', function (): void {
     $data = mapperRow($this->mapper, $this->importRow(['description' => '', 'cover_price' => '']), $this->importedProduct());
 
     expect($data->product->description)->toBeNull()
-        ->and($data->product->sku->units[0]->pricing->coverPrice)->toBeNull();
+        ->and($data->product->skus[0]->units[0]->pricing->coverPrice)->toBeNull();
 });
 
 test('BR-PR10 a percentage wins over the price', function (): void {
-    $pricing = mapperRow($this->mapper, $this->importRow(['base_price' => '95', 'base_price_percent' => '25']))->product->sku->units[0]->pricing;
+    $pricing = mapperRow($this->mapper, $this->importRow(['base_price' => '95', 'base_price_percent' => '25']))->product->skus[0]->units[0]->pricing;
 
     expect($pricing->basePrice)->toBeNull()
         ->and($pricing->basePricePercent)->toBe('25.00');
@@ -499,9 +604,9 @@ test('BR-PR10 a percentage wins over the price', function (): void {
 
 test('D95 a row repeating the stored price and percentage keeps both, and a tier keeps its percentage', function (): void {
     $product = $this->importedProduct(['base_price' => '88.00', 'base_price_percent' => '25.00']);
-    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($product->sku))->update(['discount_percent' => '30.00']);
+    SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($product->skus->first()))->update(['discount_percent' => '30.00']);
 
-    $pricing = mapperRow($this->mapper, $this->importRow(['base_price' => '88', 'base_price_percent' => '25']), $product->load('sku.activeUnits.tiers'))->product->sku->units[0]->pricing;
+    $pricing = mapperRow($this->mapper, $this->importRow(['base_price' => '88', 'base_price_percent' => '25']), $product->load('skus.activeUnits.tiers'))->product->skus[0]->units[0]->pricing;
 
     expect($pricing->basePrice)->toBe('88.00')
         ->and($pricing->basePricePercent)->toBe('25.00')
@@ -509,7 +614,7 @@ test('D95 a row repeating the stored price and percentage keeps both, and a tier
 });
 
 test('errors of the actions point at the row and column they are about', function (Closure $exception, array $errors): void {
-    expect($this->mapper->errors($exception(), $this->mapper->lookups(), [7, 8]))->toBe($errors);
+    expect($this->mapper->errors($exception(), $this->mapper->lookups(), [[7, 8]]))->toBe($errors);
 })->with([
     'custom field' => [fn (): InvalidCustomFields => InvalidCustomFields::withErrors(['publisher' => 'هذا الحقل مطلوب']), [['row' => 7, 'column' => 'field:publisher', 'label' => 'الشركة', 'message' => 'هذا الحقل مطلوب']]],
     'D28 tiers' => [fn (): InvalidTiers => InvalidTiers::withProblems(['سعر شريحة 10 أعلى من السعر الأساسي']), [['row' => 7, 'column' => 'tiers', 'label' => 'شرائح السعر', 'message' => 'سعر شريحة 10 أعلى من السعر الأساسي']]],
@@ -530,21 +635,27 @@ test('an unknown column has its key as label', function (): void {
 test('D91 the export rows hold the product as the import reads it, one per unit, the default first', function (): void {
     $product = $this->importedProduct(['base_price_percent' => '25.00']);
     $product->update(['custom_fields' => ['publisher' => $this->basics['adwaa']->id, 'brand' => 'قديم']]);
-    $this->addUnit($product->sku, ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10]);
-    $product = Product::query()->with(['sku.activeUnits.unit', 'sku.activeUnits.tiers', 'sku.baseUnit', 'sku.inventory'])->findOrFail($product->id);
+    $this->addUnit($product->skus->first(), ['unit_id' => $this->basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10]);
+    $product = Product::query()->with(['options', 'skus.activeUnits.unit', 'skus.activeUnits.tiers', 'skus.baseUnit', 'skus.inventory', 'skus.optionValues'])->findOrFail($product->id);
 
     $shared = [
+        'product_key' => 'ADW-SCI-1',
         'sku_code' => 'ADW-SCI-1',
         'product_name' => 'الأضواء علوم أولى إعدادي',
         'category_path' => 'كتب خارجية > أولى إعدادي',
         'status' => 'نشط',
         'description' => 'كتاب العلوم',
+        'variant_option_1' => null,
+        'variant_value_1' => null,
+        'variant_option_2' => null,
+        'variant_value_2' => null,
+        'sku_status' => null,
         'base_unit' => 'قطعة',
     ];
     $fields = ['field:publisher' => 'الأضواء', 'field:brand' => 'قديم'];
 
     expect($this->mapper->exportRows($product, $this->mapper->lookups()))->toBe([
-        [...$shared, 'unit' => 'كرتونة', 'unit_is_default' => 'نعم', 'conversion_factor' => 20, 'cover_price' => 120, 'base_price' => 90, 'base_price_percent' => 25, 'moq' => 5, 'on_hand' => 400, 'tier_1_min' => 10, 'tier_1_price' => 85, ...$fields],
+        [...$shared, 'unit' => 'كرتونة', 'unit_is_default' => 'نعم', 'conversion_factor' => 20, 'cover_price' => 120, 'base_price' => 90, 'base_price_percent' => 25, 'moq' => 5, 'tier_1_min' => 10, 'tier_1_price' => 85, 'on_hand' => 400, ...$fields],
         [...$shared, 'unit' => 'قطعة', 'unit_is_default' => 'لا', 'conversion_factor' => 1, 'cover_price' => null, 'base_price' => 5, 'base_price_percent' => null, 'moq' => 10, 'on_hand' => 400, ...$fields],
     ]);
 });
@@ -554,7 +665,7 @@ test('the export row writes yes or no for a boolean field and nothing for an emp
     $product = $this->importedProduct();
     $product->update(['custom_fields' => ['colored' => false]]);
 
-    $row = $this->mapper->exportRows($product->refresh()->load(['sku.activeUnits.unit', 'sku.activeUnits.tiers', 'sku.baseUnit']), $this->mapper->lookups())[0];
+    $row = $this->mapper->exportRows($product->refresh()->load(['skus.activeUnits.unit', 'skus.activeUnits.tiers', 'skus.baseUnit']), $this->mapper->lookups())[0];
 
     expect($row['field:colored'])->toBe('لا')
         ->and($row['field:publisher'])->toBeNull();

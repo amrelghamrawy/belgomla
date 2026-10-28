@@ -9,7 +9,7 @@ use App\Modules\Inventory\Contracts\ReservationHolders;
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
-    $this->sku = $this->inTenant(fn () => Product::factory()->withSku(onHand: 100, reserved: 80)->create()->sku()->sole());
+    $this->sku = $this->inTenant(fn () => Product::factory()->withSku(onHand: 100, reserved: 80)->create()->skus()->sole());
 });
 
 test('BR-INV06 an owner sets the counted on hand: the row is returned, the movement and the audit record written', function (): void {
@@ -80,7 +80,7 @@ test('adjust validation', function (array $body, string $field): void {
 ]);
 
 test('BR-T04 adjusting a sku of another tenant is 404 and changes nothing there', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->sku()->sole(), $this->otherTenant());
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->skus()->sole(), $this->otherTenant());
 
     $this->tenantJson('POST', "/api/dashboard/inventory/{$foreign->id}/adjust", ['new_on_hand' => 0, 'reason' => 'جرد'])
         ->assertNotFound()

@@ -20,8 +20,8 @@ use Carbon\CarbonImmutable;
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->travelTo(CarbonImmutable::parse('2026-10-27 10:00:00'));
-    $this->first = Product::factory()->withSku()->create(['name' => 'الأضواء علوم'])->sku()->sole();
-    $this->outside = Product::factory()->withSku()->create(['name' => 'المعلم عربي'])->sku()->sole();
+    $this->first = Product::factory()->withSku()->create(['name' => 'الأضواء علوم'])->skus()->sole();
+    $this->outside = Product::factory()->withSku()->create(['name' => 'المعلم عربي'])->skus()->sole();
     $this->promotion = Promotion::factory()->covering($this->first)->upcoming()->create([
         'name' => 'عرض الأضواء',
         'filter' => ['category' => null, 'f' => [], 'q' => 'الأضواء', 'status' => null],
@@ -44,7 +44,7 @@ test('BR-PR15 a field sent changes, the rest stays, audited with what changed', 
 });
 
 test('D90 d every save selects the skus of the stored filter again', function (): void {
-    $added = Product::factory()->withSku()->create(['name' => 'الأضواء دراسات'])->sku()->sole();
+    $added = Product::factory()->withSku()->create(['name' => 'الأضواء دراسات'])->skus()->sole();
 
     $promotion = app(UpdatePromotion::class)->handle($this->promotion, promotionChanges(['name' => 'عرض الأضواء الكبير']));
 

@@ -27,7 +27,7 @@ final readonly class OrderableQuantity
             return;
         }
 
-        if ($unit->sku->product->status !== ProductStatus::Active || ! $unit->isActive()) {
+        if ($unit->sku->product->status !== ProductStatus::Active || ! $unit->sku->isActive() || ! $unit->isActive()) {
             throw CartLineInvalid::productInactive($unit->sku_id, $unit->id);
         }
 
@@ -45,7 +45,7 @@ final readonly class OrderableQuantity
     {
         $product = $unit->sku->product;
 
-        return $product->status === ProductStatus::ComingSoon && $product->preorder_enabled && $unit->isActive();
+        return $product->status === ProductStatus::ComingSoon && $product->preorder_enabled && $unit->sku->isActive() && $unit->isActive();
     }
 
     private function assertPreorderable(SkuUnit $unit, int $quantity): void

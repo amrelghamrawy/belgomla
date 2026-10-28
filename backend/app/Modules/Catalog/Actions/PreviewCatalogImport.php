@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The import preview (V2 Task 06): stores the uploaded file for `catalog.import_token_hours` and dry-runs every
- * row through ImportCatalogRow inside one transaction that is always rolled back, so the preview finds exactly
+ * product (its rows, CatalogRowMapper::products; the counts are products, V2 Task 14) through ImportCatalogRow inside
+ * one transaction that is always rolled back, so the preview finds exactly
  * the errors the import would (references, request rules, D28 tiers, custom fields, stock below reserved) and
  * writes nothing. Returns the counts, the first `catalog.import_preview_errors` row errors and the token that
  * RunCatalogImport takes. A file that cannot be read as a whole is `422` on `file` and is not kept.
@@ -47,20 +48,17 @@ final readonly class PreviewCatalogImport
     private function dryRun(string $token, string $name, string $path, SpreadsheetFormat $format): ImportPreview
     {
         $lookups = $this->mapper->lookups();
-        $skus = $this->mapper->skus($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $this->spreadsheet->sheetName($path, $format)));
+        $products = $this->mapper->products($this->mapper->rows($this->spreadsheet->read($path, $format), $lookups, $this->spreadsheet->sheetName($path, $format)));
         $counts = array_fill_keys(array_map(fn (ImportRowAction $action): string => $action->value, ImportRowAction::cases()), 0);
         $limit = config()->integer('catalog.import_preview_errors');
         $errors = [];
         $errorCount = 0;
-        $seen = [];
 
         DB::beginTransaction();
 
         try {
-            foreach ($skus as $number => $rows) {
-                $code = $rows[$number]['sku_code'] ?? '';
-                $result = $this->importRow->handle($rows, $lookups, $code === '' ? null : ($seen[$code] ?? null));
-                $seen[$code] ??= $number;
+            foreach ($products as $product) {
+                $result = $this->importRow->handle($product['rows'], $lookups, $product['duplicates']);
                 $counts[$result->action->value]++;
 
                 foreach ($result->rowErrors() as $error) {

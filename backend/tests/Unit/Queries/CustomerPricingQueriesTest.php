@@ -25,7 +25,7 @@ beforeEach(function (): void {
 
 function pricingQuerySku(string $name = 'كتاب', string $code = 'SKU-1'): Sku
 {
-    return Product::factory()->withSku(['code' => $code])->create(['name' => $name])->sku()->sole();
+    return Product::factory()->withSku(['code' => $code])->create(['name' => $name])->skus()->sole();
 }
 
 test('BR-PR14 a guest has no pricing context', function (): void {
@@ -64,7 +64,7 @@ test('D89 an archived group no longer applies, the customer keeps it', function 
 test('BR-T04 the context never reads another tenant\'s prices', function (): void {
     $customer = $this->makeCustomer();
     $other = $this->otherTenant();
-    $this->asTenant($other, fn () => CustomerSkuPrice::factory()->create(['customer_id' => $customer->id, 'sku_id' => Product::factory()->withSku()->create()->sku()->sole()->id]));
+    $this->asTenant($other, fn () => CustomerSkuPrice::factory()->create(['customer_id' => $customer->id, 'sku_id' => Product::factory()->withSku()->create()->skus()->sole()->id]));
     app(TenantContext::class)->set($this->tenant);
 
     expect(app(PricingContextQuery::class)->for($customer)?->customerPrices)->toBe([]);

@@ -22,7 +22,7 @@ beforeEach(function (): void {
 
 function pricedSku(string $basePrice = '100.00', array $tiers = [], int $onHand = 1000): Sku
 {
-    $sku = Product::factory()->withSku(['base_price' => $basePrice, 'moq' => 1], onHand: $onHand)->create(['name' => 'منتج'])->sku()->sole();
+    $sku = Product::factory()->withSku(['base_price' => $basePrice, 'moq' => 1], onHand: $onHand)->create(['name' => 'منتج'])->skus()->sole();
 
     foreach ($tiers as $min => $price) {
         SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => $min, 'unit_price' => $price]);
@@ -113,7 +113,7 @@ test('D91 BR-PR02 each unit of a sku is priced on its own tiers, its MOQ and fac
 });
 
 test('a sku without a stock row shows nothing available', function (): void {
-    $sku = Product::factory()->withSku()->create()->sku()->sole();
+    $sku = Product::factory()->withSku()->create()->skus()->sole();
     CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'quantity' => 1]);
 
     expect(priceCart($this->customer)->lines[0]->available)->toBe(0);

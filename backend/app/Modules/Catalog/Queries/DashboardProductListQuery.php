@@ -28,7 +28,7 @@ final readonly class DashboardProductListQuery
      */
     public function paginate(ProductFilterData $filter, ?array $sort, int $perPage, bool $lowStock = false): LengthAwarePaginator
     {
-        $query = $this->filtered->builder($filter)->with(['category', 'sku.activeUnits.unit', 'sku.baseUnit', 'mainImage']);
+        $query = $this->filtered->builder($filter)->with(['category', 'skus.activeUnits.unit', 'skus.baseUnit', 'skus.optionValues', 'options.values.image', 'mainImage']);
 
         if ($lowStock) {
             $query->whereHas('skus', fn (Builder $skus): Builder => $this->lowStock->constrain($skus));
@@ -40,7 +40,8 @@ final readonly class DashboardProductListQuery
     }
 
     /**
-     * Shared with the store list: name, created_at or the base price of the SKU's default unit (D91), then id for stable pages.
+     * Shared with the store list: name, created_at or the lowest default-unit base price over the active SKUs (D91, BR-P14),
+     * then id for stable pages.
      *
      * @param  Builder<Product>  $query
      * @param  array{0: string, 1: 'asc'|'desc'}  $sort
@@ -51,7 +52,7 @@ final readonly class DashboardProductListQuery
 
         match ($column) {
             'price' => $query->orderBy(
-                SkuUnit::query()->select('sku_units.base_price')->join('skus', 'skus.id', '=', 'sku_units.sku_id')->whereColumn('skus.product_id', 'products.id')->where('sku_units.is_default', true)->orderBy('skus.id')->limit(1),
+                SkuUnit::query()->selectRaw('min(sku_units.base_price)')->join('skus', 'skus.id', '=', 'sku_units.sku_id')->whereColumn('skus.product_id', 'products.id')->where('skus.status', 'active')->where('sku_units.is_default', true),
                 $direction,
             ),
             'name' => $query->orderBy('products.name', $direction),

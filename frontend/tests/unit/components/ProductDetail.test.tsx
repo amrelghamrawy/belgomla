@@ -1,13 +1,13 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProductDetail } from "@/components/store/ProductDetail";
 
-import { cart, comingSoonSku, customer, storeProduct, storeSku, storeSkuUnit } from "../fixtures";
+import { cart, comingSoonSku, customer, penProduct, storeProduct, storeSku, storeSkuUnit } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
-import { params, renderWithQuery, router } from "../render";
+import { params, renderWithQuery, router, searchParams } from "../render";
 
 const SLUG = "الأضواء-علوم-أولى-إعدادي";
 
@@ -214,5 +214,88 @@ describe("pre-ordering on the product page (BR-O14)", () => {
     renderWithQuery(<ProductDetail />);
 
     expect(await screen.findByRole("button", { name: "اكتمل الحجز" })).toBeDisabled();
+  });
+});
+
+describe("ProductDetail with variants (V2 Task 14)", () => {
+  beforeEach(() => {
+    router.replace.mockReset();
+    params.value = { slug: "pen" };
+    searchParams.value = new URLSearchParams();
+  });
+
+  function stubPen(product = penProduct()) {
+    return stubApi({
+      "GET /api/store/products/pen": json(200, { data: product }),
+      "GET /api/store/me": json(200, { data: customer() }),
+      "POST /api/store/cart/items": json(200, { data: cart() }),
+    });
+  }
+
+  it("BR-P14 offers the colours, disabling the one without stock, and shows the product's SKU first", async () => {
+    stubPen();
+    renderWithQuery(<ProductDetail />);
+
+    const colours = await screen.findByRole("radiogroup", { name: "اللون" });
+    expect(within(colours).getByRole("radio", { name: "أزرق" })).toHaveAttribute("aria-checked", "true");
+    expect(within(colours).getByRole("radio", { name: "أسود" })).toBeEnabled();
+    expect(within(colours).getByRole("radio", { name: "أحمر (غير متوفر)" })).toBeDisabled();
+    expect(screen.getByText("10.00 ج.م")).toBeInTheDocument();
+    expect(screen.getByText("PEN-01-1")).toBeInTheDocument();
+  });
+
+  it("keeps the colour picked in the URL, and the price, code and cart line follow it", async () => {
+    vi.spyOn(toast, "success").mockImplementation(() => "t");
+    const fetchMock = stubPen();
+    const user = userEvent.setup();
+    const view = renderWithQuery(<ProductDetail />);
+
+    await user.click(await screen.findByRole("radio", { name: "أسود" }));
+    expect(router.replace).toHaveBeenCalledWith("/p/pen?sku=82", { scroll: false });
+
+    searchParams.value = new URLSearchParams("sku=82");
+    view.rerender(<ProductDetail />);
+
+    expect(screen.getByRole("radio", { name: "أسود" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("12.00 ج.م")).toBeInTheDocument();
+    expect(screen.getByText("PEN-01-2")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "أضف إلى السلة" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/store/cart/items")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/store/cart/items")[0]?.body).toEqual({ sku_unit_id: 702, quantity: 1 });
+  });
+
+  it("opens on the variant the URL names, and on the product's SKU when the URL names another", async () => {
+    searchParams.value = new URLSearchParams("sku=82");
+    stubPen();
+    const view = renderWithQuery(<ProductDetail />);
+
+    expect(await screen.findByText("PEN-01-2")).toBeInTheDocument();
+
+    searchParams.value = new URLSearchParams("sku=999");
+    view.rerender(<ProductDetail />);
+    expect(screen.getByText("PEN-01-1")).toBeInTheDocument();
+  });
+
+  it("shows a swatch for a value with an image", async () => {
+    const pen = penProduct();
+    stubPen({
+      ...pen,
+      options: [
+        {
+          ...pen.options[0]!,
+          values: pen.options[0]!.values.map((value) =>
+            value.id === 2 ? { ...value, image_url: "/storage/p/black.jpg" } : value,
+          ),
+        },
+      ],
+    });
+    renderWithQuery(<ProductDetail />);
+
+    const black = await screen.findByRole("radio", { name: "أسود" });
+    expect(within(black).getByRole("presentation", { hidden: true })).toHaveAttribute(
+      "src",
+      expect.stringContaining("black.jpg"),
+    );
   });
 });

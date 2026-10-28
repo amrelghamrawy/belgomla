@@ -27,32 +27,38 @@ type Props = {
   tierErrors: Record<number, Record<number, string>>;
   /** Server tier problems per unit index. */
   serverTierProblems: Record<number, string[]>;
+  /** The variant whose units these are (V2 Task 14); the SKU's own units when left out. */
+  variant?: number;
 };
 
 /**
  * «وحدات البيع» (V2 Task 13, D91): one card per unit the SKU is sold in, each with its unit, factor, reference price,
  * price or %, MOQ and tiers; a radio picks the default unit. At least one unit, at most ten.
  */
-export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, serverTierProblems }: Props) {
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: "units", keyName: "key" });
-  const values = useWatch({ control: form.control, name: "units" });
-  const defaultUnit = useWatch({ control: form.control, name: "default_unit" });
-  const errors = form.formState.errors.units;
+export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, serverTierProblems, variant }: Props) {
+  // The same editor serves the SKU of a product without options and each variant of one with options.
+  const path = variant === undefined ? ("units" as const) : (`variants.${variant}.units` as const);
+  const defaultPath = variant === undefined ? ("default_unit" as const) : (`variants.${variant}.default_unit` as const);
+  const scope = variant === undefined ? "product" : `product-v${variant}`;
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: path, keyName: "key" });
+  const values = useWatch({ control: form.control, name: path });
+  const defaultUnit = useWatch({ control: form.control, name: defaultPath });
+  const errors = variant === undefined ? form.formState.errors.units : form.formState.errors.variants?.[variant]?.units;
 
   const removeAt = (index: number) => {
     remove(index);
 
     if (defaultUnit === index) {
-      form.setValue("default_unit", 0);
+      form.setValue(defaultPath, 0);
     } else if (defaultUnit > index) {
-      form.setValue("default_unit", defaultUnit - 1);
+      form.setValue(defaultPath, defaultUnit - 1);
     }
   };
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="sku-units-title">
+    <section className="flex flex-col gap-4" aria-labelledby={`${scope}-units-title`}>
       <div>
-        <h3 id="sku-units-title" className="font-bold">
+        <h3 id={`${scope}-units-title`} className="font-bold">
           {copy.units.title}
         </h3>
         <p className="text-muted-foreground text-xs">{copy.units.hint}</p>
@@ -68,13 +74,13 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
               : priceFromPercent(cover, unit.base_value)
             : unit.base_value.trim() || null;
         const unitErrors = errors?.[index];
-        const id = (name: string) => `product-units-${index}-${name}`;
+        const id = (name: string) => `${scope}-units-${index}-${name}`;
 
         return (
           <fieldset
             key={field.key}
             className="grid grid-cols-1 gap-4 rounded-xl border p-4 md:grid-cols-2"
-            data-testid={`sku-unit-${index}`}
+            data-testid={variant === undefined ? `sku-unit-${index}` : `variant-${variant}-unit-${index}`}
             data-base-price={basePrice ?? ""}
           >
             <legend className="px-1 font-medium">{copy.units.unit(index + 1)}</legend>
@@ -82,10 +88,10 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="radio"
-                  name="default_unit"
+                  name={`${scope}-default_unit`}
                   className="size-4"
                   checked={defaultUnit === index}
-                  onChange={() => form.setValue("default_unit", index, { shouldDirty: true })}
+                  onChange={() => form.setValue(defaultPath, index, { shouldDirty: true })}
                 />
                 {copy.units.isDefault}
                 <span className="text-muted-foreground text-xs">{copy.units.defaultHint}</span>
@@ -109,7 +115,7 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
               <NativeSelect
                 id={id("unit_id")}
                 aria-invalid={unitErrors?.unit_id !== undefined}
-                {...form.register(`units.${index}.unit_id`)}
+                {...form.register(`${path}.${index}.unit_id`)}
               >
                 <option value="">{copy.chooseUnit}</option>
                 {units.map((option) => (
@@ -130,7 +136,7 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
                 inputMode="numeric"
                 className="text-start"
                 aria-invalid={unitErrors?.conversion_factor !== undefined}
-                {...form.register(`units.${index}.conversion_factor`)}
+                {...form.register(`${path}.${index}.conversion_factor`)}
               />
               <FieldError errors={[unitErrors?.conversion_factor]} />
             </Field>
@@ -144,19 +150,19 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
                 inputMode="decimal"
                 className="text-start"
                 aria-invalid={unitErrors?.cover_price !== undefined}
-                {...form.register(`units.${index}.cover_price`)}
+                {...form.register(`${path}.${index}.cover_price`)}
               />
               <FieldError errors={[unitErrors?.cover_price]} />
             </Field>
             <Controller
               control={form.control}
-              name={`units.${index}.base_value`}
+              name={`${path}.${index}.base_value`}
               render={({ field: input }) => (
                 <PriceInput
                   id={id("base_value")}
                   label={<LabelText text={copy.basePrice} need="required" />}
                   mode={unit.base_mode}
-                  onModeChange={(mode) => form.setValue(`units.${index}.base_mode`, mode)}
+                  onModeChange={(mode) => form.setValue(`${path}.${index}.base_mode`, mode)}
                   value={input.value}
                   onChange={input.onChange}
                   cover={cover}
@@ -175,7 +181,7 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
                 inputMode="numeric"
                 className="text-start"
                 aria-invalid={unitErrors?.moq !== undefined}
-                {...form.register(`units.${index}.moq`)}
+                {...form.register(`${path}.${index}.moq`)}
               />
               <FieldError errors={[unitErrors?.moq]} />
             </Field>
@@ -193,7 +199,7 @@ export function SkuUnitsEditor({ form, units, referenceLabel, tierErrors, server
               )}
               <Controller
                 control={form.control}
-                name={`units.${index}.tiers`}
+                name={`${path}.${index}.tiers`}
                 render={({ field: input }) => (
                   <TiersEditor
                     tiers={input.value}

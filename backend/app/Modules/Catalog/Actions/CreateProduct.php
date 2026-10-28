@@ -6,19 +6,20 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Data\ProductData;
+use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Catalog\Services\ProductSnapshot;
-use App\Modules\Inventory\Actions\RecordOpeningStock;
 use Illuminate\Support\Facades\DB;
 
 /**
- * BR-P02: creates the product and its single SKU in one transaction (owned here), audited. The SKU's units (D91) are
- * written by SaveSkuUnits, their prices, MOQ and tiers validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05).
- * The opening stock is written by Inventory's RecordOpeningStock in the same transaction (an `opening`
- * movement, BR-INV06) and recorded in the `product.created` audit as `opening_stock`. The catalog import passes
+ * BR-P02, BR-P14: creates the product with its options and SKUs (one without options, one per variant, D92) in one
+ * transaction (owned here), audited. SaveProductSkus writes them; each SKU's units (D91) go through SaveSkuUnits, their
+ * prices, MOQ and tiers validated and written by Pricing's UpdateSkuPricing (BR-PR10, BR-PR05). Each SKU's opening stock
+ * is written by Inventory's RecordOpeningStock in the same transaction (an `opening` movement, BR-INV06); the
+ * `product.created` audit records their total as `opening_stock`. The catalog import passes
  * its audit batch id (V2 Task 06).
  */
 final readonly class CreateProduct
@@ -27,8 +28,7 @@ final readonly class CreateProduct
         private ProductReferences $references,
         private CustomFieldValidator $fields,
         private ProductSnapshot $snapshot,
-        private SaveSkuUnits $units,
-        private RecordOpeningStock $openingStock,
+        private SaveProductSkus $skus,
         private AuditLogger $audit,
     ) {}
 
@@ -48,12 +48,11 @@ final readonly class CreateProduct
                 ...($data->preorder?->attributes() ?? []), // D88: pre-orders off unless sent
             ]);
 
-            $sku = $product->skus()->create($data->sku->attributes());
-            $this->units->handle($sku, $data->sku->units);
-            $this->openingStock->handle($sku, $data->openingStock, $createdBy);
-            $product->load('sku.activeUnits.tiers');
+            $this->skus->handle($product, $data, array_fill(0, count($data->skus), null), $createdBy);
+            $product->load(ProductSnapshot::RELATIONS);
 
-            $this->audit->log('product.created', $product, null, [...$this->snapshot->of($product), 'opening_stock' => $data->openingStock], $batchId);
+            $openingStock = array_sum(array_map(fn (SkuData $sku): int => $sku->openingStock, $data->skus));
+            $this->audit->log('product.created', $product, null, [...$this->snapshot->of($product), 'opening_stock' => $openingStock], $batchId);
 
             return $product;
         });

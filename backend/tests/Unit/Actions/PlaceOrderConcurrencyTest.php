@@ -35,7 +35,7 @@ beforeEach(function (): void {
 
         return app(TenantContext::class)->runAs($tenant, function () use ($tenant): array {
             // 5 cartons of 20 left; each order wants all 5.
-            $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1], onHand: 100)->create()->sku()->sole();
+            $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1], onHand: 100)->create()->skus()->sole();
             $phoned = Customer::factory()->create();
             $shopper = Customer::factory()->create();
             CartItem::factory()->for(Cart::factory()->for($shopper))->create(['sku_id' => $sku->id, 'quantity' => 5]);

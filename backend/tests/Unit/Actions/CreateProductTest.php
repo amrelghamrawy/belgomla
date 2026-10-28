@@ -33,14 +33,14 @@ beforeEach(function (): void {
     $this->data = fn (array $unit = [], array $customFields = [], array $more = []): ProductData => new ProductData(
         name: 'قلم جاف',
         categoryId: $basics['category']->id,
-        sku: new SkuData('PEN-1', $basics['piece']->id, [($this->carton)($unit), ...$more]),
+        skus: [new SkuData('PEN-1', $basics['piece']->id, [($this->carton)($unit), ...$more])],
         customFields: $customFields,
     );
 });
 
-test('BR-P02 creates an active product with exactly one sku and a system audit record', function (): void {
+test('BR-P02 BR-P14 without options it creates an active product with exactly one sku and a system audit record', function (): void {
     $product = app(CreateProduct::class)->handle(($this->data)());
-    $unit = $product->sku?->activeUnits->sole();
+    $unit = $product->skus->first()?->activeUnits->sole();
 
     expect($product->status)->toBe(ProductStatus::Active)
         ->and($product->skus()->count())->toBe(1)
@@ -59,7 +59,7 @@ test('D91 a sku is created in every unit sent, in order, the one flagged the def
 
     $product = app(CreateProduct::class)->handle(($this->data)(['isDefault' => false], more: [($this->carton)(['unitId' => $piece, 'conversionFactor' => 1, 'pricing' => new SkuPricingData('3.00', moq: 6)])]));
 
-    expect($product->sku?->activeUnits->map->only(['unit_id', 'conversion_factor', 'base_price', 'moq', 'is_default', 'sort_order'])->all())->toBe([
+    expect($product->skus->first()?->activeUnits->map->only(['unit_id', 'conversion_factor', 'base_price', 'moq', 'is_default', 'sort_order'])->all())->toBe([
         ['unit_id' => $piece, 'conversion_factor' => 1, 'base_price' => '3.00', 'moq' => 6, 'is_default' => true, 'sort_order' => 1],
         ['unit_id' => $this->catalogBasics()['carton']->id, 'conversion_factor' => 12, 'base_price' => '30.00', 'moq' => 1, 'is_default' => false, 'sort_order' => 0],
     ]);
@@ -68,9 +68,9 @@ test('D91 a sku is created in every unit sent, in order, the one flagged the def
 test('BR-INV06 the opening stock is recorded by the creating user, inside the creation audit', function (): void {
     $user = $this->makeOwner();
 
-    $product = app(CreateProduct::class)->handle(new ProductData(...[...get_object_vars(($this->data)()), 'openingStock' => 36]), $user->id);
+    $product = app(CreateProduct::class)->handle(new ProductData(...[...get_object_vars(($this->data)()), 'skus' => [new SkuData(...[...get_object_vars(($this->data)()->skus[0]), 'openingStock' => 36])]]), $user->id);
 
-    expect(SkuInventory::query()->sole()->only(['sku_id', 'on_hand', 'reserved']))->toBe(['sku_id' => $product->sku->id, 'on_hand' => 36, 'reserved' => 0])
+    expect(SkuInventory::query()->sole()->only(['sku_id', 'on_hand', 'reserved']))->toBe(['sku_id' => $product->skus->first()->id, 'on_hand' => 36, 'reserved' => 0])
         ->and(InventoryMovement::query()->sole()->only(['type', 'quantity', 'on_hand_after', 'actor_id']))->toBe(['type' => MovementType::Opening, 'quantity' => 36, 'on_hand_after' => 36, 'actor_id' => $user->id])
         ->and(AuditLog::query()->sole()->new_values)->toMatchArray(['opening_stock' => 36]);
 });
@@ -83,8 +83,8 @@ test('BR-PR10 the sku prices and tiers are written through pricing, inside the c
         coverPrice: '120.00',
     )]));
 
-    expect($product->sku?->activeUnits->sole()->base_price)->toBe('90.00')
-        ->and($product->sku?->activeUnits->sole()->tiers->map->only(['min_quantity', 'unit_price', 'discount_percent'])->all())->toBe([
+    expect($product->skus->first()?->activeUnits->sole()->base_price)->toBe('90.00')
+        ->and($product->skus->first()?->activeUnits->sole()->tiers->map->only(['min_quantity', 'unit_price', 'discount_percent'])->all())->toBe([
             ['min_quantity' => 10, 'unit_price' => '84.00', 'discount_percent' => '30.00'],
             ['min_quantity' => 50, 'unit_price' => '80.00', 'discount_percent' => null],
         ])
@@ -134,7 +134,7 @@ test('a failing sku unit insert rolls back the product and the audit record', fu
 });
 
 test('an invalid opening stock rolls back the product, its sku and the audit record', function (): void {
-    expect(fn () => app(CreateProduct::class)->handle(new ProductData(...[...get_object_vars(($this->data)()), 'openingStock' => -1])))->toThrow(RuntimeException::class);
+    expect(fn () => app(CreateProduct::class)->handle(new ProductData(...[...get_object_vars(($this->data)()), 'skus' => [new SkuData(...[...get_object_vars(($this->data)()->skus[0]), 'openingStock' => -1])]])))->toThrow(RuntimeException::class);
 
     expect(Product::query()->count())->toBe(0)
         ->and(Sku::query()->count())->toBe(0)
@@ -154,7 +154,7 @@ test('D88 a product starts without pre-orders unless the settings are given, whi
     $preorderable = app(CreateProduct::class)->handle(new ProductData(
         name: 'سلاح التلميذ ٢٠٢٧',
         categoryId: $basics['category']->id,
-        sku: new SkuData('BOOK-27', $basics['piece']->id, [($this->carton)()]),
+        skus: [new SkuData('BOOK-27', $basics['piece']->id, [($this->carton)()])],
         status: ProductStatus::ComingSoon,
         preorder: new App\Modules\Catalog\Data\PreorderData(true, Carbon\CarbonImmutable::parse('2026-12-01', 'UTC'), 500),
     ));

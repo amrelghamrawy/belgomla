@@ -21,7 +21,7 @@ import { ar } from "@/lib/copy/ar";
 import { allowsAddressEdit } from "@/lib/dashboard/order-status";
 import { balanceOf, useOrder, useVoidCollection } from "@/lib/dashboard/orders";
 import { useVoidReturn } from "@/lib/dashboard/returns";
-import { changedLineIds } from "@/lib/store/order-lines";
+import { changedLineIds, variantOf } from "@/lib/store/order-lines";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
@@ -147,6 +147,11 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                       <TableCell>
                         <span className="font-medium">{item.product_name}</span>{" "}
                         <bdi className="text-muted-foreground text-xs">{item.sku_code}</bdi>
+                        {variantOf(item) !== null && (
+                          <span className="text-muted-foreground block text-xs" data-testid={`variant-${item.id}`}>
+                            {variantOf(item)}
+                          </span>
+                        )}
                         <LineBadges item={item} changed={changed.has(item.id)} />
                       </TableCell>
                       <TableCell className="whitespace-nowrap">

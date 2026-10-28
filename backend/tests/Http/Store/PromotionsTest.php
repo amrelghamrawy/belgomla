@@ -20,12 +20,12 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-11-03 10:00:00'));
     [$this->product, $this->plain] = $this->inTenant(function (): array {
         $product = Product::factory()->withSku(['code' => 'BK-1', 'cover_price' => '125', 'base_price' => '100', 'moq' => 1], onHand: 1000)->create(['name' => 'الأضواء علوم']);
-        SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '90.00']);
-        SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 100, 'unit_price' => '80.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 10, 'unit_price' => '90.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 100, 'unit_price' => '80.00']);
 
         return [$product->refresh(), Product::factory()->withSku(['code' => 'BK-2', 'base_price' => '40'], onHand: 1000)->create(['name' => 'المعلم عربي', 'created_at' => now()->subDay()])];
     });
-    $this->sku = $this->inTenant(fn (): Sku => $this->product->sku()->sole());
+    $this->sku = $this->inTenant(fn (): Sku => $this->product->skus()->sole());
     $this->promotion = $this->inTenant(fn (): Promotion => Promotion::factory()->covering($this->sku)->create([
         'name' => 'عرض الأضواء', 'starts_at' => '2026-11-01 00:00:00', 'ends_at' => '2026-11-30 22:00:00',
     ]));

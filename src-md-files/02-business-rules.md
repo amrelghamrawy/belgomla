@@ -101,13 +101,9 @@ Every product belongs to exactly one tenant.
 
 `Product` and `SKU` are separate entities. A product has one or more SKUs (1:N).
 
-In V1:
-
-- The dashboard creates exactly one SKU per product automatically.
-- Variants (color/size) are not exposed in the UI.
-- Pricing, MOQ, inventory and order items are attached to the SKU, never to the product.
-
-This keeps V2 variants possible without a data migration.
+- A product without options has exactly one SKU (the V1 shape, still the default in the product form).
+- Since V2 Task 14 a product may have options (colour, size) and then has one SKU per combination it sells (BR-P14, D92).
+- Pricing, MOQ, units, inventory and order items are attached to the SKU, never to the product.
 
 ### BR-P03 — SKU Is Tenant-Scoped
 
@@ -191,7 +187,8 @@ Storefront behavior:
 - Filterable fields are shown as facets in the order defined by the merchant (`filter_order`). For school books this is Grade → Subject → Publisher.
 - Facets combine with AND; each facet shows only options that still have active products given the other selected facets.
 - Facet selections are reflected in the URL so a merchant can share a link such as "كل كتب أولى إعدادي الأضواء".
-- Basic search matches product name, SKU code, and the option labels of `select` custom fields (so "علوم تانية اعدادي الأضواء" finds the book). Every word must match; both sides are folded the same way (D32: tashkeel removed, alef forms unified, ى→ي, ة→ه, colloquial ث→ت, ذ→د, ظ→ض).
+- Variant options (BR-P14) are facets too, after the custom fields: one facet per option name across the store's products (folded, D32: «اللون» of every product is one facet), each value counting the visible products with an active SKU of that value. They are not custom fields.
+- Basic search matches product name, every SKU code (variants included), and the option labels of `select` custom fields (so "علوم تانية اعدادي الأضواء" finds the book). Every word must match; both sides are folded the same way (D32: tashkeel removed, alef forms unified, ى→ي, ة→ه, colloquial ث→ت, ذ→د, ظ→ض).
 
 ### BR-P09 — Vertical Templates
 
@@ -241,7 +238,18 @@ School-book merchants replace most of the catalog every academic year. V1 suppor
 
 ### BR-P13 — Printable Price List
 
-Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. A logged-in customer sees their own wholesale price (BR-PR14, V2 Task 11). The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL. The page also downloads the same selection as an Excel file (V2 Task 06); PDF is the browser's print-to-PDF of the page (D83). A guest of a store that hides prices gets no file.
+Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. A logged-in customer sees their own wholesale price (BR-PR14, V2 Task 11). The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL. The page also downloads the same selection as an Excel file (V2 Task 06); PDF is the browser's print-to-PDF of the page (D83). A guest of a store that hides prices gets no file. A product with variants has one row per unit of each active variant, naming the variant (BR-P14).
+
+### BR-P14 — Product Variants (V2 Task 14)
+
+A product may have up to two **options** (e.g. «اللون», «المقاس») with up to twenty values each (D92). Each combination the merchant sells is its own SKU with its own code (BR-P03), units and prices (D91), and stock (BR-INV02); a combination may be left out (not every colour comes in every size).
+
+- The dashboard product form has a «خيارات المنتج» section; options generate the variants table (one row per combination, codes `{base}-{value slug}`, an Arabic value slugged by its position). Each variant can be set inactive: it disappears from the storefront and cannot be ordered, while the product and its other variants stay on sale.
+- A variant removed from the form is deleted when nothing points at it; when it has history (order lines, stock movements, negotiated prices, promotions) it is set inactive and kept (BR-P05). An option or value removed from the form is deleted; the variants keep their label.
+- The storefront shows one product with option selectors (a swatch when the value has one of the product's images, a button otherwise); combinations that are not sold or not in stock are disabled; price, stock, units and the cart follow the chosen variant. The product card shows the price range «من … إلى …» and is in stock when any variant is.
+- The order line snapshots the variant label («أزرق / M») as `sku_name` (BR-PR07). Tiers never combine across variants (BR-PR02): each variant is its own SKU.
+- Books keep D16: a final revision is a separate product, not a variant. Product-level custom fields (D33's stationery colour) stay for products without variants; option values are not custom fields.
+- Duplicating a product (BR-P11) copies every variant; the catalog file (BR-P12, D95 format v3) groups the rows of one product by `product_key`.
 
 ### BR-P07 — Product Images
 

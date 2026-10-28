@@ -30,10 +30,10 @@ beforeEach(function (): void {
     $this->data = fn (array $sku = [], array $customFields = [], string $name = 'قلم', array $more = []): ProductData => new ProductData(
         name: $name,
         categoryId: $basics['category']->id,
-        sku: new SkuData('PEN-1', $basics['piece']->id, [($this->unit)($sku), ...$more]),
+        skus: [new SkuData('PEN-1', $basics['piece']->id, [($this->unit)($sku), ...$more])],
         customFields: $customFields,
     );
-    $this->sold = fn (): array => SkuUnit::query()->where('sku_id', $this->product->sku()->sole()->id)->orderBy('id')->get()
+    $this->sold = fn (): array => SkuUnit::query()->where('sku_id', $this->product->skus()->sole()->id)->orderBy('id')->get()
         ->map->only(['unit_id', 'conversion_factor', 'base_price', 'is_default', 'status'])->map(fn (array $unit): array => [...$unit, 'status' => $unit['status']->value])->all();
 });
 
@@ -42,7 +42,7 @@ test('BR-L a price and moq change is audited by pricing as exactly those changes
 
     $logs = AuditLog::query()->get()->keyBy('action');
 
-    expect($this->product->sku?->activeUnits->sole()->base_price)->toBe('28.50')
+    expect($this->product->skus->first()?->activeUnits->sole()->base_price)->toBe('28.50')
         ->and($logs->keys()->sort()->values()->all())->toBe(['product.updated', 'sku.moq_changed', 'sku.price_changed'])
         ->and($logs['sku.price_changed']->old_values)->toEqual(['base_price' => '30.00'])
         ->and($logs['sku.price_changed']->new_values)->toEqual(['base_price' => '28.50'])
@@ -52,15 +52,15 @@ test('BR-L a price and moq change is audited by pricing as exactly those changes
 });
 
 test('BR-PR03 tiers not sent are kept, tiers sent replace the old ones', function (): void {
-    SkuPriceTier::factory()->create(['sku_id' => $this->product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '25.00']);
+    SkuPriceTier::factory()->create(['sku_id' => $this->product->skus()->sole()->id, 'min_quantity' => 10, 'unit_price' => '25.00']);
 
     app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)(name: 'قلم أزرق'));
-    $kept = $this->product->sku?->activeUnits->sole()->tiers->pluck('unit_price', 'min_quantity')->all();
+    $kept = $this->product->skus->first()?->activeUnits->sole()->tiers->pluck('unit_price', 'min_quantity')->all();
 
     app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)(['pricing' => new SkuPricingData('30.00', moq: 2, tiers: [new TierData(20, '24.00')])]));
 
     expect($kept)->toBe([10 => '25.00'])
-        ->and($this->product->sku?->activeUnits->sole()->tiers->pluck('unit_price', 'min_quantity')->all())->toBe([20 => '24.00']);
+        ->and($this->product->skus->first()?->activeUnits->sole()->tiers->pluck('unit_price', 'min_quantity')->all())->toBe([20 => '24.00']);
 });
 
 test('BR-P08 archived field values survive an update that does not send them', function (): void {
@@ -109,7 +109,7 @@ test('D91 a unit is added next to the kept one and becomes the default when flag
 
 test('D91 a unit left out is archived, and sent again it comes back with its row', function (): void {
     $basics = $this->catalogBasics();
-    $carton = $this->product->sku()->sole()->defaultUnit;
+    $carton = $this->product->skus()->sole()->defaultUnit;
 
     app(UpdateProduct::class)->handle($this->product, ($this->data)(['unitId' => $basics['piece']->id, 'pricing' => new SkuPricingData('3.00')]));
     $archived = SkuUnit::query()->findOrFail($carton?->id)->status->value;
@@ -146,7 +146,7 @@ test('without a batch an update that changes nothing is still recorded, as the d
 });
 
 test('D88 the pre-order settings change when sent and are kept when left out, audited as product fields', function (): void {
-    $sent = new ProductData(name: 'قلم', categoryId: $this->product->category_id, sku: ($this->data)()->sku, preorder: new App\Modules\Catalog\Data\PreorderData(true, null, 40));
+    $sent = new ProductData(name: 'قلم', categoryId: $this->product->category_id, skus: ($this->data)()->skus, preorder: new App\Modules\Catalog\Data\PreorderData(true, null, 40));
 
     app(UpdateProduct::class)->handle($this->product, $sent);
     app(UpdateProduct::class)->handle($this->product->refresh(), ($this->data)());

@@ -21,7 +21,7 @@ function orderableUnit(ProductStatus $status = ProductStatus::Active, ?int $onHa
 {
     $product = Product::factory()->state(['status' => $status])->withSku(['moq' => 5, 'conversion_factor' => 10], onHand: $onHand)->create();
 
-    return app(CartSkuQuery::class)->findDefault($product->sku()->sole()->id);
+    return app(CartSkuQuery::class)->findDefault($product->skus()->sole()->id);
 }
 
 test('BR-MOQ01 BR-INV01 a quantity between the moq and the stock is orderable', function (int $quantity): void {

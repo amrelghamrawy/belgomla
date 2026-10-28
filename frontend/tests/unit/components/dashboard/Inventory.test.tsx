@@ -38,6 +38,7 @@ function row(overrides: Partial<InventoryRow> = {}): InventoryRow {
     product_id: 3,
     code: "ADW-SCI-1",
     name: "الأضواء علوم",
+    variant: null,
     status: "active",
     on_hand: 100,
     reserved: 80,
@@ -168,5 +169,17 @@ describe("BulkAdjustTable", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("لم تُدخل أي رصيد جديد");
     expect(callsTo(fetchMock, "POST /api/dashboard/inventory/bulk-adjust")).toHaveLength(0);
+  });
+});
+
+describe("variant rows (V2 Task 14)", () => {
+  it("BR-P14 shows the variant label next to the product name", () => {
+    stubApi({});
+    renderWithQuery(
+      <BulkAdjustTable rows={[row({ name: "قلم جاف", variant: "أزرق / M" }), row({ sku_id: 6 })]} onDone={vi.fn()} />,
+    );
+
+    expect(screen.getByText("أزرق / M")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(3);
   });
 });

@@ -8,10 +8,10 @@ use App\Modules\Catalog\Models\Product;
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
     [$this->counted, $this->held] = $this->inTenant(fn (): array => [
-        Product::factory()->withSku(onHand: 10)->create()->sku()->sole(),
-        Product::factory()->withSku(onHand: 30, reserved: 20)->create()->sku()->sole(),
+        Product::factory()->withSku(onHand: 10)->create()->skus()->sole(),
+        Product::factory()->withSku(onHand: 30, reserved: 20)->create()->skus()->sole(),
     ]);
-    $this->foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->sku()->sole(), $this->otherTenant());
+    $this->foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->skus()->sole(), $this->otherTenant());
 });
 
 test('BR-INV08 bulk adjust applies the valid counts and reports skipped skus, in one audit batch', function (): void {

@@ -9,7 +9,7 @@ use App\Modules\Pricing\Data\ResolvedPrice;
 /**
  * One cart line priced now (BR-PR04), in its SKU unit (D91): quantity and MOQ in that unit, `available` in base units like the
  * storefront (D37). A pre-order line (BR-O14) has `available` 0 and the day its product is expected. Read model built by
- * CartPricer, not request input.
+ * CartPricer, not request input. `variant` is the SKU's variant label («أزرق / M», BR-P14), null without options.
  */
 final readonly class PricedCartLine
 {
@@ -25,5 +25,6 @@ final readonly class PricedCartLine
         public int $moq,
         public int $available,
         public ?string $expectedAt = null,
+        public ?string $variant = null,
     ) {}
 }

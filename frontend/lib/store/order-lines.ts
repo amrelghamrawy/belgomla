@@ -16,3 +16,13 @@ export function changedLineIds(order: { changes: Pick<OrderItemChange, "change" 
       .filter((id): id is number => id !== null),
   );
 }
+
+/**
+ * The variant a line was ordered in (V2 Task 14, BR-P14): the SKU name snapshot («أزرق / M») when it says more than the
+ * product name; null for a product without options, whose SKU name is the product's.
+ */
+export function variantOf(item: { product_name: string; sku_name: string }): string | null {
+  const name = item.sku_name.trim();
+
+  return name === "" || name === item.product_name.trim() ? null : name;
+}

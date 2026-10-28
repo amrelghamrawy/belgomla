@@ -250,7 +250,10 @@ export function dashboardSkuUnit(overrides: Partial<DashboardSkuUnit> = {}): Das
   };
 }
 
+/** A product without options (one SKU); `skus` follows `sku` unless given (V2 Task 14). */
 export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): DashboardProduct {
+  const sku = overrides.sku === undefined ? dashboardSku() : overrides.sku;
+
   return {
     id: 3,
     name: "الأضواء علوم",
@@ -260,7 +263,9 @@ export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): Das
     category: { id: 1, name: "المرحلة الابتدائية", kind: "books" },
     custom_fields: { grade: 11 },
     preorder: { enabled: false, expected_at: null, limit: null },
-    sku: dashboardSku(),
+    sku,
+    skus: sku === null ? [] : [sku],
+    options: [],
     main_image_url: null,
     images: [],
     relations: [],
@@ -303,4 +308,45 @@ export function orderQuote(overrides: Partial<OrderQuote> = {}): OrderQuote {
     credit: null,
     ...overrides,
   };
+}
+
+/**
+ * A pen with one option «اللون» (أزرق, أسود) and a SKU per colour (V2 Task 14, BR-P14), each sold by the carton at
+ * 90.00 as in dashboardSku(); the black one is inactive.
+ */
+export function variantProduct(overrides: Partial<DashboardProduct> = {}): DashboardProduct {
+  const blue = {
+    ...dashboardSku({ id: 21, code: "PEN-01-1", tiers: [] }),
+    label: "أزرق",
+    status: "active" as const,
+    sort_order: 0,
+    option_values: ["أزرق"],
+  };
+  const black = {
+    ...dashboardSku({ id: 22, code: "PEN-01-2", tiers: [] }),
+    label: "أسود",
+    status: "inactive" as const,
+    sort_order: 1,
+    option_values: ["أسود"],
+  };
+
+  return dashboardProduct({
+    id: 4,
+    name: "قلم جاف",
+    sku: blue,
+    skus: [blue, black],
+    options: [
+      {
+        id: 31,
+        name: "اللون",
+        sort_order: 0,
+        values: [
+          { id: 41, value: "أزرق", sort_order: 0, image_id: null, image_url: null },
+          { id: 42, value: "أسود", sort_order: 1, image_id: 7, image_url: "/storage/p/7.jpg" },
+        ],
+      },
+    ],
+    images: [{ id: 7, url: "/storage/p/7.jpg", is_main: true, sort_order: 0 }],
+    ...overrides,
+  });
 }

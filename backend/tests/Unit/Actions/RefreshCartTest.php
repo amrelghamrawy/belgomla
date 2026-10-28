@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Actions\RefreshCart;
 use App\Modules\Customers\Data\PricedCartLine;
 use App\Modules\Customers\Models\Cart;
@@ -21,7 +22,7 @@ beforeEach(function (): void {
 
 function cartLine(Cart $cart, string $name, ProductStatus $status = ProductStatus::Active): CartItem
 {
-    $sku = Product::factory()->state(['name' => $name, 'status' => $status])->withSku(['base_price' => '10.00'], onHand: 100)->create()->sku()->sole();
+    $sku = Product::factory()->state(['name' => $name, 'status' => $status])->withSku(['base_price' => '10.00'], onHand: 100)->create()->skus()->sole();
 
     return CartItem::factory()->for($cart)->create(['sku_id' => $sku->id, 'quantity' => 2]);
 }
@@ -52,8 +53,8 @@ test('a customer without a cart gets an empty one', function (): void {
 });
 
 test('BR-O14 pre-order lines are priced apart; those whose product no longer takes pre-orders are dropped as preorder_closed', function (): void {
-    $open = Product::factory()->state(['name' => 'محجوز'])->preorderable()->withSku(['base_price' => '10.00'])->create()->sku()->sole();
-    $closed = Product::factory()->state(['name' => 'صار متاحًا'])->withSku(['base_price' => '10.00'], onHand: 100)->create()->sku()->sole();
+    $open = Product::factory()->state(['name' => 'محجوز'])->preorderable()->withSku(['base_price' => '10.00'])->create()->skus()->sole();
+    $closed = Product::factory()->state(['name' => 'صار متاحًا'])->withSku(['base_price' => '10.00'], onHand: 100)->create()->skus()->sole();
     $order = cartLine($this->cart, 'متاح');
     CartItem::factory()->preorder()->for($this->cart)->create(['sku_id' => $open->id, 'quantity' => 4]);
     $gone = CartItem::factory()->preorder()->for($this->cart)->create(['sku_id' => $closed->id, 'quantity' => 4]);
@@ -111,5 +112,19 @@ test('D91 a line in a unit no longer sold is deleted and reported, the SKU\'s ot
 
     expect(array_map(fn (PricedCartLine $line): int => $line->skuUnitId, $cart->lines))->toBe([$kept->sku_unit_id])
         ->and($cart->removed)->toBe([['product_name' => 'كشكول', 'reason' => 'inactive']])
+        ->and(CartItem::query()->whereKey($gone->id)->exists())->toBeFalse();
+});
+
+test('BR-P14 the line of a variant made inactive is dropped as inactive, its sibling kept with its label', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    [$blue, $red] = Sku::query()->whereIn('code', ['PEN-1', 'PEN-2'])->orderBy('code')->get()->all();
+    CartItem::factory()->for($this->cart)->create(['sku_id' => $blue->id, 'quantity' => 2]);
+    $gone = CartItem::factory()->for($this->cart)->create(['sku_id' => $red->id, 'quantity' => 2]);
+    $red->update(['status' => 'inactive']);
+
+    $cart = app(RefreshCart::class)->handle($this->customer);
+
+    expect(array_map(fn (PricedCartLine $line): array => [$line->skuId, $line->variant], $cart->lines))->toBe([[$blue->id, 'أزرق']])
+        ->and($cart->removed)->toBe([['product_name' => 'قلم جاف', 'reason' => 'inactive']])
         ->and(CartItem::query()->whereKey($gone->id)->exists())->toBeFalse();
 });

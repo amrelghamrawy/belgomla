@@ -42,7 +42,7 @@ test('the template has the header rows and no product', function (): void {
     $this->exporter->template($path, SpreadsheetFormat::Csv);
 
     expect(spreadsheetRows($path, SpreadsheetFormat::Csv))->toHaveCount(1)
-        ->and(spreadsheetRows($path, SpreadsheetFormat::Csv)[1][0])->toBe('sku_code');
+        ->and(array_slice(spreadsheetRows($path, SpreadsheetFormat::Csv)[1], 0, 2))->toBe(['product_key', 'sku_code']);
 });
 
 test('a stored export is the finished file of the tenant', function (): void {
@@ -51,7 +51,7 @@ test('a stored export is the finished file of the tenant', function (): void {
     $file = $this->exporter->download('e1', validSignature: true);
 
     expect($file['format'])->toBe(SpreadsheetFormat::Xlsx)
-        ->and(spreadsheetRows($file['path'])[3][0])->toBe('ADW-SCI-1');
+        ->and(spreadsheetRows($file['path'])[3][1])->toBe('ADW-SCI-1');
 });
 
 test('a download is refused while pending, when failed and without a valid signature', function (string $uuid, bool $signed, string $code): void {

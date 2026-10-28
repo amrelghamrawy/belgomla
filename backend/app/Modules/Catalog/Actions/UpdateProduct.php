@@ -7,14 +7,15 @@ namespace App\Modules\Catalog\Actions;
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Models\Product;
-use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
 use App\Modules\Catalog\Services\ProductSnapshot;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Replaces product and SKU fields (not status, not stock), and the pre-order settings when sent (D88). Values of archived custom fields, and of
+ * Replaces product fields (not status, not stock), its options and SKUs (BR-P14, through SaveProductSkus: a SKU left out
+ * is deleted, or set inactive when it has history, BR-P05; a new SKU gets its opening stock), and the pre-order settings
+ * when sent (D88). Values of archived custom fields, and of
  * fields bound to another section than the (new) category's kind, are carried over (BR-P08, D69). The `product.updated` audit record holds only what changed in product and SKU
  * identity fields and its units (`sku.units`: which units, factors, default; D91); each unit's prices, MOQ and tiers go
  * through SaveSkuUnits and Pricing's UpdateSkuPricing, which audits them per unit as `sku.price_changed` /
@@ -29,18 +30,19 @@ final readonly class UpdateProduct
         private ProductReferences $references,
         private CustomFieldValidator $fields,
         private ProductSnapshot $snapshot,
-        private SaveSkuUnits $units,
+        private SaveProductSkus $skus,
         private AuditLogger $audit,
     ) {}
 
     public function handle(Product $product, ProductData $data, ?string $batchId = null): Product
     {
-        $product->loadMissing('sku.activeUnits');
+        $product->load(ProductSnapshot::RELATIONS);
         $category = $this->references->check($data, $product);
+        $matches = $this->references->matches($data, $product);
         $customFields = $this->fields->validate($data->customFields, $category->kind, $product->custom_fields);
         $old = $this->snapshot->of($product, withPricing: false);
 
-        return DB::transaction(function () use ($product, $data, $customFields, $old, $batchId): Product {
+        return DB::transaction(function () use ($product, $data, $customFields, $matches, $old, $batchId): Product {
             $product->update([
                 'category_id' => $data->categoryId,
                 'name' => $data->name,
@@ -49,11 +51,9 @@ final readonly class UpdateProduct
                 ...($data->preorder?->attributes() ?? []), // D88: kept when not sent
             ]);
 
-            $sku = $product->sku instanceof Sku ? $product->sku->fill($data->sku->attributes()) : $product->skus()->make($data->sku->attributes());
-            $sku->save();
-            $this->units->handle($sku, $data->sku->units, $batchId);
+            $this->skus->handle($product, $data, $matches, null, $batchId);
 
-            $product->load('sku.activeUnits.tiers');
+            $product->load(ProductSnapshot::RELATIONS);
 
             $new = $this->snapshot->of($product, withPricing: false);
 

@@ -32,7 +32,7 @@ beforeEach(function (): void {
 
         return app(TenantContext::class)->runAs($tenant, function () use ($tenant): array {
             // A cap of 5 cartons; each customer wants all 5.
-            $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1])->preorderable(limit: 5)->create()->sku()->sole();
+            $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1])->preorderable(limit: 5)->create()->skus()->sole();
             $customers = [];
 
             foreach (['a', 'b'] as $key) {

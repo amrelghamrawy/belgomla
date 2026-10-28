@@ -365,3 +365,14 @@ describe("pre-orders in the account (BR-O14)", () => {
     expect(screen.getByRole("link", { name: "عرض الحجز" })).toHaveAttribute("href", "/account/orders/1002");
   });
 });
+
+describe("OrderDetailView variants (V2 Task 14)", () => {
+  it("BR-P14 shows the variant each line was ordered in", async () => {
+    const plain = order().items[0]!;
+    stubOrder(order({ items: [plain, { ...plain, id: 62, product_name: "قلم جاف", sku_name: "أحمر" }] }));
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("variant-62")).toHaveTextContent("أحمر");
+    expect(screen.queryByTestId("variant-61")).toBeNull();
+  });
+});

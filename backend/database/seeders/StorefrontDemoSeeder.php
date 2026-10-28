@@ -14,6 +14,8 @@ use App\Modules\Catalog\Actions\CreateUnit;
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
 use App\Modules\Catalog\Data\ProductData;
+use App\Modules\Catalog\Data\ProductOptionData;
+use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\CategoryKind;
@@ -24,6 +26,7 @@ use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Queries\CategoryTreeQuery;
 use App\Modules\Catalog\Queries\FieldDefinitionsQuery;
 use App\Modules\Catalog\Queries\UnitsQuery;
+use App\Modules\Catalog\Services\VariantGenerator;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Tenancy\Actions\UpdateTenantSettings;
@@ -34,6 +37,7 @@ use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use RuntimeException;
 
 /**
@@ -228,6 +232,39 @@ final class StorefrontDemoSeeder extends Seeder
             description: 'كشكول روتو A4 سلك، 4 مواضيع بفواصل ملونة، غلاف أسود مقوى.',
             carton: [$carton, 24], // D91: the piece and the carton of 24 draw on the same stock
         ));
+
+        $products->handle($this->highlighter($pens, $piece));
+    }
+
+    /**
+     * BR-P14 (V2 Task 14): a highlighter in three colours, each colour its own SKU (ST-007-1..3) with its own stock, the
+     * pink one a little dearer; the codes follow VariantGenerator (Arabic values slugged by position).
+     */
+    private function highlighter(int $categoryId, int $piece): ProductData
+    {
+        $colours = new ProductOptionData(null, 'اللون', [new ProductOptionValueData(null, 'أصفر'), new ProductOptionValueData(null, 'أخضر'), new ProductOptionValueData(null, 'وردي')]);
+        $skus = [];
+
+        foreach (app(VariantGenerator::class)->generate('ST-007', [$colours]) as $index => $draft) {
+            $skus[] = new SkuData(
+                code: $draft['code'],
+                baseUnitId: $piece,
+                units: [new SkuUnitData(null, $piece, 1, true, new SkuPricingData(basePrice: $index === 2 ? '9.00' : '8.00', moq: 12, coverPrice: '12.00'))],
+                optionValues: $draft['option_values'],
+                openingStock: 600 - $index * 200,
+                path: "skus.{$index}",
+            );
+        }
+
+        return new ProductData(
+            name: 'قلم هايلايتر فابر كاستل',
+            categoryId: $categoryId,
+            skus: $skus !== [] ? $skus : throw new LogicException('Three colours make three variants.'),
+            options: [$colours],
+            description: 'قلم هايلايتر بثلاثة ألوان، رأس مشطوف للتظليل والكتابة.',
+            customFields: ['brand' => $this->option('brand', 'فابر كاستل')],
+            status: ProductStatus::Active,
+        );
     }
 
     /** Toys sell by the piece (3 MOQ); the first two carry a retail price, the last two none (D68). */
@@ -298,7 +335,7 @@ final class StorefrontDemoSeeder extends Seeder
         return new ProductData(
             name: $name,
             categoryId: $categoryId,
-            sku: new SkuData(
+            skus: [new SkuData(
                 code: sprintf('BK-%03d', $n),
                 baseUnitId: $copyId,
                 units: [new SkuUnitData(
@@ -313,7 +350,8 @@ final class StorefrontDemoSeeder extends Seeder
                         coverPrice: number_format($cover, 2, '.', ''),
                     ),
                 )],
-            ),
+                openingStock: $status === ProductStatus::ComingSoon ? 0 : 1000,
+            )],
             description: $this->description($name, $grade, $subject, $publisher),
             customFields: [
                 'grade' => $this->option('grade', $grade),
@@ -322,7 +360,6 @@ final class StorefrontDemoSeeder extends Seeder
                 'term' => $this->option('term', 'الترم الأول'),
             ],
             status: $status,
-            openingStock: $status === ProductStatus::ComingSoon ? 0 : 1000,
         );
     }
 
@@ -341,7 +378,7 @@ final class StorefrontDemoSeeder extends Seeder
         return new ProductData(
             name: $name,
             categoryId: $categoryId,
-            sku: new SkuData(
+            skus: [new SkuData(
                 code: $code,
                 baseUnitId: $baseUnitId,
                 units: [
@@ -358,11 +395,11 @@ final class StorefrontDemoSeeder extends Seeder
                     ),
                     ...($carton === null ? [] : [$this->carton($carton, $retail, $base)]),
                 ],
-            ),
+                openingStock: 1000,
+            )],
             description: $description,
             customFields: $fields,
             status: ProductStatus::Active,
-            openingStock: 1000,
         );
     }
 

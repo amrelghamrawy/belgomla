@@ -122,7 +122,10 @@ export function InventoryPage() {
                     <TableCell>
                       <bdi>{row.code}</bdi>
                     </TableCell>
-                    <TableCell className="max-w-56">{row.name ?? ar.dashboard.none}</TableCell>
+                    <TableCell className="max-w-56">
+                      {row.name ?? ar.dashboard.none}
+                      {row.variant && <span className="text-muted-foreground block text-xs">{row.variant}</span>}
+                    </TableCell>
                     <TableCell>{row.on_hand}</TableCell>
                     <TableCell>{row.reserved}</TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -221,7 +224,10 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
                 <TableCell>
                   <bdi>{row.code}</bdi>
                 </TableCell>
-                <TableCell className="max-w-56">{row.name}</TableCell>
+                <TableCell className="max-w-56">
+                  {row.name}
+                  {row.variant && <span className="text-muted-foreground block text-xs">{row.variant}</span>}
+                </TableCell>
                 <TableCell>{row.on_hand}</TableCell>
                 <TableCell>{row.min_allowed}</TableCell>
                 <TableCell>

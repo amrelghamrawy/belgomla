@@ -200,6 +200,11 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
           <Link href={`/p/${encodeURIComponent(item.product_slug)}`} className="font-medium hover:underline">
             {item.product_name}
           </Link>
+          {item.variant !== null && (
+            <span className="text-muted-foreground text-sm" data-testid={`cart-variant-${item.sku_unit_id}`}>
+              {item.variant}
+            </span>
+          )}
           <span className="text-sm font-semibold" data-testid={`cart-unit-${item.sku_unit_id}`}>
             {ar.cart.unitLine(item.unit, item.conversion_factor)}
           </span>

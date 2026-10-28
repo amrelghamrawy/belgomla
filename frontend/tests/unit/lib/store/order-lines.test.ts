@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { OrderItemChange } from "@/lib/api/types";
-import { changedLineIds, liveItems } from "@/lib/store/order-lines";
+import { changedLineIds, liveItems, variantOf } from "@/lib/store/order-lines";
 
 import { order as orderDetail } from "../../fixtures";
 
@@ -27,5 +27,13 @@ describe("order lines after an edit (BR-O12, BR-O13)", () => {
     ];
 
     expect(changedLineIds({ changes })).toEqual(new Set([61, 62]));
+  });
+});
+
+describe("variantOf", () => {
+  it("BR-P14 names the variant a line was ordered in, and nothing for a product without options", () => {
+    expect(variantOf({ product_name: "قلم جاف", sku_name: "أزرق / M" })).toBe("أزرق / M");
+    expect(variantOf({ product_name: "الأضواء علوم", sku_name: "الأضواء علوم " })).toBeNull();
+    expect(variantOf({ product_name: "قلم", sku_name: "" })).toBeNull();
   });
 });

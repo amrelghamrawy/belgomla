@@ -62,12 +62,27 @@ test('the same slug is allowed in another tenant', function (): void {
     expect($foreign->slug)->toBe('قلم');
 });
 
-test('BR-P02 the sku relation returns the single sku', function (): void {
+test('BR-P02 BR-P14 a product without options has exactly one sku', function (): void {
     $product = $this->inTenant(fn () => Product::factory()->withSku(['code' => 'PEN-1'])->create());
 
-    expect($product->sku)->toBeInstanceOf(Sku::class)
-        ->and($product->sku->code)->toBe('PEN-1')
+    expect($product->skus->first())->toBeInstanceOf(Sku::class)
+        ->and($product->skus->first()->code)->toBe('PEN-1')
         ->and($product->skus)->toHaveCount(1);
+});
+
+test('BR-P14 skus are in the form order, active skus leave the inactive out, options are ordered', function (): void {
+    $product = $this->variantProduct(['أزرق', 'أسود', 'أحمر']);
+    $this->inTenant(function () use ($product): void {
+        Sku::query()->where('code', 'PEN-1')->update(['sort_order' => 5]);
+        Sku::query()->where('code', 'PEN-2')->update(['status' => 'inactive']);
+        $product->options()->create(['name' => 'المقاس', 'sort_order' => 1]);
+    });
+
+    $product = $this->inTenant(fn () => $product->refresh()->load('skus', 'activeSkus', 'options'));
+
+    expect($product->skus->pluck('code')->all())->toBe(['PEN-2', 'PEN-3', 'PEN-1'])
+        ->and($product->activeSkus->pluck('code')->all())->toBe(['PEN-3', 'PEN-1'])
+        ->and($product->options->pluck('name')->all())->toBe(['اللون', 'المقاس']);
 });
 
 test('images are ordered and the main image is exposed', function (): void {

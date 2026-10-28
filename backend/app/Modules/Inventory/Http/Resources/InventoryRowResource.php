@@ -39,6 +39,7 @@ final class InventoryRowResource extends JsonResource
             'product_id' => $sku->product_id,
             'code' => $sku->code,
             'name' => $product instanceof Product ? $product->name : null,
+            'variant' => $sku->name, // BR-P14: the variant label, null without options
             'status' => $product instanceof Product ? $product->status->value : null,
             'on_hand' => $onHand,
             'reserved' => $reserved,

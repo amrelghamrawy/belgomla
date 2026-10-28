@@ -11,6 +11,7 @@ use App\Modules\Catalog\Jobs\ImportCatalog;
 use App\Modules\Catalog\Models\CatalogImport;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
@@ -26,6 +27,12 @@ beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->importBasics();
     $this->owner = $this->makeOwner();
+    $this->penRow = fn (string $code, string $color, array $overrides = []): array => $this->importRow([
+        'product_key' => 'PEN', 'sku_code' => $code, 'product_name' => 'قلم جاف',
+        'variant_option_1' => 'اللون', 'variant_value_1' => $color, 'variant_option_2' => 'المقاس', 'variant_value_2' => 'M', 'sku_status' => '',
+        'unit' => 'قطعة', 'conversion_factor' => '1', 'cover_price' => '7', 'base_price' => '5', 'moq' => '10', 'tier_1_min' => '', 'tier_1_price' => '', 'on_hand' => '100',
+        ...$overrides,
+    ]);
 });
 
 /**
@@ -46,16 +53,16 @@ function importJobRun(Tests\TenantTestCase $test, array $rows, ?int $actorId = n
 test('a new code creates the product with its prices, tiers, fields and opening stock', function (): void {
     $import = importJobRun($this, [$this->importRow()], $this->owner->id);
 
-    $product = Product::query()->with('sku.defaultUnit.tiers')->sole();
+    $product = Product::query()->with('skus.defaultUnit.tiers')->sole();
 
     expect($import->status)->toBe(ImportStatus::Done)
         ->and($import->only(['total', 'processed', 'created', 'updated', 'skipped', 'failed']))->toBe(['total' => 1, 'processed' => 1, 'created' => 1, 'updated' => 0, 'skipped' => 0, 'failed' => 0])
         ->and($product->name)->toBe('الأضواء علوم أولى إعدادي')
         ->and($product->created_by)->toBe($this->owner->id)
         ->and($product->custom_fields)->toBe(['publisher' => $this->importBasics()['adwaa']->id])
-        ->and($product->sku?->code)->toBe('ADW-SCI-1')
-        ->and($product->sku?->defaultUnit?->only(['conversion_factor', 'cover_price', 'base_price', 'moq']))->toBe(['conversion_factor' => 20, 'cover_price' => '120.00', 'base_price' => '90.00', 'moq' => 5])
-        ->and($product->sku?->defaultUnit?->tiers->pluck('unit_price', 'min_quantity')->all())->toBe([10 => '85.00'])
+        ->and($product->skus->first()?->code)->toBe('ADW-SCI-1')
+        ->and($product->skus->first()?->defaultUnit?->only(['conversion_factor', 'cover_price', 'base_price', 'moq']))->toBe(['conversion_factor' => 20, 'cover_price' => '120.00', 'base_price' => '90.00', 'moq' => 5])
+        ->and($product->skus->first()?->defaultUnit?->tiers->pluck('unit_price', 'min_quantity')->all())->toBe([10 => '85.00'])
         ->and(InventoryMovement::query()->sole()->only(['type', 'quantity', 'actor_id']))->toEqual(['type' => App\Modules\Inventory\Enums\MovementType::Opening, 'quantity' => 400, 'actor_id' => $this->owner->id]);
 });
 
@@ -79,7 +86,7 @@ test('BR-INV06 the stock is adjusted to on_hand with the import reason', functio
 
     $movement = InventoryMovement::query()->where('type', 'adjustment')->sole();
 
-    expect(SkuInventory::query()->whereKey($product->sku?->id)->value('on_hand'))->toBe(350)
+    expect(SkuInventory::query()->whereKey($product->skus->first()?->id)->value('on_hand'))->toBe(350)
         ->and($movement->only(['quantity', 'on_hand_after', 'reason', 'actor_id']))->toBe(['quantity' => -50, 'on_hand_after' => 350, 'reason' => 'استيراد', 'actor_id' => $this->owner->id]);
 });
 
@@ -97,7 +104,7 @@ test('an empty on_hand leaves the stock alone', function (): void {
 
     importJobRun($this, [$this->importRow(['on_hand' => '0', 'sku_code' => 'NEW-1']), $this->importRow(['on_hand' => ''])]);
 
-    expect(SkuInventory::query()->whereKey($product->sku?->id)->value('on_hand'))->toBe(400);
+    expect(SkuInventory::query()->whereKey($product->skus->first()?->id)->value('on_hand'))->toBe(400);
 });
 
 test('one bad row is skipped with its error and does not roll back the others', function (): void {
@@ -114,7 +121,7 @@ test('one bad row is skipped with its error and does not roll back the others', 
 
 test('a row that fails on stock is rolled back whole, product changes included', function (): void {
     $product = $this->importedProduct();
-    SkuInventory::query()->whereKey($product->sku?->id)->update(['reserved' => 100]);
+    SkuInventory::query()->whereKey($product->skus->first()?->id)->update(['reserved' => 100]);
 
     $import = importJobRun($this, [$this->importRow(['product_name' => 'لن يُحفظ', 'on_hand' => '50'])]);
 
@@ -264,13 +271,13 @@ test('D91 consecutive rows of a code import as one SKU sold in each unit, counte
 
 test('D91 an update keeps the units the file does not list', function (): void {
     $product = $this->importedProduct();
-    $piece = $this->addUnit($product->sku, ['unit_id' => $this->importBasics()['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00']);
+    $piece = $this->addUnit($product->skus->first(), ['unit_id' => $this->importBasics()['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00']);
 
     $import = importJobRun($this, [$this->importRow(['base_price' => '88'])]);
 
     expect($import->updated)->toBe(1)
         ->and(SkuUnit::query()->orderBy('id')->get()->map(fn (SkuUnit $unit): array => [$unit->id, $unit->base_price, $unit->status->value])->all())
-        ->toBe([[$this->defaultUnitId($product->sku), '88.00', 'active'], [$piece->id, '5.00', 'active']]);
+        ->toBe([[$this->defaultUnitId($product->skus->first()), '88.00', 'active'], [$piece->id, '5.00', 'active']]);
 });
 
 test('D91 an error of a SKU\'s second unit is recorded on its own row', function (): void {
@@ -294,4 +301,111 @@ test('D91 a code repeated after another code is a duplicate, not another unit', 
     expect($import->only(['total', 'created', 'skipped']))->toBe(['total' => 3, 'created' => 2, 'skipped' => 1])
         ->and($import->errors[0]['message'])->toBe('الكود مكرر في الملف (الصف 3)')
         ->and(SkuUnit::query()->count())->toBe(2);
+});
+
+test('D91 a format v2 file still imports, one product per SKU', function (): void {
+    $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow(), $this->importRow(['sku_code' => 'NEW-1'])], sheetName: 'products_v2'));
+    $import = app(RunCatalogImport::class)->handle($preview->token);
+
+    runJob(new ImportCatalog($import->id));
+
+    expect($import->refresh()->only(['total', 'created']))->toBe(['total' => 2, 'created' => 2])
+        ->and(Product::query()->count())->toBe(2);
+});
+
+test('BR-P14 format v3 groups rows sharing a product key into one product with its variants', function (): void {
+    $import = importJobRun($this, [
+        ($this->penRow)('PEN-BLUE', 'أزرق'),
+        ($this->penRow)('PEN-RED', 'أحمر', ['on_hand' => '50', 'product_name' => 'يتجاهل']),
+        ($this->penRow)('PEN-RED', 'أحمر', ['product_key' => '', 'unit' => 'كرتونة', 'unit_is_default' => '', 'conversion_factor' => '12', 'base_price' => '55', 'variant_option_1' => '', 'variant_value_1' => '']),
+        $this->importRow(['sku_code' => 'NEW-1']),
+    ], $this->owner->id);
+
+    $pen = Product::query()->with(['options.values', 'skus.units', 'skus.inventory'])->where('name', 'قلم جاف')->sole();
+
+    expect($import->only(['total', 'processed', 'created', 'skipped']))->toBe(['total' => 2, 'processed' => 2, 'created' => 2, 'skipped' => 0])
+        ->and($pen->options->map(fn (ProductOption $option): array => [$option->name, $option->values->pluck('value')->all()])->all())->toBe([['اللون', ['أزرق', 'أحمر']], ['المقاس', ['M']]])
+        ->and($pen->skus->map(fn (Sku $sku): array => [$sku->code, $sku->name, $sku->status->value, $sku->units->count(), $sku->inventory?->on_hand])->all())->toBe([
+            ['PEN-BLUE', 'أزرق / M', 'active', 1, 100],
+            ['PEN-RED', 'أحمر / M', 'active', 2, 50],
+        ])
+        ->and(InventoryMovement::query()->where('type', 'opening')->pluck('quantity')->sort()->values()->all())->toBe([50, 100, 400]);
+});
+
+test('BR-P14 a v3 update of one variant keeps the product\'s other variants, options and stock', function (): void {
+    importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), ($this->penRow)('PEN-RED', 'أحمر', ['on_hand' => '50'])]);
+
+    $import = importJobRun($this, [($this->penRow)('PEN-RED', 'أحمر', ['product_key' => '', 'base_price' => '4.5', 'on_hand' => ''])]);
+
+    $pen = Product::query()->with(['options.values', 'skus.defaultUnit', 'skus.inventory'])->sole();
+
+    expect($import->only(['total', 'updated', 'skipped']))->toBe(['total' => 1, 'updated' => 1, 'skipped' => 0])
+        ->and($pen->skus->map(fn (Sku $sku): array => [$sku->code, $sku->status->value, $sku->defaultUnit?->base_price, $sku->inventory?->on_hand])->all())->toBe([
+            ['PEN-BLUE', 'active', '5.00', 100],
+            ['PEN-RED', 'active', '4.50', 50],
+        ])
+        ->and($pen->options->map(fn (ProductOption $option): int => $option->values->count())->all())->toBe([2, 1]);
+});
+
+test('BR-P14 a row naming no option of a variant keeps its values, so a v2 file updates a variant', function (): void {
+    importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), ($this->penRow)('PEN-RED', 'أحمر')]);
+    $row = ($this->penRow)('PEN-RED', 'أحمر', ['base_price' => '4.5']);
+    unset($row['product_key'], $row['variant_option_1'], $row['variant_value_1'], $row['variant_option_2'], $row['variant_value_2'], $row['sku_status']);
+    $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([$row], sheetName: 'products_v2'));
+    $import = app(RunCatalogImport::class)->handle($preview->token);
+
+    runJob(new ImportCatalog($import->id));
+
+    expect($import->refresh()->updated)->toBe(1)
+        ->and(Sku::query()->with('defaultUnit')->orderBy('sort_order')->get()->map(fn (Sku $sku): array => [$sku->code, $sku->name, $sku->defaultUnit?->base_price])->all())
+        ->toBe([['PEN-BLUE', 'أزرق / M', '5.00'], ['PEN-RED', 'أحمر / M', '4.50']]);
+});
+
+test('BR-P14 a new variant in the file is added to the product with its opening stock', function (): void {
+    importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق')]);
+
+    $import = importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), ($this->penRow)('PEN-GREEN', 'أخضر', ['on_hand' => '30', 'sku_status' => 'غير نشط'])], $this->owner->id);
+
+    $green = Sku::query()->with('inventory')->where('code', 'PEN-GREEN')->sole();
+
+    expect($import->only(['updated', 'created']))->toBe(['updated' => 1, 'created' => 0])
+        ->and(Product::query()->count())->toBe(1)
+        ->and([$green->name, $green->status->value, $green->sort_order, $green->inventory?->on_hand])->toBe(['أخضر / M', 'inactive', 1, 30])
+        ->and(InventoryMovement::query()->where('sku_id', $green->id)->sole()->only(['type', 'quantity']))->toEqual(['type' => App\Modules\Inventory\Enums\MovementType::Opening, 'quantity' => 30]);
+});
+
+test('BR-P14 an error of one variant names its own row and skips the whole product', function (): void {
+    $import = importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), ($this->penRow)('PEN-RED', 'أحمر', ['base_price' => '0'])]);
+
+    expect($import->only(['total', 'skipped']))->toBe(['total' => 1, 'skipped' => 1])
+        ->and($import->errors)->toEqual([['row' => 4, 'column' => 'base_price', 'label' => 'سعر الجملة', 'message' => 'يجب أن تكون قيمة سعر الجملة أكبر من 0.']])
+        ->and(Product::query()->count())->toBe(0);
+});
+
+test('BR-INV08 a stock below what one variant has reserved is an error on that variant\'s row', function (): void {
+    importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), ($this->penRow)('PEN-RED', 'أحمر', ['on_hand' => '50'])]);
+    SkuInventory::query()->whereKey(Sku::query()->where('code', 'PEN-RED')->value('id'))->update(['reserved' => 40]);
+
+    $import = importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق', ['on_hand' => '90']), ($this->penRow)('PEN-RED', 'أحمر', ['on_hand' => '10'])]);
+
+    expect($import->skipped)->toBe(1)
+        ->and(array_map(fn (array $error): array => [$error['row'], $error['column']], $import->errors))->toBe([[4, 'on_hand']])
+        ->and(SkuInventory::query()->pluck('on_hand')->sort()->values()->all())->toBe([50, 100]);
+});
+
+test('BR-P14 codes of two products of the store under one key are an error on the other product\'s code', function (): void {
+    $this->importedProduct();
+    importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق')]);
+
+    $import = importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), ($this->penRow)('ADW-SCI-1', 'أحمر')]);
+
+    expect($import->skipped)->toBe(1)
+        ->and($import->errors)->toEqual([['row' => 4, 'column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'هذا الكود لصنف من منتج آخر في المتجر']]);
+});
+
+test('BR-P14 a product key that comes back after another product is a duplicate', function (): void {
+    $import = importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), $this->importRow(['sku_code' => 'NEW-1']), ($this->penRow)('PEN-RED', 'أحمر')]);
+
+    expect($import->only(['total', 'created', 'skipped']))->toBe(['total' => 3, 'created' => 2, 'skipped' => 1])
+        ->and($import->errors)->toEqual([['row' => 5, 'column' => 'product_key', 'label' => 'مفتاح المنتج', 'message' => 'مفتاح المنتج مكرر في الملف (الصف 3)']]);
 });

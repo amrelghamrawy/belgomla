@@ -27,6 +27,9 @@ export type StoreSku = Schemas["StoreSku"];
 /** One unit a SKU is sold in (V2 Task 13, D91). */
 export type StoreSkuUnit = Schemas["StoreSkuUnit"];
 export type StoreProduct = Schemas["StoreProduct"];
+/** A variant option with the values some active SKU uses (V2 Task 14, BR-P14). */
+export type StoreProductOption = Schemas["StoreProductOption"];
+export type PriceRange = Schemas["PriceRange"];
 export type StoreProductDetail = Schemas["StoreProductDetail"];
 export type ProductImage = Schemas["ProductImage"];
 export type RelatedProduct = Schemas["RelatedProduct"];
@@ -70,6 +73,11 @@ export type DashboardSku = Schemas["DashboardSku"];
 export type DashboardSkuUnit = Schemas["DashboardSkuUnit"];
 export type SkuUnitRequest = Schemas["SkuUnitRequest"];
 export type DashboardProduct = Schemas["DashboardProduct"];
+/** A variant option with every value (V2 Task 14, BR-P14, D92). */
+export type DashboardProductOption = Schemas["DashboardProductOption"];
+export type SkuStatus = Schemas["SkuStatus"];
+export type ProductOptionRequest = Schemas["ProductOptionRequest"];
+export type SkuRequest = Schemas["SkuRequest"];
 export type ProductRelation = Schemas["ProductRelation"];
 export type ProductRequest = Schemas["ProductRequest"];
 export type TierRequest = Schemas["TierRequest"];

@@ -34,7 +34,7 @@ final readonly class RefreshCart
         $lines = $this->cart->linesOf($customer);
         $kept = $lines->filter(fn (CartItem $item): bool => $item->kind === CartLineKind::Preorder
             ? $this->orderable->preorderable($item->skuUnit)
-            : $item->skuUnit->sku->product->status === ProductStatus::Active && $item->skuUnit->isActive());
+            : $item->skuUnit->sku->product->status === ProductStatus::Active && $item->skuUnit->sku->isActive() && $item->skuUnit->isActive());
         $gone = $lines->diff($kept);
 
         $removed = [];

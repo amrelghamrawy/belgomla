@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\PriceListQuery;
 use App\Modules\Catalog\Queries\PriceVisibilityQuery;
 use App\Modules\Catalog\Queries\StorefrontFieldsQuery;
 use App\Modules\Catalog\Queries\StoreProductDetailQuery;
 use App\Modules\Catalog\Queries\StoreProductListQuery;
+use App\Modules\Pricing\Models\Promotion;
 use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -58,7 +60,7 @@ test('the store list eager-loads what the resource needs and hides inactive prod
 
     expect($page->total())->toBe(1)
         ->and($page->items()[0]->is($visible))->toBeTrue()
-        ->and($page->items()[0]->relationLoaded('sku'))->toBeTrue()
+        ->and($page->items()[0]->relationLoaded('activeSkus'))->toBeTrue()
         ->and($page->items()[0]->relationLoaded('mainImage'))->toBeTrue();
 });
 
@@ -82,4 +84,35 @@ test('BR-P13 the price list reads one row more than the limit to detect truncati
         ->and($exact['rows'])->toHaveCount(2)
         ->and($over['truncated'])->toBeTrue()
         ->and($over['rows'])->toHaveCount(2);
+});
+
+test('BR-P14 the store list loads the variants with their option values and the options with their swatches', function (): void {
+    $this->variantProduct();
+
+    $product = app(StoreProductListQuery::class)->paginate(new ProductFilterData, null, 24)->items()[0];
+
+    expect($product->activeSkus)->toHaveCount(3)
+        ->and($product->activeSkus->first()->relationLoaded('optionValues'))->toBeTrue()
+        ->and($product->options->first()->values->first()->relationLoaded('image'))->toBeTrue();
+});
+
+test('BR-P14 BR-PR15 on offer ignores a promotion that covers only an inactive variant', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود']);
+    $inactive = Sku::query()->where('code', 'PEN-2')->sole();
+    Promotion::factory()->covering($inactive)->create();
+    $inactive->update(['status' => 'inactive']);
+
+    $offers = app(StoreProductListQuery::class)->paginate(new ProductFilterData, null, 24, onOffer: true);
+
+    expect($offers->total())->toBe(0);
+});
+
+test('BR-P14 BR-PR15 on offer keeps a product with a promoted active variant', function (): void {
+    $pen = $this->variantProduct(colours: ['أزرق', 'أسود']);
+    Promotion::factory()->covering(Sku::query()->where('code', 'PEN-2')->sole())->create();
+
+    $offers = app(StoreProductListQuery::class)->paginate(new ProductFilterData, null, 24, onOffer: true);
+
+    expect($offers->total())->toBe(1)
+        ->and($offers->items()[0]->is($pen))->toBeTrue();
 });

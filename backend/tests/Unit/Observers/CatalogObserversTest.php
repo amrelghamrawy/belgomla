@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Observers\FacetCacheObserver;
 use App\Modules\Catalog\Services\FacetCacheVersion;
 use App\Modules\Tenancy\TenantContext;
@@ -14,7 +17,7 @@ beforeEach(function (): void {
     $this->versions = app(FacetCacheVersion::class);
 });
 
-test('saving or deleting a category, field or option bumps the facet cache version', function (Closure $make): void {
+test('saving or deleting a model that shapes the facets bumps the facet cache version', function (Closure $make): void {
     $model = $make();
     $afterSave = $this->versions->current($this->tenant->id);
 
@@ -26,6 +29,9 @@ test('saving or deleting a category, field or option bumps the facet cache versi
     'category' => [fn () => Category::factory()->create()],
     'field definition' => [fn () => ProductFieldDefinition::factory()->create()],
     'field option' => [fn () => ProductFieldOption::factory()->create()],
+    'BR-P14 variant option' => [fn () => ProductOption::factory()->create()],
+    'BR-P14 variant option value' => [fn () => ProductOptionValue::factory()->create()],
+    'BR-P14 sku' => [fn () => Sku::factory()->create()],
 ]);
 
 test('a model without a tenant id is ignored by the facet observer', function (): void {

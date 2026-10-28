@@ -47,9 +47,9 @@ test('BR-P04 a status the product cannot move to is an error on the status colum
 });
 
 test('a duplicate of an earlier row is skipped without touching the catalog', function (): void {
-    $result = app(ImportCatalogRow::class)->handle([5 => $this->importRow()], $this->lookups, duplicateOf: 3);
+    $result = app(ImportCatalogRow::class)->handle([5 => $this->importRow()], $this->lookups, [5 => ['sku_code' => ['الكود مكرر في الملف (الصف 3)']]]);
 
-    expect($result->errors)->toBe([['column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'الكود مكرر في الملف (الصف 3)']])
+    expect($result->errors)->toBe([['row' => 5, 'column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'الكود مكرر في الملف (الصف 3)']])
         ->and(Product::query()->count())->toBe(0);
 });
 

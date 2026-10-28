@@ -8,14 +8,20 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\ProductImage;
+use App\Modules\Catalog\Models\Sku;
+
+const STORE_SKU_KEYS = [
+    'id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers',
+    'units' => ['*' => ['id', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'is_default', 'in_stock']],
+    'available', 'in_stock', 'label', 'option_value_ids',
+];
 
 const STORE_PRODUCT_KEYS = [
     'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name', 'kind'],
-    'sku' => [
-        'id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers',
-        'units' => ['*' => ['id', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'is_default', 'in_stock']],
-        'available', 'in_stock',
-    ],
+    'sku' => STORE_SKU_KEYS,
+    'skus' => ['*' => STORE_SKU_KEYS],
+    'options',
+    'price_range' => ['min', 'max'],
     'preorder',
 ];
 
@@ -62,7 +68,7 @@ test('the store lists visible products in the documented shape with laravel pagi
 
 test('D91 a product sold by the piece and by the carton shows both units with their own prices', function (): void {
     $product = $this->inTenant(fn (): Product => Product::factory()->withSku(['base_price' => '10.00', 'moq' => 6], onHand: 30)->create());
-    $carton = $this->addUnit($this->inTenant(fn () => $product->sku()->sole()), ['conversion_factor' => 24, 'base_price' => '220.00'], [5 => '210.00']);
+    $carton = $this->addUnit($this->inTenant(fn () => $product->skus()->sole()), ['conversion_factor' => 24, 'base_price' => '220.00'], [5 => '210.00']);
 
     $this->tenantJson('GET', "/api/store/products/{$product->slug}")
         ->assertOk()
@@ -200,3 +206,107 @@ test('BR-T05 the store never lists products of another tenant', function (): voi
 
     $this->tenantJson('GET', '/api/store/products')->assertOk()->assertJsonPath('meta.total', 0);
 });
+
+test('BR-P14 a card stands for the first variant in stock: the second one when the first is sold out', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود', 'أحمر'], stock: ['أزرق' => 0]);
+
+    $this->tenantJson('GET', '/api/store/products')
+        ->assertOk()
+        ->assertJsonPath('data.0.sku.code', 'PEN-2')
+        ->assertJsonPath('data.0.sku.label', 'أسود')
+        ->assertJsonPath('data.0.sku.in_stock', true);
+});
+
+test('BR-P14 a product with every variant sold out stands for its first variant, not in stock', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود'], stock: ['أزرق' => 0, 'أسود' => 0]);
+
+    $this->tenantJson('GET', '/api/store/products')
+        ->assertOk()
+        ->assertJsonPath('data.0.sku.code', 'PEN-1')
+        ->assertJsonPath('data.0.sku.in_stock', false);
+});
+
+test('BR-P14 the card shows the price range over the variants', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود', 'أحمر'], prices: ['أزرق' => '12.00', 'أحمر' => '8.50']);
+
+    $this->tenantJson('GET', '/api/store/products')
+        ->assertOk()
+        ->assertJsonPath('data.0.price_range', ['min' => '8.50', 'max' => '12.00']);
+});
+
+test('BR-P14 the price range leaves out an inactive variant', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود', 'أحمر'], prices: ['أزرق' => '12.00', 'أحمر' => '8.50']);
+    $this->inTenant(fn () => Sku::query()->where('code', 'PEN-3')->update(['status' => 'inactive']));
+
+    $this->tenantJson('GET', '/api/store/products')
+        ->assertOk()
+        ->assertJsonPath('data.0.price_range', ['min' => '10.00', 'max' => '12.00']);
+});
+
+test('D1 hidden prices leave out the price range', function (): void {
+    $this->tenant->settings->update(['require_login_for_prices' => true]);
+    $this->variantProduct(prices: ['أزرق' => '12.00']);
+
+    $this->tenantJson('GET', '/api/store/products')
+        ->assertOk()
+        ->assertJsonPath('data.0.prices_hidden', true)
+        ->assertJsonMissingPath('data.0.price_range');
+});
+
+test('BR-P14 search matches the code of any variant', function (): void {
+    $pen = $this->variantProduct(code: 'PEN');
+    $this->inTenant(fn () => Product::factory()->withSku(['code' => 'NOTE-1'])->create(['name' => 'كشكول']));
+
+    $this->tenantJson('GET', '/api/store/products?q=pen-3')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $pen->id);
+});
+
+test('BR-P14 the option filter keeps the products with an active variant of that value, folding the spelling', function (string $query): void {
+    $blue = $this->variantProduct(colours: ['أزرق', 'أسود'], code: 'PEN');
+    $this->variantProduct(colours: ['أحمر'], name: 'قلم رصاص', code: 'PCL');
+
+    $this->tenantJson('GET', '/api/store/products?'.$query)
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $blue->id);
+})->with([
+    'folded name and value' => ['f[o:اللون]=ازرق'],
+    'as spelled by the merchant' => ['f[o:اللون]=أزرق'],
+]);
+
+test('BR-P14 the option filter skips a product whose only variant of that value is inactive', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود']);
+    $this->inTenant(fn () => Sku::query()->where('code', 'PEN-1')->update(['status' => 'inactive']));
+
+    $this->tenantJson('GET', '/api/store/products?f[o:اللون]=ازرق')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 0);
+});
+
+test('BR-P14 the option filter combines with a custom field facet', function (): void {
+    $match = $this->variantProduct(colours: ['أزرق'], code: 'PEN');
+    $this->variantProduct(colours: ['أزرق'], name: 'قلم رصاص', code: 'PCL');
+    $this->inTenant(fn () => $match->update(['custom_fields' => ['grade' => $this->firstPrep->id]]));
+
+    $this->tenantJson('GET', "/api/store/products?f[o:اللون]=ازرق&f[grade]={$this->firstPrep->id}")
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $match->id);
+});
+
+test('BR-P14 the price sort uses the cheapest active variant', function (string $sort, array $order): void {
+    $ids = [
+        'pen' => $this->variantProduct(colours: ['أزرق', 'أحمر', 'أسود'], prices: ['أزرق' => '30.00', 'أحمر' => '5.00', 'أسود' => '4.00'], code: 'PEN')->id,
+        'pencil' => $this->inTenant(fn () => Product::factory()->withSku(['base_price' => '6.00'])->create(['name' => 'قلم رصاص'])->id),
+        'eraser' => $this->inTenant(fn () => Product::factory()->withSku(['base_price' => '4.50'])->create(['name' => 'ممحاة'])->id),
+    ];
+    $this->inTenant(fn () => Sku::query()->where('code', 'PEN-3')->update(['status' => 'inactive']));
+
+    $this->tenantJson('GET', "/api/store/products?sort={$sort}")
+        ->assertJsonPath('data.*.id', array_map(fn (string $key): int => $ids[$key], $order));
+})->with([
+    'cheapest first' => ['price', ['eraser', 'pen', 'pencil']],
+    'most expensive first' => ['-price', ['pencil', 'pen', 'eraser']],
+]);

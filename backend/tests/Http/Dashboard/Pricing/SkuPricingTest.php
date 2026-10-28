@@ -17,11 +17,11 @@ beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
     $this->product = $this->inTenant(function (): Product {
         $product = Product::factory()->withSku(['code' => 'ADW-1', 'cover_price' => '120.00', 'base_price' => '100.00', 'moq' => 1])->create();
-        SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 5, 'unit_price' => '99.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 5, 'unit_price' => '99.00']);
 
         return $product;
     });
-    $this->unit = $this->inTenant(fn (): SkuUnit => $this->product->sku()->sole()->defaultUnit ?? throw new RuntimeException);
+    $this->unit = $this->inTenant(fn (): SkuUnit => $this->product->skus()->sole()->defaultUnit ?? throw new RuntimeException);
     $this->url = "/api/dashboard/products/{$this->product->id}/units/{$this->unit->id}/pricing";
     $this->body = fn (array $overrides = []): array => [
         'cover_price' => '120.00',
@@ -138,7 +138,7 @@ test('pricing validation', function (array $overrides, string $field, array $wit
 test('BR-T04 the pricing of another tenant product is 404 and stays untouched', function (): void {
     $other = $this->otherTenant();
     $foreign = $this->inTenant(fn () => Product::factory()->withSku(['base_price' => '100.00'])->create(), $other);
-    $unit = $this->defaultUnitId($this->inTenant(fn () => $foreign->sku()->sole(), $other));
+    $unit = $this->defaultUnitId($this->inTenant(fn () => $foreign->skus()->sole(), $other));
 
     $this->tenantJson('PUT', "/api/dashboard/products/{$foreign->id}/units/{$unit}/pricing", ($this->body)())
         ->assertNotFound()
@@ -148,7 +148,7 @@ test('BR-T04 the pricing of another tenant product is 404 and stays untouched', 
 });
 
 test('D91 a unit of another product, or an archived unit, has no pricing here: 404 and untouched', function (): void {
-    $elsewhere = $this->inTenant(fn (): int => $this->defaultUnitId(Product::factory()->withSku()->create()->sku()->sole()));
+    $elsewhere = $this->inTenant(fn (): int => $this->defaultUnitId(Product::factory()->withSku()->create()->skus()->sole()));
     $archived = $this->inTenant(fn (): SkuUnit => SkuUnit::factory()->archived()->create(['sku_id' => $this->unit->sku_id]));
 
     $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/units/{$elsewhere}/pricing", ($this->body)())->assertNotFound();
@@ -158,7 +158,7 @@ test('D91 a unit of another product, or an archived unit, has no pricing here: 4
 });
 
 test('D91 each unit is priced on its own: the carton keeps its prices when the piece changes', function (): void {
-    $carton = $this->addUnit($this->inTenant(fn () => $this->product->sku()->sole()), ['cover_price' => '1440.00', 'base_price' => '1100.00']);
+    $carton = $this->addUnit($this->inTenant(fn () => $this->product->skus()->sole()), ['cover_price' => '1440.00', 'base_price' => '1100.00']);
 
     $this->tenantJson('PUT', "/api/dashboard/products/{$this->product->id}/units/{$carton->id}/pricing", ($this->body)(['cover_price' => '1440.00', 'tiers' => []]))
         ->assertOk()

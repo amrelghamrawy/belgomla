@@ -25,7 +25,10 @@ export function AdjustStockSheet({ row, onClose }: { row: InventoryRow; onClose:
       <SheetContent side="end" className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle>{copy.adjustTitle(row.code)}</SheetTitle>
-          <SheetDescription>{row.name}</SheetDescription>
+          <SheetDescription>
+            {row.name}
+            {row.variant && ` — ${row.variant}`}
+          </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">
           {fresh.isError && <ErrorBlock error={fresh.error} onRetry={() => void fresh.refetch()} />}

@@ -25,6 +25,9 @@ erDiagram
   categories ||--o{ products : contains
   products ||--o{ product_images : has
   products ||--o{ skus : has
+  products ||--o{ product_options : has
+  product_options ||--o{ product_option_values : has
+  skus ||--o{ sku_option_values : names
   products ||--o{ product_relations : relates
   skus ||--o{ sku_price_tiers : has
   skus ||--|| sku_inventory : has
@@ -190,7 +193,7 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 | type               | enum      | `revision_of`, `companion`                        |
 | —                  |           | **unique (product_id, related_product_id, type)** |
 
-### `skus` (BR-P02, BR-U02, BR-PR01, BR-PR10)
+### `skus` (BR-P02, BR-P14, BR-U02, BR-PR01, BR-PR10)
 
 | Column             | Type          | Notes                                                 |
 | ------------------ | ------------- | ----------------------------------------------------- |
@@ -198,12 +201,46 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 | tenant_id          | FK            |                                                       |
 | product_id         | FK            |                                                       |
 | code               | varchar(60)   | **unique (tenant_id, code)** (BR-P03)                 |
-| name               | varchar(200)  | nullable; V1 = product name                           |
+| name               | varchar(200)  | nullable; the variant label («أزرق / M», V2 Task 14), null without options; snapshot as `order_items.sku_name` |
 | base_unit_id       | FK units      | the unit stock is kept in (BR-U03)                    |
+| status             | varchar(10)   | V2 Task 14: `active` \| `inactive` (check), default active; an inactive variant is hidden and cannot be ordered (BR-P14) |
+| sort_order         | int           | V2 Task 14: the product form's order (backfilled by id within the product) |
 
 V2 Task 13 (D91) moved `selling_unit_id, conversion_factor, cover_price, base_price, base_price_percent, moq` to `sku_units` (backfilled as each SKU's default unit, then dropped in a second migration).
 
-V1 invariant (app-enforced): exactly one SKU per product. V2 lifts it.
+A product without options has exactly one SKU; with options (V2 Task 14, BR-P14, D92) one SKU per combination it sells. A variant removed from the form is deleted, or set inactive when it has history.
+
+### `product_options` (V2 Task 14, BR-P14, D92)
+
+| Column     | Type        | Notes                                                   |
+| ---------- | ----------- | ------------------------------------------------------- |
+| id         | bigint PK   |                                                         |
+| tenant_id  | FK          |                                                         |
+| product_id | FK products | cascade; **unique (product_id, name)**; at most 2 per product (request) |
+| name       | varchar(50) | «اللون», «المقاس»                                        |
+| sort_order | int         |                                                         |
+
+### `product_option_values`
+
+| Column            | Type                | Notes                                              |
+| ----------------- | ------------------- | -------------------------------------------------- |
+| id                | bigint PK           |                                                    |
+| tenant_id         | FK                  |                                                    |
+| product_option_id | FK product_options  | cascade; **unique (product_option_id, value)**; up to 20 per option (request) |
+| value             | varchar(50)         | «أزرق»                                             |
+| sort_order        | int                 |                                                    |
+| image_id          | FK product_images   | nullable, null on delete; the storefront swatch    |
+
+### `sku_option_values`
+
+| Column                  | Type                      | Notes                                               |
+| ----------------------- | ------------------------- | --------------------------------------------------- |
+| tenant_id               | FK                        |                                                     |
+| sku_id                  | FK skus                   | cascade                                             |
+| product_option_id       | FK product_options        | cascade; **PK (sku_id, product_option_id)**: one value per option |
+| product_option_value_id | FK product_option_values  | cascade                                             |
+
+The combination of a product's SKUs is unique per product (checked in the request and action, folded).
 
 ### `sku_units` (V2 Task 13, BR-U02, BR-U04, D91)
 
@@ -480,7 +517,7 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | product_id        | FK            | reference only                         |
 | product_name      | varchar(200)  | snapshot                               |
 | sku_code          | varchar(60)   | snapshot                               |
-| sku_name          | varchar(200)  | snapshot                               |
+| sku_name          | varchar(200)  | snapshot: the variant label (V2 Task 14) or the product name |
 | unit_name         | varchar(50)   | snapshot of the line's selling unit (D91) |
 | conversion_factor | int           | snapshot of the unit's factor          |
 | quantity          | int           | selling units, **check ≥ 1**           |
@@ -758,7 +795,7 @@ Each module exposes services; cross-module calls go through those services, neve
 
 | V2 feature             | Hook already present                                   |
 | ---------------------- | ------------------------------------------------------ |
-| Variants               | products 1:N skus                                      |
+| Variants               | Built in V2 Task 14: `product_options`, `product_option_values`, `sku_option_values`, `skus.status` / `sort_order` (BR-P14, D92) |
 | Roles                  | `tenant_users.role` enum                               |
 | Pre-orders             | Built in V2 Task 10: `products.preorder_*`, `orders.kind` / `converted_from_id` / `converted_at`, `order_items.reserved` / `converted_quantity`, `cart_items.kind` (BR-O14, D88) |
 | Order notifications    | `outbound_messages.purpose` enum                       |

@@ -21,9 +21,9 @@ use Carbon\CarbonImmutable;
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->travelTo(CarbonImmutable::parse('2026-10-27 10:00:00'));
-    $this->first = Product::factory()->withSku(['code' => 'ADW-1'])->create(['name' => 'الأضواء علوم'])->sku()->sole();
-    $this->second = Product::factory()->withSku(['code' => 'ADW-2'])->create(['name' => 'الأضواء رياضيات'])->sku()->sole();
-    $this->outside = Product::factory()->withSku(['code' => 'MOA-1'])->create(['name' => 'المعلم عربي'])->sku()->sole();
+    $this->first = Product::factory()->withSku(['code' => 'ADW-1'])->create(['name' => 'الأضواء علوم'])->skus()->sole();
+    $this->second = Product::factory()->withSku(['code' => 'ADW-2'])->create(['name' => 'الأضواء رياضيات'])->skus()->sole();
+    $this->outside = Product::factory()->withSku(['code' => 'MOA-1'])->create(['name' => 'المعلم عربي'])->skus()->sole();
     $this->data = fn (array $changes = []): PromotionData => new PromotionData(...[
         'name' => 'عرض الأضواء',
         'discountPercent' => '15.00',
@@ -94,7 +94,7 @@ test('D90 d a selection without any sku is refused and nothing is written', func
 ]);
 
 test('BR-T04 a sku of another store refuses the whole list', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->sku()->sole(), $this->otherTenant());
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->skus()->sole(), $this->otherTenant());
     app(TenantContext::class)->set($this->tenant);
 
     expect(fn () => app(CreatePromotion::class)->handle(($this->data)(['filter' => null, 'skuIds' => [$this->first->id, $foreign->id]])))

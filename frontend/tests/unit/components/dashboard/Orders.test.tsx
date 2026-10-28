@@ -1169,3 +1169,20 @@ describe("pre-orders on the dashboard (BR-O14, D88)", () => {
     ).toHaveAttribute("href", "/dashboard/orders/990");
   });
 });
+
+describe("order lines of a variant (V2 Task 14)", () => {
+  it("BR-P14 shows the variant label under the product name, and none for a product without options", () => {
+    stubApi({});
+    const plain = order().items[0]!;
+    renderWithQuery(
+      <OrderDetail
+        order={order({
+          items: [plain, { ...plain, id: 62, product_name: "قلم جاف", sku_code: "PEN-01-1-M", sku_name: "أزرق / M" }],
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("variant-62")).toHaveTextContent("أزرق / M");
+    expect(screen.queryByTestId("variant-61")).toBeNull();
+  });
+});

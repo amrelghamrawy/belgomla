@@ -51,6 +51,13 @@ test('D5 the low-stock report leaves out inactive products but keeps coming soon
     expect(app(LowStockQuery::class)->builder()->pluck('product_id')->all())->toBe([$comingSoon->id]);
 });
 
+test('BR-P14 the low-stock report leaves out an inactive variant', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر'], stock: ['أزرق' => 0, 'أحمر' => 0]);
+    Sku::query()->where('code', 'PEN-2')->update(['status' => 'inactive']);
+
+    expect(app(LowStockQuery::class)->builder()->pluck('code')->all())->toBe(['PEN-1']);
+});
+
 test('the inventory list shows every sku of the tenant with product and stock loaded, by code', function (): void {
     $b = Product::factory()->inactive()->withSku(['code' => 'B-1'], onHand: 3)->create();
     $a = Product::factory()->withSku(['code' => 'A-1'], onHand: 9)->create();

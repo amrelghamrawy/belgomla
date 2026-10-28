@@ -28,22 +28,20 @@ final readonly class BulkPricingTargetsQuery
         $units = new Collection;
         $products = $this->products->builder($filter)
             ->with([
-                'sku.activeUnits' => fn (HasMany $query): HasMany => $unitId === null ? $query : $query->where('unit_id', $unitId),
-                'sku.activeUnits.tiers',
-                'sku.activeUnits.unit',
+                'skus.activeUnits' => fn (HasMany $query): HasMany => $unitId === null ? $query : $query->where('unit_id', $unitId),
+                'skus.activeUnits.tiers',
+                'skus.activeUnits.unit',
             ])
             ->orderBy('products.id')
             ->get();
 
         foreach ($products as $product) {
-            if (! $product->sku instanceof Sku) {
-                continue;
-            }
+            foreach ($product->skus as $sku) {
+                $sku->setRelation('product', $product);
 
-            $product->sku->setRelation('product', $product);
-
-            foreach ($product->sku->activeUnits as $unit) {
-                $units->push($unit->setRelation('sku', $product->sku));
+                foreach ($sku->activeUnits as $unit) {
+                    $units->push($unit->setRelation('sku', $sku));
+                }
             }
         }
 

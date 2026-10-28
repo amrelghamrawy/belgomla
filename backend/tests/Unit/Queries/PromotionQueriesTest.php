@@ -17,8 +17,8 @@ use App\Modules\Tenancy\TenantContext;
 
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
-    $this->first = Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '100.00'])->create(['name' => 'الأضواء علوم'])->sku()->sole();
-    $this->second = Product::factory()->withSku(['code' => 'ADW-2', 'base_price' => '10.10'])->create(['name' => 'الأضواء رياضيات'])->sku()->sole();
+    $this->first = Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '100.00'])->create(['name' => 'الأضواء علوم'])->skus()->sole();
+    $this->second = Product::factory()->withSku(['code' => 'ADW-2', 'base_price' => '10.10'])->create(['name' => 'الأضواء رياضيات'])->skus()->sole();
 });
 
 test('D90 d the preview counts the selection and prices a sample under the %', function (): void {

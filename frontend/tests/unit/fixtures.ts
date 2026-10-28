@@ -109,7 +109,10 @@ export function storeSku(overrides: Partial<StoreSku> = {}): StoreSku {
   return units === undefined ? sku : { ...sku, units };
 }
 
+/** A product without options (one SKU, V1 shape); `skus` follows `sku` unless given (V2 Task 14). */
 export function storeProduct(overrides: Partial<StoreProductDetail> = {}): StoreProductDetail {
+  const sku = overrides.sku === undefined ? storeSku() : overrides.sku;
+
   return {
     id: 11,
     name: "الأضواء علوم أولى إعدادي",
@@ -119,7 +122,9 @@ export function storeProduct(overrides: Partial<StoreProductDetail> = {}): Store
     main_image_url: null,
     category: { id: 3, name: "أولى إعدادي", kind: "books" },
     custom_fields: [{ key: "grade", label: "السنة الدراسية", value: "أولى إعدادي" }],
-    sku: storeSku(),
+    sku,
+    skus: sku === null ? [] : [sku],
+    options: [],
     preorder: null,
     gallery: [],
     related: [],
@@ -164,6 +169,7 @@ export function cartItem(overrides: Partial<CartItem> = {}): CartItem {
     sku_id: 501,
     sku_unit_id: 601,
     product_name: "الأضواء علوم أولى إعدادي",
+    variant: null,
     product_slug: "الأضواء-علوم-أولى-إعدادي",
     unit: "كرتونة",
     conversion_factor: 20,
@@ -284,4 +290,65 @@ export function hiddenPriceSku(): StoreSku {
 /** A coming-soon SKU (D21): no `available`, not in stock. */
 export function comingSoonSku(): StoreSku {
   return omit(storeSku({ in_stock: false, coming_soon: true }), "available");
+}
+
+/**
+ * A pen in three colours (V2 Task 14, BR-P14): أزرق 10.00 and أسود 12.00 in stock, أحمر out of stock; each SKU sold by
+ * the piece (MOQ 1) with its own unit id (6xx + colour).
+ */
+export function penProduct(overrides: Partial<StoreProductDetail> = {}): StoreProductDetail {
+  const colour = (id: number, value: number, label: string, price: string, available: number) =>
+    storeSku({
+      id,
+      code: `PEN-01-${value}`,
+      unit: "قطعة",
+      conversion_factor: 1,
+      moq: 1,
+      cover_price: null,
+      base_price: price,
+      discount_percent: null,
+      tiers: [],
+      available,
+      in_stock: available > 0,
+      label,
+      option_value_ids: [value],
+      units: [
+        storeSkuUnit({
+          id: 700 + value,
+          unit: "قطعة",
+          conversion_factor: 1,
+          base_price: price,
+          is_default: true,
+          in_stock: available > 0,
+        }),
+      ],
+    });
+  const skus = [
+    colour(81, 1, "أزرق", "10.00", 50),
+    colour(82, 2, "أسود", "12.00", 30),
+    colour(83, 3, "أحمر", "10.00", 0),
+  ];
+
+  return storeProduct({
+    id: 40,
+    name: "قلم جاف",
+    slug: "pen",
+    category: { id: 5, name: "أقلام", kind: "stationery" },
+    custom_fields: [],
+    sku: skus[0],
+    skus,
+    options: [
+      {
+        id: 1,
+        name: "اللون",
+        values: [
+          { id: 1, value: "أزرق", image_url: null },
+          { id: 2, value: "أسود", image_url: null },
+          { id: 3, value: "أحمر", image_url: null },
+        ],
+      },
+    ],
+    price_range: { min: "10.00", max: "12.00" },
+    ...overrides,
+  });
 }

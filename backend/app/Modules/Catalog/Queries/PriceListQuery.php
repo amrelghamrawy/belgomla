@@ -39,7 +39,7 @@ final readonly class PriceListQuery
     {
         return $this->filtered->builder($filter)
             ->tap(new VisibleOnStore)
-            ->with(['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers']) // tiers: a group price shows only when below them (BR-PR14)
+            ->with(['category', 'activeSkus.activeUnits.unit', 'activeSkus.activeUnits.tiers']) // tiers: a group price shows only when below them (BR-PR14)
             ->orderBy('products.name')
             ->orderBy('products.id');
     }

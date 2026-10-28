@@ -322,7 +322,7 @@ describe("product form", () => {
 
     expect(productBody(values, [selectField()], true, "books")).toMatchObject({ status: "active", opening_stock: 100 });
     expect(productBody(values, [selectField()], false, "books")).not.toHaveProperty("opening_stock");
-    expect(productBody(values, [selectField()], false, "books").sku.units[0]).toMatchObject({
+    expect(productBody(values, [selectField()], false, "books").sku?.units[0]).toMatchObject({
       base_price: null,
       base_price_percent: "25.00",
       tiers: [{ min_quantity: 10, discount_percent: "30.00" }],

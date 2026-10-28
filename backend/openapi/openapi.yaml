@@ -3403,7 +3403,7 @@ components:
     Facets:
       name: f
       in: query
-      description: '`f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08).'
+      description: '`f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries.'
       style: deepObject
       explode: true
       schema:
@@ -3977,7 +3977,7 @@ components:
       required: [id, label, count]
       properties:
         id:
-          description: Select option id, or "true"/"false" for a boolean field; sent back as `f[<key>]=<id>`.
+          description: Select option id, "true"/"false" for a boolean field, or the folded value of a variant option (type `option`); sent back as `f[<key>]=<id>`.
           type: [integer, string]
         label: { type: string }
         count: { type: integer }
@@ -3990,7 +3990,8 @@ components:
         label: { type: string }
         type:
           type: string
-          enum: [select, boolean]
+          description: '`option` = a variant option (BR-P14) whose key is `o:<folded name>`; select and boolean are custom fields'
+          enum: [select, boolean, option]
         options:
           type: array
           items: { $ref: '#/components/schemas/FacetOption' }
@@ -4068,6 +4069,38 @@ components:
         available: { type: integer }
         in_stock: { type: boolean, description: 'At least one unit can be ordered' }
         coming_soon: { type: boolean, const: true }
+        label:
+          description: 'The variant label, the SKU''s option values in option order joined by " / " («أزرق / M»); null for a product without options (BR-P14)'
+          type: [string, 'null']
+        option_value_ids:
+          description: 'The SKU''s option value ids in option order (one per option of the product; empty without options)'
+          type: array
+          items: { type: integer }
+
+    StoreProductOption:
+      description: 'A variant option (BR-P14, D92) with the values at least one active SKU uses, in the merchant''s order'
+      type: object
+      required: [id, name, values]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        values:
+          type: array
+          items:
+            type: object
+            required: [id, value, image_url]
+            properties:
+              id: { type: integer }
+              value: { type: string }
+              image_url: { type: [string, 'null'], description: 'The swatch: one product image chosen for the value' }
+
+    PriceRange:
+      description: 'The lowest and highest default-unit price over the active SKUs, at the shopper''s prices («من … إلى …»)'
+      type: object
+      required: [min, max]
+      properties:
+        min: { $ref: '#/components/schemas/Money' }
+        max: { $ref: '#/components/schemas/Money' }
 
     StoreSkuUnit:
       description: 'One unit of a SKU (D91), priced on its own at the shopper''s prices; price keys follow the SKU''s rules'
@@ -4106,7 +4139,7 @@ components:
 
     StoreProduct:
       type: object
-      required: [id, name, slug, description, status, main_image_url, category, custom_fields, sku, preorder]
+      required: [id, name, slug, description, status, main_image_url, category, custom_fields, sku, skus, options, preorder]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -4129,8 +4162,22 @@ components:
           type: array
           items: { $ref: '#/components/schemas/CustomFieldValue' }
         sku:
+          description: 'The SKU standing for the product on cards and lists: the first active SKU that is in stock, else the first active one (V2 Task 14); null when no SKU is active'
           oneOf:
             - $ref: '#/components/schemas/StoreSku'
+            - type: 'null'
+        skus:
+          description: 'Every active SKU (variant) in the merchant''s order, each priced like `sku` (BR-P14); one entry for a product without options'
+          type: array
+          items: { $ref: '#/components/schemas/StoreSku' }
+        options:
+          description: 'The variant options (at most 2, D92); empty for a product without options'
+          type: array
+          items: { $ref: '#/components/schemas/StoreProductOption' }
+        price_range:
+          description: 'Left out when prices are hidden (D1); null when no SKU is active'
+          oneOf:
+            - $ref: '#/components/schemas/PriceRange'
             - type: 'null'
         prices_hidden:
           description: Present (true) only when the tenant hides prices from guests (BR-CU04).
@@ -4172,11 +4219,13 @@ components:
               items: { $ref: '#/components/schemas/RelatedProduct' }
 
     PriceListRow:
-      description: 'One row per unit the product is sold in, the default first (D91)'
+      description: 'One row per unit of every active SKU (variant) of the product, SKUs in the merchant''s order, the default unit first (D91, BR-P14)'
       type: object
-      required: [id, sku_unit_id, name, slug, kind, code, unit, conversion_factor, is_default, moq, availability]
+      required: [id, sku_id, variant, sku_unit_id, name, slug, kind, code, unit, conversion_factor, is_default, moq, availability]
       properties:
         id: { type: integer, description: The product }
+        sku_id: { type: [integer, 'null'] }
+        variant: { type: [string, 'null'], description: 'The variant label («أزرق / M»), null without options' }
         sku_unit_id: { type: [integer, 'null'] }
         conversion_factor: { type: [integer, 'null'] }
         is_default: { type: boolean }
@@ -4292,11 +4341,12 @@ components:
 
     CartItem:
       type: object
-      required: [sku_id, sku_unit_id, product_name, product_slug, unit, conversion_factor, quantity, unit_price, tier_min_quantity, price_source, promotion, line_total, moq, available]
+      required: [sku_id, sku_unit_id, product_name, variant, product_slug, unit, conversion_factor, quantity, unit_price, tier_min_quantity, price_source, promotion, line_total, moq, available]
       properties:
         sku_id: { type: integer }
         sku_unit_id: { type: integer, description: 'The unit of the line (D91); a SKU may be in the cart in two units' }
         product_name: { type: string }
+        variant: { type: [string, 'null'], description: 'The variant label («أزرق / M», BR-P14), null without options' }
         product_slug: { type: string }
         unit: { type: string }
         conversion_factor: { type: integer }
@@ -4895,10 +4945,42 @@ components:
           type: array
           items: { $ref: '#/components/schemas/DashboardSkuUnit' }
         inventory: { $ref: '#/components/schemas/StockLevels' }
+        label: { type: [string, 'null'], description: 'The variant label («أزرق / M»), null without options (BR-P14)' }
+        status: { $ref: '#/components/schemas/SkuStatus' }
+        sort_order: { type: integer }
+        option_values:
+          description: 'The SKU''s option values in option order, as sent in `skus[].option_values`; empty without options'
+          type: array
+          items: { type: string }
+
+    SkuStatus:
+      description: 'An inactive SKU (variant) is hidden from the storefront and cannot be ordered (BR-P14)'
+      type: string
+      enum: [active, inactive]
+
+    DashboardProductOption:
+      description: 'A variant option (BR-P14, D92) with every value, in the merchant''s order'
+      type: object
+      required: [id, name, sort_order, values]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sort_order: { type: integer }
+        values:
+          type: array
+          items:
+            type: object
+            required: [id, value, sort_order, image_id, image_url]
+            properties:
+              id: { type: integer }
+              value: { type: string }
+              sort_order: { type: integer }
+              image_id: { type: [integer, 'null'] }
+              image_url: { type: [string, 'null'] }
 
     DashboardProduct:
       type: object
-      required: [id, name, slug, description, status, category, custom_fields, preorder, sku, main_image_url, created_at, updated_at]
+      required: [id, name, slug, description, status, category, custom_fields, preorder, sku, skus, options, main_image_url, created_at, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -4915,9 +4997,18 @@ components:
           additionalProperties: { type: [string, integer, number, boolean] }
         preorder: { $ref: '#/components/schemas/ProductPreorder' }
         sku:
+          description: 'The SKU standing for the product in lists: the first active SKU, else the first (V2 Task 14)'
           oneOf:
             - $ref: '#/components/schemas/DashboardSku'
             - type: 'null'
+        skus:
+          description: 'Every SKU (variant), active and inactive, in the merchant''s order (BR-P14); one for a product without options'
+          type: array
+          items: { $ref: '#/components/schemas/DashboardSku' }
+        options:
+          description: 'The variant options (at most 2, D92); empty without options'
+          type: array
+          items: { $ref: '#/components/schemas/DashboardProductOption' }
         main_image_url: { type: [string, 'null'] }
         images:
           type: array
@@ -5022,8 +5113,25 @@ components:
 
     ProductRequest:
       type: object
-      required: [name, category_id, sku]
+      description: >
+        Send either `sku` (a product without options: its one SKU, the V1 shape) or `skus` (BR-P14, V2 Task 14). With
+        `options`, `skus` is required: one SKU per combination sold, each naming one value of every option in
+        `option_values` (in option order); a combination at most once; at least one SKU active. A SKU left out of
+        `skus` is deleted when nothing points at it (no orders, stock movements, negotiated prices or promotions),
+        otherwise it is set inactive (BR-P05). An option or value left out is deleted. A SKU sent without `id` takes
+        the place of the product's SKU with the same code, else with the same combination, else it is created.
+      required: [name, category_id]
       properties:
+        options:
+          type: array
+          maxItems: 2
+          description: 'At most two options with up to 20 values each (D92); names distinct, values distinct within an option'
+          items: { $ref: '#/components/schemas/ProductOptionRequest' }
+        skus:
+          type: array
+          minItems: 1
+          maxItems: 400
+          items: { $ref: '#/components/schemas/SkuRequest' }
         name: { type: string, maxLength: 200 }
         category_id: { type: integer }
         description: { type: [string, 'null'], maxLength: 5000 }
@@ -5050,6 +5158,44 @@ components:
               maxItems: 10
               description: 'The units the SKU is sold in (D91), each unit_id once; at most one is_default (none = the first). A unit left out is archived; sending its unit_id again restores it.'
               items: { $ref: '#/components/schemas/SkuUnitRequest' }
+
+    ProductOptionRequest:
+      type: object
+      required: [name, values]
+      properties:
+        id: { type: [integer, 'null'], minimum: 1, description: 'An existing option of the product; omitted for a new one (matched by name then)' }
+        name: { type: string, maxLength: 50 }
+        values:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [value]
+            properties:
+              id: { type: [integer, 'null'], minimum: 1 }
+              value: { type: string, maxLength: 50 }
+              image_id: { type: [integer, 'null'], description: 'One of the product''s images, shown as the swatch' }
+
+    SkuRequest:
+      type: object
+      required: [code, base_unit_id, units]
+      properties:
+        id: { type: [integer, 'null'], minimum: 1, description: 'An existing SKU of the product' }
+        code: { type: string, maxLength: 60, pattern: '^[A-Za-z0-9][A-Za-z0-9._/-]*$' }
+        base_unit_id: { type: integer }
+        status: { $ref: '#/components/schemas/SkuStatus' }
+        option_values:
+          description: 'One value of every option, in option order (the value text); empty or left out without options'
+          type: array
+          maxItems: 2
+          items: { type: string, maxLength: 50 }
+        opening_stock: { type: integer, minimum: 0, maximum: 10000000, description: 'Base units; applied only to a SKU this call creates' }
+        units:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/SkuUnitRequest' }
 
     SkuUnitRequest:
       allOf:
@@ -5214,12 +5360,13 @@ components:
 
     InventoryRow:
       type: object
-      required: [sku_id, product_id, code, name, status, on_hand, reserved, available, min_allowed, moq, conversion_factor, low_stock]
+      required: [sku_id, product_id, code, name, variant, status, on_hand, reserved, available, min_allowed, moq, conversion_factor, low_stock]
       properties:
         sku_id: { type: integer }
         product_id: { type: integer }
         code: { type: string }
         name: { type: [string, 'null'] }
+        variant: { type: [string, 'null'], description: 'The variant label («أزرق / M»), null without options (BR-P14)' }
         status:
           oneOf:
             - $ref: '#/components/schemas/ProductStatus'

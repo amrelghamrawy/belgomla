@@ -18,7 +18,7 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | 11 | [Customer groups & customer pricing](11-customer-pricing.md) | Customers, Pricing, Catalog          | done    | see log |
 | 12 | [Promotional pricing](12-promotions.md)                | Pricing, Catalog                           | done    | see log |
 | 13 | [Multiple selling units per SKU](13-multi-unit-skus.md) | Catalog, Pricing, Inventory, Customers, Orders | done    | see log |
-| 14 | [Product variants](14-variants.md)                     | Catalog, Pricing, frontend                 | planned |        |
+| 14 | [Product variants](14-variants.md)                     | Catalog, Pricing, frontend                 | done    | see log |
 | 15 | [Bundles & full-grade sets](15-bundles.md)             | Catalog, Pricing, Inventory, Orders        | planned |        |
 | 16 | [Advanced reports](16-advanced-reports.md)             | Reports                                    | planned |        |
 | 17 | [V2 release](17-v2-release.md)                         | docs, seeders, deploy                      | planned |        |

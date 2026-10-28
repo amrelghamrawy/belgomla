@@ -12,6 +12,8 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\ProductImage;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
@@ -19,6 +21,7 @@ use App\Modules\Pricing\Data\ListedPrice;
 use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Services\PriceResolver;
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -43,6 +46,11 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * V2 Task 13 (D91): `sku.units` lists the units the SKU is sold in, the default first, each `{ id, unit, conversion_factor,
  * moq, prices…, is_default, in_stock }` priced on its own; the flat `unit`, `conversion_factor`, `moq` and prices of `sku`
  * are its default unit's, and `sku.in_stock` is true when any unit can be ordered.
+ *
+ * V2 Task 14 (BR-P14): `skus` lists the active SKUs (variants), each priced like `sku` with its `label` and
+ * `option_value_ids` (option order); `options` the variant options with only the values an active SKU uses (and the
+ * swatch `image_url`); `sku` is the first active SKU in stock, else the first active one (cards, lists, pre-order cap);
+ * `price_range { min, max }` spans the default units' prices over the active SKUs (left out when prices are hidden).
  *
  * @property-read Product $resource
  */
@@ -90,8 +98,8 @@ final class StoreProductResource extends JsonResource
             ];
 
             foreach ([$product, ...$related] as $shown) {
-                if ($shown->relationLoaded('sku') && $shown->sku instanceof Sku) {
-                    $ids[] = $shown->sku->id;
+                if ($shown->relationLoaded('activeSkus')) {
+                    array_push($ids, ...$shown->activeSkus->map(fn (Sku $sku): int => $sku->id)->all());
                 }
             }
         }
@@ -107,7 +115,7 @@ final class StoreProductResource extends JsonResource
         $product = $this->resource;
         $mainImage = $product->relationLoaded('mainImage') ? $product->mainImage : null;
         $category = $product->relationLoaded('category') ? $product->category : null;
-        $sku = $product->relationLoaded('sku') ? $product->sku : null;
+        $sku = $this->primary();
 
         return [
             'id' => $product->id,
@@ -119,6 +127,9 @@ final class StoreProductResource extends JsonResource
             'category' => $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null,
             'custom_fields' => $this->customFields(),
             'sku' => $sku instanceof Sku ? $this->sku($sku) : null,
+            'skus' => $this->skus()->map(fn (Sku $sku): array => $this->sku($sku))->values()->all(),
+            'options' => $this->options(),
+            'price_range' => $this->when(! $this->pricesHidden, fn (): ?array => $this->priceRange()),
             'preorder' => $this->preorder(),
             'prices_hidden' => $this->when($this->pricesHidden, true),
             'gallery' => $this->when($product->relationLoaded('images'), fn (): AnonymousResourceCollection => ProductImageResource::collection($product->images)),
@@ -151,7 +162,7 @@ final class StoreProductResource extends JsonResource
     /** D91: base units in one of the SKU's default unit, the unit the pre-order cap is in. */
     private function defaultFactor(): int
     {
-        $sku = $this->resource->relationLoaded('sku') ? $this->resource->sku : null;
+        $sku = $this->primary();
         $units = $sku instanceof Sku && $sku->relationLoaded('activeUnits') ? $sku->activeUnits : new Collection;
 
         return max(1, $units->firstWhere('is_default', true)->conversion_factor ?? 1);
@@ -216,7 +227,106 @@ final class StoreProductResource extends JsonResource
             'available' => $this->when(! $comingSoon, $available),
             'in_stock' => is_int($smallest) && $this->orderable($available, $smallest),
             'coming_soon' => $this->when($comingSoon, true),
+            'label' => $sku->name,
+            'option_value_ids' => $this->optionValueIds($sku),
         ];
+    }
+
+    /**
+     * @return Collection<int, Sku>
+     */
+    private function skus(): Collection
+    {
+        return $this->resource->relationLoaded('activeSkus') ? $this->resource->activeSkus : new Collection;
+    }
+
+    /** The SKU standing for the product: the first active one in stock, else the first active one. */
+    private function primary(): ?Sku
+    {
+        $skus = $this->skus();
+
+        return $skus->first(fn (Sku $sku): bool => $this->inStock($sku)) ?? $skus->first();
+    }
+
+    private function inStock(Sku $sku): bool
+    {
+        $smallest = $sku->relationLoaded('activeUnits') ? $sku->activeUnits->min('conversion_factor') : null;
+        $available = $sku->relationLoaded('inventory') ? $sku->inventory->available ?? 0 : 0;
+
+        return is_int($smallest) && $this->orderable($available, $smallest);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function optionValueIds(Sku $sku): array
+    {
+        if (! $sku->relationLoaded('optionValues') || ! $this->resource->relationLoaded('options')) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($this->resource->options as $option) {
+            $value = $sku->optionValues->firstWhere('product_option_id', $option->id);
+
+            if ($value instanceof ProductOptionValue) {
+                $ids[] = $value->id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * The options with the values some active SKU uses (BR-P14).
+     *
+     * @return list<array{id: int, name: string, values: list<array{id: int, value: string, image_url: string|null}>}>
+     */
+    private function options(): array
+    {
+        if (! $this->resource->relationLoaded('options')) {
+            return [];
+        }
+
+        $used = $this->skus()->flatMap(fn (Sku $sku): array => $this->optionValueIds($sku))->unique()->all();
+
+        return array_values($this->resource->options->map(fn (ProductOption $option): array => [
+            'id' => $option->id,
+            'name' => $option->name,
+            'values' => array_values($option->values
+                ->filter(fn (ProductOptionValue $value): bool => in_array($value->id, $used, true))
+                ->map(fn (ProductOptionValue $value): array => ['id' => $value->id, 'value' => $value->value, 'image_url' => $value->relationLoaded('image') ? $value->image?->url() : null])
+                ->all()),
+        ])->all());
+    }
+
+    /**
+     * The lowest and highest default-unit price over the active SKUs, at the shopper's prices.
+     *
+     * @return array{min: string, max: string}|null
+     */
+    private function priceRange(): ?array
+    {
+        $prices = [];
+
+        foreach ($this->skus() as $sku) {
+            $units = $sku->relationLoaded('activeUnits') ? $sku->activeUnits : new Collection;
+            $unit = $units->firstWhere('is_default', true) ?? $units->first();
+
+            if ($unit instanceof SkuUnit) {
+                $listed = $unit->relationLoaded('tiers') ? app(PriceResolver::class)->listed($unit, $this->pricing) : null;
+                $prices[] = $listed->basePrice ?? $unit->base_price;
+            }
+        }
+
+        if ($prices === []) {
+            return null;
+        }
+
+        usort($prices, Money::compare(...));
+
+        return ['min' => $prices[0], 'max' => $prices[count($prices) - 1]];
     }
 
     /**

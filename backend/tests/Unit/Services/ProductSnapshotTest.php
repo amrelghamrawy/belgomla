@@ -13,7 +13,7 @@ beforeEach(function (): void {
 test('BR-L the snapshot flattens product and sku fields for the audit diff', function (): void {
     $product = Product::factory()->withSku(['code' => 'PEN-1', 'base_price' => '9.5', 'moq' => 3])->create([
         'name' => 'قلم', 'description' => null, 'custom_fields' => ['brand' => 'Bic'],
-    ])->load('sku.defaultUnit');
+    ])->load('skus.defaultUnit');
 
     expect(app(ProductSnapshot::class)->of($product))->toBe([
         'name' => 'قلم',
@@ -25,9 +25,9 @@ test('BR-L the snapshot flattens product and sku fields for the audit diff', fun
         'expected_at' => null,
         'preorder_limit' => null,
         'sku.code' => 'PEN-1',
-        'sku.base_unit_id' => $product->sku?->base_unit_id,
+        'sku.base_unit_id' => $product->skus->first()?->base_unit_id,
         'sku.units' => [[
-            'unit_id' => $product->sku?->defaultUnit?->unit_id,
+            'unit_id' => $product->skus->first()?->defaultUnit?->unit_id,
             'conversion_factor' => 1,
             'is_default' => true,
             'cover_price' => null,
@@ -41,11 +41,11 @@ test('BR-L the snapshot flattens product and sku fields for the audit diff', fun
 
 test('BR-L D91 the snapshot lists every active unit with its tiers, and leaves pricing out when asked', function (): void {
     $product = Product::factory()->withSku()->create();
-    $sku = $product->sku()->sole();
+    $sku = $product->skus()->sole();
     App\Modules\Pricing\Models\SkuPriceTier::factory()->percent('20.00')->create(['sku_id' => $sku->id, 'min_quantity' => 10, 'unit_price' => '80.00']);
     $carton = $this->addUnit($sku);
     App\Modules\Catalog\Models\SkuUnit::factory()->archived()->create(['sku_id' => $sku->id]);
-    $product->load('sku.activeUnits.tiers');
+    $product->load('skus.activeUnits.tiers');
 
     $full = app(ProductSnapshot::class)->of($product);
     $withoutPricing = app(ProductSnapshot::class)->of($product, withPricing: false);
@@ -58,7 +58,20 @@ test('BR-L D91 the snapshot lists every active unit with its tiers, and leaves p
 });
 
 test('a product without a sku has no sku keys', function (): void {
-    $product = Product::factory()->create()->load('sku');
+    $product = Product::factory()->create()->load('skus');
 
     expect(app(ProductSnapshot::class)->of($product))->not->toHaveKey('sku.code');
+});
+
+test('BR-L BR-P14 a product with variants is snapshot as its options and skus', function (): void {
+    $product = $this->variantProduct(['أزرق', 'أسود'])->load(ProductSnapshot::RELATIONS);
+
+    $snapshot = app(ProductSnapshot::class)->of($product, withPricing: false);
+
+    expect($snapshot)->not->toHaveKey('sku.code')
+        ->and($snapshot['options'])->toBe([['name' => 'اللون', 'values' => ['أزرق', 'أسود']]])
+        ->and($snapshot['skus'])->toBe([
+            ['code' => 'PEN-1', 'label' => 'أزرق', 'status' => 'active', 'base_unit_id' => $product->skus[0]->base_unit_id, 'units' => [['unit_id' => $product->skus[0]->base_unit_id, 'conversion_factor' => 1, 'is_default' => true]]],
+            ['code' => 'PEN-2', 'label' => 'أسود', 'status' => 'active', 'base_unit_id' => $product->skus[0]->base_unit_id, 'units' => [['unit_id' => $product->skus[0]->base_unit_id, 'conversion_factor' => 1, 'is_default' => true]]],
+        ]);
 });

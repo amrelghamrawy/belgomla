@@ -17,7 +17,7 @@ test('to array', function (): void {
     $sku = $this->inTenant(fn () => Sku::factory()->create()->fresh());
 
     expect(array_keys($sku->toArray()))->toBe([
-        'id', 'tenant_id', 'product_id', 'code', 'name', 'base_unit_id', 'created_at', 'updated_at',
+        'id', 'tenant_id', 'product_id', 'code', 'name', 'base_unit_id', 'created_at', 'updated_at', 'status', 'sort_order',
     ]);
 });
 
@@ -68,4 +68,28 @@ test('BR-P03 the same sku code is allowed in another tenant', function (): void 
     $this->inTenant(fn () => Sku::factory()->create(['code' => 'PEN-001']), $this->otherTenant());
 
     expect(Sku::withoutTenantScope()->where('code', 'PEN-001')->count())->toBe(2);
+});
+
+test('BR-P14 a sku is active by default and its status is cast', function (): void {
+    $sku = Sku::factory()->create()->fresh();
+    $inactive = Sku::factory()->create(['status' => App\Modules\Catalog\Enums\SkuStatus::Inactive])->fresh();
+
+    expect($sku?->status)->toBe(App\Modules\Catalog\Enums\SkuStatus::Active)
+        ->and($sku?->isActive())->toBeTrue()
+        ->and($sku?->sort_order)->toBe(0)
+        ->and($inactive?->isActive())->toBeFalse();
+});
+
+test('BR-P14 the database refuses an unknown sku status', function (): void {
+    Illuminate\Support\Facades\DB::table('skus')->where('id', Sku::factory()->create()->id)->update(['status' => 'archived']);
+})->throws(Illuminate\Database\QueryException::class);
+
+test('BR-P14 a variant names one value of each option of its product', function (): void {
+    $product = $this->variantProduct(['أزرق', 'أسود'], ['S', 'M']);
+
+    $sku = Sku::query()->with('optionValues')->where('code', 'PEN-2')->sole();
+
+    expect($sku->optionValues->pluck('value')->sort()->values()->all())->toBe(['M', 'أزرق'])
+        ->and($sku->name)->toBe('أزرق / M')
+        ->and($sku->product_id)->toBe($product->id);
 });

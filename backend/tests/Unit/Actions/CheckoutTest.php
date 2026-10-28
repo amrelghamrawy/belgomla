@@ -6,6 +6,7 @@ use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\CustomerAddress;
@@ -406,4 +407,36 @@ test('D91 BR-U03 two units of one SKU that pass the stock only one by one are re
     })
         ->and(Order::query()->count())->toBe(0)
         ->and(($this->reserved)())->toBe(0);
+});
+
+test('BR-P14 BR-PR07 BR-INV03 an order of two colours snapshots each variant label and reserves each variant\'s stock', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    [$blue, $red] = Sku::query()->whereIn('code', ['PEN-1', 'PEN-2'])->orderBy('code')->get()->all();
+    $this->fillCart($this->customer, [$blue->id => 3, $red->id => 7]);
+
+    $order = ($this->checkout)();
+
+    expect(OrderItem::query()->where('order_id', $order->id)->orderBy('id')->get(['sku_id', 'product_name', 'sku_code', 'sku_name'])->toArray())->toBe([
+        ['sku_id' => $blue->id, 'product_name' => 'قلم جاف', 'sku_code' => 'PEN-1', 'sku_name' => 'أزرق'],
+        ['sku_id' => $red->id, 'product_name' => 'قلم جاف', 'sku_code' => 'PEN-2', 'sku_name' => 'أحمر'],
+    ])
+        ->and(SkuInventory::query()->whereIn('sku_id', [$blue->id, $red->id])->orderBy('sku_id')->pluck('reserved')->all())->toBe([3, 7])
+        ->and($order->order_total)->toBe('100.00');
+});
+
+test('BR-P14 a variant made inactive after it went into the cart rolls the checkout back', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    $red = Sku::query()->where('code', 'PEN-2')->sole();
+    $this->fillCart($this->customer, [$this->sku->id => 5, $red->id => 2]);
+    $red->update(['status' => 'inactive']);
+
+    expect(fn () => ($this->checkout)())->toThrow(function (CheckoutFailed $e) use ($red): void {
+        expect($e->errorCode)->toBe('checkout_failed')
+            ->and($e->items)->toBe([['sku_id' => $red->id, 'sku_unit_id' => $this->defaultUnitId($red), 'reason' => 'product_inactive']]);
+    });
+
+    expect(Order::query()->count())->toBe(0)
+        ->and(AuditLog::query()->where('action', 'order.created')->count())->toBe(0)
+        ->and(SkuInventory::query()->sum('reserved'))->toBe(0)
+        ->and(CartItem::query()->count())->toBe(2);
 });

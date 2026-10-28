@@ -25,7 +25,7 @@ function cartSku(App\Modules\Tenancy\Models\Tenant $tenant, ProductStatus $statu
             ->state(['name' => 'الأضواء علوم', 'status' => $status])
             ->withSku(['selling_unit_id' => $carton->id, 'conversion_factor' => 20, 'moq' => 5, 'base_price' => '90.00'], onHand: $onHand)
             ->create()
-            ->sku()
+            ->skus()
             ->sole();
         SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
 
@@ -58,6 +58,7 @@ test('BR-CU06 BR-PR04 adding a sku returns the cart with the price resolved for 
                 'sku_id' => $this->sku->id,
                 'sku_unit_id' => $this->defaultUnitId($this->sku),
                 'product_name' => 'الأضواء علوم',
+                'variant' => null,
                 'product_slug' => $this->sku->product->slug,
                 'unit' => 'كرتونة',
                 'conversion_factor' => 20,
@@ -276,6 +277,34 @@ test('D91 BR-T04 a SKU unit of another tenant is not found and nothing is writte
     $theirs = cartSku($this->otherTenant());
 
     $this->tenantJson('POST', '/api/store/cart/items', ['sku_unit_id' => $this->defaultUnitId($theirs), 'quantity' => 5])->assertNotFound();
+
+    $this->assertDatabaseCount('cart_items', 0);
+});
+
+test('BR-P14 two colours of one pen are two lines, each naming its variant', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر'], prices: ['أحمر' => '12.00']);
+    [$blue, $red] = $this->inTenant(fn (): array => Sku::query()->whereIn('code', ['PEN-1', 'PEN-2'])->orderBy('code')->get()->all());
+
+    addToCart($blue->id, 3)->assertOk();
+    addToCart($red->id, 2)
+        ->assertOk()
+        ->assertJsonCount(2, 'data.items')
+        ->assertJsonPath('data.items.*.sku_id', [$blue->id, $red->id])
+        ->assertJsonPath('data.items.*.product_name', ['قلم جاف', 'قلم جاف'])
+        ->assertJsonPath('data.items.*.variant', ['أزرق', 'أحمر'])
+        ->assertJsonPath('data.items.*.line_total', ['30.00', '24.00'])
+        ->assertJsonPath('data.items_total', '54.00');
+});
+
+test('BR-P14 an inactive variant is refused as product_inactive', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    $red = $this->inTenant(fn (): Sku => Sku::query()->where('code', 'PEN-2')->sole());
+    $this->inTenant(fn () => $red->update(['status' => 'inactive']));
+
+    addToCart($red->id, 3)
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'cart_line_invalid')
+        ->assertJsonPath('error.items.0', ['sku_id' => $red->id, 'sku_unit_id' => $this->defaultUnitId($red), 'reason' => 'product_inactive']);
 
     $this->assertDatabaseCount('cart_items', 0);
 });

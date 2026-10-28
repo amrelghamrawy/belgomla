@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     [$this->sku, $this->other] = $this->inTenant(fn (): array => [
-        Product::factory()->withSku()->create()->sku()->sole(),
-        Product::factory()->withSku()->create()->sku()->sole(),
+        Product::factory()->withSku()->create()->skus()->sole(),
+        Product::factory()->withSku()->create()->skus()->sole(),
     ]);
     $this->promotion = $this->inTenant(fn (): Promotion => Promotion::factory()->covering($this->sku)->create([
         'name' => 'عرض نوفمبر',

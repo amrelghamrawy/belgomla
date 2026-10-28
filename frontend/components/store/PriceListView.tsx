@@ -188,6 +188,11 @@ export function PriceListView() {
                     <Link href={`/p/${encodeURIComponent(row.slug)}`} className="hover:underline print:no-underline">
                       {row.name}
                     </Link>
+                    {row.variant && (
+                      <span className="text-muted-foreground block text-xs" data-testid="price-list-variant">
+                        {row.variant}
+                      </span>
+                    )}
                   </td>
                   <td className="p-2 whitespace-nowrap">
                     <bdi>{row.code}</bdi>

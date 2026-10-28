@@ -18,7 +18,7 @@ beforeEach(function (): void {
     $this->sku = $this->inTenant(function (): Sku {
         $carton = Unit::factory()->create(['name' => 'كرتونة']);
 
-        return Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '90', 'selling_unit_id' => $carton->id])->create(['name' => 'الأضواء علوم'])->sku()->sole();
+        return Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '90', 'selling_unit_id' => $carton->id])->create(['name' => 'الأضواء علوم'])->skus()->sole();
     });
     $this->url = fn (?Sku $sku = null): string => "/api/dashboard/customers/{$this->customer->id}/prices".($sku instanceof Sku ? "/{$this->defaultUnitId($sku)}" : '');
 });
@@ -86,7 +86,7 @@ test('BR-PR13 removing a price answers 204 and a missing one 404', function (): 
 test('BR-T04 another store\'s customer or sku is 404 and nothing changes there', function (string $method, string $which): void {
     $other = $this->otherTenant();
     $foreignCustomer = $this->makeCustomer(tenant: $other);
-    $foreignSku = $this->inTenant(fn (): Sku => Product::factory()->withSku()->create()->sku()->sole(), $other);
+    $foreignSku = $this->inTenant(fn (): Sku => Product::factory()->withSku()->create()->skus()->sole(), $other);
     $foreignPrice = $this->inTenant(fn () => CustomerSkuPrice::factory()->create(['customer_id' => $foreignCustomer->id, 'sku_id' => $foreignSku->id, 'unit_price' => '50.00']), $other);
     $uri = $which === 'customer'
         ? "/api/dashboard/customers/{$foreignCustomer->id}/prices/{$this->defaultUnitId($this->sku)}"

@@ -24,9 +24,10 @@ final class CatalogConflict extends ApiException
         return new self(409, 'duplicate_label', 'يوجد اختيار بنفس الاسم في هذا الحقل');
     }
 
-    public static function duplicateSkuCode(): self
+    /** `$field` names the variant whose code is taken (V2 Task 14, "skus.{i}.code"). */
+    public static function duplicateSkuCode(?string $field = null): self
     {
-        return new self(409, 'duplicate_code', 'كود الصنف مستخدم بالفعل');
+        return new self(409, 'duplicate_code', 'كود الصنف مستخدم بالفعل', $field === null ? null : [$field => ['كود الصنف مستخدم بالفعل']]);
     }
 
     public static function duplicateRelation(): self

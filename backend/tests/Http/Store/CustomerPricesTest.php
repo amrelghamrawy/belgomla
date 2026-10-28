@@ -18,12 +18,12 @@ use App\Modules\Pricing\Models\SkuPriceTier;
 beforeEach(function (): void {
     [$this->product, $this->group] = $this->inTenant(function (): array {
         $product = Product::factory()->withSku(['code' => 'BK-1', 'cover_price' => '125', 'base_price' => '100', 'moq' => 1], onHand: 1000)->create(['name' => 'كتاب']);
-        SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '90.00']);
-        SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 100, 'unit_price' => '80.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 10, 'unit_price' => '90.00']);
+        SkuPriceTier::factory()->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 100, 'unit_price' => '80.00']);
 
         return [$product->refresh(), CustomerGroup::factory()->create(['name' => 'موزع', 'discount_percent' => '15.00'])];
     });
-    $this->sku = $this->inTenant(fn (): Sku => $this->product->sku()->sole());
+    $this->sku = $this->inTenant(fn (): Sku => $this->product->skus()->sole());
     $this->distributor = $this->makeCustomer(['customer_group_id' => $this->group->id]);
     $this->negotiated = $this->makeCustomer();
     $this->inTenant(fn () => CustomerSkuPrice::factory()->create(['customer_id' => $this->negotiated->id, 'sku_id' => $this->sku->id, 'unit_price' => '95.00']));

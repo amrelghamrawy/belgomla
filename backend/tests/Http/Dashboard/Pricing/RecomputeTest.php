@@ -16,7 +16,7 @@ beforeEach(function (): void {
 test('BR-PR10 recompute applies the stored percentages to the new cover price, audited', function (): void {
     $product = $this->inTenant(function (): Product {
         $product = Product::factory()->withSku(['cover_price' => '140.00', 'base_price' => '90.00', 'base_price_percent' => '25.00'])->create();
-        SkuPriceTier::factory()->percent('30.00')->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '84.00']);
+        SkuPriceTier::factory()->percent('30.00')->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 10, 'unit_price' => '84.00']);
 
         return $product;
     });
@@ -35,7 +35,7 @@ test('BR-PR10 recompute applies the stored percentages to the new cover price, a
 
 test('D91 recompute answers every unit of the product, each off its own cover price', function (): void {
     $product = $this->inTenant(fn (): Product => Product::factory()->withSku(['cover_price' => '140.00', 'base_price' => '90.00', 'base_price_percent' => '25.00'])->create());
-    $carton = $this->addUnit($this->inTenant(fn () => $product->sku()->sole()), ['cover_price' => '1680.00', 'base_price' => '1000.00', 'base_price_percent' => '20.00']);
+    $carton = $this->addUnit($this->inTenant(fn () => $product->skus()->sole()), ['cover_price' => '1680.00', 'base_price' => '1000.00', 'base_price_percent' => '20.00']);
 
     $this->tenantJson('POST', "/api/dashboard/products/{$product->id}/pricing/recompute")
         ->assertOk()

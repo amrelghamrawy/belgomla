@@ -51,7 +51,7 @@ test('the preview writes nothing: no product, price, stock, movement or audit re
 
     expect([Product::query()->count(), Sku::query()->count(), SkuUnit::query()->count(), SkuPriceTier::query()->count(), InventoryMovement::query()->count(), AuditLog::query()->count()])->toBe($before)
         ->and(SkuUnit::query()->sole()->base_price)->toBe('90.00')
-        ->and(SkuInventory::query()->whereKey($product->sku?->id)->value('on_hand'))->toBe(400)
+        ->and(SkuInventory::query()->whereKey($product->skus->first()?->id)->value('on_hand'))->toBe(400)
         ->and($product->refresh()->status->value)->toBe('active');
 });
 
@@ -100,7 +100,7 @@ test('D91 consecutive rows of one code are one SKU in the counts', function (): 
 
 test('BR-INV08 an on hand below what open orders reserve is an error on the stock column', function (): void {
     $product = $this->importedProduct();
-    SkuInventory::query()->whereKey($product->sku?->id)->update(['reserved' => 100]);
+    SkuInventory::query()->whereKey($product->skus->first()?->id)->update(['reserved' => 100]);
 
     $preview = app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow(['on_hand' => '50'])]));
 
@@ -129,8 +129,8 @@ test('a file without rows is refused as a whole and not kept', function (): void
 });
 
 test('a file of another format version is refused as a whole', function (): void {
-    expect(fn () => app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow()], sheetName: 'products_v3')))
+    expect(fn () => app(PreviewCatalogImport::class)->handle(catalogUpload([$this->importRow()], sheetName: 'products_v4')))
         ->toThrow(function (InvalidImportFile $e): void {
-            expect($e->details)->toBe(['file' => ['إصدار الملف «products_v3» غير مدعوم، نزّل قالبًا جديدًا']]);
+            expect($e->details)->toBe(['file' => ['إصدار الملف «products_v4» غير مدعوم، نزّل قالبًا جديدًا']]);
         });
 });

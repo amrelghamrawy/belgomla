@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Modules\Catalog\Actions\CreateProduct;
+use App\Modules\Catalog\Data\ProductData;
+use App\Modules\Catalog\Data\ProductOptionData;
+use App\Modules\Catalog\Data\ProductOptionValueData;
+use App\Modules\Catalog\Data\SkuData;
+use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Category;
@@ -13,6 +19,7 @@ use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Catalog\Services\VariantGenerator;
 use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
@@ -22,12 +29,14 @@ use App\Modules\Orders\Actions\Checkout;
 use App\Modules\Orders\Actions\PlacePreorder;
 use App\Modules\Orders\Data\CheckoutData;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -165,9 +174,9 @@ abstract class TenantTestCase extends TestCase
                 'status' => $status,
                 'custom_fields' => ['publisher' => $basics['adwaa']->id],
             ]);
-            SkuPriceTier::factory()->create(['sku_id' => $product->sku()->sole()->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
+            SkuPriceTier::factory()->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
 
-            return $product->refresh()->load('sku.activeUnits.tiers');
+            return $product->refresh()->load('skus.activeUnits.tiers');
         });
     }
 
@@ -330,7 +339,7 @@ abstract class TenantTestCase extends TestCase
                     ...$attributes,
                 ], onHand: $onHand)
                 ->create()
-                ->sku()
+                ->skus()
                 ->sole();
             SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
 
@@ -351,6 +360,45 @@ abstract class TenantTestCase extends TestCase
             foreach ($lines as $skuId => $quantity) {
                 CartItem::query()->updateOrCreate(['cart_id' => $cart->id, 'sku_unit_id' => $this->defaultUnitId($skuId), 'kind' => CartLineKind::Order], ['sku_id' => $skuId, 'quantity' => $quantity]);
             }
+        });
+    }
+
+    /**
+     * BR-P14 (V2 Task 14): a pen with variants, made through CreateProduct: one option «اللون» (and «المقاس» when sizes are
+     * given), one SKU per combination coded `PEN-{n}` in combination order, each sold by the piece at its price (default
+     * 10.00) with its opening stock (default 50). `$prices` / `$stock` are keyed by the variant label («أزرق / M»).
+     *
+     * @param  list<string>  $colours
+     * @param  list<string>  $sizes
+     * @param  array<string, string>  $prices
+     * @param  array<string, int>  $stock
+     */
+    protected function variantProduct(array $colours = ['أزرق', 'أسود', 'أحمر'], array $sizes = [], array $prices = [], array $stock = [], string $name = 'قلم جاف', string $code = 'PEN', ?Tenant $tenant = null): Product
+    {
+        return $this->asTenant($tenant ?? $this->tenant, function () use ($colours, $sizes, $prices, $stock, $name, $code): Product {
+            $piece = Unit::query()->firstOrCreate(['name' => 'قطعة']);
+            $category = Category::factory()->kind(CategoryKind::Stationery)->create(['name' => 'أدوات']);
+            $options = [new ProductOptionData(null, 'اللون', array_map(fn (string $value): ProductOptionValueData => new ProductOptionValueData(null, $value), $colours))];
+
+            if ($sizes !== []) {
+                $options[] = new ProductOptionData(null, 'المقاس', array_map(fn (string $value): ProductOptionValueData => new ProductOptionValueData(null, $value), $sizes));
+            }
+
+            $skus = [];
+
+            foreach (app(VariantGenerator::class)->generate($code, $options) as $index => $draft) {
+                $label = (string) $draft['label'];
+                $skus[] = new SkuData(
+                    code: $code.'-'.($index + 1),
+                    baseUnitId: $piece->id,
+                    units: [new SkuUnitData(null, $piece->id, 1, true, new SkuPricingData($prices[$label] ?? '10.00'))],
+                    optionValues: $draft['option_values'],
+                    openingStock: $stock[$label] ?? 50,
+                    path: "skus.{$index}",
+                );
+            }
+
+            return app(CreateProduct::class)->handle(new ProductData(name: $name, categoryId: $category->id, skus: $skus !== [] ? $skus : throw new LogicException('A colour makes a variant.'), options: $options))->refresh();
         });
     }
 

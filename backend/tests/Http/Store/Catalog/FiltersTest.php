@@ -78,3 +78,28 @@ test('BR-T05 facets never count products of another tenant', function (): void {
 
     $this->tenantJson('GET', '/api/store/filters')->assertJsonPath('data.0.options.0.count', 2);
 });
+
+test('BR-P14 the variant options are facets after the fields, keyed by the folded option name', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود'], code: 'PEN');
+    $this->variantProduct(colours: ['أزرق'], name: 'قلم رصاص', code: 'PCL');
+
+    $this->tenantJson('GET', '/api/store/filters')
+        ->assertOk()
+        ->assertJsonPath('data.*.key', ['grade', 'publisher', 'o:اللون'])
+        ->assertJsonPath('data.2', ['key' => 'o:اللون', 'label' => 'اللون', 'type' => 'option', 'options' => [
+            ['id' => 'ازرق', 'label' => 'أزرق', 'count' => 2],
+            ['id' => 'اسود', 'label' => 'أسود', 'count' => 1],
+        ]]);
+});
+
+test('BR-P14 BR-P08 an option selection narrows the field facets but not its own', function (): void {
+    $this->variantProduct(colours: ['أزرق'], code: 'PEN');
+    $this->variantProduct(colours: ['أسود'], name: 'قلم رصاص', code: 'PCL');
+    $this->inTenant(fn () => Product::query()->where('name', 'قلم جاف')->update(['custom_fields' => ['grade' => $this->second->id]]));
+
+    $this->tenantJson('GET', '/api/store/filters?f[o:اللون]=ازرق')
+        ->assertOk()
+        ->assertJsonPath('data.*.key', ['grade', 'o:اللون'])
+        ->assertJsonPath('data.0.options', [['id' => $this->second->id, 'label' => 'ثانية إعدادي', 'count' => 1]])
+        ->assertJsonPath('data.1.options.*.count', [1, 1]);
+});

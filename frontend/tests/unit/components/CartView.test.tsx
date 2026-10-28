@@ -80,6 +80,30 @@ describe("CartView", () => {
     expect(screen.getAllByRole("link", { name: "الأضواء علوم أولى إعدادي" })).toHaveLength(2);
   });
 
+  it("BR-P14 shows two colours of one pen as two lines, each naming its variant", async () => {
+    stubCart(
+      cart({
+        items: [
+          cartItem({ sku_id: 11, sku_unit_id: 611, product_name: "قلم جاف", variant: "أزرق" }),
+          cartItem({ sku_id: 12, sku_unit_id: 612, product_name: "قلم جاف", variant: "أسود" }),
+        ],
+      }),
+    );
+    renderWithQuery(<CartView />);
+
+    expect(await screen.findByTestId("cart-variant-611")).toHaveTextContent("أزرق");
+    expect(screen.getByTestId("cart-variant-612")).toHaveTextContent("أسود");
+  });
+
+  it("shows no variant line for a product without options", async () => {
+    stubCart(cart());
+    renderWithQuery(<CartView />);
+
+    await screen.findByTestId("cart-unit-601");
+
+    expect(screen.queryByTestId("cart-variant-601")).not.toBeInTheDocument();
+  });
+
   it("BR-PR04 shows each line priced by the server and the total", async () => {
     stubCart(
       cart({

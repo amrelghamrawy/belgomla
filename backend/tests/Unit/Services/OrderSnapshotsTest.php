@@ -71,3 +71,13 @@ test('D88 a converted order takes the pre-order\'s delivery snapshot as it is', 
         'delivery_name' => 'فرع الدقي', 'delivery_phone' => '+201155555555', 'delivery_address' => $preorder->delivery_address,
     ]);
 });
+
+test('BR-P14 BR-PR07 the item snapshot of a variant names the variant label', function (): void {
+    $this->variantProduct(colours: ['أزرق'], sizes: ['M']);
+    $unit = app(App\Modules\Catalog\Queries\CartSkuQuery::class)->findDefault(App\Modules\Catalog\Models\Sku::query()->where('code', 'PEN-1')->sole()->id);
+    $price = new ResolvedPrice(unitPrice: '10.00', tierMinQuantity: null, discountPercent: null, coverPrice: null, lineTotal: '30.00');
+
+    $item = new OrderSnapshots()->item(new CheckoutLine($unit, 3, $price));
+
+    expect([$item['product_name'], $item['sku_code'], $item['sku_name']])->toBe(['قلم جاف', 'PEN-1', 'أزرق / M']);
+});

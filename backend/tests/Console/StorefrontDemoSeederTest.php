@@ -31,7 +31,7 @@ test('the demo catalog seeds books, supplies, toys, categories, stock and the st
     ]);
     $settings = TenantSetting::query()->whereKey($this->tenant->id)->sole();
 
-    expect($products)->toBe(44)
+    expect($products)->toBe(45)
         ->and($comingSoon)->toBe(1)
         ->and($categories)->toBe(11)
         ->and($stocked)->toBe(43)
@@ -88,7 +88,7 @@ test('the store lists the seeded books with the grade facet', function (): void 
     $response = $this->tenantJson('GET', '/api/store/filters')->assertOk();
 
     expect($response->json('data.0.key'))->toBe('grade')
-        ->and($this->tenantJson('GET', '/api/store/products?per_page=24')->json('meta.total'))->toBe(44);
+        ->and($this->tenantJson('GET', '/api/store/products?per_page=24')->json('meta.total'))->toBe(45);
 });
 
 test('a database with other test data still gets the demo catalog, reusing its units', function (): void {
@@ -96,7 +96,7 @@ test('a database with other test data still gets the demo catalog, reusing its u
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): array => [Product::query()->count(), Unit::query()->count()]))->toBe([44, 3]);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Unit::query()->count()]))->toBe([45, 3]);
 });
 
 test('seeding twice changes nothing', function (): void {
@@ -104,7 +104,7 @@ test('seeding twice changes nothing', function (): void {
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([44, 11, 11]);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([45, 11, 11]);
 });
 
 test('the books read like the publisher describes them, the revision edition as an exam review', function (): void {
@@ -134,4 +134,14 @@ test('D91 the A4 notebook sells by the piece and by the carton of 24, the piece 
         ['قطعة', 1, '45.00', '60.00', 6, true],
         ['كرتونة', 24, '972.00', '1440.00', 1, false],
     ]);
+});
+
+test('BR-P14 the demo catalog has a highlighter in three colours, each its own sku with its own stock', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $skus = $this->inTenant(fn () => Product::query()->where('name', 'قلم هايلايتر فابر كاستل')->sole()->skus()->with('inventory')->get());
+
+    expect($skus->pluck('code')->all())->toBe(['ST-007-1', 'ST-007-2', 'ST-007-3'])
+        ->and($skus->pluck('name')->all())->toBe(['أصفر', 'أخضر', 'وردي'])
+        ->and($skus->pluck('inventory.on_hand')->all())->toBe([600, 400, 200]);
 });

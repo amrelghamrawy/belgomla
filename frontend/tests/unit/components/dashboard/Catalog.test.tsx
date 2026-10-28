@@ -12,7 +12,7 @@ import { ProductForm } from "@/components/dashboard/catalog/ProductEditor";
 import { ProductsPage } from "@/components/dashboard/catalog/ProductsPage";
 import { UnitsPage } from "@/components/dashboard/catalog/UnitsPage";
 
-import { category, dashboardProduct, dashboardSku, selectField, unit } from "../../dashboard-fixtures";
+import { category, dashboardProduct, dashboardSku, selectField, unit, variantProduct } from "../../dashboard-fixtures";
 import { page } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderWithQuery, router, searchParams } from "../../render";
@@ -466,6 +466,210 @@ describe("ProductForm", () => {
 
     expect(await screen.findByText("العنصر المختار مؤرشف")).toBeVisible();
     expect(screen.getByRole("tab", { name: "التسعير" })).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+describe("ProductForm with options (V2 Task 14)", () => {
+  const units = [unit(), unit({ id: 2, name: "كرتونة" })];
+  const categories = [category()];
+
+  function renderForm(product = dashboardProduct()) {
+    return renderWithQuery(
+      <ProductForm product={product} definitions={[selectField()]} units={units} categories={categories} />,
+    );
+  }
+
+  const rows = () => screen.getAllByTestId(/^variant-\d$/);
+
+  async function addValue(user: ReturnType<typeof userEvent.setup>, option: string, value: string) {
+    await user.type(screen.getByLabelText(`قيمة جديدة لـ ${option}`), `${value}{Enter}`);
+  }
+
+  it("BR-P14 adding an option generates a variant per value and saves options + skus instead of sku", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/products/3": json(200, { data: dashboardProduct() }) });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(screen.getByTestId("sku-unit-0")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "إضافة خيار" }));
+    await user.type(screen.getByLabelText("اسم الخيار 1 *"), "اللون");
+    await addValue(user, "اللون", "أزرق");
+    await addValue(user, "اللون", "Navy blue");
+
+    expect(screen.queryByTestId("sku-unit-0")).toBeNull();
+    expect(within(screen.getByTestId("variant-0")).getByLabelText("الكود *")).toHaveValue("ADW-SCI-1-1");
+    expect(within(screen.getByTestId("variant-1")).getByLabelText("الكود *")).toHaveValue("ADW-SCI-1-NAVY-BLUE");
+    expect(screen.getByTestId("variant-1-price")).toHaveTextContent("كرتونة · 25.00%");
+
+    await user.selectOptions(within(screen.getByTestId("variant-1")).getByLabelText("الحالة"), "inactive");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/products/3")).toHaveLength(1));
+    const body = callsTo(fetchMock, "PUT /api/dashboard/products/3")[0]?.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty("sku");
+    expect(body.options).toEqual([
+      {
+        name: "اللون",
+        values: [
+          { value: "أزرق", image_id: null },
+          { value: "Navy blue", image_id: null },
+        ],
+      },
+    ]);
+    expect(body.skus).toEqual([
+      expect.objectContaining({ code: "ADW-SCI-1-1", base_unit_id: 1, status: "active", option_values: ["أزرق"] }),
+      expect.objectContaining({ code: "ADW-SCI-1-NAVY-BLUE", status: "inactive", option_values: ["Navy blue"] }),
+    ]);
+    const firstUnit = (body.skus as { units: object[] }[])[0]?.units[0];
+    expect(firstUnit).toMatchObject({ unit_id: 2, base_price_percent: "25.00", is_default: true });
+    expect(firstUnit).not.toHaveProperty("id");
+  });
+
+  it("a second option multiplies the rows, and removing a value drops its rows", async () => {
+    stubApi({});
+    const user = userEvent.setup();
+    renderForm(variantProduct());
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(rows()).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "إضافة خيار" }));
+    await user.type(screen.getByLabelText("اسم الخيار 2 *"), "المقاس");
+    await addValue(user, "المقاس", "S");
+    await addValue(user, "المقاس", "M");
+
+    expect(rows().map((row) => row.getAttribute("aria-label"))).toEqual([
+      "أزرق / S",
+      "أزرق / M",
+      "أسود / S",
+      "أسود / M",
+    ]);
+    expect(within(screen.getByTestId("variant-3")).getByLabelText("الكود *")).toHaveValue("PEN-01-2-M");
+
+    await user.click(screen.getByRole("button", { name: "حذف أسود" }));
+    expect(rows()).toHaveLength(2);
+    // A combination this save creates takes an opening stock.
+    expect(within(screen.getByTestId("variant-0")).getByLabelText("الرصيد الافتتاحي (اختياري)")).toBeInTheDocument();
+  });
+
+  it("refuses a repeated value as it is typed", async () => {
+    stubApi({});
+    const user = userEvent.setup();
+    renderForm(variantProduct());
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    await addValue(user, "اللون", "أزرق");
+
+    expect(screen.getByText("هذه القيمة موجودة بالفعل")).toBeInTheDocument();
+    expect(rows()).toHaveLength(2);
+  });
+
+  it("«تطبيق على الكل» copies the first variant's units and prices to every variant", async () => {
+    const product = variantProduct();
+    const black = {
+      ...product.skus[1]!,
+      ...dashboardSku({ id: 22, code: "PEN-01-2", base_price: "50.00", base_price_percent: null, tiers: [] }),
+    };
+    const fetchMock = stubApi({ "PUT /api/dashboard/products/4": json(200, { data: product }) });
+    const user = userEvent.setup();
+    renderForm({ ...product, skus: [product.skus[0]!, black] });
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(screen.getByTestId("variant-1-price")).toHaveTextContent("كرتونة · 50.00 ج.م");
+    await user.click(screen.getByRole("button", { name: "تطبيق على الكل" }));
+    expect(screen.getByTestId("variant-1-price")).toHaveTextContent("كرتونة · 25.00%");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/products/4")).toHaveLength(1));
+    const body = callsTo(fetchMock, "PUT /api/dashboard/products/4")[0]?.body as { skus: { units: object[] }[] };
+    expect(body.skus[1]?.units).toEqual([
+      expect.objectContaining({ id: 22, unit_id: 2, base_price: null, base_price_percent: "25.00" }),
+    ]);
+  });
+
+  it("opens a variant's units editor and checks its prices before calling the API", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderForm(variantProduct());
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    await user.click(within(screen.getByTestId("variant-0")).getByRole("button", { name: "الوحدات والأسعار" }));
+    const unitCard = within(screen.getByTestId("variant-0-unit-0"));
+    await user.clear(unitCard.getByLabelText("سعر الجملة *"));
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("راجع وحدات وأسعار هذا المتغير")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "التسعير" })).toHaveAttribute("aria-selected", "true");
+    expect(callsTo(fetchMock, "PUT /api/dashboard/products/4")).toHaveLength(0);
+  });
+
+  it("needs one active variant", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderForm(variantProduct());
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    await user.selectOptions(within(screen.getByTestId("variant-0")).getByLabelText("الحالة"), "inactive");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("اجعل متغيرًا واحدًا على الأقل نشطًا")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "PUT /api/dashboard/products/4")).toHaveLength(0);
+  });
+
+  it("shows the backend's skus.* and options.* errors on the variant and the option", async () => {
+    stubApi({
+      "PUT /api/dashboard/products/4": envelopeError(422, "validation_failed", "بعض البيانات غير صحيحة", {
+        "skus.1.code": ["الكود مستخدم بالفعل"],
+        "options.0.values.1.value": ["القيمة طويلة"],
+      }),
+    });
+    const user = userEvent.setup();
+    renderForm(variantProduct());
+
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    expect(await screen.findByText("الكود مستخدم بالفعل")).toBeVisible();
+    expect(within(screen.getByTestId("variant-1")).getByText("الكود مستخدم بالفعل")).toBeInTheDocument();
+    expect(within(screen.getByTestId("product-option-0")).getByText("القيمة طويلة")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "التسعير" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("offers the product's images as a value's swatch", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/products/4": json(200, { data: variantProduct() }) });
+    const user = userEvent.setup();
+    renderForm(variantProduct());
+
+    await user.click(screen.getByRole("tab", { name: "التسعير" }));
+    expect(screen.getByLabelText("صورة أسود")).toHaveValue("7");
+    await user.selectOptions(screen.getByLabelText("صورة أزرق"), "7");
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/products/4")).toHaveLength(1));
+    expect(callsTo(fetchMock, "PUT /api/dashboard/products/4")[0]?.body).toMatchObject({
+      options: [
+        {
+          id: 31,
+          values: [
+            { id: 41, image_id: 7 },
+            { id: 42, image_id: 7 },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("keeps the V1 sku body for a product without options", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/products/3": json(200, { data: dashboardProduct() }) });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
+
+    await waitFor(() => expect(callsTo(fetchMock, "PUT /api/dashboard/products/3")).toHaveLength(1));
+    const body = callsTo(fetchMock, "PUT /api/dashboard/products/3")[0]?.body;
+    expect(body).toHaveProperty("sku");
+    expect(body).not.toHaveProperty("options");
+    expect(body).not.toHaveProperty("skus");
   });
 });
 

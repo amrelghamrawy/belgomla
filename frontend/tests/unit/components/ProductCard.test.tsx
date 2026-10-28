@@ -10,6 +10,7 @@ import {
   comingSoonSku,
   customer,
   hiddenPriceSku,
+  penProduct,
   storeProduct,
   storeSku,
   storeSkuUnit,
@@ -365,5 +366,34 @@ describe("the offer on the card (BR-PR15)", () => {
     renderWithQuery(<ProductCard product={storeProduct()} />);
 
     expect(screen.queryByTestId("offer-badge")).toBeNull();
+  });
+});
+
+describe("ProductCard with variants (V2 Task 14)", () => {
+  it("BR-P14 shows the price range and links to the product page to choose a variant", () => {
+    stubApi(signedIn());
+    renderWithQuery(<ProductCard product={penProduct()} />);
+
+    expect(screen.getByTestId("price-range")).toHaveTextContent("من 10.00 ج.م إلى 12.00 ج.م");
+    expect(screen.getByRole("link", { name: "اختر مواصفات «قلم جاف»" })).toHaveAttribute("href", "/p/pen");
+    expect(screen.queryByRole("button", { name: /أضف/ })).toBeNull();
+  });
+
+  it("shows the one price when every variant costs the same", () => {
+    stubApi(guest);
+    renderWithQuery(<ProductCard product={penProduct({ price_range: { min: "10.00", max: "10.00" } })} />);
+
+    expect(screen.queryByTestId("price-range")).toBeNull();
+    expect(screen.getByText("10.00 ج.م")).toBeInTheDocument();
+  });
+
+  it("keeps quick add for a product with one SKU and hides the range when prices are hidden", () => {
+    stubApi(guest);
+    renderWithQuery(
+      <ProductCard product={penProduct({ prices_hidden: true, sku: hiddenPriceSku(), skus: [hiddenPriceSku()] })} />,
+    );
+
+    expect(screen.queryByTestId("price-range")).toBeNull();
+    expect(screen.getByRole("link", { name: "سجل الدخول لرؤية الأسعار" })).toBeInTheDocument();
   });
 });

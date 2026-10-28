@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, type FieldErrors, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,6 +35,8 @@ import {
   productSchema,
   serverFields,
   serverTierProblems,
+  serverVariantTierProblems,
+  type UnitFormValues,
 } from "@/lib/dashboard/product-form";
 import { useRecomputePricing } from "@/lib/dashboard/pricing";
 
@@ -45,11 +47,26 @@ import { CustomFieldInputs } from "./CustomFieldInputs";
 import { ProductImages } from "./ProductImages";
 import { ProductRelations } from "./ProductRelations";
 import { PreorderPanel } from "./PreorderPanel";
+import { ProductOptionsEditor } from "./ProductOptionsEditor";
 import { SkuUnitsEditor } from "./SkuUnitsEditor";
+import { VariantsEditor } from "./VariantsEditor";
 
 const copy = ar.dashboard.productForm;
 const STATUSES: ProductStatus[] = ["active", "coming_soon", "inactive"];
 type Tab = "basics" | "fields" | "pricing" | "images" | "relations";
+
+/** The tab holding the first invalid field: the SKU's units, the options and the variants are on «التسعير». */
+function tabOf(errors: FieldErrors<ProductFormValues>): Tab {
+  const basics = ["name", "category_id", "code", "base_unit_id", "opening_stock", "expected_at", "preorder_limit"];
+
+  if (basics.some((name) => name in errors)) {
+    return "basics";
+  }
+
+  return errors.units !== undefined || errors.options !== undefined || errors.variants !== undefined
+    ? "pricing"
+    : "basics";
+}
 
 /** Loads what the form needs (the product on edit, fields, units, categories) and renders it. */
 export function ProductEditor({ productId }: { productId?: number }) {
@@ -99,6 +116,12 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   const [tierErrors, setTierErrors] = useState<Record<number, Record<number, string>>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [serverTiers, setServerTiers] = useState<Record<number, string[]>>({});
+  // V2 Task 14: the same per variant, and which variant rows show their units and prices.
+  const [variantTierErrors, setVariantTierErrors] = useState<Record<number, Record<number, Record<number, string>>>>(
+    {},
+  );
+  const [variantServerTiers, setVariantServerTiers] = useState<Record<number, Record<number, string[]>>>({});
+  const [openVariants, setOpenVariants] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -106,26 +129,28 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   });
   const errors = form.formState.errors;
   const categoryId = useWatch({ control: form.control, name: "category_id" });
+  const hasOptions = useWatch({ control: form.control, name: "options" }).length > 0;
   // The chosen category's section (D68): names the reference price and picks the custom fields (D69).
   const kind = kindOfCategory(categories, categoryId === "" ? null : Number(categoryId));
   const referenceLabel = ar.product.referencePrice(kind);
   const tierMessages = { ...copy.tierErrors, percentNeedsCover: copy.tierErrors.percentNeedsCover(referenceLabel) };
+  const storedSkus = product === null ? [] : product.skus.length > 0 ? product.skus : product.sku ? [product.sku] : [];
   const activeUnits = units.filter(
     (unit) =>
       unit.status === "active" ||
-      unit.id === product?.sku?.base_unit?.id ||
-      (product?.sku?.units ?? []).some((sold) => sold.unit?.id === unit.id),
+      storedSkus.some(
+        (sku) => sku.base_unit?.id === unit.id || (sku.units ?? []).some((sold) => sold.unit?.id === unit.id),
+      ),
   );
   const activeCategories = activeOnly(categories);
 
-  const onInvalid = () => setTab("basics");
+  const onInvalid = (invalid: FieldErrors<ProductFormValues>) => setTab(tabOf(invalid));
 
-  const submit = form.handleSubmit((valid) => {
-    setError(null);
-    setServerTiers({});
+  /** The client tier problems of one SKU's units, by unit index. */
+  const unitTierProblems = (skuUnits: readonly UnitFormValues[]) => {
     const tiers: Record<number, Record<number, string>> = {};
 
-    valid.units.forEach((unit, index) => {
+    skuUnits.forEach((unit, index) => {
       const cover = unit.cover_price.trim() === "" ? null : unit.cover_price.trim();
       const basePrice =
         unit.base_mode === "percent"
@@ -139,11 +164,34 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
         tiers[index] = problems;
       }
     });
+
+    return tiers;
+  };
+
+  const submit = form.handleSubmit((valid) => {
+    setError(null);
+    setServerTiers({});
+    setVariantServerTiers({});
+    const withOptions = valid.options.length > 0;
+    const tiers = withOptions ? {} : unitTierProblems(valid.units);
+    const variantTiers: Record<number, Record<number, Record<number, string>>> = {};
+
+    if (withOptions) {
+      valid.variants.forEach((variant, index) => {
+        const problems = unitTierProblems(variant.units);
+
+        if (Object.keys(problems).length > 0) {
+          variantTiers[index] = problems;
+        }
+      });
+    }
+
     const custom = customFieldProblems(definitions, valid.custom, kind, {
       required: copy.required,
       number: copy.invalidInteger,
     });
     setTierErrors(tiers);
+    setVariantTierErrors(variantTiers);
     setFieldErrors(custom);
 
     if (Object.keys(custom).length > 0) {
@@ -151,7 +199,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
       return;
     }
 
-    if (Object.keys(tiers).length > 0) {
+    if (Object.keys(tiers).length > 0 || Object.keys(variantTiers).length > 0) {
       setTab("pricing");
       return;
     }
@@ -171,14 +219,25 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   }, onInvalid);
 
   const showServerErrors = (failure: unknown) => {
+    const values = form.getValues();
+    const fieldKeys = serverFields(
+      values.units.length,
+      values.options.length === 0 ? [] : values.variants.map((variant) => variant.units.length),
+      values.options.map((option) => option.values.length),
+    );
+
     if (isApiError(failure, "invalid_tiers")) {
-      setServerTiers(serverTierProblems(failure.details, failure.message));
+      if (values.options.length > 0) {
+        setVariantServerTiers(serverVariantTierProblems(failure.details, failure.message));
+      } else {
+        setServerTiers(serverTierProblems(failure.details, failure.message));
+      }
       setTab("pricing");
       return;
     }
 
     if (isApiError(failure, "cover_price_required")) {
-      for (const [field, key] of serverFields(form.getValues("units").length)) {
+      for (const [field, key] of fieldKeys) {
         if (failure.details?.[key] !== undefined) {
           form.setError(field, { type: "server", message: failure.message });
           setTab("pricing");
@@ -191,13 +250,13 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
       let mapped = false;
       let pricing = false;
 
-      for (const [field, key] of serverFields(form.getValues("units").length)) {
+      for (const [field, key] of fieldKeys) {
         const message = failure.fieldMessage(key);
 
         if (message !== null) {
           form.setError(field, { type: "server", message });
           mapped = true;
-          pricing ||= field.startsWith("units");
+          pricing ||= ["units", "options", "variants"].some((prefix) => field.startsWith(prefix));
         }
       }
 
@@ -348,7 +407,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
             )}
             {text("code", copy.code, "required", true)}
             {unitSelect("base_unit_id", copy.baseUnit)}
-            {creating && text("opening_stock", copy.openingStock, "optional", true)}
+            {creating && !hasOptions && text("opening_stock", copy.openingStock, "optional", true)}
           </div>
           <fieldset className="mt-6 grid gap-4 rounded-xl border p-4 md:grid-cols-3" data-testid="preorder-settings">
             <legend className="px-1 font-bold">{copy.preorder.title}</legend>
@@ -415,13 +474,34 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
 
         <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
           <div className="flex flex-col gap-4 pt-4">
-            <SkuUnitsEditor
+            <ProductOptionsEditor
               form={form}
-              units={activeUnits}
-              referenceLabel={referenceLabel}
-              tierErrors={tierErrors}
-              serverTierProblems={serverTiers}
+              images={product?.images ?? []}
+              onCombinationsChange={() => {
+                setOpenVariants([]);
+                setVariantTierErrors({});
+                setVariantServerTiers({});
+              }}
             />
+            {hasOptions ? (
+              <VariantsEditor
+                form={form}
+                units={activeUnits}
+                referenceLabel={referenceLabel}
+                tierErrors={variantTierErrors}
+                serverTierProblems={variantServerTiers}
+                open={openVariants}
+                onOpenChange={setOpenVariants}
+              />
+            ) : (
+              <SkuUnitsEditor
+                form={form}
+                units={activeUnits}
+                referenceLabel={referenceLabel}
+                tierErrors={tierErrors}
+                serverTierProblems={serverTiers}
+              />
+            )}
             {!creating && <RecomputeButton productId={product.id} />}
           </div>
         </TabsContent>

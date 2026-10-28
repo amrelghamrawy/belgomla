@@ -7,6 +7,8 @@ namespace App\Modules\Catalog\Http\Resources;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductImage;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
@@ -17,7 +19,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Dashboard view of a product with its SKU (08-api-contract.md §6). The detail endpoint also loads
+ * Dashboard view of a product with its SKUs (08-api-contract.md §6). `skus` lists every SKU, active and inactive, in the
+ * merchant's order, each with its variant `label`, `status`, `sort_order` and `option_values` (texts in option order, as
+ * the form sends them; BR-P14, V2 Task 14); `options` the variant options with their values and swatches; `sku` is the
+ * first active SKU (else the first), standing for the product in lists. The detail endpoint also loads
  * `images` and `relations`; the list leaves them out. `custom_fields` is the raw stored map
  * (select values are option ids) because the dashboard form edits it. `sku.units` lists the active units the SKU is
  * sold in, the default first (V2 Task 13, D91), each with its tiers (with the % each was entered as) when they are
@@ -46,7 +51,9 @@ final class DashboardProductResource extends JsonResource
             'category' => $this->category(),
             'custom_fields' => (object) $product->custom_fields,
             'preorder' => ['enabled' => $product->preorder_enabled, 'expected_at' => $product->expected_at?->toDateString(), 'limit' => $product->preorder_limit],
-            'sku' => $this->sku(),
+            'sku' => $this->primary(),
+            'skus' => $this->whenLoaded('skus', fn (): array => $product->skus->map(fn (Sku $sku): array => $this->sku($sku))->values()->all(), []),
+            'options' => $this->whenLoaded('options', fn (): array => $product->options->map($this->option(...))->values()->all(), []),
             'main_image_url' => $this->mainImage()?->url(),
             'images' => $this->whenLoaded('images', fn () => ProductImageResource::collection($product->images)),
             'relations' => $this->when(
@@ -76,13 +83,62 @@ final class DashboardProductResource extends JsonResource
     /**
      * @return array<string, mixed>|null
      */
-    private function sku(): ?array
+    private function primary(): ?array
     {
-        $sku = $this->resource->relationLoaded('sku') ? $this->resource->sku : null;
+        $skus = $this->resource->relationLoaded('skus') ? $this->resource->skus : null;
+        $sku = $skus?->first(fn (Sku $sku): bool => $sku->isActive()) ?? $skus?->first();
 
-        if (! $sku instanceof Sku) {
-            return null;
+        return $sku instanceof Sku ? $this->sku($sku) : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function option(ProductOption $option): array
+    {
+        return [
+            'id' => $option->id,
+            'name' => $option->name,
+            'sort_order' => $option->sort_order,
+            'values' => $option->values->map(fn (ProductOptionValue $value): array => [
+                'id' => $value->id,
+                'value' => $value->value,
+                'sort_order' => $value->sort_order,
+                'image_id' => $value->image_id,
+                'image_url' => $value->relationLoaded('image') ? $value->image?->url() : null,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * The SKU's option values in the product's option order (BR-P14).
+     *
+     * @return list<string>
+     */
+    private function optionValues(Sku $sku): array
+    {
+        if (! $sku->relationLoaded('optionValues') || ! $this->resource->relationLoaded('options')) {
+            return [];
         }
+
+        $values = [];
+
+        foreach ($this->resource->options as $option) {
+            $value = $sku->optionValues->firstWhere('product_option_id', $option->id);
+
+            if ($value instanceof ProductOptionValue) {
+                $values[] = $value->value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sku(Sku $sku): array
+    {
 
         $units = $sku->relationLoaded('activeUnits') ? $sku->activeUnits : null;
         $default = $units?->firstWhere('is_default', true);
@@ -103,6 +159,10 @@ final class DashboardProductResource extends JsonResource
                 'reserved' => $sku->inventory->reserved ?? 0,
                 'available' => $sku->inventory->available ?? 0,
             ]),
+            'label' => $sku->name,
+            'status' => $sku->status->value,
+            'sort_order' => $sku->sort_order,
+            'option_values' => $this->optionValues($sku),
         ];
     }
 

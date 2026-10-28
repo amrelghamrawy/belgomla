@@ -10,8 +10,8 @@ use Illuminate\Support\LazyCollection;
 
 /**
  * The catalog export selection (V2 Task 06): the dashboard filter (every status), oldest product first, read lazily
- * in chunks of `CHUNK` with the SKU's units, tiers and stock row eager-loaded, so a catalog of any size streams in
- * flat memory. Custom field values are on the product; their labels come from CatalogRowMapper's lookups.
+ * in chunks of `CHUNK` with its options and every SKU's (variant's, BR-P14) units, tiers, stock row and option values
+ * eager-loaded, so a catalog of any size streams in flat memory. Custom field values are on the product; their labels come from CatalogRowMapper's lookups.
  */
 final readonly class CatalogExportQuery
 {
@@ -25,7 +25,7 @@ final readonly class CatalogExportQuery
     public function get(ProductFilterData $filter): LazyCollection
     {
         return $this->filtered->builder($filter)
-            ->with(['sku.activeUnits.unit', 'sku.activeUnits.tiers', 'sku.baseUnit', 'sku.inventory'])
+            ->with(['options', 'skus.activeUnits.unit', 'skus.activeUnits.tiers', 'skus.baseUnit', 'skus.inventory', 'skus.optionValues'])
             ->lazyById(self::CHUNK, 'products.id', 'id');
     }
 

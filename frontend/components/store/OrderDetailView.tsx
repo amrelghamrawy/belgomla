@@ -26,7 +26,7 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
-import { changedLineIds, liveItems } from "@/lib/store/order-lines";
+import { changedLineIds, liveItems, variantOf } from "@/lib/store/order-lines";
 import { useCancelOrder, useOrder } from "@/lib/store/orders";
 import { useRouteParam } from "@/lib/store/route";
 
@@ -170,6 +170,11 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
                     )
                   )}
                 </span>
+                {variantOf(item) !== null && (
+                  <span className="text-muted-foreground text-xs" data-testid={`variant-${item.id}`}>
+                    {variantOf(item)}
+                  </span>
+                )}
                 {item.converted_quantity > 0 && (
                   <span className="text-primary text-xs" data-testid={`converted-${item.id}`}>
                     {ar.orders.convertedOf(item.converted_quantity, item.quantity, item.unit)}

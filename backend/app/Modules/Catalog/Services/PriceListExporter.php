@@ -73,7 +73,7 @@ final readonly class PriceListExporter
         $rows = $this->query->get($filter)
             ->chunk(PriceListExportQuery::CHUNK)
             ->flatMap(function (LazyCollection $chunk) use ($customer): array {
-                $pricing = $this->pricing->for($customer, array_values($chunk->map(fn (Product $product): ?int => $product->sku?->id)->filter()->all()));
+                $pricing = $this->pricing->for($customer, array_values($chunk->flatMap(fn (Product $product): array => $product->activeSkus->map(fn (Sku $sku): int => $sku->id)->all())->all()));
 
                 return $chunk->flatMap(fn (Product $product): array => $this->rows($product, $pricing))->values()->all();
             });
@@ -82,23 +82,31 @@ final readonly class PriceListExporter
     }
 
     /**
-     * One row per unit the product is sold in, the default first (D91).
+     * One row per unit of every active SKU (BR-P14), each SKU's default unit first (D91); a variant's name carries its label.
      *
      * @return list<array<string, string|int|float|null>>
      */
     private function rows(Product $product, ?PricingContext $pricing): array
     {
-        $units = $product->sku instanceof Sku ? $product->sku->activeUnits->all() : [];
+        $rows = [];
 
-        return array_values(array_map(fn (?SkuUnit $unit): array => [
-            'name' => $product->name,
-            'section' => $product->category->kind->label(),
-            'code' => $product->sku?->code,
-            'unit' => $unit?->unit->name,
-            'moq' => $unit?->moq,
-            'cover_price' => $unit?->cover_price === null ? null : (float) $unit->cover_price,
-            'base_price' => $unit instanceof SkuUnit ? (float) $this->resolver->listed($unit, $pricing)->basePrice : null,
-            'availability' => $product->status === ProductStatus::ComingSoon ? 'قريبًا' : 'متاح',
-        ], $units === [] ? [null] : $units));
+        foreach ($product->activeSkus->isEmpty() ? [null] : $product->activeSkus->all() as $sku) {
+            $units = $sku instanceof Sku ? $sku->activeUnits->all() : [];
+
+            foreach ($units === [] ? [null] : $units as $unit) {
+                $rows[] = [
+                    'name' => $sku?->name === null ? $product->name : "{$product->name} ({$sku->name})",
+                    'section' => $product->category->kind->label(),
+                    'code' => $sku?->code,
+                    'unit' => $unit?->unit->name,
+                    'moq' => $unit?->moq,
+                    'cover_price' => $unit?->cover_price === null ? null : (float) $unit->cover_price,
+                    'base_price' => $unit instanceof SkuUnit ? (float) $this->resolver->listed($unit, $pricing)->basePrice : null,
+                    'availability' => $product->status === ProductStatus::ComingSoon ? 'قريبًا' : 'متاح',
+                ];
+            }
+        }
+
+        return $rows;
     }
 }

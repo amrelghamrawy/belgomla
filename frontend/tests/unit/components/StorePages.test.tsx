@@ -161,6 +161,18 @@ describe("PriceListView", () => {
     expect(callsTo(fetchMock, "GET /api/store/price-list")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
   });
 
+  it("BR-P14 shows a variant row's label under the product name", async () => {
+    stubList({}, [
+      { ...rows[0], sku_id: 81, variant: "أزرق / M" },
+      { ...rows[1], variant: null },
+    ]);
+    renderWithQuery(<PriceListView />);
+
+    const table = await screen.findByTestId("price-list");
+    expect(within(table).getAllByTestId("price-list-variant")).toHaveLength(1);
+    expect(table).toHaveTextContent("الأضواء علومأزرق / MBK-001");
+  });
+
   it("BR-PR15 marks the rows a promotion priced with the offer badge", async () => {
     stubList({}, [
       {

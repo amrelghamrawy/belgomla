@@ -77,6 +77,7 @@ final readonly class CartPricer
                 moq: $unit->moq,
                 available: $preorder ? 0 : $sku->inventory->available ?? 0,
                 expectedAt: $preorder ? $sku->product->expected_at?->toDateString() : null,
+                variant: $sku->name,
             );
         }
 

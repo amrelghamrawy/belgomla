@@ -15,9 +15,9 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-27 10:00:00'));
     $this->me = $this->actingAsOwner();
     [$this->first, $this->second, $this->outside] = $this->inTenant(fn (): array => [
-        Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '100.00'])->create(['name' => 'الأضواء علوم'])->sku()->sole(),
-        Product::factory()->withSku(['code' => 'ADW-2', 'base_price' => '50.00'])->create(['name' => 'الأضواء رياضيات'])->sku()->sole(),
-        Product::factory()->withSku(['code' => 'MOA-1'])->create(['name' => 'المعلم عربي'])->sku()->sole(),
+        Product::factory()->withSku(['code' => 'ADW-1', 'base_price' => '100.00'])->create(['name' => 'الأضواء علوم'])->skus()->sole(),
+        Product::factory()->withSku(['code' => 'ADW-2', 'base_price' => '50.00'])->create(['name' => 'الأضواء رياضيات'])->skus()->sole(),
+        Product::factory()->withSku(['code' => 'MOA-1'])->create(['name' => 'المعلم عربي'])->skus()->sole(),
     ]);
     $this->body = fn (array $changes = []): array => [
         'name' => 'عرض الأضواء',
@@ -80,7 +80,7 @@ test('BR-PR15 promotion validation', function (array $changes, string $field): v
 ]);
 
 test('BR-T04 a sku of another store is refused like an unknown one', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->sku()->sole(), $this->otherTenant());
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->skus()->sole(), $this->otherTenant());
 
     $this->tenantJson('POST', '/api/dashboard/promotions', ($this->body)(['filter' => null, 'sku_ids' => [$foreign->id]]))
         ->assertUnprocessable()

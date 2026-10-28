@@ -30,8 +30,16 @@ final readonly class SkuPricingQuery
      */
     public function forProduct(Product $product): Collection
     {
-        $sku = $product->sku()->with(['activeUnits.tiers', 'activeUnits.unit'])->firstOrFail()->setRelation('product', $product);
+        $units = new Collection;
 
-        return $sku->activeUnits->each(fn (SkuUnit $unit): SkuUnit => $unit->setRelation('sku', $sku));
+        foreach ($product->skus()->with(['activeUnits.tiers', 'activeUnits.unit'])->get() as $sku) {
+            $sku->setRelation('product', $product);
+
+            foreach ($sku->activeUnits as $unit) {
+                $units->push($unit->setRelation('sku', $sku));
+            }
+        }
+
+        return $units;
     }
 }

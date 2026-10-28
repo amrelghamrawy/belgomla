@@ -91,7 +91,7 @@ test('BR-INV01 reserved units are not available', function (): void {
 });
 
 test('BR-INV01 a sku without a stock row has nothing available', function (): void {
-    $sku = $this->inTenant(fn (): Sku => Product::factory()->withSku(['moq' => 1])->create()->sku()->sole());
+    $sku = $this->inTenant(fn (): Sku => Product::factory()->withSku(['moq' => 1])->create()->skus()->sole());
     $this->fillCart($this->customer, [$sku->id => 1]);
 
     expect(($this->failure)()->items)->toBe([['sku_id' => $sku->id, 'sku_unit_id' => $this->defaultUnitId($sku), 'reason' => 'insufficient_stock', 'requested' => 1, 'available' => 0]]);
@@ -368,4 +368,20 @@ test('D91 BR-O14 the pre-order cap is in the default unit and counts the base un
     $report = app(CheckoutValidator::class)->checkPreorder([$line], $this->customer->refresh(), [$sku->id => 20], null);
 
     expect($report->problemFor($piece->id)?->toArray())->toBe(['sku_id' => $sku->id, 'sku_unit_id' => $piece->id, 'reason' => 'preorder_limit', 'requested' => 21, 'remaining' => 20]);
+});
+
+test('BR-P14 a variant made inactive after it went into the cart is refused as product_inactive', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    [$blue, $red] = Sku::query()->whereIn('code', ['PEN-1', 'PEN-2'])->orderBy('code')->get()->all();
+    $this->fillCart($this->customer, [$blue->id => 2, $red->id => 2]);
+    $red->update(['status' => 'inactive']);
+
+    expect(($this->failure)()->items)->toBe([['sku_id' => $red->id, 'sku_unit_id' => $this->defaultUnitId($red), 'reason' => 'product_inactive']]);
+});
+
+test('BR-P14 BR-O14 an inactive variant of a coming soon product cannot be pre-ordered', function (): void {
+    $sku = $this->preorderableSku();
+    $sku->update(['status' => 'inactive']);
+
+    expect(preorderReport($sku, 5, $this->customer)->problemFor($this->defaultUnitId($sku))?->reason)->toBe('preorder_unavailable');
 });

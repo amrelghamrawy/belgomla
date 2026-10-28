@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->customer = $this->makeCustomer();
-    $this->sku = Product::factory()->withSku(['base_price' => '90.00'])->create()->sku()->sole();
+    $this->sku = Product::factory()->withSku(['base_price' => '90.00'])->create()->skus()->sole();
     $this->unit = App\Modules\Catalog\Models\SkuUnit::query()->findOrFail($this->defaultUnitId($this->sku));
 });
 

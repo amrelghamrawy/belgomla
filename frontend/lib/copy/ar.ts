@@ -301,6 +301,10 @@ export const ar = {
     preorderFull: "اكتمل الحجز",
     inPreorders: (quantity: number, unit: string) => `محجوز ${quantity} ${unit}`,
     inCart: (quantity: number, unit: string) => `${quantity} ${unit} في السلة`,
+    // V2 Task 14 (BR-P14): a product with variants.
+    priceRange: (min: string, max: string) => `من ${min} إلى ${max}`,
+    chooseOptions: "اختر المواصفات",
+    chooseOptionsLabel: (name: string) => `اختر مواصفات «${name}»`,
   },
   product: {
     /**
@@ -327,6 +331,8 @@ export const ar = {
     // V2 Task 13 (D91): the units a SKU is sold in.
     unitPicker: "اختر وحدة البيع",
     unitWithFactor: (unit: string, factor: number) => `${unit} (${factor})`,
+    // V2 Task 14 (BR-P14): option selectors; a combination without stock cannot be picked.
+    valueUnavailable: "غير متوفر",
     code: "الكود",
     details: "تفاصيل المنتج",
     related: "نسخ أخرى من هذا الكتاب",

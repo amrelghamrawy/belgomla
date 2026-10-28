@@ -49,7 +49,7 @@ test('D51 a blocked customer still browses the store read-only', function (): vo
 });
 
 test('D53 a guest adding to the cart while prices are hidden is told to log in', function (): void {
-    $this->tenantJson('POST', '/api/store/cart/items', ['sku_id' => $this->inTenant(fn () => $this->product->sku()->sole()->id), 'quantity' => 1])
+    $this->tenantJson('POST', '/api/store/cart/items', ['sku_id' => $this->inTenant(fn () => $this->product->skus()->sole()->id), 'quantity' => 1])
         ->assertForbidden()
         ->assertExactJson(['error' => ['code' => 'prices_hidden', 'message' => 'سجّل الدخول لعرض الأسعار والإضافة إلى السلة']]);
 });

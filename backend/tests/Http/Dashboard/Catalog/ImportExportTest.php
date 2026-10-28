@@ -34,7 +34,7 @@ test('the export streams the filtered catalog as an xlsx download', function ():
     $response->assertOk()
         ->assertHeader('content-type', SpreadsheetFormat::Xlsx->mimeType())
         ->assertDownload('products-'.now()->format('Y-m-d').'.xlsx');
-    expect(array_column(spreadsheetRows(downloadedFile($response)), 0))->toBe(['كود الصنف', 'sku_code', 'ADW-SCI-1']);
+    expect(array_column(spreadsheetRows(downloadedFile($response)), 1))->toBe(['كود الصنف', 'sku_code', 'ADW-SCI-1']);
 });
 
 test('the export can be a csv with the keys only', function (): void {
@@ -43,7 +43,7 @@ test('the export can be a csv with the keys only', function (): void {
     $response = $this->tenantJson('GET', '/api/dashboard/products/export?format=csv');
 
     $response->assertOk()->assertDownload('products-'.now()->format('Y-m-d').'.csv');
-    expect(array_column(spreadsheetRows(downloadedFile($response, SpreadsheetFormat::Csv), SpreadsheetFormat::Csv), 0))->toBe(['sku_code', 'ADW-SCI-1']);
+    expect(array_column(spreadsheetRows(downloadedFile($response, SpreadsheetFormat::Csv), SpreadsheetFormat::Csv), 1))->toBe(['sku_code', 'ADW-SCI-1']);
 });
 
 test('the export validates its format and filter', function (string $query, string $field): void {
@@ -80,7 +80,7 @@ test('the signed link answers not ready until the job wrote the file, then the f
     $file = $this->get('http://alnoor.gomal.test'.$link, ['Origin' => 'http://alnoor.gomal.test']);
 
     $file->assertOk()->assertDownload('products-'.now()->format('Y-m-d').'.xlsx');
-    expect(spreadsheetRows($file->baseResponse->getFile()->getPathname())[3][0])->toBe('ADW-SCI-1');
+    expect(spreadsheetRows($file->baseResponse->getFile()->getPathname())[3][1])->toBe('ADW-SCI-1');
 });
 
 test('a link with a wrong signature or a failed export is not found', function (): void {

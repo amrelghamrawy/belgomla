@@ -20,7 +20,7 @@ beforeEach(function (): void {
     $this->other = Product::factory()->withSku(['code' => 'A-2', 'cover_price' => '80.00', 'base_price' => '80.00'])->create(['name' => 'علوم ثانية']);
     $this->noCover = Product::factory()->withSku(['code' => 'A-3', 'cover_price' => null, 'base_price' => '50.00'])->create(['name' => 'علوم ثالثة']);
     $this->outside = Product::factory()->withSku(['code' => 'B-1', 'cover_price' => '100.00', 'base_price' => '100.00'])->create(['name' => 'رياضيات']);
-    $this->unitOf = fn (Product $product): SkuUnit => SkuUnit::query()->where('sku_id', $product->sku()->sole()->id)->where('is_default', true)->sole();
+    $this->unitOf = fn (Product $product): SkuUnit => SkuUnit::query()->where('sku_id', $product->skus()->sole()->id)->where('is_default', true)->sole();
     $this->data = fn (array $changes = []): BulkPricingData => new BulkPricingData(...[
         'filter' => new ProductFilterData(q: 'علوم'),
         'basePricePercent' => '25.00',
@@ -35,7 +35,7 @@ test('BR-PR11 preview reports affected and skipped skus and writes nothing', fun
     expect($result)->toBe([
         'affected' => 2,
         'skipped_no_cover_price' => [[
-            'product_id' => $this->noCover->id, 'sku_id' => $this->noCover->sku()->sole()->id, 'sku_unit_id' => ($this->unitOf)($this->noCover)->id,
+            'product_id' => $this->noCover->id, 'sku_id' => $this->noCover->skus()->sole()->id, 'sku_unit_id' => ($this->unitOf)($this->noCover)->id,
             'code' => 'A-3', 'name' => 'علوم ثالثة', 'unit' => ($this->unitOf)($this->noCover)->unit->name,
         ]],
         'batch_id' => null,
@@ -95,8 +95,8 @@ test('BR-PR03 bulk pricing replaces the tiers of every matching sku', function (
 });
 
 test('D91 every active unit of a matching sku is priced off its own cover price', function (): void {
-    $carton = $this->addUnit($this->priced->sku()->sole(), ['cover_price' => '1200.00', 'base_price' => '1000.00']);
-    $archived = SkuUnit::factory()->archived()->create(['sku_id' => $this->priced->sku()->sole()->id, 'cover_price' => '50.00', 'base_price' => '40.00']);
+    $carton = $this->addUnit($this->priced->skus()->sole(), ['cover_price' => '1200.00', 'base_price' => '1000.00']);
+    $archived = SkuUnit::factory()->archived()->create(['sku_id' => $this->priced->skus()->sole()->id, 'cover_price' => '50.00', 'base_price' => '40.00']);
 
     $result = app(BulkApplyPricing::class)->handle(($this->data)());
 
@@ -106,8 +106,8 @@ test('D91 every active unit of a matching sku is priced off its own cover price'
 });
 
 test('D91 a store unit filter prices only the units sold in it, skipped ones naming their unit', function (): void {
-    $carton = $this->addUnit($this->priced->sku()->sole(), ['cover_price' => '1200.00', 'base_price' => '1000.00']);
-    $bare = $this->addUnit($this->other->sku()->sole(), ['unit_id' => $carton->unit_id, 'cover_price' => null]);
+    $carton = $this->addUnit($this->priced->skus()->sole(), ['cover_price' => '1200.00', 'base_price' => '1000.00']);
+    $bare = $this->addUnit($this->other->skus()->sole(), ['unit_id' => $carton->unit_id, 'cover_price' => null]);
 
     $result = app(BulkApplyPricing::class)->handle(($this->data)(['unitId' => $carton->unit_id]));
 

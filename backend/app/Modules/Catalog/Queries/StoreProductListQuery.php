@@ -18,7 +18,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 final readonly class StoreProductListQuery
 {
-    public const array RELATIONS = ['category', 'sku.activeUnits.unit', 'sku.activeUnits.tiers', 'sku.inventory', 'mainImage'];
+    public const array RELATIONS = ['category', 'activeSkus.activeUnits.unit', 'activeSkus.activeUnits.tiers', 'activeSkus.inventory', 'activeSkus.optionValues', 'options.values.image', 'mainImage'];
 
     public function __construct(private FilteredProductsQuery $filtered, private ActivePromotions $promotions) {}
 
@@ -31,7 +31,7 @@ final readonly class StoreProductListQuery
         $query = $this->filtered->builder($filter)->tap(new VisibleOnStore)->with(self::RELATIONS);
 
         if ($onOffer) {
-            $query->whereIn('products.id', Sku::query()->whereIn('skus.id', $this->promotions->skuIdsQuery())->select('skus.product_id'));
+            $query->whereIn('products.id', Sku::query()->where('skus.status', 'active')->whereIn('skus.id', $this->promotions->skuIdsQuery())->select('skus.product_id'));
         }
 
         DashboardProductListQuery::applySort($query, $sort ?? ['created_at', 'desc']);

@@ -15,7 +15,7 @@ use Carbon\CarbonImmutable;
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->travelTo(CarbonImmutable::parse('2026-10-27 10:00:00'));
-    $this->sku = Product::factory()->withSku()->create()->sku()->sole();
+    $this->sku = Product::factory()->withSku()->create()->skus()->sole();
 });
 
 test('D90 f a running promotion is cancelled at once: its prices stop, audited', function (): void {

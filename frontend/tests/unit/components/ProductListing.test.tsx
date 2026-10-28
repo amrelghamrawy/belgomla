@@ -192,6 +192,39 @@ describe("ProductListing", () => {
     expect(router.replace).toHaveBeenCalledWith("/c/prep?f%5Bgrade%5D=7", { scroll: false });
   });
 
+  it("BR-P14 filters by a variant option, sending its o: key and folded value back", async () => {
+    searchParams.value = new URLSearchParams("f[o:اللون]=احمر");
+    const fetchMock = stubApi({
+      "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/filters": json(200, {
+        data: [
+          facet({
+            key: "o:اللون",
+            label: "اللون",
+            type: "option",
+            options: [
+              { id: "ازرق", label: "أزرق", count: 4 },
+              { id: "احمر", label: "أحمر", count: 2 },
+            ],
+          }),
+        ],
+      }),
+      "GET /api/store/products": json(200, page([storeProduct()])),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<ProductListing category="prep" />);
+    await user.click(await screen.findByRole("button", { name: "تصفية (1)" }));
+
+    expect(await screen.findByRole("radio", { name: /أحمر/ })).toHaveAttribute("aria-checked", "true");
+    expect(callsTo(fetchMock, "GET /api/store/products")[0]?.url.searchParams.get("f[o:اللون]")).toBe("احمر");
+
+    await user.click(screen.getByRole("radio", { name: /أزرق/ }));
+
+    expect(router.replace).toHaveBeenCalledWith(`/c/prep?${new URLSearchParams({ "f[o:اللون]": "ازرق" }).toString()}`, {
+      scroll: false,
+    });
+  });
+
   it("BR-P08 a second facet is added to the first (AND)", async () => {
     searchParams.value = new URLSearchParams("f[grade]=7");
     stubCatalog();

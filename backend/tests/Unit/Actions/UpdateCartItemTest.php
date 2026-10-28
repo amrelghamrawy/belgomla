@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->customer = Customer::factory()->create();
-    $this->sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'], onHand: 50)->create()->sku()->sole();
+    $this->sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'], onHand: 50)->create()->skus()->sole();
     $this->item = CartItem::factory()->for(Cart::factory()->for($this->customer))->create(['sku_id' => $this->sku->id, 'quantity' => 2]);
 });
 
@@ -37,7 +37,7 @@ test('a sku that is not in this customer\'s cart is not found', function (): voi
 })->throws(ModelNotFoundException::class);
 
 test('BR-O14 a pre-order line changes with the pre-order checks, without stock, the order line stays', function (): void {
-    $sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'])->preorderable()->create()->sku()->sole();
+    $sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'])->preorderable()->create()->skus()->sole();
     $preorder = CartItem::factory()->preorder()->create(['cart_id' => $this->item->cart_id, 'sku_id' => $sku->id, 'quantity' => 2]);
 
     $cart = app(UpdateCartItem::class)->handle($this->customer, $this->defaultUnitId($sku), 80, CartLineKind::Preorder);

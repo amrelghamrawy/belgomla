@@ -38,7 +38,7 @@ final readonly class LowStockQuery
     public function builder(): Builder
     {
         return $this->constrain(
-            Sku::query()->whereHas('product', fn (Builder $products): Builder => $products->where('status', '!=', ProductStatus::Inactive)),
+            Sku::query()->where('skus.status', 'active')->whereHas('product', fn (Builder $products): Builder => $products->where('status', '!=', ProductStatus::Inactive)), // an inactive variant is not restocked (BR-P14)
         );
     }
 }

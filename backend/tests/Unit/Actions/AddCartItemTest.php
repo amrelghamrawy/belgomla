@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
     $this->customer = Customer::factory()->create();
-    $this->sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'], onHand: 50)->create()->sku()->sole();
+    $this->sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'], onHand: 50)->create()->skus()->sole();
 });
 
 test('BR-CU06 the first add creates the customer cart and the line, and returns the priced cart', function (): void {
@@ -64,7 +64,7 @@ test('another sku goes on its own line', function (): void {
 });
 
 test('BR-O14 a coming soon product with pre-orders on is added as a pre-order line without any stock', function (): void {
-    $sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'], onHand: 0)->preorderable()->create()->sku()->sole();
+    $sku = Product::factory()->withSku(['moq' => 2, 'base_price' => '10.00'], onHand: 0)->preorderable()->create()->skus()->sole();
 
     $cart = app(AddCartItem::class)->handle($this->customer, new CartLineData($sku->id, 40, CartLineKind::Preorder));
 
@@ -74,7 +74,7 @@ test('BR-O14 a coming soon product with pre-orders on is added as a pre-order li
 });
 
 test('BR-O14 order lines and pre-order lines sit in the cart side by side, priced apart', function (): void {
-    $preorderable = Product::factory()->withSku(['moq' => 2, 'base_price' => '15.00'])->preorderable()->create()->sku()->sole();
+    $preorderable = Product::factory()->withSku(['moq' => 2, 'base_price' => '15.00'])->preorderable()->create()->skus()->sole();
     app(AddCartItem::class)->handle($this->customer, new CartLineData($this->sku->id, 3));
 
     $cart = app(AddCartItem::class)->handle($this->customer, new CartLineData($preorderable->id, 7, CartLineKind::Preorder));
@@ -149,7 +149,19 @@ test('D91 a unit no longer sold cannot be added', function (): void {
 
 test('D91 BR-T04 a unit of another tenant is not found', function (): void {
     $other = $this->otherTenant();
-    $theirs = $this->asTenant($other, fn (): int => $this->defaultUnitId(Product::factory()->withSku(onHand: 50)->create()->sku()->sole()));
+    $theirs = $this->asTenant($other, fn (): int => $this->defaultUnitId(Product::factory()->withSku(onHand: 50)->create()->skus()->sole()));
 
     expect(fn () => app(AddCartItem::class)->handle($this->customer, new CartLineData(null, 1, skuUnitId: $theirs)))->toThrow(ModelNotFoundException::class);
+});
+
+test('BR-P14 an inactive variant is refused while its sibling is accepted', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    Sku::query()->where('code', 'PEN-2')->update(['status' => 'inactive']);
+    $blue = Sku::query()->where('code', 'PEN-1')->sole();
+    $red = Sku::query()->where('code', 'PEN-2')->sole();
+
+    app(AddCartItem::class)->handle($this->customer, new CartLineData($blue->id, 3));
+
+    expect(fn () => app(AddCartItem::class)->handle($this->customer, new CartLineData($red->id, 3)))->toThrow(CartLineInvalid::class)
+        ->and(CartItem::query()->pluck('sku_id')->all())->toBe([$blue->id]);
 });

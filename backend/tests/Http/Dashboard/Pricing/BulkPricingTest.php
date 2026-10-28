@@ -92,7 +92,7 @@ test('BR-PR05 duplicate thresholds fail preview and apply alike with invalid_tie
 })->with(['preview' => ['/api/dashboard/pricing/bulk/preview'], 'apply' => ['/api/dashboard/pricing/bulk']]);
 
 test('D91 a store unit filter reprices only the units sold in it', function (): void {
-    $carton = $this->addUnit($this->inTenant(fn () => $this->science->sku()->sole()), ['cover_price' => '1440.00', 'base_price' => '1300.00']);
+    $carton = $this->addUnit($this->inTenant(fn () => $this->science->skus()->sole()), ['cover_price' => '1440.00', 'base_price' => '1300.00']);
 
     $this->tenantJson('POST', '/api/dashboard/pricing/bulk', ($this->body)(['unit_id' => $carton->unit_id, 'tiers' => []]))
         ->assertOk()
