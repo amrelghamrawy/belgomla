@@ -9,9 +9,11 @@ use App\Modules\Catalog\Data\ImportRowData;
 use App\Modules\Catalog\Data\ImportRowResult;
 use App\Modules\Catalog\Enums\ImportRowAction;
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\ProductType;
 use App\Modules\Catalog\Exceptions\InvalidImportRow;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Services\BundleSheet;
 use App\Modules\Catalog\Services\CatalogRowMapper;
 use App\Modules\Inventory\Actions\AdjustStock;
 use App\Modules\Inventory\Data\StockAdjustmentData;
@@ -31,7 +33,8 @@ use Illuminate\Support\Facades\DB;
  * A product that fails anything is rolled back whole and comes back as `skip` with its errors per row and column; so
  * is a product the file repeats (`duplicates`) and one whose codes belong to two products of the store. A database
  * failure is reported and marked `unexpected`. Codes are looked up in the tenant in context only, so another tenant's
- * code is a new product here (BR-P03). The preview runs the same products inside a transaction it rolls back.
+ * code is a new product here (BR-P03). A row with a bundle's code is an error, never an update: bundles are exported,
+ * not imported (D93). The preview runs the same products inside a transaction it rolls back.
  */
 final readonly class ImportCatalogRow
 {
@@ -84,7 +87,7 @@ final readonly class ImportCatalogRow
 
     /**
      * The product the rows' codes belong to, null when none is the tenant's. Codes of two products are an error on the
-     * rows of the codes that are not the first one's product.
+     * rows of the codes that are not the first one's product; a bundle's code is an error on its row (D93).
      *
      * @param  non-empty-array<int, array<string, string>>  $rows
      *
@@ -107,6 +110,7 @@ final readonly class ImportCatalogRow
         }
 
         $owners = Sku::query()->whereIn('code', array_column($codes, 0))->get(['code', 'product_id']);
+        $bundles = Product::query()->whereKey($owners->pluck('product_id')->all())->where('type', ProductType::Bundle)->pluck('id')->all();
         $productId = null;
         $errors = [];
 
@@ -114,6 +118,12 @@ final readonly class ImportCatalogRow
             $owner = $owners->first(fn (Sku $sku): bool => $sku->code === $code)?->product_id;
 
             if ($owner === null) {
+                continue;
+            }
+
+            if (in_array($owner, $bundles, true)) {
+                $errors[$number]['sku_code'] = [BundleSheet::NOT_IMPORTED];
+
                 continue;
             }
 

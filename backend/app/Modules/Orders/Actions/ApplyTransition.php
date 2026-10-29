@@ -27,6 +27,10 @@ use Illuminate\Database\Eloquent\Collection;
  * its `delivered_quantity` and is charged for it, every short line is written as a `delivered_short` change, the
  * totals are recomputed (OrderTotals, an EGP order discount capped) and the collection status derived again; what was
  * already collected must still fit (`409 below_collected`). The history note defaults to «تسليم جزئي».
+ *
+ * A bundle (BR-P15, V2 Task 15, D93) moves the stock of its component lines; a partial delivery names the bundle line
+ * with the bundles delivered (its component lines cannot be named apart), each component line delivering that many
+ * bundles' worth and keeping its share per bundle; the bundle line records the short delivery.
  */
 final readonly class ApplyTransition
 {
@@ -75,6 +79,8 @@ final readonly class ApplyTransition
     {
         /** @var Collection<int, OrderItem> $items */
         $items = $order->liveItems()->where('reserved', true)->with('sku')->get()->keyBy('id'); // a pre-order line holds nothing (BR-O14)
+        /** @var Collection<int, OrderItem> $bundles */
+        $bundles = $order->liveItems()->where('is_bundle', true)->get()->keyBy('id'); // D93: their component lines hold the stock
         $this->ledger->lock(array_values($items->map(fn (OrderItem $item): int => $item->sku_id)->all()));
 
         if (! $plan->deductsStock) {
@@ -85,8 +91,12 @@ final readonly class ApplyTransition
             return [];
         }
 
-        $delivered = $this->delivered($items, $deliveredQuantities);
+        $delivered = $this->delivered($items, $bundles, $deliveredQuantities);
         $short = [];
+
+        foreach ($bundles as $bundle) {
+            $short = [...$short, ...$this->deliverBundle($order, $bundle, $delivered[$bundle->id], $tenantUserId)];
+        }
 
         foreach ($items as $item) {
             $units = $delivered[$item->id];
@@ -98,6 +108,17 @@ final readonly class ApplyTransition
 
             if ($deducted < $item->quantity_base) {
                 $this->ledger->release($item->sku, $item->quantity_base - $deducted);
+            }
+
+            if ($item->parent_item_id !== null) {
+                $parent = $bundles->get($item->parent_item_id);
+                $perBundle = $parent instanceof OrderItem ? bcdiv($item->line_total, (string) max(1, $parent->quantity), 2) : $item->unit_price;
+                $item->forceFill(['delivered_quantity' => $units, 'line_total' => Money::times($perBundle, $parent instanceof OrderItem ? $delivered[$parent->id] : $units)])->save();
+
+                continue;
+            }
+
+            if ($deducted < $item->quantity_base) {
                 $short[] = ['order_item_id' => $item->id, 'ordered' => $item->quantity, 'delivered' => $units];
                 OrderItemChange::query()->create([
                     'order_id' => $order->id, 'order_item_id' => $item->id, 'change' => OrderItemChangeType::DeliveredShort,
@@ -110,26 +131,56 @@ final readonly class ApplyTransition
         }
 
         if ($short !== []) {
-            $this->recomputeTotals($order, $items);
+            $this->recomputeTotals($order, $items->concat($bundles));
         }
 
         return $short;
     }
 
     /**
+     * D93: the bundle line keeps the bundles delivered and is charged for them; delivered short, it records the change.
+     *
+     * @return list<array{order_item_id: int, ordered: int, delivered: int}>
+     */
+    private function deliverBundle(Order $order, OrderItem $bundle, int $units, ?int $tenantUserId): array
+    {
+        $bundle->forceFill(['delivered_quantity' => $units, 'line_total' => Money::times($bundle->unit_price, $units)])->save();
+
+        if ($units === $bundle->quantity) {
+            return [];
+        }
+
+        OrderItemChange::query()->create([
+            'order_id' => $order->id, 'order_item_id' => $bundle->id, 'change' => OrderItemChangeType::DeliveredShort,
+            'old_quantity' => $bundle->quantity, 'new_quantity' => $units,
+            'unit_price_before' => $bundle->unit_price, 'unit_price_after' => $bundle->unit_price, 'actor_id' => $tenantUserId,
+        ]);
+
+        return [['order_item_id' => $bundle->id, 'ordered' => $bundle->quantity, 'delivered' => $units]];
+    }
+
+    /**
      * BR-O13: every line's delivered units, the ordered quantity unless given; a line of another order, more than was
      * ordered, or nothing delivered at all is refused (422, the order is cancelled instead, D86).
      *
+     * D93: a bundle line is given in bundles; its component lines follow it (quantity per bundle × the bundles
+     * delivered) and cannot be given themselves.
+     *
      * @param  Collection<int, OrderItem>  $items
+     * @param  Collection<int, OrderItem>  $bundles
      * @param  array<int, int>  $given
      * @return array<int, int> order item id => delivered selling units
      */
-    private function delivered(Collection $items, array $given): array
+    private function delivered(Collection $items, Collection $bundles, array $given): array
     {
         $index = 0;
 
         foreach ($given as $id => $units) {
-            $item = $items->get($id) ?? throw OrderEditRefused::unknownLine('delivered_quantities', $index);
+            $item = $bundles->get($id) ?? $items->get($id);
+
+            if (! $item instanceof OrderItem || $item->parent_item_id !== null) {
+                throw OrderEditRefused::unknownLine('delivered_quantities', $index);
+            }
 
             if ($units > $item->quantity) {
                 throw OrderEditRefused::deliveredAboveOrdered($index, $item->quantity);
@@ -138,7 +189,14 @@ final readonly class ApplyTransition
             $index++;
         }
 
-        $delivered = $items->map(fn (OrderItem $item): int => $given[$item->id] ?? $item->quantity)->all();
+        $delivered = $bundles->map(fn (OrderItem $bundle): int => $given[$bundle->id] ?? $bundle->quantity)->all();
+
+        foreach ($items as $item) {
+            $parent = $item->parent_item_id === null ? null : $bundles->get($item->parent_item_id);
+            $delivered[$item->id] = $parent instanceof OrderItem
+                ? intdiv($item->quantity, max(1, $parent->quantity)) * $delivered[$parent->id]
+                : $given[$item->id] ?? $item->quantity;
+        }
 
         if (array_sum($delivered) === 0) {
             throw OrderEditRefused::nothingDelivered();

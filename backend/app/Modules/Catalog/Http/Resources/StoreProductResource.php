@@ -7,6 +7,7 @@ namespace App\Modules\Catalog\Http\Resources;
 use App\Modules\Catalog\Contracts\PreorderDemand;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -17,9 +18,11 @@ use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
+use App\Modules\Catalog\Services\BundleAvailability;
 use App\Modules\Pricing\Data\ListedPrice;
 use App\Modules\Pricing\Data\PricingContext;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\BundlePricer;
 use App\Modules\Pricing\Services\PriceResolver;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Collection;
@@ -51,6 +54,12 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * `option_value_ids` (option order); `options` the variant options with only the values an active SKU uses (and the
  * swatch `image_url`); `sku` is the first active SKU in stock, else the first active one (cards, lists, pre-order cap);
  * `price_range { min, max }` spans the default units' prices over the active SKUs (left out when prices are hidden).
+ *
+ * V2 Task 15 (BR-P15, D93): `type` is `simple` or `bundle`. A bundle has no stock of its own: its SKU's `available` and
+ * `in_stock` follow `availability`, the bundles its components allow now (BundleAvailability). It adds `components[]`
+ * (`product_name`, `slug`, `sku_code`, `label`, `unit`, `quantity`, `in_stock` = the component allows one bundle, so an
+ * unavailable bundle names what is missing) and, when prices are shown, `components_total` (the components bought on
+ * their own at the shopper's prices) and `saving` (that less the bundle's price, never below 0) for «وفّر».
  *
  * @property-read Product $resource
  */
@@ -99,7 +108,13 @@ final class StoreProductResource extends JsonResource
 
             foreach ([$product, ...$related] as $shown) {
                 if ($shown->relationLoaded('activeSkus')) {
-                    array_push($ids, ...$shown->activeSkus->map(fn (Sku $sku): int => $sku->id)->all());
+                    foreach ($shown->activeSkus as $sku) {
+                        $ids[] = $sku->id;
+
+                        if ($sku->relationLoaded('bundleItems')) {
+                            array_push($ids, ...$sku->bundleItems->map(fn (BundleItem $item): int => $item->componentUnit->sku_id)->all()); // D93: the components' own prices
+                        }
+                    }
                 }
             }
         }
@@ -123,6 +138,7 @@ final class StoreProductResource extends JsonResource
             'slug' => $product->slug,
             'description' => $product->description,
             'status' => $product->status->value,
+            'type' => $product->type->value,
             'main_image_url' => $mainImage instanceof ProductImage ? $mainImage->url() : null,
             'category' => $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null,
             'custom_fields' => $this->customFields(),
@@ -131,6 +147,10 @@ final class StoreProductResource extends JsonResource
             'options' => $this->options(),
             'price_range' => $this->when(! $this->pricesHidden, fn (): ?array => $this->priceRange()),
             'preorder' => $this->preorder(),
+            'components' => $this->when($product->isBundle(), fn (): array => $this->components()),
+            'availability' => $this->when($product->isBundle(), fn (): int => $this->bundleAvailability()),
+            'components_total' => $this->when($product->isBundle() && ! $this->pricesHidden, fn (): ?string => $this->componentsTotal()),
+            'saving' => $this->when($product->isBundle() && ! $this->pricesHidden, fn (): ?string => $this->saving()),
             'prices_hidden' => $this->when($this->pricesHidden, true),
             'gallery' => $this->when($product->relationLoaded('images'), fn (): AnonymousResourceCollection => ProductImageResource::collection($product->images)),
             'related' => $this->when(
@@ -211,7 +231,7 @@ final class StoreProductResource extends JsonResource
         $units = $sku->relationLoaded('activeUnits') ? $sku->activeUnits : new Collection;
         $default = $units->firstWhere('is_default', true) ?? $units->first();
         $comingSoon = $this->resource->status === ProductStatus::ComingSoon;
-        $available = $sku->relationLoaded('inventory') ? $sku->inventory->available ?? 0 : 0;
+        $available = $this->available($sku);
         $smallest = $units->min('conversion_factor');
 
         return [
@@ -251,9 +271,78 @@ final class StoreProductResource extends JsonResource
     private function inStock(Sku $sku): bool
     {
         $smallest = $sku->relationLoaded('activeUnits') ? $sku->activeUnits->min('conversion_factor') : null;
-        $available = $sku->relationLoaded('inventory') ? $sku->inventory->available ?? 0 : 0;
+        $available = $this->available($sku);
 
         return is_int($smallest) && $this->orderable($available, $smallest);
+    }
+
+    /** BR-INV02: the SKU's stock in base units; a bundle's is the bundles its components allow (D93). */
+    private function available(Sku $sku): int
+    {
+        if ($this->resource->isBundle()) {
+            return $sku->relationLoaded('bundleItems') ? app(BundleAvailability::class)->available($sku) : 0;
+        }
+
+        return $sku->relationLoaded('inventory') ? $sku->inventory->available ?? 0 : 0;
+    }
+
+    private function bundleSku(): ?Sku
+    {
+        $sku = $this->skus()->first();
+
+        return $sku instanceof Sku && $sku->relationLoaded('bundleItems') ? $sku : null;
+    }
+
+    private function bundleAvailability(): int
+    {
+        $sku = $this->bundleSku();
+
+        return $sku instanceof Sku ? $this->available($sku) : 0;
+    }
+
+    /**
+     * BR-P15: the bundle's components, each saying whether it allows one bundle now.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function components(): array
+    {
+        $sku = $this->bundleSku();
+        $availability = app(BundleAvailability::class);
+
+        return $sku instanceof Sku ? array_values($sku->bundleItems->map(fn (BundleItem $item): array => [
+            'product_name' => $item->componentUnit->sku->product->name,
+            'slug' => $item->componentUnit->sku->product->slug,
+            'sku_code' => $item->componentUnit->sku->code,
+            'label' => $item->componentUnit->sku->name,
+            'unit' => $item->componentUnit->unit->name,
+            'quantity' => $item->quantity,
+            'in_stock' => $availability->allows($item) >= 1,
+        ])->all()) : [];
+    }
+
+    /** D93: the components bought on their own at the shopper's prices. */
+    private function componentsTotal(): ?string
+    {
+        $sku = $this->bundleSku();
+
+        return $sku instanceof Sku ? app(BundlePricer::class)->listedSum($sku->bundleItems, $this->pricing) : null;
+    }
+
+    /** D93: what buying the bundle saves this shopper, never below 0. */
+    private function saving(): ?string
+    {
+        $sku = $this->bundleSku();
+        $unit = $sku instanceof Sku && $sku->relationLoaded('activeUnits') ? $sku->activeUnits->first() : null;
+        $total = $this->componentsTotal();
+
+        if (! $unit instanceof SkuUnit || $total === null) {
+            return null;
+        }
+
+        $saving = Money::subtract($total, app(PriceResolver::class)->listed($unit, $this->pricing)->basePrice);
+
+        return Money::compare($saving, '0.00') > 0 ? $saving : '0.00';
     }
 
     /**

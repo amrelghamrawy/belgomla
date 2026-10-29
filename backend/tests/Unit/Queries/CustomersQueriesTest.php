@@ -40,7 +40,7 @@ test('BR-CU06 the cart query loads a customer\'s lines oldest first with what pr
     expect($lines->pluck('id')->all())->toBe([$first->id, $second->id])
         ->and($lines[0]->relationLoaded('skuUnit'))->toBeTrue()
         ->and(array_keys($lines[0]->skuUnit->getRelations()))->toBe(['sku', 'unit', 'tiers'])
-        ->and(array_keys($lines[0]->skuUnit->sku->getRelations()))->toBe(['product', 'inventory', 'defaultUnit']);
+        ->and(array_keys($lines[0]->skuUnit->sku->getRelations()))->toBe(['product', 'inventory', 'defaultUnit', 'bundleItems']);
 });
 
 test('D91 the cart sku query loads a sku unit with its unit, tiers and its sku\'s product, stock and default unit', function (): void {
@@ -49,7 +49,7 @@ test('D91 the cart sku query loads a sku unit with its unit, tiers and its sku\'
     $found = app(CartSkuQuery::class)->find($this->defaultUnitId($sku));
 
     expect(array_keys($found->getRelations()))->toBe(['sku', 'unit', 'tiers'])
-        ->and(array_keys($found->sku->getRelations()))->toBe(['product', 'inventory', 'defaultUnit']);
+        ->and(array_keys($found->sku->getRelations()))->toBe(['product', 'inventory', 'defaultUnit', 'bundleItems']);
 });
 
 test('D91 the cart sku query finds the default unit of a sku, archived units too by id', function (): void {

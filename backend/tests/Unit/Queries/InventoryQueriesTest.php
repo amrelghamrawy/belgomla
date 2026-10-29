@@ -44,6 +44,25 @@ test('D36 a sku without a stock row is low on stock', function (): void {
     expect(app(LowStockQuery::class)->builder()->pluck('id')->all())->toBe([$sku->id]);
 });
 
+test('D93 a bundle without a stock row is never low on stock', function (): void {
+    Product::factory()->bundle()->withSku()->create();
+    $simple = Product::factory()->withSku()->create();
+
+    expect(app(LowStockQuery::class)->builder()->pluck('product_id')->all())->toBe([$simple->id]);
+});
+
+test('D93 the inventory list leaves out bundles, low stock or not', function (bool $lowStock): void {
+    Product::factory()->bundle()->withSku(['code' => 'SET-1'])->create();
+    Product::factory()->withSku(['code' => 'A-1'])->create();
+
+    $page = app(InventoryListQuery::class)->paginate(null, $lowStock, null, 24);
+
+    expect(collect($page->items())->pluck('code')->all())->toBe(['A-1']);
+})->with([
+    'every sku' => [false],
+    'D36 low stock' => [true],
+]);
+
 test('D5 the low-stock report leaves out inactive products but keeps coming soon ones', function (): void {
     $comingSoon = Product::factory()->comingSoon()->withSku(onHand: 0)->create();
     Product::factory()->inactive()->withSku(onHand: 0)->create();

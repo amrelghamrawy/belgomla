@@ -53,6 +53,7 @@ final class CartResource extends JsonResource
             'sku_unit_id' => $line->skuUnitId,
             'product_name' => $line->productName,
             'variant' => $line->variant,
+            'is_bundle' => $line->isBundle,
             'product_slug' => $line->productSlug,
             'unit' => $line->unit,
             'conversion_factor' => $line->conversionFactor,

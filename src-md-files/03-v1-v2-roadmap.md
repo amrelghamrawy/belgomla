@@ -174,7 +174,7 @@ V2 should focus on increasing merchant flexibility and operational capability af
 - **Pre-orders** on Coming Soon products, converted to normal orders when stock arrives.
 - Order editing and partial fulfilment.
 - Automatic expiry of unconfirmed orders.
-- Product bundles / full-grade sets.
+- Product bundles / full-grade sets. **Done (V2 Task 15, BR-P15, D93).**
 
 ### Customer Management
 

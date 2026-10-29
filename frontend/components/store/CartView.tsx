@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Cart, CartItem, CartLineKind, PreorderCartItem, RemovedCartItem } from "@/lib/api/types";
@@ -200,6 +201,11 @@ export function CartLine({ item, kind = "order" }: { item: CartItem | PreorderCa
           <Link href={`/p/${encodeURIComponent(item.product_slug)}`} className="font-medium hover:underline">
             {item.product_name}
           </Link>
+          {"is_bundle" in item && item.is_bundle && (
+            <Badge variant="secondary" className="self-start" data-testid={`cart-bundle-${item.sku_unit_id}`}>
+              {ar.cart.bundle}
+            </Badge>
+          )}
           {item.variant !== null && (
             <span className="text-muted-foreground text-sm" data-testid={`cart-variant-${item.sku_unit_id}`}>
               {item.variant}

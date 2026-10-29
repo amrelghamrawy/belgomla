@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Modules\Catalog\Actions\CreateBundle;
 use App\Modules\Catalog\Actions\CreateProduct;
+use App\Modules\Catalog\Data\BundleComponentData;
+use App\Modules\Catalog\Data\BundleData;
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\ProductOptionValueData;
@@ -29,11 +32,15 @@ use App\Modules\Orders\Actions\Checkout;
 use App\Modules\Orders\Actions\PlacePreorder;
 use App\Modules\Orders\Data\CheckoutData;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Pricing\Data\BundlePricingData;
 use App\Modules\Pricing\Data\SkuPricingData;
+use App\Modules\Pricing\Enums\BundlePriceMode;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
+use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use LogicException;
@@ -178,6 +185,89 @@ abstract class TenantTestCase extends TestCase
 
             return $product->refresh()->load('skus.activeUnits.tiers');
         });
+    }
+
+    /**
+     * V2 Task 15 (D93): a bundle «باقة أولى إعدادي» (code SET-1, sold by the piece, MOQ 2) of `$quantity` of the given
+     * product's default unit, at the components' sum less 10 %, made through CreateBundle in importBasics()' grade.
+     */
+    protected function importedBundle(Product $component, int $quantity = 2, string $code = 'SET-1'): Product
+    {
+        $basics = $this->importBasics();
+
+        return $this->inTenant(fn (): Product => app(CreateBundle::class)->handle(new BundleData(
+            name: 'باقة أولى إعدادي',
+            categoryId: $basics['grade']->id,
+            code: $code,
+            unitId: $basics['piece']->id,
+            components: [new BundleComponentData($this->defaultUnitId($component->skus()->firstOrFail()), $quantity)],
+            pricing: new BundlePricingData(BundlePriceMode::PercentOffSum, '10.00'),
+            moq: 2,
+        )));
+    }
+
+    /**
+     * V2 Task 15 (BR-P15, D93): a bundle «طقم الصف» made through CreateBundle of `[sku_id => quantity]` (each SKU's default
+     * unit), sold by the piece, priced `$mode` at `$value` (fixed 300.00 by default).
+     *
+     * @param  array<int, int>  $components
+     */
+    protected function gradeSet(array $components, BundlePriceMode $mode = BundlePriceMode::Fixed, string $value = '300.00', int $moq = 1, string $code = 'SET-1', ?ProductStatus $status = null, ?Tenant $tenant = null): Product
+    {
+        return $this->inTenant(function () use ($components, $mode, $value, $moq, $code, $status): Product {
+            $piece = Unit::query()->firstOrCreate(['name' => 'قطعة']);
+            $category = Category::query()->first() ?? Category::factory()->create(['name' => 'أولى إعدادي']);
+
+            return app(CreateBundle::class)->handle(new BundleData(
+                name: 'طقم الصف',
+                categoryId: $category->id,
+                code: $code,
+                unitId: $piece->id,
+                components: array_map(fn (int $skuId, int $quantity): BundleComponentData => new BundleComponentData($this->defaultUnitId($skuId), $quantity), array_keys($components), $components) ?: throw new LogicException('A bundle has a component.'),
+                pricing: new BundlePricingData($mode, $value),
+                moq: $moq,
+                status: $status,
+            ))->refresh();
+        }, $tenant);
+    }
+
+    /** The SKU of a bundle (D93: exactly one). */
+    protected function bundleSku(Product $bundle): Sku
+    {
+        return $this->inTenant(fn (): Sku => Sku::query()->where('product_id', $bundle->id)->sole(), Tenant::query()->findOrFail($bundle->tenant_id));
+    }
+
+    /**
+     * V2 Task 15 (D93): an order of `$bundles` of a bundle at `$price` each, as checkout snapshots it: the bundle line
+     * (priced, holding nothing) and a child line per component (`[sku_unit_id => quantity in one bundle]`). With
+     * `$delivered` the order is delivered at `$deliveredAt` with that many bundles gone out (the children follow, the
+     * bundle line charged for them); without it the order stays as `$order` makes it (pending by default).
+     *
+     * @param  array<int, int>  $components
+     * @param  array<string, mixed>  $order  Order attributes
+     */
+    protected function bundleOrder(Sku $bundle, array $components, int $bundles = 1, string $price = '100.00', ?int $delivered = null, ?string $deliveredAt = null, array $order = [], ?Tenant $tenant = null): Order
+    {
+        return $this->inTenant(function () use ($bundle, $components, $bundles, $price, $delivered, $deliveredAt, $order): Order {
+            $state = $delivered === null ? $order : ['status' => 'delivered', 'confirmed_at' => now(), 'delivered_at' => $deliveredAt ?? now(), ...$order];
+            $placed = Order::factory()->create($state);
+            $line = OrderItem::factory()->for($placed)->create([
+                'sku_id' => $bundle->id, 'is_bundle' => true, 'reserved' => false, 'quantity' => $bundles, 'unit_price' => $price,
+                ...($delivered === null ? [] : ['delivered_quantity' => $delivered, 'line_total' => Money::times($price, $delivered)]),
+            ]);
+
+            foreach ($components as $unitId => $quantity) {
+                $unit = SkuUnit::query()->findOrFail($unitId);
+                OrderItem::factory()->for($placed)->create([
+                    'sku_id' => $unit->sku_id, 'sku_unit_id' => $unit->id, 'parent_item_id' => $line->id, 'quantity' => $quantity * $bundles, 'unit_price' => '10.00',
+                    ...($delivered === null ? [] : ['delivered_quantity' => $quantity * $delivered]),
+                ]);
+            }
+
+            $placed->forceFill(['items_total' => $line->line_total, 'order_total' => $line->line_total])->save();
+
+            return $placed;
+        }, $tenant);
     }
 
     /**

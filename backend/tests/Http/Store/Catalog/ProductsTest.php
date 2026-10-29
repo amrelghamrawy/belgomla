@@ -17,7 +17,7 @@ const STORE_SKU_KEYS = [
 ];
 
 const STORE_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category' => ['id', 'name', 'kind'],
+    'id', 'name', 'slug', 'description', 'status', 'type', 'main_image_url', 'category' => ['id', 'name', 'kind'],
     'sku' => STORE_SKU_KEYS,
     'skus' => ['*' => STORE_SKU_KEYS],
     'options',

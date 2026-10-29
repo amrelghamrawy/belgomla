@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * tiers (`units`, BR-U04); stock is kept per SKU in its base unit (BR-U03, BR-INV02). A product has one SKU per
  * variant (BR-P14, V2 Task 14): `optionValues` names one value of every option of the product, `name` keeps the variant
  * label («أزرق / M», null without options) for snapshots, `status` hides one variant, `sort_order` is the form order.
+ * The SKU of a bundle (BR-P15, V2 Task 15, D93) lists its components in `bundleItems` and has no stock row.
  *
  * @property int $id
  * @property int $tenant_id
@@ -45,6 +46,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property-read SkuUnit|null $smallestUnit
  * @property-read SkuInventory|null $inventory
  * @property-read Collection<int, ProductOptionValue> $optionValues
+ * @property-read Collection<int, BundleItem> $bundleItems
  */
 #[ObservedBy(FacetCacheObserver::class)]
 final class Sku extends Model
@@ -139,6 +141,16 @@ final class Sku extends Model
     public function optionValues(): BelongsToMany
     {
         return $this->belongsToMany(ProductOptionValue::class, 'sku_option_values')->withPivot('product_option_id');
+    }
+
+    /**
+     * The components of a bundle's SKU (BR-P15, D93), in the merchant's order; empty for a simple product's SKU.
+     *
+     * @return HasMany<BundleItem, $this>
+     */
+    public function bundleItems(): HasMany
+    {
+        return $this->hasMany(BundleItem::class, 'bundle_sku_id')->orderBy('sort_order')->orderBy('id');
     }
 
     public function isActive(): bool

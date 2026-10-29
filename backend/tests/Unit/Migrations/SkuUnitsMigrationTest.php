@@ -42,6 +42,7 @@ function skuUnitsInsert(string $table, array $values): int
 }
 
 beforeEach(function (): void {
+    (require database_path('migrations/2026_11_04_100000_add_bundles.php'))->down(); // V2 Task 15: bundle_items points at sku_units
     skuUnitsStepTwo()->down();
     skuUnitsStepOne()->down();
 

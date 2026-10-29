@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SalesGrouping } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { activeFilters, pageOf } from "@/lib/dashboard/list-query";
-import { useLowStockReport, useOutstandingReport, useSalesReport } from "@/lib/dashboard/reports";
+import { useBundleReport, useLowStockReport, useOutstandingReport, useSalesReport } from "@/lib/dashboard/reports";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -35,10 +35,11 @@ export function ReportsPage() {
     <>
       <PageHeader title={copy.title} description={copy.exportLater} />
       <Tabs dir="rtl" value={tab} onValueChange={(value) => setQuery({ tab: value === "sales" ? null : value })}>
-        <TabsList>
+        <TabsList className="w-full justify-start overflow-x-auto sm:w-fit">
           <TabsTrigger value="sales">{copy.tabs.sales}</TabsTrigger>
           <TabsTrigger value="outstanding">{copy.tabs.outstanding}</TabsTrigger>
           <TabsTrigger value="low-stock">{copy.tabs.lowStock}</TabsTrigger>
+          <TabsTrigger value="bundles">{copy.tabs.bundles}</TabsTrigger>
         </TabsList>
         <TabsContent value="sales" className="pt-4">
           <SalesSection query={query} setQuery={setQuery} />
@@ -48,6 +49,9 @@ export function ReportsPage() {
         </TabsContent>
         <TabsContent value="low-stock" className="pt-4">
           <LowStockSection page={pageOf(query)} onPage={(page) => setQuery({ page })} />
+        </TabsContent>
+        <TabsContent value="bundles" className="pt-4">
+          <BundlesSection query={query} setQuery={setQuery} />
         </TabsContent>
       </Tabs>
     </>
@@ -273,6 +277,118 @@ export function LowStockSection({ page, onPage }: { page: number; onPage: (page:
         </div>
       )}
       <Pager meta={report.data?.meta} onPage={onPage} />
+    </div>
+  );
+}
+
+/**
+ * BR-P15, D93: the bundles delivered in the page's date range (`from`/`to`, shared with the sales tab) and the base
+ * units of each component they consumed.
+ */
+export function BundlesSection({ query, setQuery }: SectionProps) {
+  const report = useBundleReport({ from: query.from, to: query.to });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <FilterPanel active={activeFilters(query, ["from", "to"])}>
+        <label className="flex flex-col gap-1 text-xs">
+          {ar.dashboard.list.from}
+          <Input
+            type="date"
+            value={query.from ?? report.data?.from ?? ""}
+            onChange={(event) => setQuery({ from: event.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs">
+          {ar.dashboard.list.to}
+          <Input
+            type="date"
+            value={query.to ?? report.data?.to ?? ""}
+            onChange={(event) => setQuery({ to: event.target.value })}
+          />
+        </label>
+      </FilterPanel>
+      {report.isError && <ErrorBlock error={report.error} onRetry={() => void report.refetch()} />}
+      {report.isPending && <LoadingBlock rows={4} />}
+      {report.data && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card className="min-w-0">
+            <CardHeader>
+              <CardTitle>{copy.bundlesTitle}</CardTitle>
+              <p className="text-muted-foreground text-xs">{copy.bundlesHint}</p>
+            </CardHeader>
+            <CardContent>
+              {report.data.bundles.length === 0 ? (
+                <EmptyBlock>{copy.noBundles}</EmptyBlock>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table data-testid="bundle-report">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{copy.bundleName}</TableHead>
+                        <TableHead>{copy.bundlesSold}</TableHead>
+                        <TableHead>{copy.bundlesTotal}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {report.data.bundles.map((row) => (
+                        <TableRow key={row.product_id}>
+                          <TableCell>
+                            <Link href={`/dashboard/bundles/${row.product_id}`} className="font-medium hover:underline">
+                              {row.name}
+                            </Link>{" "}
+                            <bdi className="text-muted-foreground text-xs">{row.sku_code}</bdi>
+                          </TableCell>
+                          <TableCell>{row.quantity}</TableCell>
+                          <TableCell className="whitespace-nowrap">{formatMoney(row.total)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="min-w-0">
+            <CardHeader>
+              <CardTitle>{copy.componentsTitle}</CardTitle>
+              <p className="text-muted-foreground text-xs">{copy.componentsHint}</p>
+            </CardHeader>
+            <CardContent>
+              {report.data.components.length === 0 ? (
+                <EmptyBlock>{copy.noBundles}</EmptyBlock>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table data-testid="bundle-components-report">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{copy.product}</TableHead>
+                        <TableHead>{copy.code}</TableHead>
+                        <TableHead>{copy.quantityBase}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {report.data.components.map((row) => (
+                        <TableRow key={row.sku_id}>
+                          <TableCell>
+                            <Link href={`/dashboard/inventory/${row.sku_id}`} className="font-medium hover:underline">
+                              {row.product_name}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <bdi>{row.sku_code}</bdi>
+                          </TableCell>
+                          <TableCell className="font-semibold">{row.quantity_base}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

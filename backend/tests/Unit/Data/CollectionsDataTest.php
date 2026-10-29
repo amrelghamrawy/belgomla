@@ -9,8 +9,10 @@ use App\Modules\Collections\Data\CollectionFiltersData;
 use App\Modules\Collections\Http\Requests\ListCollectionsRequest;
 use App\Modules\Collections\Http\Requests\RecordCollectionRequest;
 use App\Modules\Collections\Http\Requests\VoidCollectionRequest;
+use App\Modules\Reports\Data\BundleReportData;
 use App\Modules\Reports\Data\SalesReportData;
 use App\Modules\Reports\Enums\SalesGrouping;
+use App\Modules\Reports\Http\Requests\BundleReportRequest;
 use App\Modules\Reports\Http\Requests\SalesReportRequest;
 use Carbon\CarbonImmutable;
 
@@ -70,6 +72,19 @@ test('D5 the sales report defaults to the last 30 business days by day', functio
 
     expect(SalesReportData::fromRequest(validatedCollectionsRequest(SalesReportRequest::class, [], 'GET')))
         ->toEqual(new SalesReportData('2026-09-12', '2026-10-11', SalesGrouping::Day, 'Africa/Cairo'));
+});
+
+test('D93 the bundle report takes the range it is given', function (): void {
+    $request = validatedCollectionsRequest(BundleReportRequest::class, ['from' => '2026-09-01', 'to' => '2026-09-30'], 'GET');
+
+    expect(BundleReportData::fromRequest($request))->toEqual(new BundleReportData('2026-09-01', '2026-09-30', 'Africa/Cairo'));
+});
+
+test('D60 D93 the bundle report defaults to the last 30 business days', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-10 22:30:00', 'UTC'));
+
+    expect(BundleReportData::fromRequest(validatedCollectionsRequest(BundleReportRequest::class, [], 'GET')))
+        ->toEqual(new BundleReportData('2026-09-12', '2026-10-11', 'Africa/Cairo'));
 });
 
 test('audit filters: entity, actor, business days and a lower-cased batch id', function (): void {

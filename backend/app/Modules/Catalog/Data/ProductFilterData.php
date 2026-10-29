@@ -8,6 +8,7 @@ use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Http\Requests\BulkProductStatusRequest;
 use App\Modules\Catalog\Http\Requests\ExportPriceListRequest;
 use App\Modules\Catalog\Http\Requests\ExportProductsRequest;
+use App\Modules\Catalog\Http\Requests\GenerateBundleRequest;
 use App\Modules\Catalog\Http\Requests\ListDashboardProductsRequest;
 use App\Modules\Catalog\Http\Requests\StoreProductListRequest;
 
@@ -29,7 +30,7 @@ final readonly class ProductFilterData
         public ?ProductStatus $status = null,
     ) {}
 
-    public static function fromRequest(ListDashboardProductsRequest|BulkProductStatusRequest|StoreProductListRequest|ExportProductsRequest|ExportPriceListRequest $request): self
+    public static function fromRequest(ListDashboardProductsRequest|BulkProductStatusRequest|StoreProductListRequest|ExportProductsRequest|ExportPriceListRequest|GenerateBundleRequest $request): self
     {
         $input = $request->productFilterInput();
 

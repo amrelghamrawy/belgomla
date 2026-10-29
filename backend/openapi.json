@@ -3077,6 +3077,143 @@
                 }
             }
         },
+        "/api/dashboard/bundles": {
+            "post": {
+                "operationId": "dashboardCreateBundle",
+                "tags": [
+                    "dashboard-catalog"
+                ],
+                "summary": "Creates a bundle product (BR-P15, D93): its SKU sold in one unit, its components and pricing",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/BundleRequest"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "status": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "active",
+                                                    "inactive"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "$ref": "#/components/responses/DashboardProduct"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/bundles/generate": {
+            "post": {
+                "operationId": "dashboardGenerateBundle",
+                "tags": [
+                    "dashboard-catalog"
+                ],
+                "summary": "Makes a draft (inactive) grade set from a product filter: every matching active simple product, quantity 1 (D93)",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "filter"
+                                ],
+                                "properties": {
+                                    "filter": {
+                                        "$ref": "#/components/schemas/ProductFilter"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "$ref": "#/components/responses/DashboardProduct"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/bundles/{product}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/ProductId"
+                }
+            ],
+            "put": {
+                "operationId": "dashboardUpdateBundle",
+                "tags": [
+                    "dashboard-catalog"
+                ],
+                "summary": "Replaces a bundle's fields, components and pricing (not its status); a simple product is 404",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BundleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/DashboardProduct"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/dashboard/products/bulk/status": {
             "post": {
                 "operationId": "dashboardBulkProductStatus",
@@ -7532,6 +7669,52 @@
                 }
             }
         },
+        "/api/dashboard/reports/bundles": {
+            "get": {
+                "operationId": "dashboardReportBundles",
+                "tags": [
+                    "dashboard-reports"
+                ],
+                "summary": "Bundles sold and the component units they consumed, over orders delivered in the range (Africa/Cairo days, D60; default the last 30 days); BR-P15, D93",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/From"
+                    },
+                    {
+                        "$ref": "#/components/parameters/To"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bundle sales and component consumption",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BundleReport"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/dashboard/reports/outstanding": {
             "get": {
                 "operationId": "dashboardReportOutstanding",
@@ -8435,6 +8618,7 @@
                     "invalid_vertical",
                     "inventory_below_reserved",
                     "invited",
+                    "is_bundle",
                     "is_preorder",
                     "last_active_user",
                     "last_owner",
@@ -9338,6 +9522,7 @@
                     "slug",
                     "description",
                     "status",
+                    "type",
                     "main_image_url",
                     "category",
                     "custom_fields",
@@ -9369,10 +9554,46 @@
                             "coming_soon"
                         ]
                     },
+                    "type": {
+                        "$ref": "#/components/schemas/ProductType"
+                    },
                     "main_image_url": {
                         "type": [
                             "string",
                             "null"
+                        ]
+                    },
+                    "components": {
+                        "description": "A bundle's components (BR-P15, D93); left out for a simple product",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/StoreBundleComponent"
+                        }
+                    },
+                    "availability": {
+                        "type": "integer",
+                        "description": "Bundles the components allow now (D93); left out for a simple product"
+                    },
+                    "components_total": {
+                        "description": "The components bought on their own at the shopper's prices; bundles only, left out when prices are hidden",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "saving": {
+                        "description": "components_total less the bundle's price, never below 0 («وفّر»); bundles only, left out when prices are hidden",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
                         ]
                     },
                     "preorder": {
@@ -9891,6 +10112,7 @@
                     "sku_unit_id",
                     "product_name",
                     "variant",
+                    "is_bundle",
                     "product_slug",
                     "unit",
                     "conversion_factor",
@@ -9920,6 +10142,10 @@
                             "null"
                         ],
                         "description": "The variant label («أزرق / M», BR-P14), null without options"
+                    },
+                    "is_bundle": {
+                        "type": "boolean",
+                        "description": "A bundle (D93): available is then the bundles its components allow"
                     },
                     "product_slug": {
                         "type": "string"
@@ -10166,7 +10392,9 @@
                     "line_total",
                     "delivered_quantity",
                     "removed_at",
-                    "converted_quantity"
+                    "converted_quantity",
+                    "is_bundle",
+                    "parent_item_id"
                 ],
                 "properties": {
                     "id": {
@@ -10272,6 +10500,17 @@
                     "converted_quantity": {
                         "type": "integer",
                         "description": "Selling units of a pre-order line already converted into a normal order (BR-O14); line_total charges the rest. 0 on a normal order"
+                    },
+                    "is_bundle": {
+                        "type": "boolean",
+                        "description": "The line of a bundle (D93): priced, holding no stock; its components follow it"
+                    },
+                    "parent_item_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "The bundle line a component line belongs to (D93); out of the items total"
                     }
                 }
             },
@@ -11713,6 +11952,7 @@
                     "slug",
                     "description",
                     "status",
+                    "type",
                     "category",
                     "custom_fields",
                     "preorder",
@@ -11742,6 +11982,9 @@
                     "status": {
                         "$ref": "#/components/schemas/ProductStatus"
                     },
+                    "type": {
+                        "$ref": "#/components/schemas/ProductType"
+                    },
                     "category": {
                         "oneOf": [
                             {
@@ -11766,6 +12009,17 @@
                     },
                     "preorder": {
                         "$ref": "#/components/schemas/ProductPreorder"
+                    },
+                    "bundle": {
+                        "description": "A bundle's pricing and components (BR-P15, D93); detail responses of a bundle only",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/DashboardBundle"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     },
                     "sku": {
                         "description": "The SKU standing for the product in lists: the first active SKU, else the first (V2 Task 14)",
@@ -12342,6 +12596,353 @@
                         ]
                     }
                 ]
+            },
+            "BundleReport": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "bundles",
+                    "components"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "bundles": {
+                        "type": "array",
+                        "description": "One row per bundle delivered in the range, most sold first",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "product_id",
+                                "name",
+                                "sku_code",
+                                "quantity",
+                                "total"
+                            ],
+                            "properties": {
+                                "product_id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "The bundle name as snapshotted on its latest line"
+                                },
+                                "sku_code": {
+                                    "type": "string"
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "description": "Bundles delivered (less returns are not taken off)"
+                                },
+                                "total": {
+                                    "$ref": "#/components/schemas/Money",
+                                    "description": "Σ line_total of the bundle lines"
+                                }
+                            }
+                        }
+                    },
+                    "components": {
+                        "type": "array",
+                        "description": "One row per component SKU the delivered bundles consumed, most first",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "sku_id",
+                                "sku_code",
+                                "product_name",
+                                "quantity_base"
+                            ],
+                            "properties": {
+                                "sku_id": {
+                                    "type": "integer"
+                                },
+                                "sku_code": {
+                                    "type": "string"
+                                },
+                                "product_name": {
+                                    "type": "string"
+                                },
+                                "quantity_base": {
+                                    "type": "integer",
+                                    "description": "Base units delivered inside bundles"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ProductType": {
+                "type": "string",
+                "enum": [
+                    "simple",
+                    "bundle"
+                ],
+                "description": "A bundle (BR-P15, D93) is one SKU made of component SKU units, with no stock of its own"
+            },
+            "BundlePricing": {
+                "type": "object",
+                "required": [
+                    "mode",
+                    "value"
+                ],
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "fixed",
+                            "percent_off_sum"
+                        ]
+                    },
+                    "value": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "The price (fixed, at least 0.01) or the % off the components' sum (0 ≤ % < 100)"
+                    }
+                }
+            },
+            "BundleRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "category_id",
+                    "code",
+                    "unit_id",
+                    "components",
+                    "pricing"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "category_id": {
+                        "type": "integer"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 5000
+                    },
+                    "custom_fields": {
+                        "type": "object",
+                        "description": "Optional for a bundle (none is required)",
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "integer",
+                                "number",
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    },
+                    "code": {
+                        "type": "string",
+                        "maxLength": 60
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "description": "The store unit the bundle is sold in (factor 1)"
+                    },
+                    "moq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000
+                    },
+                    "components": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "sku_unit_id",
+                                "quantity"
+                            ],
+                            "properties": {
+                                "sku_unit_id": {
+                                    "type": "integer",
+                                    "description": "A unit of an active SKU of an active simple product, once per bundle"
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 1000
+                                }
+                            }
+                        }
+                    },
+                    "pricing": {
+                        "type": "object",
+                        "required": [
+                            "mode",
+                            "value"
+                        ],
+                        "properties": {
+                            "mode": {
+                                "type": "string",
+                                "enum": [
+                                    "fixed",
+                                    "percent_off_sum"
+                                ]
+                            },
+                            "value": {
+                                "type": [
+                                    "string",
+                                    "number"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "DashboardBundle": {
+                "type": "object",
+                "required": [
+                    "pricing",
+                    "components",
+                    "components_total",
+                    "availability"
+                ],
+                "properties": {
+                    "pricing": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/BundlePricing"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "components": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DashboardBundleComponent"
+                        }
+                    },
+                    "components_total": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "Σ component base price × quantity"
+                    },
+                    "availability": {
+                        "type": "integer",
+                        "description": "Bundles the components allow now"
+                    }
+                }
+            },
+            "DashboardBundleComponent": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "sku_unit_id",
+                    "sku_id",
+                    "product_id",
+                    "product_name",
+                    "sku_code",
+                    "label",
+                    "unit",
+                    "conversion_factor",
+                    "quantity",
+                    "base_price",
+                    "available",
+                    "orderable"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "sku_unit_id": {
+                        "type": "integer"
+                    },
+                    "sku_id": {
+                        "type": "integer"
+                    },
+                    "product_id": {
+                        "type": "integer"
+                    },
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The variant label, null without options"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "conversion_factor": {
+                        "type": "integer"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "Units of the component in one bundle"
+                    },
+                    "base_price": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "available": {
+                        "type": "integer",
+                        "description": "Base units of the component in stock"
+                    },
+                    "orderable": {
+                        "type": "boolean",
+                        "description": "The component can still be ordered (product active, SKU active, unit sold)"
+                    }
+                }
+            },
+            "StoreBundleComponent": {
+                "type": "object",
+                "required": [
+                    "product_name",
+                    "slug",
+                    "sku_code",
+                    "label",
+                    "unit",
+                    "quantity",
+                    "in_stock"
+                ],
+                "properties": {
+                    "product_name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "in_stock": {
+                        "type": "boolean",
+                        "description": "The component allows at least one bundle now; false names what is missing"
+                    }
+                }
             },
             "ProductFilter": {
                 "type": "object",
@@ -13953,6 +14554,7 @@
                     "quantity",
                     "moq",
                     "available",
+                    "is_bundle",
                     "cover_price",
                     "unit_price",
                     "discount_percent",
@@ -13992,7 +14594,10 @@
                     },
                     "available": {
                         "type": "integer",
-                        "description": "Selling units left now (not locked)"
+                        "description": "Selling units left now (not locked); for a bundle the bundles its components allow (D93)"
+                    },
+                    "is_bundle": {
+                        "type": "boolean"
                     },
                     "cover_price": {
                         "oneOf": [

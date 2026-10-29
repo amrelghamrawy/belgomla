@@ -36,6 +36,7 @@ import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/Stat
 import { BulkPricingDialog } from "./BulkPricingDialog";
 import { BulkStatusDialog } from "./BulkStatusDialog";
 import { ExportButtons } from "./ExportButtons";
+import { GradeSetWizard } from "./GradeSetWizard";
 import { ImportWizard } from "./ImportWizard";
 
 const copy = ar.dashboard.products;
@@ -53,6 +54,8 @@ export function ProductsPage() {
   const fields = useFields();
   const scope = bulkFilterOf(query);
   const total = products.data?.meta.total ?? 0;
+  const categoryOptions = categories.data ? flatten(activeOnly(categories.data)) : [];
+  const facets = (fields.data ?? []).filter((field) => field.is_filterable && field.status === "active");
 
   return (
     <>
@@ -62,18 +65,19 @@ export function ProductsPage() {
           <div className="flex flex-wrap items-center gap-2">
             {allowed("catalog.manage") && <ExportButtons query={query} />}
             {allowed("catalog.manage") && <ImportWizard />}
+            {allowed("catalog.manage") && <GradeSetWizard query={query} categories={categoryOptions} facets={facets} />}
+            {allowed("catalog.manage") && (
+              <Button asChild variant="outline">
+                <Link href="/dashboard/bundles/new">{ar.dashboard.bundles.add}</Link>
+              </Button>
+            )}
             <Button asChild>
               <Link href="/dashboard/products/new">{copy.add}</Link>
             </Button>
           </div>
         }
       />
-      <Filters
-        query={query}
-        setQuery={setQuery}
-        categories={categories.data ? flatten(activeOnly(categories.data)) : []}
-        facets={(fields.data ?? []).filter((field) => field.is_filterable && field.status === "active")}
-      />
+      <Filters query={query} setQuery={setQuery} categories={categoryOptions} facets={facets} />
       <div className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm">
         <span className="font-medium">{copy.bulk}:</span>
         {"filter" in scope ? (
@@ -122,7 +126,9 @@ export function ProductsPage() {
 function ProductRow({ product }: { product: DashboardProduct }) {
   const router = useRouter();
   const duplicate = useDuplicateProduct();
-  const available = product.sku?.inventory?.available;
+  // BR-P15, D93: a bundle has no stock of its own (no low-stock flag) and its own editor; it is not duplicated.
+  const bundle = product.type === "bundle";
+  const available = bundle ? undefined : product.sku?.inventory?.available;
   const low =
     product.sku !== null &&
     available !== undefined &&
@@ -131,9 +137,17 @@ function ProductRow({ product }: { product: DashboardProduct }) {
   return (
     <TableRow data-testid={`product-${product.id}`}>
       <TableCell className="max-w-64 font-medium">
-        <Link href={`/dashboard/products/${product.id}`} className="hover:underline">
+        <Link
+          href={bundle ? `/dashboard/bundles/${product.id}` : `/dashboard/products/${product.id}`}
+          className="hover:underline"
+        >
           {product.name}
         </Link>
+        {bundle && (
+          <Badge variant="outline" className="ms-2" data-testid={`bundle-badge-${product.id}`}>
+            {ar.dashboard.bundles.badge}
+          </Badge>
+        )}
       </TableCell>
       <TableCell>
         <bdi>{product.sku?.code ?? ar.dashboard.none}</bdi>
@@ -156,23 +170,25 @@ function ProductRow({ product }: { product: DashboardProduct }) {
         )}
       </TableCell>
       <TableCell>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={duplicate.isPending}
-          onClick={() =>
-            duplicate.mutate(product.id, {
-              onSuccess: (copyOf) => {
-                toast.success(copy.duplicated);
-                router.push(`/dashboard/products/${copyOf.id}`);
-              },
-              onError: (error) => toast.error(messageFor(error)),
-            })
-          }
-        >
-          <CopyIcon />
-          {copy.duplicate}
-        </Button>
+        {!bundle && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={duplicate.isPending}
+            onClick={() =>
+              duplicate.mutate(product.id, {
+                onSuccess: (copyOf) => {
+                  toast.success(copy.duplicated);
+                  router.push(`/dashboard/products/${copyOf.id}`);
+                },
+                onError: (error) => toast.error(messageFor(error)),
+              })
+            }
+          >
+            <CopyIcon />
+            {copy.duplicate}
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );

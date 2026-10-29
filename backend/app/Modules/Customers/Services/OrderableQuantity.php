@@ -6,6 +6,7 @@ namespace App\Modules\Customers\Services;
 
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\SkuUnit;
+use App\Modules\Catalog\Services\BundleAvailability;
 use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Exceptions\CartLineInvalid;
 
@@ -16,9 +17,15 @@ use App\Modules\Customers\Exceptions\CartLineInvalid;
  * (`$heldBase`: piece and carton draw on the same stock). A pre-order line (BR-O14, D88) needs a Coming Soon product with
  * pre-orders on and the MOQ, never stock. Checkout and the pre-order confirmation repeat these under lock. Expects the
  * unit's `sku.product` and `sku.inventory` loaded.
+ *
+ * A bundle (BR-P15, V2 Task 15, D93) has no stock of its own: it can go in while its components allow that many bundles
+ * (BundleAvailability; a component that can no longer be ordered makes it `product_inactive`). What the cart holds of a
+ * component loose is checked with the bundle at checkout, not here.
  */
 final readonly class OrderableQuantity
 {
+    public function __construct(private BundleAvailability $bundles) {}
+
     public function assert(SkuUnit $unit, int $quantity, CartLineKind $kind = CartLineKind::Order, int $heldBase = 0): void
     {
         if ($kind === CartLineKind::Preorder) {
@@ -29,6 +36,12 @@ final readonly class OrderableQuantity
 
         if ($unit->sku->product->status !== ProductStatus::Active || ! $unit->sku->isActive() || ! $unit->isActive()) {
             throw CartLineInvalid::productInactive($unit->sku_id, $unit->id);
+        }
+
+        if ($unit->sku->product->isBundle()) {
+            $this->assertBundle($unit, $quantity);
+
+            return;
         }
 
         $this->assertMoq($unit, $quantity);
@@ -55,6 +68,24 @@ final readonly class OrderableQuantity
         }
 
         $this->assertMoq($unit, $quantity);
+    }
+
+    /** D93: every component can be ordered, the MOQ, and the components allow that many bundles. */
+    private function assertBundle(SkuUnit $unit, int $quantity): void
+    {
+        $items = $unit->sku->bundleItems;
+
+        if ($items->isEmpty() || ! $items->every($this->bundles->orderable(...))) {
+            throw CartLineInvalid::productInactive($unit->sku_id, $unit->id);
+        }
+
+        $this->assertMoq($unit, $quantity);
+
+        $available = $this->bundles->available($unit->sku);
+
+        if ($quantity > $available) {
+            throw CartLineInvalid::insufficientStock($unit->sku_id, $unit->id, $available);
+        }
     }
 
     private function assertMoq(SkuUnit $unit, int $quantity): void

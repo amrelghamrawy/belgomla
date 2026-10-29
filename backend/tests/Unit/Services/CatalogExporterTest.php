@@ -6,6 +6,7 @@ use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Enums\SpreadsheetFormat;
 use App\Modules\Catalog\Exceptions\ImportUnavailable;
 use App\Modules\Catalog\Jobs\ExportCatalog;
+use App\Modules\Catalog\Services\BundleSheet;
 use App\Modules\Catalog\Services\CatalogExporter;
 use App\Modules\Catalog\Services\CatalogFiles;
 use App\Modules\Tenancy\TenantContext;
@@ -15,7 +16,7 @@ use Illuminate\Support\Str;
 beforeEach(function (): void {
     Queue::fake();
     app(TenantContext::class)->set($this->tenant);
-    $this->importedProduct();
+    $this->book = $this->importedProduct();
     $this->exporter = app(CatalogExporter::class);
 });
 
@@ -65,6 +66,47 @@ test('a download is refused while pending, when failed and without a valid signa
     'failed' => ['failed-one', true, 'not_found'],
     'bad signature' => ['pending-one', false, 'not_found'],
 ]);
+
+test('D93 an xlsx export writes the bundles to the bundles_v1 sheet, labels over keys, one row per component', function (): void {
+    $this->importedBundle($this->book);
+    $path = sys_get_temp_dir().'/export-'.Str::uuid().'.xlsx';
+
+    $this->exporter->write($path, new ProductFilterData, SpreadsheetFormat::Xlsx);
+
+    expect(spreadsheetRows($path, sheetName: 'bundles_v1'))->toBe([
+        1 => array_values(BundleSheet::LABELS),
+        2 => array_keys(BundleSheet::LABELS),
+        3 => ['SET-1', 'باقة أولى إعدادي', 'نشط', 'كتب خارجية > أولى إعدادي', 'قطعة', '2', 'خصم من مجموع الأصناف', '10', '162', 'ADW-SCI-1', 'كرتونة', '2'],
+    ]);
+});
+
+test('D93 the products sheet of an export leaves bundles out', function (SpreadsheetFormat $format): void {
+    $this->importedBundle($this->book);
+    $path = sys_get_temp_dir().'/export-'.Str::uuid().'.'.$format->value;
+
+    $this->exporter->write($path, new ProductFilterData, $format);
+
+    expect(array_values(array_filter(array_column(spreadsheetRows($path, $format), 1), fn (string $code): bool => $code !== 'sku_code' && $code !== 'كود الصنف')))->toBe(['ADW-SCI-1']);
+})->with(['xlsx' => [SpreadsheetFormat::Xlsx], 'csv' => [SpreadsheetFormat::Csv]]);
+
+test('D93 a csv export has no bundles at all: one sheet only', function (): void {
+    $this->importedBundle($this->book);
+    $path = sys_get_temp_dir().'/export-'.Str::uuid().'.csv';
+
+    $this->exporter->write($path, new ProductFilterData, SpreadsheetFormat::Csv);
+
+    expect((string) file_get_contents($path))->not->toContain('SET-1')
+        ->and(spreadsheetRows($path, SpreadsheetFormat::Csv))->toHaveCount(2);
+});
+
+test('the template has no bundles sheet', function (): void {
+    $this->importedBundle($this->book);
+    $path = sys_get_temp_dir().'/template-'.Str::uuid().'.xlsx';
+
+    $this->exporter->template($path, SpreadsheetFormat::Xlsx);
+
+    expect(spreadsheetRows($path, sheetName: 'bundles_v1'))->toBe([]);
+});
 
 test('a file is named after what it holds and today', function (): void {
     $this->travelTo(now()->setDate(2026, 10, 20));

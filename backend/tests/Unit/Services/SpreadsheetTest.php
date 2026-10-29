@@ -61,6 +61,36 @@ test('without keys an xlsx file has the label row only', function (): void {
         ->and(app(Spreadsheet::class)->sheetName($path, SpreadsheetFormat::Xlsx))->toBe('قائمة الأسعار');
 });
 
+test('an xlsx file gets further sheets after the first, each read back by its name', function (): void {
+    $path = spreadsheetTempPath(SpreadsheetFormat::Xlsx);
+
+    app(Spreadsheet::class)->write($path, SpreadsheetFormat::Xlsx, SPREADSHEET_HEADERS, [['sku_code' => 'A']], 'products_v3', withKeys: true, moreSheets: [
+        ['name' => 'bundles_v1', 'headers' => ['bundle_code' => 'كود الباقة'], 'rows' => [['bundle_code' => 'SET-1']]],
+    ]);
+
+    expect(spreadsheetRows($path, sheetName: 'bundles_v1'))->toBe([1 => ['كود الباقة'], 2 => ['bundle_code'], 3 => ['SET-1']])
+        ->and(spreadsheetRows($path))->toHaveCount(3)
+        ->and(app(Spreadsheet::class)->sheetName($path, SpreadsheetFormat::Xlsx))->toBe('products_v3');
+});
+
+test('a csv file leaves the further sheets out', function (): void {
+    $path = spreadsheetTempPath(SpreadsheetFormat::Csv);
+
+    app(Spreadsheet::class)->write($path, SpreadsheetFormat::Csv, SPREADSHEET_HEADERS, [['sku_code' => 'A']], withKeys: true, moreSheets: [
+        ['name' => 'bundles_v1', 'headers' => ['bundle_code' => 'كود الباقة'], 'rows' => [['bundle_code' => 'SET-1']]],
+    ]);
+
+    expect(spreadsheetRows($path, SpreadsheetFormat::Csv))->toBe([1 => ['sku_code', 'product_name', 'base_price'], 2 => ['A', '', '']]);
+});
+
+test('reading a sheet the file does not have gives no rows', function (): void {
+    $path = spreadsheetTempPath(SpreadsheetFormat::Xlsx);
+
+    app(Spreadsheet::class)->write($path, SpreadsheetFormat::Xlsx, SPREADSHEET_HEADERS, [['sku_code' => 'A']]);
+
+    expect(spreadsheetRows($path, sheetName: 'bundles_v1'))->toBe([]);
+});
+
 test('reading keeps the spreadsheet row numbers across empty rows and trims cells', function (): void {
     $path = spreadsheetTempPath(SpreadsheetFormat::Csv);
     file_put_contents($path, "sku_code,product_name\n\n  A-1 , كتاب \n,\nB-2,قلم\n");

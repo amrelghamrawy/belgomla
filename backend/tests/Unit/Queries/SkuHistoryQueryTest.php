@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\SkuHistoryQuery;
@@ -32,6 +33,14 @@ test('BR-P05 a sku with a stock movement has history', function (): void {
 test('BR-P05 a sku with a negotiated customer price has history', function (): void {
     $sku = ($this->fresh)();
     CustomerSkuPrice::factory()->create(['sku_id' => $sku->id, 'sku_unit_id' => $this->defaultUnitId($sku)]);
+
+    expect(app(SkuHistoryQuery::class)->withHistory([$sku->id]))->toBe([$sku->id]);
+});
+
+test('D93 a sku one of whose units is a bundle component has history', function (): void {
+    $sku = ($this->fresh)();
+    $carton = $this->addUnit($sku);
+    BundleItem::factory()->create(['component_sku_unit_id' => $carton->id]);
 
     expect(app(SkuHistoryQuery::class)->withHistory([$sku->id]))->toBe([$sku->id]);
 });

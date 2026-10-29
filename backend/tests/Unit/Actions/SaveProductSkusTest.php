@@ -9,6 +9,7 @@ use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\SkuStatus;
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Catalog\Models\ProductOptionValue;
@@ -59,6 +60,18 @@ test('BR-P05 BR-P14 a variant left out that has history is set inactive and keep
         ->and($red->fresh()?->status)->toBe(SkuStatus::Inactive)
         ->and($red->fresh()?->name)->toBe('أحمر')
         ->and(ProductOptionValue::query()->where('value', 'أحمر')->exists())->toBeFalse();
+});
+
+test('D93 a variant left out that is a bundle component is set inactive, not deleted', function (): void {
+    $red = Sku::query()->where('code', 'PEN-3')->sole();
+    SkuInventory::query()->whereKey($red->id)->update(['on_hand' => 0]);
+    App\Modules\Inventory\Models\InventoryMovement::query()->where('sku_id', $red->id)->delete();
+    BundleItem::factory()->create(['component_sku_unit_id' => $this->defaultUnitId($red)]);
+
+    $product = ($this->save)([($this->sku)('PEN-1', ['أزرق']), ($this->sku)('PEN-2', ['أسود'])], [($this->colours)('أزرق', 'أسود')]);
+
+    expect($product->skus->pluck('code')->all())->toBe(['PEN-1', 'PEN-2', 'PEN-3'])
+        ->and($red->fresh()?->status)->toBe(SkuStatus::Inactive);
 });
 
 test('BR-P14 a variant sent without its id takes the place of the one with the same code', function (): void {

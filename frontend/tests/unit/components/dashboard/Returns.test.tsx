@@ -232,3 +232,21 @@ describe("ReturnsPage", () => {
     expect(router.replace).toHaveBeenCalledWith(expect.stringContaining("q=1001"), { scroll: false });
   });
 });
+
+describe("ReturnDialog bundles (BR-P15, D93)", () => {
+  it("names the bundle a component line came in", async () => {
+    stubApi({
+      "GET /api/dashboard/orders/1001/returns": returnsOf([
+        line({ order_item_id: 71 }),
+        line({ order_item_id: 73, product_name: "قلم" }),
+      ]),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<ReturnDialog orderNumber={1001} bundles={{ 71: "طقم أولى إعدادي" }} />);
+
+    await user.click(screen.getByRole("button", { name: "تسجيل مرتجع" }));
+
+    expect(await screen.findByTestId("return-bundle-71")).toHaveTextContent("ضمن طقم أولى إعدادي");
+    expect(screen.queryByTestId("return-bundle-73")).not.toBeInTheDocument();
+  });
+});

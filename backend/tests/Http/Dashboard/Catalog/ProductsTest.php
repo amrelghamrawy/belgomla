@@ -18,7 +18,7 @@ const DASHBOARD_SKU_KEYS = [
 ];
 
 const DASHBOARD_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name', 'kind'], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
+    'id', 'name', 'slug', 'description', 'status', 'type', 'category' => ['id', 'name', 'kind'], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
     'sku' => DASHBOARD_SKU_KEYS,
     'skus' => ['*' => DASHBOARD_SKU_KEYS],
     'options',
@@ -412,6 +412,16 @@ test('D36 low_stock=1 keeps products whose stock is at most one minimum order, i
         ->json('data.*.id');
 
     expect($listed)->toEqualCanonicalizing([$ids['low'], $ids['no stock row']]);
+});
+
+test('D93 low_stock=1 never lists a bundle', function (): void {
+    $simple = $this->inTenant(fn (): int => Product::factory()->withSku()->create()->id);
+    $this->inTenant(fn () => Product::factory()->bundle()->withSku()->create());
+
+    $this->tenantJson('GET', '/api/dashboard/products?low_stock=1')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', $simple);
 });
 
 test('dashboard list validation', function (string $query, string $field): void {

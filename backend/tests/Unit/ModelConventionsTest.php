@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\CatalogImport;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
@@ -38,6 +39,7 @@ use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Orders\Models\TenantOrderCounter;
+use App\Modules\Pricing\Models\BundlePricing;
 use App\Modules\Pricing\Models\Promotion;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -82,6 +84,7 @@ function columnsEndingWith(string $model, array $suffixes): array
 test('the module model list is explicit so new models are reviewed', function (): void {
     expect(moduleModels())->toBe([
         AuditLog::class,
+        BundleItem::class,
         CatalogImport::class,
         Category::class,
         Product::class,
@@ -117,6 +120,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         OrderReturnItem::class,
         OrderStatusHistory::class,
         TenantOrderCounter::class,
+        BundlePricing::class,
         Promotion::class,
         SkuPriceTier::class,
         Tenant::class,

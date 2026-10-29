@@ -23,7 +23,7 @@ test('to array', function (): void {
 
     expect(array_keys($product->toArray()))->toBe([
         'id', 'tenant_id', 'category_id', 'name', 'slug', 'description', 'status', 'custom_fields', 'created_by', 'created_at', 'updated_at',
-        'preorder_enabled', 'expected_at', 'preorder_limit',
+        'preorder_enabled', 'expected_at', 'preorder_limit', 'type',
     ]);
 });
 
@@ -165,3 +165,11 @@ test('BR-O14 the database refuses a pre-order cap below one', function (): void 
 
     DB::table('products')->where('id', $product->id)->update(['preorder_limit' => 0]);
 })->throws(QueryException::class, 'products_preorder_limit_positive');
+
+test('BR-P15 a product is simple unless made a bundle', function (): void {
+    [$simple, $bundle] = $this->inTenant(fn (): array => [Product::factory()->create()->fresh(), Product::factory()->bundle()->create()->fresh()]);
+
+    expect($simple->type)->toBe(App\Modules\Catalog\Enums\ProductType::Simple)
+        ->and($simple->isBundle())->toBeFalse()
+        ->and($bundle->isBundle())->toBeTrue();
+});

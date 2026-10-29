@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { BundleComponentsList } from "@/components/shared/BundleComponentsList";
 import { StatusPage } from "@/components/shared/StatusPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
-import { changedLineIds, liveItems, variantOf } from "@/lib/store/order-lines";
+import { changedLineIds, groupOrderLines, liveItems, variantOf } from "@/lib/store/order-lines";
 import { useCancelOrder, useOrder } from "@/lib/store/orders";
 import { useRouteParam } from "@/lib/store/route";
 
@@ -145,7 +146,7 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
           {ar.orders.items} ({ar.orders.itemsCount(liveItems(order).length)})
         </h2>
         <ul className="flex flex-col divide-y rounded-xl border">
-          {order.items.map((item) => (
+          {groupOrderLines(order.items).map(({ item, components }) => (
             <li
               key={item.id}
               data-testid={`order-line-${item.id}`}
@@ -158,6 +159,11 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
               <div className="flex flex-col gap-0.5">
                 <span className="font-medium">
                   {item.product_name}
+                  {item.is_bundle && (
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {ar.orders.bundle}
+                    </Badge>
+                  )}
                   {item.removed_at !== null ? (
                     <Badge variant="outline" className="ms-2 text-xs">
                       {ar.orders.lineRemoved}
@@ -194,6 +200,7 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
                   )}{" "}
                   {formatMoney(item.unit_price)}
                 </span>
+                <BundleComponentsList bundle={item} components={components} />
               </div>
               <span className="font-medium whitespace-nowrap">{formatMoney(item.line_total)}</span>
             </li>

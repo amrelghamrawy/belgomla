@@ -251,6 +251,17 @@ A product may have up to two **options** (e.g. «اللون», «المقاس»)
 - Books keep D16: a final revision is a separate product, not a variant. Product-level custom fields (D33's stationery colour) stay for products without variants; option values are not custom fields.
 - Duplicating a product (BR-P11) copies every variant; the catalog file (BR-P12, D95 format v3) groups the rows of one product by `product_key`.
 
+### BR-P15 — Bundles and Full-Grade Sets (V2 Task 15)
+
+A **bundle** (باقة) is a sellable product made of component SKU units with fixed quantities, for example every book of أولى إعدادي, first term, from الأضواء (D93).
+
+- It has one SKU sold in one unit (its own code and MOQ). Its components are units of active simple products; a bundle never contains a bundle.
+- It is priced at a fixed price or at the components' base prices summed less a %; group, promotion and negotiated prices apply to the bundle price like to any SKU (BR-PR14, BR-PR15). The storefront shows what the components cost on their own and the saving («وفّر»).
+- It has no stock of its own: it is available while every component is, as many times as the scarcest component allows (BR-INV02). The product page lists the components and names the one that is missing.
+- Ordering a bundle reserves, deducts and returns its components. The order keeps the bundle line (price, total) and one line per component with the price allocated to it; a partial delivery counts whole bundles; a return brings back components at their allocated price.
+- The merchant can generate a draft «طقم» from a facet selection (grade + term + publisher) in one step and review it before activating it.
+- Bundles are exported in the catalog file (second sheet) but not imported (D93).
+
 ### BR-P07 — Product Images
 
 A product can have:
@@ -521,6 +532,8 @@ Each SKU has, in base units:
 Formula:
 
 `Available = On Hand - Reserved`
+
+A bundle (BR-P15, V2 Task 15) has no stock of its own: its availability is derived, the minimum over its components of their Available divided by what one bundle takes of them (D93).
 
 ### BR-INV03 — Reservation at Order Creation
 

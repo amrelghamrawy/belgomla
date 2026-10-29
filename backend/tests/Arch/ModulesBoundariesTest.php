@@ -208,6 +208,7 @@ arch('customers reach tenancy only through its context, concern, queries and the
         'App\Modules\Tenancy\Http\Resources',
     ]);
 
+// V2 Task 15 (D93): a bundle in the cart is as available as its components allow, which Catalog's BundleAvailability says.
 arch('customers only touch the catalog product and sku of a cart line')
     ->expect('App\Modules\Customers')
     ->not->toUse([
@@ -222,7 +223,8 @@ arch('customers only touch the catalog product and sku of a cart line')
         'App\Modules\Catalog\Services',
         'App\Modules\Catalog\Exceptions',
         'App\Modules\Catalog\Http',
-    ]);
+    ])
+    ->ignoring(App\Modules\Catalog\Services\BundleAvailability::class);
 
 arch('customers price only through the pricing services and read stock only through the sku')
     ->expect('App\Modules\Customers')

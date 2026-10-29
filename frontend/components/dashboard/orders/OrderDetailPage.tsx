@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { BundleComponentsList } from "@/components/shared/BundleComponentsList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import { ar } from "@/lib/copy/ar";
 import { allowsAddressEdit } from "@/lib/dashboard/order-status";
 import { balanceOf, useOrder, useVoidCollection } from "@/lib/dashboard/orders";
 import { useVoidReturn } from "@/lib/dashboard/returns";
-import { changedLineIds, variantOf } from "@/lib/store/order-lines";
+import { changedLineIds, groupOrderLines, variantOf } from "@/lib/store/order-lines";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
@@ -138,21 +139,27 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.items.map((item) => (
+                  {groupOrderLines(order.items).map(({ item, components }) => (
                     <TableRow
                       key={item.id}
                       data-testid={`order-line-${item.id}`}
                       className={item.removed_at === null ? undefined : "text-muted-foreground line-through"}
                     >
-                      <TableCell>
+                      <TableCell className="align-top">
                         <span className="font-medium">{item.product_name}</span>{" "}
                         <bdi className="text-muted-foreground text-xs">{item.sku_code}</bdi>
+                        {item.is_bundle && (
+                          <Badge variant="outline" className="ms-2 text-xs">
+                            {ar.dashboard.bundles.badge}
+                          </Badge>
+                        )}
                         {variantOf(item) !== null && (
                           <span className="text-muted-foreground block text-xs" data-testid={`variant-${item.id}`}>
                             {variantOf(item)}
                           </span>
                         )}
                         <LineBadges item={item} changed={changed.has(item.id)} />
+                        <BundleComponentsList bundle={item} components={components} />
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {ar.orders.quantityOf(item.quantity, item.unit)}

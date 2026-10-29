@@ -168,6 +168,7 @@ erDiagram
 | preorder_enabled | boolean      | V2 Task 10: default false; a Coming Soon product takes pre-orders (BR-P04, BR-O14, D88)                  |
 | expected_at   | date            | V2 Task 10: nullable; the day the product is expected, shown on the storefront                          |
 | preorder_limit | int            | V2 Task 10: nullable, **check ≥ 1**; cap in selling units over every open pre-order (null = none)       |
+| type          | varchar(10)     | V2 Task 15: `simple` (default) \| `bundle` (check); a bundle has one SKU made of components (BR-P15, D93) |
 
 Search: `pg_trgm` GIN index on `name`; option labels are joined at query time for search (BR-P08).
 
@@ -258,6 +259,14 @@ The combination of a product's SKUs is unique per product (checked in the reques
 | is_default         | boolean       | **partial unique (sku_id) where is_default**; **check** a default is active |
 | sort_order         | int           | the form's order                                      |
 | status             | varchar(10)   | `active` \| `archived` (check); a unit left out of the form is archived, never deleted |
+
+### `bundle_items` (V2 Task 15, BR-P15, D93)
+
+`id, tenant_id, bundle_sku_id FK skus (cascade), component_sku_unit_id FK sku_units (no action: a unit in a bundle is archived, never deleted; a SKU whose unit is a component counts as having history), quantity int (check ≥ 1), sort_order` with **unique (bundle_sku_id, component_sku_unit_id)**. Replaced as a whole when the bundle is saved. Model `Catalog\Models\BundleItem`; `Sku::bundleItems()`.
+
+### `bundle_pricing` (V2 Task 15, Pricing)
+
+`bundle_sku_id PK FK skus (cascade), tenant_id, mode varchar(16) (check `fixed` \| `percent_off_sum`), value numeric(12,2)` (check: fixed > 0, percent 0 ≤ value < 100). The price it gives is stored as the bundle unit's `base_price` (BundlePricer) and recomputed when a component's base price changes (RepriceBundles). Model `Pricing\Models\BundlePricing`. A bundle SKU has no `sku_inventory` row.
 
 ### `imports` (V2 Task 06)
 
@@ -536,6 +545,8 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | removed_at        | timestamp     | V2 Task 09: the merchant removed the line (BR-O12); kept for history, out of totals, stock moves and returns; **check** a removed line has no delivered_quantity |
 | reserved          | boolean       | V2 Task 10: default true; false on a pre-order line, which holds no stock; transitions and cancel release reserved lines only (BR-O14) |
 | converted_quantity | int          | V2 Task 10: default 0, **check 0 ≤ converted_quantity ≤ quantity** and 0 on a reserved line; selling units of a pre-order line already in a normal order; a pre-order line's line_total = unit_price × (quantity − converted_quantity) |
+| is_bundle         | boolean       | V2 Task 15: default false; the line of a bundle (BR-P15, D93): priced and totalled, holds no stock (**check** not reserved, top level) |
+| parent_item_id    | FK order_items | V2 Task 15: nullable; a component line of the bundle line it names: carries the quantity (bundles × component quantity), the reservation, the delivery and its allocated share (`line_total` = share × bundles, **not** in items_total; `unit_price` = share per unit) |
 
 ### `order_status_history` (BR-O04)
 
@@ -797,5 +808,6 @@ Each module exposes services; cross-module calls go through those services, neve
 | ---------------------- | ------------------------------------------------------ |
 | Variants               | Built in V2 Task 14: `product_options`, `product_option_values`, `sku_option_values`, `skus.status` / `sort_order` (BR-P14, D92) |
 | Roles                  | `tenant_users.role` enum                               |
+| Bundles                | Built in V2 Task 15: `products.type`, `bundle_items`, `bundle_pricing`, `order_items.is_bundle` / `parent_item_id` (BR-P15, D93) |
 | Pre-orders             | Built in V2 Task 10: `products.preorder_*`, `orders.kind` / `converted_from_id` / `converted_at`, `order_items.reserved` / `converted_quantity`, `cart_items.kind` (BR-O14, D88) |
 | Order notifications    | `outbound_messages.purpose` enum                       |

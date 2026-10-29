@@ -6,6 +6,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Data\ProductData;
+use App\Modules\Catalog\Exceptions\BundleRefused;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Services\CustomFieldValidator;
 use App\Modules\Catalog\Services\ProductReferences;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\DB;
  * `sku.moq_changed` / `sku.tiers_changed` (BR-L). A unit's tiers not sent are kept; a unit not sent is archived.
  * Inside an audit batch (the catalog import, V2 Task 06) every record carries the batch id, and a product whose
  * own fields did not change gets no `product.updated` record, so re-importing a file does not flood the log.
+ * A bundle is edited through UpdateBundle (`409 is_bundle`, BR-P15, D93).
  * Owns its transaction.
  */
 final readonly class UpdateProduct
@@ -36,6 +38,10 @@ final readonly class UpdateProduct
 
     public function handle(Product $product, ProductData $data, ?string $batchId = null): Product
     {
+        if ($product->isBundle()) {
+            throw BundleRefused::isBundle();
+        }
+
         $product->load(ProductSnapshot::RELATIONS);
         $category = $this->references->check($data, $product);
         $matches = $this->references->matches($data, $product);

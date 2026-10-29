@@ -1,4 +1,4 @@
-import { CalendarClockIcon, PackageIcon, TrendingUpIcon } from "lucide-react";
+import { BoxesIcon, CalendarClockIcon, PackageIcon, TrendingUpIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -6,6 +6,7 @@ import type { StoreProduct } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
 import { formatDay } from "@/lib/format/date";
 import { formatPercent } from "@/lib/format/money";
+import { isBundle, savingLabel } from "@/lib/store/bundles";
 import { unitSummary } from "@/lib/store/quantity";
 
 import { GeneratedCover } from "./GeneratedCover";
@@ -23,6 +24,8 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
   const pack = product.sku === null ? "" : unitSummary(product.sku);
   const margin = product.prices_hidden === true ? null : (product.sku?.discount_percent ?? null);
   const preorder = comingSoon && product.preorder?.enabled === true ? product.preorder : null;
+  // BR-P15, D93: a bundle says so and what it saves against its components bought alone.
+  const saving = savingLabel(product);
 
   return (
     <article className="group bg-card hover:border-primary/30 hover:shadow-card flex h-full flex-col overflow-hidden rounded-2xl border transition-[box-shadow,border-color,translate] duration-200 motion-safe:hover:-translate-y-0.5">
@@ -66,6 +69,19 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
           </Link>
         </h3>
         {comingSoon && <span className="sr-only">{ar.catalog.comingSoon}</span>}
+        {isBundle(product) && (
+          <p className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="bundle-card">
+            <span className="bg-brand-soft text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold">
+              <BoxesIcon className="size-3.5" aria-hidden />
+              {ar.catalog.bundle}
+            </span>
+            {saving !== null && (
+              <span className="bg-highlight text-highlight-foreground rounded-full px-2 py-0.5 font-bold">
+                {saving}
+              </span>
+            )}
+          </p>
+        )}
         {pack && (
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <PackageIcon className="size-3.5 shrink-0" aria-hidden />

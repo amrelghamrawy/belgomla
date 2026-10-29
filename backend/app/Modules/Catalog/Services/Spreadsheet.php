@@ -30,13 +30,15 @@ use ValueError;
  * Writing: a header of `key => label`. XLSX gets the Arabic labels in bold on a right-to-left sheet and, when
  * `withKeys`, the machine keys in a second, hidden-looking row (2px high, grey) so a file comes back with its
  * columns named exactly; CSV (UTF-8 with a BOM, so Excel shows Arabic) gets the keys only, or the labels when
- * there are no keys to write. Rows are maps by header key; a missing key is an empty cell.
+ * there are no keys to write. Rows are maps by header key; a missing key is an empty cell. An XLSX may get more sheets
+ * after the first (`$moreSheets`, written the same way; V2 Task 15's `bundles_v1`); a CSV has one sheet, so they are left out.
  *
- * Reading: the first sheet, every non-empty row as `row number (1-based, as the spreadsheet shows it) => cells as
+ * Reading: the first sheet (or the one named), every non-empty row as `row number (1-based, as the spreadsheet shows it) => cells as
  * text`. Numbers come back without exponent or trailing zeros (90.0 → "90", 7.5 → "7.5"), dates as Y-m-d. A file
  * OpenSpout cannot read is `422 validation_failed` on `file` (InvalidImportFile), so nothing else sees OpenSpout.
  *
  * @phpstan-type Cell string|int|float|bool|null
+ * @phpstan-type Sheet array{name: string, headers: array<string, string>, rows: iterable<array<string, Cell>>}
  */
 final readonly class Spreadsheet
 {
@@ -45,29 +47,21 @@ final readonly class Spreadsheet
     /**
      * @param  array<string, string>  $headers  key => label, in column order
      * @param  iterable<array<string, Cell>>  $rows
+     * @param  list<Sheet>  $moreSheets  further XLSX sheets, after the first; not written to a CSV
      */
-    public function write(string $path, SpreadsheetFormat $format, array $headers, iterable $rows, string $sheetName = 'Sheet1', bool $withKeys = false): void
+    public function write(string $path, SpreadsheetFormat $format, array $headers, iterable $rows, string $sheetName = 'Sheet1', bool $withKeys = false, array $moreSheets = []): void
     {
-        $keys = array_keys($headers);
         $writer = $format === SpreadsheetFormat::Xlsx ? new XlsxWriter : new CsvWriter(new CsvWriterOptions(SHOULD_ADD_BOM: true));
         $writer->openToFile($path);
 
         try {
+            $this->sheet($writer, ['name' => $sheetName, 'headers' => $headers, 'rows' => $rows], $withKeys);
+
             if ($writer instanceof XlsxWriter) {
-                $sheet = $writer->getCurrentSheet();
-                $sheet->setName($sheetName);
-                $sheet->setSheetView(new SheetView(rightToLeft: true, freezeRow: $withKeys ? 3 : 2));
-                $writer->addRow(Row::fromValuesWithStyle(array_values($headers), new Style(fontBold: true)));
-
-                if ($withKeys) {
-                    $writer->addRow(Row::fromValuesWithStyle($keys, new Style(fontSize: 6, fontColor: 'A0A0A0'), self::KEY_ROW_HEIGHT));
+                foreach ($moreSheets as $sheet) {
+                    $writer->addNewSheetAndMakeItCurrent();
+                    $this->sheet($writer, $sheet, $withKeys);
                 }
-            } else {
-                $writer->addRow(Row::fromValues($withKeys ? $keys : array_values($headers)));
-            }
-
-            foreach ($rows as $row) {
-                $writer->addRow(Row::fromValues(array_map(fn (string $key): string|int|float|bool|null => $row[$key] ?? null, $keys)));
             }
         } finally {
             $writer->close();
@@ -75,14 +69,21 @@ final readonly class Spreadsheet
     }
 
     /**
+     * The rows of the first sheet, or of the sheet named `$sheetName` (none when the file has no such sheet; a CSV's
+     * one sheet has no name, so it is always the first).
+     *
      * @return Generator<int, list<string>>
      */
-    public function read(string $path, SpreadsheetFormat $format): Generator
+    public function read(string $path, SpreadsheetFormat $format, ?string $sheetName = null): Generator
     {
         $reader = $this->open($path, $format);
 
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
+                if ($sheetName !== null && $format === SpreadsheetFormat::Xlsx && $sheet->getName() !== $sheetName) {
+                    continue;
+                }
+
                 $number = 0;
 
                 foreach ($sheet->getRowIterator() as $row) {
@@ -120,6 +121,33 @@ final readonly class Spreadsheet
             return null;
         } finally {
             $reader->close();
+        }
+    }
+
+    /**
+     * One sheet: XLSX gets the bold labels on a right-to-left sheet (and the grey key row), CSV the keys or the labels.
+     *
+     * @param  Sheet  $sheet
+     */
+    private function sheet(XlsxWriter|CsvWriter $writer, array $sheet, bool $withKeys): void
+    {
+        $keys = array_keys($sheet['headers']);
+
+        if ($writer instanceof XlsxWriter) {
+            $current = $writer->getCurrentSheet();
+            $current->setName($sheet['name']);
+            $current->setSheetView(new SheetView(rightToLeft: true, freezeRow: $withKeys ? 3 : 2));
+            $writer->addRow(Row::fromValuesWithStyle(array_values($sheet['headers']), new Style(fontBold: true)));
+
+            if ($withKeys) {
+                $writer->addRow(Row::fromValuesWithStyle($keys, new Style(fontSize: 6, fontColor: 'A0A0A0'), self::KEY_ROW_HEIGHT));
+            }
+        } else {
+            $writer->addRow(Row::fromValues($withKeys ? $keys : array_values($sheet['headers'])));
+        }
+
+        foreach ($sheet['rows'] as $row) {
+            $writer->addRow(Row::fromValues(array_map(fn (string $key): string|int|float|bool|null => $row[$key] ?? null, $keys)));
         }
     }
 

@@ -260,6 +260,7 @@ export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): Das
     slug: "adwaa-science",
     description: null,
     status: "active",
+    type: "simple",
     category: { id: 1, name: "المرحلة الابتدائية", kind: "books" },
     custom_fields: { grade: 11 },
     preorder: { enabled: false, expected_at: null, limit: null },
@@ -288,6 +289,7 @@ export function orderQuoteLine(overrides: Partial<OrderQuoteLine> = {}): OrderQu
     quantity: 12,
     moq: 5,
     available: 20,
+    is_bundle: false,
     cover_price: null,
     unit_price: "85.00",
     discount_percent: null,
@@ -347,6 +349,72 @@ export function variantProduct(overrides: Partial<DashboardProduct> = {}): Dashb
       },
     ],
     images: [{ id: 7, url: "/storage/p/7.jpg", is_main: true, sort_order: 0 }],
+    ...overrides,
+  });
+}
+
+/**
+ * A bundle (V2 Task 15, BR-P15, D93) «طقم أولى إعدادي», code SET-1, sold by the «طقم» (unit 7), MOQ 1, inactive: 1 ×
+ * ADW-SCI-1 (unit 5, 90.00) and 2 × piece of a pen (unit 21, 10.00), sum 110.00 at 10 % off; 3 can be made now.
+ */
+export function bundleDashboardProduct(overrides: Partial<DashboardProduct> = {}): DashboardProduct {
+  const sku = dashboardSku({
+    id: 50,
+    code: "SET-1",
+    selling_unit: { id: 7, name: "طقم" },
+    base_unit: { id: 7, name: "طقم" },
+    conversion_factor: 1,
+    cover_price: null,
+    base_price: "99.00",
+    base_price_percent: null,
+    moq: 1,
+    tiers: [],
+  });
+
+  return dashboardProduct({
+    id: 30,
+    name: "طقم أولى إعدادي",
+    type: "bundle",
+    status: "inactive",
+    custom_fields: { grade: 11 },
+    sku,
+    bundle: {
+      pricing: { mode: "percent_off_sum", value: "10.00" },
+      components: [
+        {
+          id: 1,
+          sku_unit_id: 5,
+          sku_id: 5,
+          product_id: 3,
+          product_name: "الأضواء علوم",
+          sku_code: "ADW-SCI-1",
+          label: null,
+          unit: "كرتونة",
+          conversion_factor: 20,
+          quantity: 1,
+          base_price: "90.00",
+          available: 400,
+          orderable: true,
+        },
+        {
+          id: 2,
+          sku_unit_id: 21,
+          sku_id: 21,
+          product_id: 4,
+          product_name: "قلم جاف",
+          sku_code: "PEN-01-1",
+          label: "أزرق",
+          unit: "قطعة",
+          conversion_factor: 1,
+          quantity: 2,
+          base_price: "10.00",
+          available: 6,
+          orderable: false,
+        },
+      ],
+      components_total: "110.00",
+      availability: 3,
+    },
     ...overrides,
   });
 }

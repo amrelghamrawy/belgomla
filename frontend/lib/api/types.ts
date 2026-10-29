@@ -167,3 +167,12 @@ export type PreorderDemand = Schemas["PreorderDemand"];
 export type PreorderDemandCounts = Schemas["PreorderDemandCounts"];
 export type PreorderConversion = Schemas["PreorderConversion"];
 export type DashboardPreorder = Schemas["DashboardPreorder"];
+
+// V2 Task 15 — bundles and grade sets (BR-P15, D93)
+export type ProductType = Schemas["ProductType"];
+export type BundlePricing = Schemas["BundlePricing"];
+export type BundleRequest = Schemas["BundleRequest"];
+export type DashboardBundle = Schemas["DashboardBundle"];
+export type DashboardBundleComponent = Schemas["DashboardBundleComponent"];
+export type StoreBundleComponent = Schemas["StoreBundleComponent"];
+export type BundleReport = Schemas["BundleReport"];

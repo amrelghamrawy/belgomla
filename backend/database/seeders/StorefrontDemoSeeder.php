@@ -6,11 +6,14 @@ namespace Database\Seeders;
 
 use App\Modules\Catalog\Actions\AddProductRelation;
 use App\Modules\Catalog\Actions\ApplyVerticalTemplate;
+use App\Modules\Catalog\Actions\CreateBundle;
 use App\Modules\Catalog\Actions\CreateCategory;
 use App\Modules\Catalog\Actions\CreateFieldDefinition;
 use App\Modules\Catalog\Actions\CreateFieldOption;
 use App\Modules\Catalog\Actions\CreateProduct;
 use App\Modules\Catalog\Actions\CreateUnit;
+use App\Modules\Catalog\Data\BundleComponentData;
+use App\Modules\Catalog\Data\BundleData;
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
 use App\Modules\Catalog\Data\ProductData;
@@ -22,13 +25,16 @@ use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\RelationType;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Queries\CategoryTreeQuery;
 use App\Modules\Catalog\Queries\FieldDefinitionsQuery;
 use App\Modules\Catalog\Queries\UnitsQuery;
 use App\Modules\Catalog\Services\VariantGenerator;
+use App\Modules\Pricing\Data\BundlePricingData;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Enums\BundlePriceMode;
 use App\Modules\Tenancy\Actions\UpdateTenantSettings;
 use App\Modules\Tenancy\Data\TenantSettingsData;
 use App\Modules\Tenancy\Enums\Vertical;
@@ -44,7 +50,8 @@ use RuntimeException;
  * Local development and Playwright catalog for the `alnoor` tenant (tasks/9), or the store `tenant:demo` creates: store contacts, a minimum order
  * value of 500 and the three sections of D68. Books (كتب خارجية): a stage/grade tree, 34 books with
  * grade/subject/publisher facets, cover and wholesale prices, a few tiers and carton MOQs, stock on every
- * book, one coming-soon book and one final-revision edition linked to its main book. School supplies
+ * book, one coming-soon book, one final-revision edition linked to its main book and a grade set (a bundle of four
+ * الأضواء books of أولى إعدادي at 10% off, SET-DEMO-1, D93). School supplies
  * (أدوات دراسية): pens and notebooks with the stationery template's brand/color/size facets and a retail
  * price. Toys (ألعاب): a few items with an age facet, some without a retail price. Everything goes through
  * the module actions, like a merchant would. Runs once.
@@ -77,11 +84,12 @@ final class StorefrontDemoSeeder extends Seeder
         CreateCategory $categories,
         CreateProduct $products,
         AddProductRelation $relations,
+        CreateBundle $bundles,
         string $subdomain = 'alnoor',
     ): void {
         $tenant = Tenant::query()->where('subdomain', $subdomain)->firstOrFail();
 
-        $context->runAs($tenant, fn () => DB::transaction(function () use ($tenant, $tree, $existingUnits, $fields, $settings, $templates, $fieldDefinitions, $fieldOptions, $units, $categories, $products, $relations): void {
+        $context->runAs($tenant, fn () => DB::transaction(function () use ($tenant, $tree, $existingUnits, $fields, $settings, $templates, $fieldDefinitions, $fieldOptions, $units, $categories, $products, $relations, $bundles): void {
             // The demo tree's books root marks a seeded catalog; a dev database may hold other test data.
             if ($tree->forDashboard()->contains('name', 'كتب خارجية')) {
                 return;
@@ -100,7 +108,7 @@ final class StorefrontDemoSeeder extends Seeder
             $carton = $known['كرتونة'] ?? $units->handle('كرتونة')->id;
             $piece = $known['قطعة'] ?? $units->handle('قطعة')->id;
 
-            $this->books($categories, $products, $relations, $copy, $carton);
+            $this->books($categories, $products, $relations, $bundles, $copy, $carton);
             $this->supplies($categories, $products, $piece, $carton);
             $this->toys($categories, $products, $piece);
         }));
@@ -145,7 +153,7 @@ final class StorefrontDemoSeeder extends Seeder
         }
     }
 
-    private function books(CreateCategory $categories, CreateProduct $products, AddProductRelation $relations, int $copy, int $carton): void
+    private function books(CreateCategory $categories, CreateProduct $products, AddProductRelation $relations, CreateBundle $bundles, int $copy, int $carton): void
     {
         $books = $categories->handle(new CategoryData('كتب خارجية', null, 1, kind: CategoryKind::Books));
         $primary = $categories->handle(new CategoryData('المرحلة الابتدائية', $books->id, 1));
@@ -159,6 +167,7 @@ final class StorefrontDemoSeeder extends Seeder
 
         $number = 0;
         $main = null;
+        $set = [];
 
         foreach ($grades as $grade => $categoryId) {
             foreach (self::SUBJECTS as $subject) {
@@ -166,6 +175,10 @@ final class StorefrontDemoSeeder extends Seeder
                     $number++;
                     $product = $products->handle($this->book($number, "{$publisher} {$subject} {$grade}", $categoryId, $grade, $subject, $publisher, $copy, $carton));
                     $main ??= $product;
+
+                    if ($grade === 'أولى إعدادي' && $publisher === 'الأضواء' && $subject !== 'إنجليزي') {
+                        $set[] = $product; // sold by the copy (the English book goes by the carton)
+                    }
                 }
             }
         }
@@ -180,6 +193,35 @@ final class StorefrontDemoSeeder extends Seeder
         $number++;
         $revision = $products->handle($this->book($number, "المراجعة النهائية {$main->name}", $grades['أولى إعدادي'], 'أولى إعدادي', 'عربي', 'الأضواء', $copy, $carton));
         $relations->handle($revision, $main->id, RelationType::RevisionOf);
+        $bundles->handle($this->gradeSet($set, $grades['أولى إعدادي'], $copy));
+    }
+
+    /**
+     * D93: «باقة الأضواء أولى إعدادي», one copy of each given book at the books' sum less 10%, sold by the copy.
+     *
+     * @param  list<Product>  $books
+     */
+    private function gradeSet(array $books, int $categoryId, int $copyId): BundleData
+    {
+        $components = array_map(fn (Product $book): BundleComponentData => new BundleComponentData(
+            $book->skus()->sole()->defaultUnit->id ?? throw new LogicException("{$book->name} has no default unit."),
+            1,
+        ), $books);
+
+        return new BundleData(
+            name: 'باقة الأضواء أولى إعدادي',
+            categoryId: $categoryId,
+            code: 'SET-DEMO-1',
+            unitId: $copyId,
+            components: $components === [] ? throw new LogicException('The grade set has no books.') : $components,
+            pricing: new BundlePricingData(BundlePriceMode::PercentOffSum, '10.00'),
+            description: 'كتب الأضواء لأولى إعدادي، الترم الأول، في باقة واحدة بخصم 10% على مجموع أسعارها.',
+            customFields: [
+                'grade' => $this->option('grade', 'أولى إعدادي'),
+                'publisher' => $this->option('publisher', 'الأضواء'),
+                'term' => $this->option('term', 'الترم الأول'),
+            ],
+        );
     }
 
     /** Pens sell by the carton of 12 (one carton MOQ), notebooks by the piece (10 MOQ); every item has a retail price. */

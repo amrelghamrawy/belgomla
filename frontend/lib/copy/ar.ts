@@ -57,6 +57,7 @@ const errors: Record<ApiErrorCode, string> = {
   invalid_transition: "لا يمكن تنفيذ هذا الإجراء في الحالة الحالية",
   invalid_vertical: "نوع النشاط غير صالح",
   invited: "أكمل التسجيل من رابط الدعوة أولًا",
+  is_bundle: "هذه باقة، عدّلها من محرر الباقات",
   is_preorder: "لا يُسجَّل تحصيل على حجز مسبق، يُحصَّل على الطلب بعد تحويله",
   last_active_user: "يجب أن يبقى مستخدم نشط واحد على الأقل",
   last_owner: "يجب أن يبقى مالك نشط واحد على الأقل",
@@ -305,8 +306,21 @@ export const ar = {
     priceRange: (min: string, max: string) => `من ${min} إلى ${max}`,
     chooseOptions: "اختر المواصفات",
     chooseOptionsLabel: (name: string) => `اختر مواصفات «${name}»`,
+    // V2 Task 15 (BR-P15, D93): a bundle of several products at one price.
+    bundle: "باقة",
+    saving: (amount: string) => `وفّر ${amount}`,
   },
   product: {
+    // V2 Task 15 (BR-P15, D93): what a bundle holds, and what stops it when it is unavailable.
+    bundleComponents: "محتويات الباقة",
+    bundleComponentsHint: (n: number) => `${n} صنف في الباقة الواحدة`,
+    bundleQuantity: (quantity: number, unit: string) => `${quantity} ${unit}`,
+    componentInStock: "متوفر",
+    componentMissing: "غير متوفر",
+    bundleAvailable: (n: number) => `متاح الآن ${n} باقة`,
+    bundleSumNote: (sum: string) => `الأصناف منفردة بـ ${sum}`,
+    bundleUnavailable: (names: string) => `الباقة غير متاحة الآن: ينقص ${names}`,
+    bundleUnavailableAny: "الباقة غير متاحة الآن",
     /**
      * What a SKU's optional reference price is called (BR-PR10, D68): the printed cover price for books, the
      * retail price for every other section; both names when the section is not known yet.
@@ -469,6 +483,7 @@ export const ar = {
     // V2 Task 13 (D91): a line is one unit of the SKU; the same product may be there in two units.
     unitLine: (unit: string, factor: number) => (factor > 1 ? `الوحدة: ${unit} (${factor})` : `الوحدة: ${unit}`),
     tierApplied: (min: number) => `سعر الكمية من ${min}`,
+    bundle: "باقة",
     remove: "حذف من السلة",
     removedTitle: "تم حذف بعض الأصناف من سلتك لأنها لم تعد متاحة:",
     movRemaining: (amount: string) => `باقي ${amount} للحد الأدنى للطلب`,
@@ -586,6 +601,12 @@ export const ar = {
       `تحوّل ${converted} من ${ordered} ${unit} إلى طلب`,
     cancelPreorder: "إلغاء الحجز",
     cancelPreorderBody: "يمكنك إلغاء ما لم يتحول بعد من حجزك.",
+    // V2 Task 15 (BR-P15, D93): a bundle line opens to the component lines it was delivered as.
+    bundle: "باقة",
+    showComponents: (n: number) => `عرض المكونات (${n})`,
+    hideComponents: "إخفاء المكونات",
+    components: (name: string) => `مكونات ${name}`,
+    inBundle: (name: string) => `ضمن ${name}`,
   },
   statement: {
     title: "كشف الحساب",

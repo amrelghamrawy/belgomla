@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\ProductType;
 use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Models\Casts\JsonObject;
 use App\Modules\Catalog\Observers\ProductObserver;
@@ -22,7 +23,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * BR-P01..P04. A product has 1..N SKUs (BR-P02): one without options, one per variant when it has options (BR-P14,
  * V2 Task 14, D92; `options`, at most two). A Coming Soon product may take pre-orders
- * (`preorder_enabled`, V2 Task 10, D88).
+ * (`preorder_enabled`, V2 Task 10, D88). A bundle (`type`, BR-P15, V2 Task 15, D93) has one SKU made of component SKU units
+ * (`Sku::bundleItems`) and no stock of its own.
  *
  * @property int $id
  * @property int $tenant_id
@@ -31,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $slug
  * @property string|null $description
  * @property ProductStatus $status
+ * @property ProductType $type simple, or a bundle of component SKU units (D93)
  * @property array<string, int|float|string|bool> $custom_fields select values are option ids
  * @property bool $preorder_enabled customers may pre-order it while it is Coming Soon (BR-P04, BR-O14, D88)
  * @property CarbonImmutable|null $expected_at the day the merchant expects it, shown on the storefront
@@ -57,6 +60,7 @@ final class Product extends Model
 
     protected $attributes = [
         'status' => 'active',
+        'type' => 'simple',
         'custom_fields' => '{}',
         'preorder_enabled' => false,
         'expected_at' => null,
@@ -142,6 +146,11 @@ final class Product extends Model
         return $this->hasMany(ProductRelation::class, 'related_product_id');
     }
 
+    public function isBundle(): bool
+    {
+        return $this->type === ProductType::Bundle;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -149,6 +158,7 @@ final class Product extends Model
     {
         return [
             'status' => ProductStatus::class,
+            'type' => ProductType::class,
             'custom_fields' => JsonObject::class,
             'preorder_enabled' => 'boolean',
             'expected_at' => 'datetime', // a date column: the day only (Y-m-d), *_at columns cast to datetime

@@ -465,6 +465,16 @@ V2 Task 14 (BR-P14, D92): a product with options sends `options: [{ id?, name, v
 
 V2 Task 10 (BR-O14, D88): both bodies take an optional `preorder { enabled, expected_at? (Y-m-d), limit? (1..10,000,000 selling units) }`; left out it is off on create and kept on update. Every dashboard product carries `preorder { enabled, expected_at, limit }` (audited as the product fields `preorder_enabled`, `expected_at`, `preorder_limit`). `PATCH …/status` answers `meta.preorder_demand { quantity, customers, preorders }` (the product's open pre-orders); going active converts nothing by itself. The storefront product adds `preorder`: null unless Coming Soon, then `{ enabled, expected_at, remaining }` (`remaining` under the cap in selling units, null = no cap).
 
+### Bundles (V2 Task 15, BR-P15, D93)
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| POST | `/api/dashboard/bundles` | `catalog.manage`; `{ name, category_id, description?, custom_fields?, code, unit_id, moq?, components: [{ sku_unit_id, quantity }] (1–50, each unit once), pricing: { mode: fixed \| percent_off_sum, value }, status?: active \| inactive }` → `201` dashboard product |
+| PUT | `/api/dashboard/bundles/{product}` | the same without `status`; a simple product is `404` |
+| POST | `/api/dashboard/bundles/generate` | `{ filter: { category?, f?, q? } }` (not empty) → `201` the draft (inactive) grade set |
+
+A component that is not a unit of an active SKU of an active simple product, or another bundle, is `422` on `components.{i}.sku_unit_id`; a code taken is `409 duplicate_code` on `code`. Every dashboard product carries `type` (`simple` \| `bundle`); a bundle's detail adds `bundle { pricing { mode, value }, components: [{ id, sku_unit_id, sku_id, product_id, product_name, sku_code, label, unit, conversion_factor, quantity, base_price, available, orderable }], components_total, availability }`. `PUT /products/{id}`, `POST /products/{id}/duplicate` and `PUT /products/{id}/units/{unit}/pricing` on a bundle are `409 is_bundle`. The storefront product carries `type`; a bundle adds `components: [{ product_name, slug, sku_code, label, unit, quantity, in_stock }]`, `availability` (bundles that can be made now; also the SKU's `available`) and, when prices are shown, `components_total` and `saving`. Cart lines and quote lines carry `is_bundle`. Order items (both surfaces) carry `is_bundle` and `parent_item_id`: a bundle line is followed by its component lines, which are out of the items total; partial delivery (`delivered_quantities`) names the bundle line in bundles; returns name component lines; edits and line discounts name the bundle line.
+
 ### Catalog import / export (V2 Task 06, D83, D95)
 
 | Method | Path | Notes |
@@ -713,6 +723,7 @@ Delivered in Task 7:
 | GET    | `/api/dashboard/reports/sales`       | `?from=&to=&group=day                                                                      | week | month` → totals per bucket |
 | GET    | `/api/dashboard/reports/outstanding` | per customer: orders, total, collected, outstanding                                        |
 | GET    | `/api/dashboard/reports/low-stock`   | SKUs with `available ≤ moq` (threshold param optional)                                     |
+| GET    | `/api/dashboard/reports/bundles`     | V2 Task 15: `?from=&to=` → bundles sold and component consumption                           |
 
 Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 
@@ -728,6 +739,9 @@ Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 - **outstanding**:
   - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding, aging { current, 0_30, 31_60, 61_90, over_90 }, overdue }` rows, largest debt first. `aging` splits the outstanding by days past each order's due date (`current` = not due yet; BR-C06).
   - It covers delivered orders that are not fully collected (D59); `total` and `outstanding` are net of returns.
+- **bundles** (V2 Task 15, D93):
+  - Shape: `{ from, to, bundles: [ { product_id, name, sku_code, quantity, total } ], components: [ { sku_id, sku_code, product_name, quantity_base } ] }`, most first.
+  - Delivered orders by `delivered_at` (Cairo days, default the last 30); bundles = delivered bundle lines, components = base units delivered inside bundles.
 - **low-stock**:
   - Paginated `{ sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold }`, ordered by code.
   - It covers SKUs of products that are not inactive.
@@ -793,9 +807,9 @@ php artisan pricing:promotions-tick # D90: move promotions scheduled → active 
 | Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        16 |
-| Dashboard      |       105 |
+| Dashboard      |       109 |
 | Webhooks       |         2 |
-| **Total**      |   **140** |
+| **Total**      |   **144** |
 
 ---
 

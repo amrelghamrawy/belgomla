@@ -52,7 +52,7 @@ test('BR-PR06 checkout answers 201 with the order detail', function (): void {
             'id' => $itemId, 'sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
             'conversion_factor' => 20, 'quantity' => 12, 'cover_price' => null, 'list_unit_price' => '85.00', 'manual_discount' => null,
             'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => 10, 'price_source' => 'tier', 'line_total' => '1020.00',
-            'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0,
+            'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0, 'is_bundle' => false, 'parent_item_id' => null,
         ]],
         'converted_from' => null,
         'conversions' => [],

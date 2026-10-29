@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Actions;
 
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Services\AuditLogger;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\CartSkuQuery;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Queries\PricingContextQuery;
@@ -24,12 +25,12 @@ use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\OrderItemChange;
 use App\Modules\Orders\Models\Scopes\Live;
 use App\Modules\Orders\Services\CheckoutValidator;
-use App\Modules\Orders\Services\OrderSnapshots;
 use App\Modules\Orders\Services\OrderTotals;
 use App\Modules\Pricing\Services\DiscountCalculator;
 use App\Modules\Tenancy\Queries\CurrentTenantSettingsQuery;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -53,6 +54,11 @@ use RuntimeException;
  *    text after commit when the store sends it (D87).
  *
  * Sending the lines the order already has writes nothing.
+ *
+ * A bundle (BR-P15, V2 Task 15, D93) is one line here, its bundle line: its component lines are not sent. Adding one
+ * reserves its components (AddOrderLine); removing it releases them and removes them with it; changing its quantity
+ * releases the old component lines and writes new ones at the new quantity and price (AddBundleComponents), its manual
+ * discount kept. Its components' stock counts what the order already holds of them.
  */
 final readonly class EditOrderLines
 {
@@ -64,7 +70,8 @@ final readonly class EditOrderLines
         private CheckoutValidator $validator,
         private PricingContextQuery $pricing,
         private DiscountCalculator $calculator,
-        private OrderSnapshots $snapshots,
+        private AddOrderLine $lines,
+        private AddBundleComponents $components,
         private OrderTotals $totals,
         private CurrentTenantSettingsQuery $settings,
         private ApplyCollectedAmount $collected,
@@ -87,7 +94,7 @@ final readonly class EditOrderLines
             }
 
             /** @var array<int, OrderItem> $live */
-            $live = OrderItem::query()->with('sku')->where('order_id', $order->id)->tap(new Live)->orderBy('id')->get()->keyBy('id')->all();
+            $live = OrderItem::query()->with(['sku', 'children' => fn (HasMany $children): HasMany => $children->tap(new Live)->with('sku')])->where('order_id', $order->id)->whereNull('parent_item_id')->tap(new Live)->orderBy('id')->get()->keyBy('id')->all(); // D93: a bundle is its bundle line
             [$changed, $added, $removed] = $this->diff($live, $data->lines);
 
             if ($changed === [] && $added === [] && $removed === []) {
@@ -173,7 +180,10 @@ final readonly class EditOrderLines
         foreach ($changed as $id => $quantity) {
             $item = $live[$id];
             $inputs[] = new CartLineInput($units->get($item->sku_unit_id ?? 0) ?? throw new RuntimeException("Order line {$item->id} has no SKU unit."), $quantity);
-            $own[$item->sku_id] = ($own[$item->sku_id] ?? 0) + $item->quantity_base;
+
+            foreach ($this->holdings($item) as $held) {
+                $own[$held->sku_id] = ($own[$held->sku_id] ?? 0) + $held->quantity_base;
+            }
         }
 
         foreach ($added as $index => $line) {
@@ -181,11 +191,11 @@ final readonly class EditOrderLines
         }
 
         $stock = $this->ledger->lock([
-            ...array_map(fn (CartLineInput $input): int => $input->sku->id, $inputs),
-            ...array_map(fn (OrderItem $item): int => $item->sku_id, $removed),
+            ...array_merge([], ...array_map(fn (CartLineInput $input): array => array_map(fn (Sku $sku): int => $sku->id, $input->stockSkus()), $inputs)),
+            ...array_merge([], ...array_map(fn (OrderItem $item): array => array_map(fn (OrderItem $held): int => $held->sku_id, $this->holdings($item)), $removed)),
         ]);
 
-        $pricing = $this->pricing->for($customer, array_map(fn (CartLineInput $input): int => $input->sku->id, $inputs));
+        $pricing = $this->pricing->for($customer, array_values(array_unique(array_merge([], ...array_map(fn (CartLineInput $input): array => $input->pricedSkuIds(), $inputs)))));
         $report = $this->validator->checkLines($inputs, $this->withOwnReservation($stock, $own), $pricing);
 
         if ($report->problems !== []) {
@@ -230,7 +240,11 @@ final readonly class EditOrderLines
         $changes = [];
 
         foreach ($removed as $item) {
-            $this->ledger->release($item->sku, $item->quantity_base);
+            foreach ($this->holdings($item) as $held) {
+                $this->ledger->release($held->sku, $held->quantity_base);
+                $held->forceFill(['removed_at' => now()])->save();
+            }
+
             $item->forceFill(['removed_at' => now()])->save();
             $changes[] = ['order_item_id' => $item->id, 'change' => OrderItemChangeType::Removed, 'old_quantity' => $item->quantity, 'unit_price_before' => $item->unit_price];
         }
@@ -254,13 +268,7 @@ final readonly class EditOrderLines
         foreach ($changed as $id => $quantity) {
             $item = $live[$id];
             $line = $priced[$item->sku_unit_id ?? 0];
-            $difference = $line->quantityBase() - $item->quantity_base;
-
-            if ($difference > 0) {
-                $this->ledger->reserve($line->sku, $difference);
-            } elseif ($difference < 0) {
-                $this->ledger->release($line->sku, -$difference);
-            }
+            $this->moveStock($item, $line);
 
             $old = ['quantity' => $item->quantity, 'unit_price' => $item->unit_price];
             $list = $line->price->unitPrice;
@@ -283,6 +291,10 @@ final readonly class EditOrderLines
                 'line_total' => Money::times($unit, $quantity),
             ])->save();
 
+            if ($item->is_bundle) {
+                $this->components->handle($item, $line); // D93: new component lines at the new quantity and price
+            }
+
             $changes[] = ['order_item_id' => $item->id, 'change' => OrderItemChangeType::Quantity, 'old_quantity' => $old['quantity'], 'new_quantity' => $quantity, 'unit_price_before' => $old['unit_price'], 'unit_price_after' => $unit];
         }
 
@@ -302,12 +314,45 @@ final readonly class EditOrderLines
 
         foreach ($added as $line) {
             $checked = $priced[$line->skuUnitId];
-            $item = $order->items()->create($this->snapshots->item($checked));
-            $this->ledger->reserve($checked->sku, $checked->quantityBase());
+            $item = $this->lines->handle($order, $checked);
             $changes[] = ['order_item_id' => $item->id, 'change' => OrderItemChangeType::Added, 'new_quantity' => $line->quantity, 'unit_price_after' => $item->unit_price];
         }
 
         return $changes;
+    }
+
+    /**
+     * The lines that hold the stock of a line: itself, or a bundle line's live component lines (D93).
+     *
+     * @return list<OrderItem>
+     */
+    private function holdings(OrderItem $item): array
+    {
+        return $item->is_bundle ? array_values($item->children->all()) : [$item];
+    }
+
+    /**
+     * Step 5 for a changed line: the reservation follows the new quantity; a bundle line gives back its component lines,
+     * whose new ones are written after the line (D93).
+     */
+    private function moveStock(OrderItem $item, CheckoutLine $line): void
+    {
+        if ($item->is_bundle) {
+            foreach ($item->children as $child) {
+                $this->ledger->release($child->sku, $child->quantity_base);
+                $child->delete(); // nothing points at a component line before delivery
+            }
+
+            return;
+        }
+
+        $difference = $line->quantityBase() - $item->quantity_base;
+
+        if ($difference > 0) {
+            $this->ledger->reserve($line->sku, $difference);
+        } elseif ($difference < 0) {
+            $this->ledger->release($line->sku, -$difference);
+        }
     }
 
     /**

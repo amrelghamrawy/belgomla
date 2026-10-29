@@ -67,7 +67,7 @@ test('the store order detail adds the lines and the history', function (): void 
             'id' => $item->id, 'sku_id' => $item->sku_id, 'sku_unit_id' => $item->sku_unit_id, 'product_name' => $item->product_name, 'sku_code' => $item->sku_code, 'sku_name' => $item->sku_name,
             'unit' => $item->unit_name, 'conversion_factor' => 1, 'quantity' => 2, 'cover_price' => null, 'list_unit_price' => '85.00',
             'manual_discount' => null, 'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => null, 'price_source' => 'base', 'line_total' => '170.00',
-            'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0,
+            'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0, 'is_bundle' => false, 'parent_item_id' => null,
         ]],
         'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
     ]);
@@ -103,7 +103,7 @@ test('the order item resource is the line snapshot', function (): void {
     expect(array_keys(rendered(new OrderItemResource($item), storeRequest())))->toBe([
         'id', 'sku_id', 'sku_unit_id', 'product_name', 'sku_code', 'sku_name', 'unit', 'conversion_factor', 'quantity', 'cover_price', 'list_unit_price',
         'manual_discount', 'unit_price', 'discount_percent', 'tier_min_quantity', 'price_source', 'line_total', 'delivered_quantity', 'removed_at',
-        'converted_quantity',
+        'converted_quantity', 'is_bundle', 'parent_item_id',
     ]);
 });
 
@@ -251,7 +251,7 @@ test('BR-O11 the quote resource renders every line with its tiers and problem, t
     expect(rendered(new App\Modules\Orders\Http\Resources\OrderQuoteResource($quote), dashboardRequest('/api/dashboard/orders/quote')))->toBe([
         'lines' => [[
             'sku_id' => $sku->id, 'sku_unit_id' => $this->defaultUnitId($sku), 'product_name' => 'كراسة', 'sku_code' => 'Q-1', 'sku_name' => 'كراسة', 'unit' => 'كرتونة', 'conversion_factor' => 20,
-            'quantity' => 10, 'moq' => 5, 'available' => 3, 'cover_price' => null, 'unit_price' => '85.00', 'discount_percent' => null,
+            'quantity' => 10, 'moq' => 5, 'available' => 3, 'is_bundle' => false, 'cover_price' => null, 'unit_price' => '85.00', 'discount_percent' => null,
             'tier_min_quantity' => 10, 'price_source' => 'tier', 'line_total' => '850.00', 'tiers' => [['min_quantity' => 10, 'unit_price' => '85.00']],
             'problem' => ['reason' => 'insufficient_stock', 'requested' => 10, 'available' => 3],
         ]],

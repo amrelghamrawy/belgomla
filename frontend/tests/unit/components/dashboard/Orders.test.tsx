@@ -146,6 +146,8 @@ function order(overrides: Partial<DashboardOrderDetail> = {}): DashboardOrderDet
         delivered_quantity: null,
         removed_at: null,
         converted_quantity: 0,
+        is_bundle: false,
+        parent_item_id: null,
       },
     ],
     changes: [],
@@ -454,6 +456,8 @@ describe("OrderDetail discounts (BR-PR08, D85)", () => {
           delivered_quantity: null,
           removed_at: null,
           converted_quantity: 0,
+          is_bundle: false,
+          parent_item_id: null,
         },
       ],
     });
@@ -1184,5 +1188,86 @@ describe("order lines of a variant (V2 Task 14)", () => {
 
     expect(screen.getByTestId("variant-62")).toHaveTextContent("أزرق / M");
     expect(screen.queryByTestId("variant-61")).toBeNull();
+  });
+});
+
+describe("OrderDetail bundles (BR-P15, D93)", () => {
+  const [base] = order().items;
+  const bundleItems = [
+    {
+      ...base!,
+      id: 70,
+      sku_unit_id: 50,
+      product_name: "طقم أولى إعدادي",
+      sku_code: "SET-1",
+      sku_name: "طقم أولى إعدادي",
+      unit: "طقم",
+      conversion_factor: 1,
+      quantity: 2,
+      unit_price: "135.00",
+      list_unit_price: "135.00",
+      line_total: "270.00",
+      is_bundle: true,
+    },
+    {
+      ...base!,
+      id: 71,
+      product_name: "الأضواء علوم",
+      quantity: 2,
+      unit: "نسخة",
+      line_total: "180.00",
+      parent_item_id: 70,
+    },
+    {
+      ...base!,
+      id: 72,
+      product_name: "قلم جاف",
+      sku_name: "أزرق",
+      quantity: 4,
+      unit: "قطعة",
+      line_total: "90.00",
+      parent_item_id: 70,
+    },
+  ];
+
+  it("shows the bundle line once and opens it to its components", async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ items: bundleItems })} />);
+
+    expect(screen.getByTestId("order-line-70")).toHaveTextContent("باقة");
+    expect(screen.queryByTestId("order-line-71")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("bundle-components-70")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "عرض المكونات (2)" }));
+
+    const components = screen.getByTestId("bundle-components-70");
+    expect(components).toHaveTextContent("الأضواء علوم × 2 نسخة");
+    expect(components).toHaveTextContent("قلم جاف · أزرق × 4 قطعة");
+  });
+
+  it("delivers short by the bundle line, never by its components", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/orders/1001/transition": json(200, { data: order({ status: "delivered" }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order({ status: "out_for_delivery", items: bundleItems })} />);
+
+    await user.click(screen.getByRole("button", { name: "تم التسليم" }));
+    await user.click(screen.getByLabelText("تسليم جزئي؟"));
+    const lines = screen.getByTestId("delivered-lines");
+    expect(within(lines).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(lines).queryByText("الأضواء علوم")).not.toBeInTheDocument();
+
+    const stepper = screen.getByLabelText("الكمية المسلَّمة من طقم أولى إعدادي");
+    await user.clear(stepper);
+    await user.type(stepper, "1");
+    expect(screen.getByTestId("delivered-total")).toHaveTextContent("135.00 ج.م");
+    await user.click(screen.getByRole("button", { name: "تأكيد التسليم" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/transition")[0]?.body).toEqual({
+      to: "delivered",
+      delivered_quantities: [{ order_item_id: 70, quantity: 1 }],
+    });
   });
 });

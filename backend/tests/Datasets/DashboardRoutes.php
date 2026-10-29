@@ -49,6 +49,9 @@ dataset('dashboard authenticated routes', [
     'products update' => ['PUT', '/api/dashboard/products/1'],
     'products status' => ['PATCH', '/api/dashboard/products/1/status'],
     'products duplicate' => ['POST', '/api/dashboard/products/1/duplicate'],
+    'bundles create' => ['POST', '/api/dashboard/bundles'],
+    'bundles generate' => ['POST', '/api/dashboard/bundles/generate'],
+    'bundles update' => ['PUT', '/api/dashboard/bundles/1'],
     'product images upload' => ['POST', '/api/dashboard/products/1/images'],
     'product images reorder' => ['POST', '/api/dashboard/products/1/images/reorder'],
     'product images delete' => ['DELETE', '/api/dashboard/products/1/images/1'],
@@ -115,5 +118,6 @@ dataset('dashboard authenticated routes', [
     'reports sales' => ['GET', '/api/dashboard/reports/sales'],
     'reports outstanding' => ['GET', '/api/dashboard/reports/outstanding'],
     'reports low stock' => ['GET', '/api/dashboard/reports/low-stock'],
+    'reports bundles' => ['GET', '/api/dashboard/reports/bundles'],
     'audit log' => ['GET', '/api/dashboard/audit'],
 ]);

@@ -18,9 +18,12 @@ describe("what a promotion allows (D90 f)", () => {
       false,
       false,
     ]);
-    expect([isCancellable("active"), isCancellable("draft"), isCancellable("ended"), isCancellable("cancelled")]).toEqual(
-      [true, true, false, false],
-    );
+    expect([
+      isCancellable("active"),
+      isCancellable("draft"),
+      isCancellable("ended"),
+      isCancellable("cancelled"),
+    ]).toEqual([true, true, false, false]);
   });
 });
 

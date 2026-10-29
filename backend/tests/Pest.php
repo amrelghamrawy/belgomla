@@ -350,13 +350,14 @@ function catalogUpload(
 }
 
 /**
- * The rows of a spreadsheet file (row number => cells), read back with the app's Spreadsheet service.
+ * The rows of a spreadsheet file (row number => cells), read back with the app's Spreadsheet service: the first sheet,
+ * or the one named.
  *
  * @return array<int, list<string>>
  */
-function spreadsheetRows(string $path, App\Modules\Catalog\Enums\SpreadsheetFormat $format = App\Modules\Catalog\Enums\SpreadsheetFormat::Xlsx): array
+function spreadsheetRows(string $path, App\Modules\Catalog\Enums\SpreadsheetFormat $format = App\Modules\Catalog\Enums\SpreadsheetFormat::Xlsx, ?string $sheetName = null): array
 {
-    return iterator_to_array(app(App\Modules\Catalog\Services\Spreadsheet::class)->read($path, $format));
+    return iterator_to_array(app(App\Modules\Catalog\Services\Spreadsheet::class)->read($path, $format, $sheetName));
 }
 
 /**

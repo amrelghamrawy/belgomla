@@ -57,6 +57,7 @@ arch('data classes are final readonly value objects')
         App\Modules\Orders\Data\CheckoutLine::class, // checkout read models (CheckoutValidator, OrderStateMachine), not request input
         App\Modules\Orders\Data\CheckoutProblem::class,
         App\Modules\Orders\Data\CheckoutReport::class,
+        App\Modules\Orders\Data\CheckoutComponent::class, // V2 Task 15: a checked bundle line's component, not request input
         App\Modules\Orders\Data\OrderQuote::class,
         App\Modules\Orders\Data\CartLineInput::class, // V2 Task 07: a line to order, from the cart or the merchant's form
         App\Modules\Orders\Data\TransitionPlan::class,

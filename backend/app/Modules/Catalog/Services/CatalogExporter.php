@@ -17,7 +17,8 @@ use Illuminate\Support\Str;
  * The catalog export (V2 Task 06): the dashboard filter's products in the import format (CatalogRowMapper), so the
  * file comes back through the import unchanged. Up to `catalog.export_sync_limit` products stream straight to the
  * response; above it the ExportCatalog job writes the file and the dashboard downloads it from a temporary signed
- * link (D95). The import template is the same file without rows.
+ * link (D95). The import template is the same file without rows. An XLSX export also gets the selection's bundles on a
+ * second sheet, `bundles_v1` (BundleSheet, D93); a CSV has one sheet, so it has no bundles.
  */
 final readonly class CatalogExporter
 {
@@ -26,6 +27,7 @@ final readonly class CatalogExporter
         private CatalogRowMapper $mapper,
         private CatalogExportQuery $query,
         private CatalogFiles $files,
+        private BundleSheet $bundles,
         private TenantContext $tenant,
     ) {}
 
@@ -53,6 +55,7 @@ final readonly class CatalogExporter
             $this->query->get($filter)->flatMap(fn (Product $product): array => $this->mapper->exportRows($product, $lookups)),
             CatalogRowMapper::SHEET_NAME,
             withKeys: true,
+            moreSheets: $format === SpreadsheetFormat::Xlsx ? [$this->bundles->sheet($filter, $lookups)] : [],
         );
     }
 

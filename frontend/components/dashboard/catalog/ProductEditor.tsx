@@ -43,6 +43,7 @@ import { useRecomputePricing } from "@/lib/dashboard/pricing";
 import { CategoryPicker } from "../common/CategoryPicker";
 import { LabelText } from "../common/LabelText";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { BundleForm } from "./BundleEditor";
 import { CustomFieldInputs } from "./CustomFieldInputs";
 import { ProductImages } from "./ProductImages";
 import { ProductRelations } from "./ProductRelations";
@@ -87,6 +88,18 @@ export function ProductEditor({ productId }: { productId?: number }) {
     (productId !== undefined && product.data === undefined)
   ) {
     return <LoadingBlock rows={8} />;
+  }
+
+  // BR-P15, D93: a bundle has its own editor (the product payload refuses it with 409 is_bundle).
+  if (product.data?.type === "bundle") {
+    return (
+      <BundleForm
+        key={`${product.data.id}-${product.data.updated_at}`}
+        product={product.data}
+        units={units.data}
+        categories={categories.data}
+      />
+    );
   }
 
   return (

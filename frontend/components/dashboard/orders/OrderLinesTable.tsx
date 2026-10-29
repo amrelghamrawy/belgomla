@@ -81,6 +81,11 @@ export function OrderLinesTable({
                           {marks[line.sku_unit_id]}
                         </Badge>
                       )}
+                      {quoted?.is_bundle === true && (
+                        <Badge variant="outline" className="ms-2 text-xs">
+                          {ar.dashboard.bundles.badge}
+                        </Badge>
+                      )}
                     </span>
                     <bdi dir="ltr" className="text-muted-foreground text-start text-xs">
                       {line.code}

@@ -84,6 +84,15 @@ test('BR-PR11 D91 bulk targets are the active units of the matching products, in
         ->and($units->first()?->sku->product->name)->toBe('علوم أولى');
 });
 
+test('D93 bulk targets leave out bundles', function (): void {
+    $simple = Product::factory()->withSku()->create(['name' => 'علوم أولى']);
+    Product::factory()->bundle()->withSku()->create(['name' => 'علوم باقة']);
+
+    $units = app(BulkPricingTargetsQuery::class)->get(new ProductFilterData(q: 'علوم'));
+
+    expect($units->map(fn (SkuUnit $unit): int => $unit->sku->product_id)->all())->toBe([$simple->id]);
+});
+
 test('D91 bulk targets can be only the units sold in one store unit', function (): void {
     $product = Product::factory()->withSku()->create(['name' => 'علوم أولى']);
     $carton = $this->addUnit($product->skus()->sole());

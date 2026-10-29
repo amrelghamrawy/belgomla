@@ -14,7 +14,8 @@ use App\Support\Money;
  * order's `items_total` (Σ line_total of the live lines), `discount_amount` and `order_total = items_total −
  * discount_amount` without saving. A % order discount is taken off the new items total again; an EGP one keeps its
  * value. When it no longer fits, an edit is refused (`422 discount_too_large`, D85) while a delivery, which already
- * happened, caps it so the order still costs 0.01 (D86).
+ * happened, caps it so the order still costs 0.01 (D86). A bundle's component lines (BR-P15, D93) carry shares of
+ * their bundle line's total and are not counted again.
  */
 final readonly class OrderTotals
 {
@@ -28,7 +29,9 @@ final readonly class OrderTotals
         $itemsTotal = '0.00';
 
         foreach ($lines as $line) {
-            $itemsTotal = Money::add($itemsTotal, $line->line_total);
+            if ($line->parent_item_id === null) {
+                $itemsTotal = Money::add($itemsTotal, $line->line_total);
+            }
         }
 
         $amount = $this->discountAmount($order, $itemsTotal, $capDiscount);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Http\Resources;
 
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductImage;
@@ -12,7 +13,9 @@ use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Catalog\Services\BundleAvailability;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\BundlePricer;
 use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -29,7 +32,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * loaded, i.e. on the detail; `selling_unit`, `conversion_factor`, the prices and `moq` next to them are the default
  * unit's, for the lists. `sku.inventory`
  * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros). `preorder` holds the pre-order
- * settings (`enabled`, `expected_at` as Y-m-d, `limit`, D88).
+ * settings (`enabled`, `expected_at` as Y-m-d, `limit`, D88). `type` is `simple` or `bundle` (BR-P15, V2 Task 15, D93); a
+ * bundle's detail adds `bundle { pricing { mode, value }, components[], components_total, availability }`: each component
+ * with its product, SKU, unit, quantity, base price, stock (`available`, base units) and whether it can be ordered, the
+ * components' sum at their base prices and the bundles that can be made now.
  *
  * @property-read Product $resource
  */
@@ -48,12 +54,14 @@ final class DashboardProductResource extends JsonResource
             'slug' => $product->slug,
             'description' => $product->description,
             'status' => $product->status->value,
+            'type' => $product->type->value,
             'category' => $this->category(),
             'custom_fields' => (object) $product->custom_fields,
             'preorder' => ['enabled' => $product->preorder_enabled, 'expected_at' => $product->expected_at?->toDateString(), 'limit' => $product->preorder_limit],
             'sku' => $this->primary(),
             'skus' => $this->whenLoaded('skus', fn (): array => $product->skus->map(fn (Sku $sku): array => $this->sku($sku))->values()->all(), []),
             'options' => $this->whenLoaded('options', fn (): array => $product->options->map($this->option(...))->values()->all(), []),
+            'bundle' => $this->when($product->isBundle() && $this->bundleSku() instanceof Sku, fn (): ?array => $this->bundle()),
             'main_image_url' => $this->mainImage()?->url(),
             'images' => $this->whenLoaded('images', fn () => ProductImageResource::collection($product->images)),
             'relations' => $this->when(
@@ -62,6 +70,53 @@ final class DashboardProductResource extends JsonResource
             ),
             'created_at' => $product->created_at->toIso8601String(),
             'updated_at' => $product->updated_at->toIso8601String(),
+        ];
+    }
+
+    /** The bundle's SKU with its components loaded (the detail). */
+    private function bundleSku(): ?Sku
+    {
+        $sku = $this->resource->relationLoaded('skus') ? $this->resource->skus->first() : null;
+
+        return $sku instanceof Sku && $sku->relationLoaded('bundleItems') ? $sku : null;
+    }
+
+    /**
+     * BR-P15, D93: how the bundle is priced, its components and what can be made now.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function bundle(): ?array
+    {
+        $sku = $this->bundleSku();
+
+        if (! $sku instanceof Sku) {
+            return null;
+        }
+
+        $availability = app(BundleAvailability::class);
+        $pricer = app(BundlePricer::class);
+        $pricing = $pricer->pricingOf($sku);
+
+        return [
+            'pricing' => $pricing === null ? null : ['mode' => $pricing->mode->value, 'value' => $pricing->value],
+            'components' => $sku->bundleItems->map(fn (BundleItem $item): array => [
+                'id' => $item->id,
+                'sku_unit_id' => $item->component_sku_unit_id,
+                'sku_id' => $item->componentUnit->sku_id,
+                'product_id' => $item->componentUnit->sku->product_id,
+                'product_name' => $item->componentUnit->sku->product->name,
+                'sku_code' => $item->componentUnit->sku->code,
+                'label' => $item->componentUnit->sku->name,
+                'unit' => $item->componentUnit->unit->name,
+                'conversion_factor' => $item->componentUnit->conversion_factor,
+                'quantity' => $item->quantity,
+                'base_price' => $item->componentUnit->base_price,
+                'available' => $item->componentUnit->sku->inventory->available ?? 0,
+                'orderable' => $availability->orderable($item),
+            ])->values()->all(),
+            'components_total' => $pricer->sum($sku->bundleItems),
+            'availability' => $availability->available($sku),
         ];
     }
 

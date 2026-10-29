@@ -7,6 +7,7 @@ namespace App\Modules\Orders\Actions;
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
@@ -44,6 +45,10 @@ use App\Support\Money;
  * CheckoutValidator::checkPreorder (pre-orders on, MOQ, the merchant's cap over every open pre-order, credit limit; no
  * MOV), reserves nothing (its lines are `reserved = false`) and rings `new_preorder`. A normal order converted from a
  * pre-order (`convertedFrom`, D88) keeps the pre-order's delivery snapshot and only needs its lines orderable now.
+ *
+ * A bundle line (BR-P15, V2 Task 15, D93) locks, checks and reserves its components' stock, and is written as the bundle
+ * and its component children (AddOrderLine); the pricing context covers the components too (their prices split the
+ * bundle's).
  */
 final readonly class PlaceOrder
 {
@@ -56,6 +61,7 @@ final readonly class PlaceOrder
         private PreorderDemandQuery $demand,
         private OrderNumbers $numbers,
         private OrderSnapshots $snapshots,
+        private AddOrderLine $lines,
         private RecordStatusChange $history,
         private NotifyMerchants $notify,
         private AuditLogger $audit,
@@ -71,7 +77,7 @@ final readonly class PlaceOrder
         }
 
         // BR-PR06, D90: the promotions live at this moment, inside the checkout transaction
-        $pricing = $this->pricing->for($customer, array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
+        $pricing = $this->pricing->for($customer, array_values(array_unique(array_merge(...array_map(fn (CartLineInput $line): array => $line->pricedSkuIds(), $data->lines)))));
         $report = $data->kind === OrderKind::Preorder ? $this->checkPreorder($data, $customer, $pricing) : $this->checkOrder($data, $customer, $pricing);
         $checked = $data->convertedFrom instanceof Order ? $report->assertConvertible() : $report->assertPasses($data->skipMov);
 
@@ -137,7 +143,7 @@ final readonly class PlaceOrder
     /** BR-INV01, BR-INV03: the stock rows locked in sku_id order, then every check against them. */
     private function checkOrder(OrderPlacementData $data, Customer $customer, ?PricingContext $pricing): CheckoutReport
     {
-        $stock = $this->ledger->lock(array_map(fn (CartLineInput $line): int => $line->sku->id, $data->lines));
+        $stock = $this->ledger->lock(array_merge(...array_map(fn (CartLineInput $line): array => array_map(fn (Sku $sku): int => $sku->id, $line->stockSkus()), $data->lines)));
 
         return $this->validator->check($data->lines, $stock, $customer, $pricing);
     }
@@ -185,11 +191,7 @@ final readonly class PlaceOrder
         ]);
 
         foreach ($checked as $line) {
-            $order->items()->create([...$this->snapshots->item($line), 'reserved' => $reserves]);
-
-            if ($reserves) {
-                $this->ledger->reserve($line->sku, $line->quantityBase()); // BR-INV03; a pre-order holds nothing (BR-INV01)
-            }
+            $this->lines->handle($order, $line, $reserves); // BR-INV03; a pre-order holds nothing (BR-INV01)
         }
 
         return $order;

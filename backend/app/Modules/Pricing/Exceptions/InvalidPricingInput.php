@@ -20,6 +20,12 @@ final class InvalidPricingInput extends ApiException
         return self::field('base_price', 'السعر الأساسي الناتج يجب أن يكون أكبر من صفر');
     }
 
+    /** BR-P15, D93: a bundle's price is its pricing (fixed or the components' sum less a %), set on the bundle. */
+    public static function bundle(): self
+    {
+        return new self(409, 'is_bundle', 'هذا المنتج باقة: عدّل سعرها من شاشة الباقة');
+    }
+
     /** Same guard as bulk status (BR-P12): an empty filter would reprice the whole catalog. */
     public static function emptyFilter(): self
     {

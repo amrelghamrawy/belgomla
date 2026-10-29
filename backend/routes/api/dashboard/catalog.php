@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Http\Controllers\Dashboard\BundleController;
+use App\Modules\Catalog\Http\Controllers\Dashboard\BundleGenerateController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\CategoryArchiveController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\CategoryController;
 use App\Modules\Catalog\Http\Controllers\Dashboard\CategoryReorderController;
@@ -50,6 +52,11 @@ Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(fun
     Route::get('products', [ProductController::class, 'index'])->middleware('permission:orders.view')->name('products.index');
     Route::post('products', [ProductController::class, 'store'])->middleware('permission:catalog.manage')->name('products.store');
     Route::post('products/bulk/status', [ProductBulkStatusController::class, 'store'])->middleware('permission:catalog.manage')->name('products.bulk-status');
+
+    // V2 Task 15 (BR-P15, D93): bundles are products; these write them, the products endpoints read them.
+    Route::post('bundles', [BundleController::class, 'store'])->middleware('permission:catalog.manage')->name('bundles.store');
+    Route::post('bundles/generate', [BundleGenerateController::class, 'store'])->middleware('permission:catalog.manage')->name('bundles.generate');
+    Route::put('bundles/{product}', [BundleController::class, 'update'])->whereNumber('product')->middleware('permission:catalog.manage')->name('bundles.update');
 
     // V2 Task 06: catalog export / import (the import is one run per previewed file, retry-safe).
     Route::get('products/export', [ProductExportController::class, 'index'])->middleware('permission:catalog.manage')->name('products.export');

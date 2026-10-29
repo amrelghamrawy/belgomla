@@ -9,6 +9,7 @@ use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ImportRowAction;
 use App\Modules\Catalog\Enums\ImportStatus;
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\ProductType;
 use App\Modules\Catalog\Enums\RelationType;
 use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Enums\SpreadsheetFormat;
@@ -18,7 +19,7 @@ test('every catalog enum exposes labels for all cases', function (string $enum):
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([ArchiveStatus::class, ProductStatus::class, FieldType::class, RelationType::class, CategoryKind::class, CategoryIcon::class, SpreadsheetFormat::class, ImportStatus::class, ImportRowAction::class, SkuStatus::class]);
+})->with([ArchiveStatus::class, ProductStatus::class, FieldType::class, RelationType::class, CategoryKind::class, CategoryIcon::class, SpreadsheetFormat::class, ImportStatus::class, ImportRowAction::class, SkuStatus::class, ProductType::class]);
 
 test('BR-PR10 the reference price is the cover price for books and the retail price for every other kind', function (CategoryKind $kind, string $label): void {
     expect($kind->referencePriceLabel())->toBe($label);
@@ -80,3 +81,7 @@ test('an import is finished once done or failed', function (ImportStatus $status
     'done' => [ImportStatus::Done, true],
     'failed' => [ImportStatus::Failed, true],
 ]);
+
+test('BR-P15 a product is simple or a bundle', function (): void {
+    expect(ProductType::toArray())->toBe(['simple' => 'منتج', 'bundle' => 'باقة']);
+});

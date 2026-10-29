@@ -42,7 +42,14 @@ function today(): string {
  * (BR-R02), the reason and the date. When the server answers `refund_required`, the amount to pay back is shown
  * and the merchant confirms the cash refund before sending again.
  */
-export function ReturnDialog({ orderNumber }: { orderNumber: number }) {
+export function ReturnDialog({
+  orderNumber,
+  bundles = {},
+}: {
+  orderNumber: number;
+  /** D93: the bundle name of each component line (a bundle comes back through its components). */
+  bundles?: Record<number, string>;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -55,13 +62,21 @@ export function ReturnDialog({ orderNumber }: { orderNumber: number }) {
           <DialogTitle>{copy.recordTitle}</DialogTitle>
           <DialogDescription>{copy.recordBody}</DialogDescription>
         </DialogHeader>
-        {open && <ReturnForm orderNumber={orderNumber} onDone={() => setOpen(false)} />}
+        {open && <ReturnForm orderNumber={orderNumber} bundles={bundles} onDone={() => setOpen(false)} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function ReturnForm({ orderNumber, onDone }: { orderNumber: number; onDone: () => void }) {
+function ReturnForm({
+  orderNumber,
+  bundles,
+  onDone,
+}: {
+  orderNumber: number;
+  bundles: Record<number, string>;
+  onDone: () => void;
+}) {
   const returns = useOrderReturns(orderNumber);
   const record = useRecordReturn(orderNumber);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
@@ -150,6 +165,11 @@ function ReturnForm({ orderNumber, onDone }: { orderNumber: number; onDone: () =
                   <bdi>{line.sku_code}</bdi> · {copy.ordered}: {ar.orders.quantityOf(line.ordered, line.unit)} ·{" "}
                   {copy.alreadyReturned}: {line.returned} · {formatMoney(line.unit_price)}
                 </span>
+                {bundles[line.order_item_id] !== undefined && (
+                  <span className="text-primary text-xs" data-testid={`return-bundle-${line.order_item_id}`}>
+                    {ar.orders.inBundle(bundles[line.order_item_id] ?? "")}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-1">
                 <Button

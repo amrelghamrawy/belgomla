@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Customers\Services;
 
+use App\Modules\Catalog\Services\BundleAvailability;
 use App\Modules\Customers\Data\PricedCart;
 use App\Modules\Customers\Data\PricedCartLine;
 use App\Modules\Customers\Models\CartItem;
@@ -19,12 +20,14 @@ use Illuminate\Support\Collection;
  * the items total, and the minimum order value against it (BR-MOV02). Pre-order lines (BR-O14) are priced the same way
  * into their own indicative total, without the minimum order value (D88). Each line is priced in its own unit (D91).
  * Expects the lines' `skuUnit` with its `unit`, `tiers`, `sku.product` and `sku.inventory` loaded (CartQuery) and lines that can no longer be ordered removed.
+ * A bundle's `available` is the bundles its components allow (BR-P15, D93).
  */
 final readonly class CartPricer
 {
     public function __construct(
         private PriceResolver $prices,
         private CurrentTenantSettingsQuery $settings,
+        private BundleAvailability $bundles,
     ) {}
 
     /**
@@ -75,9 +78,14 @@ final readonly class CartPricer
                 quantity: $item->quantity,
                 price: $price,
                 moq: $unit->moq,
-                available: $preorder ? 0 : $sku->inventory->available ?? 0,
+                available: match (true) {
+                    $preorder => 0,
+                    $sku->product->isBundle() => $this->bundles->available($sku),
+                    default => $sku->inventory->available ?? 0,
+                },
                 expectedAt: $preorder ? $sku->product->expected_at?->toDateString() : null,
                 variant: $sku->name,
+                isBundle: $sku->product->isBundle(),
             );
         }
 

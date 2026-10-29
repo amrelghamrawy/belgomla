@@ -90,7 +90,7 @@ test('BR-CU06 the cart resource matches the contract, money as strings', functio
 
     expect(rendered(new CartResource($cart), storeRequest('/api/store/cart')))->toBe([
         'items' => [[
-            'sku_id' => 501, 'sku_unit_id' => 601, 'product_name' => 'علوم', 'variant' => null, 'product_slug' => 'olom', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 12, 'unit_price' => '85.00',
+            'sku_id' => 501, 'sku_unit_id' => 601, 'product_name' => 'علوم', 'variant' => null, 'is_bundle' => false, 'product_slug' => 'olom', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 12, 'unit_price' => '85.00',
             'tier_min_quantity' => 10, 'price_source' => 'base', 'promotion' => null, 'line_total' => '1020.00', 'moq' => 5, 'available' => 140,
         ]],
         'removed_items' => [['product_name' => 'قديم', 'reason' => 'inactive']],
@@ -118,7 +118,7 @@ test('BR-O14 the cart lists its pre-order lines apart with the expected day and 
         ->and($data['removed_items'])->toBe([['product_name' => 'أطلس', 'reason' => 'preorder_closed']])
         ->and($data['preorders'])->toBe([
             'items' => [[
-                'sku_id' => 77, 'sku_unit_id' => 177, 'product_name' => 'سلاح التلميذ ٢٠٢٧', 'variant' => null, 'product_slug' => 'selah', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 5, 'unit_price' => '90.00',
+                'sku_id' => 77, 'sku_unit_id' => 177, 'product_name' => 'سلاح التلميذ ٢٠٢٧', 'variant' => null, 'is_bundle' => false, 'product_slug' => 'selah', 'unit' => 'كرتونة', 'conversion_factor' => 20, 'quantity' => 5, 'unit_price' => '90.00',
                 'tier_min_quantity' => null, 'price_source' => 'base', 'promotion' => null, 'line_total' => '450.00', 'moq' => 5, 'available' => 0, 'expected_at' => '2026-12-01',
             ]],
             'items_total' => '450.00',

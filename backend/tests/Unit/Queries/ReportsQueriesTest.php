@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
@@ -212,6 +213,13 @@ test('D36 the low-stock report lists low skus of products that are not inactive,
     expect($page->pluck('code')->all())->toBe(['A-1', 'B-1'])
         ->and($page->first()?->relationLoaded('product'))->toBeTrue()
         ->and($page->first()?->relationLoaded('inventory'))->toBeTrue();
+});
+
+test('D93 the low-stock report never lists a bundle', function (): void {
+    Product::factory()->bundle()->withSku(['code' => 'SET-1'])->create();
+    $this->orderableSku(['code' => 'A-1'], onHand: 0);
+
+    expect(app(LowStockReportQuery::class)->paginate(24)->pluck('code')->all())->toBe(['A-1']);
 });
 
 test('the status values of the overview follow the order statuses', function (): void {

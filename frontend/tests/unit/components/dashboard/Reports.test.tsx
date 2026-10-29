@@ -1,9 +1,14 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { compact } from "@/components/dashboard/reports/SalesChart";
-import { LowStockSection, OutstandingSection, SalesSection } from "@/components/dashboard/reports/ReportsPage";
+import {
+  BundlesSection,
+  LowStockSection,
+  OutstandingSection,
+  SalesSection,
+} from "@/components/dashboard/reports/ReportsPage";
 
 import { page } from "../../fixtures";
 import { callsTo, json, stubApi } from "../../http";
@@ -128,5 +133,49 @@ describe("LowStockSection", () => {
     renderWithQuery(<LowStockSection page={1} onPage={vi.fn()} />);
 
     expect(await screen.findByRole("link", { name: "الأضواء علوم" })).toHaveAttribute("href", "/dashboard/inventory/5");
+  });
+});
+
+describe("BundlesSection (BR-P15, D93)", () => {
+  it("lists the bundles sold and the component units they used over the page's date range", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/reports/bundles": json(200, {
+        data: {
+          from: "2026-10-01",
+          to: "2026-10-31",
+          bundles: [{ product_id: 30, name: "طقم أولى إعدادي", sku_code: "SET-1", quantity: 4, total: "540.00" }],
+          components: [{ sku_id: 5, sku_code: "ADW-SCI-1", product_name: "الأضواء علوم", quantity_base: 80 }],
+        },
+      }),
+    });
+    const setQuery = vi.fn();
+    renderWithQuery(<BundlesSection query={{ from: "2026-10-01", to: "2026-10-31" }} setQuery={setQuery} />);
+
+    const bundles = await screen.findByTestId("bundle-report");
+    expect(within(bundles).getByRole("link", { name: "طقم أولى إعدادي" })).toHaveAttribute(
+      "href",
+      "/dashboard/bundles/30",
+    );
+    expect(bundles).toHaveTextContent("540.00 ج.م");
+    expect(screen.getByTestId("bundle-components-report")).toHaveTextContent("الأضواء علوم");
+    expect(screen.getByTestId("bundle-components-report")).toHaveTextContent("80");
+    expect(callsTo(fetchMock, "GET /api/dashboard/reports/bundles")[0]?.url.search).toBe(
+      "?from=2026-10-01&to=2026-10-31",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^تصفية/ }));
+    fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-10-05" } });
+    expect(setQuery).toHaveBeenCalledWith({ from: "2026-10-05" });
+  });
+
+  it("says when no bundle was delivered", async () => {
+    stubApi({
+      "GET /api/dashboard/reports/bundles": json(200, {
+        data: { from: "2026-10-01", to: "2026-10-31", bundles: [], components: [] },
+      }),
+    });
+    renderWithQuery(<BundlesSection query={{}} setQuery={vi.fn()} />);
+
+    expect((await screen.findAllByText("لم تُسلَّم باقات في هذه الفترة")).length).toBe(2);
   });
 });

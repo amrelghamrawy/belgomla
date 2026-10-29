@@ -46,6 +46,17 @@ test('the export can be a csv with the keys only', function (): void {
     expect(array_column(spreadsheetRows(downloadedFile($response, SpreadsheetFormat::Csv), SpreadsheetFormat::Csv), 1))->toBe(['sku_code', 'ADW-SCI-1']);
 });
 
+test('D93 the xlsx export has the bundles on their own sheet, the csv leaves them out', function (): void {
+    $this->importedBundle($this->importedProduct());
+
+    $xlsx = downloadedFile($this->tenantJson('GET', '/api/dashboard/products/export')->assertOk());
+    $csv = downloadedFile($this->tenantJson('GET', '/api/dashboard/products/export?format=csv')->assertOk(), SpreadsheetFormat::Csv);
+
+    expect(array_column(spreadsheetRows($xlsx), 1))->toBe(['كود الصنف', 'sku_code', 'ADW-SCI-1'])
+        ->and(array_column(spreadsheetRows($xlsx, sheetName: 'bundles_v1'), 0))->toBe(['كود الباقة', 'bundle_code', 'SET-1'])
+        ->and(array_column(spreadsheetRows($csv, SpreadsheetFormat::Csv), 1))->toBe(['sku_code', 'ADW-SCI-1']);
+});
+
 test('the export validates its format and filter', function (string $query, string $field): void {
     $this->tenantJson('GET', "/api/dashboard/products/export?{$query}")
         ->assertUnprocessable()

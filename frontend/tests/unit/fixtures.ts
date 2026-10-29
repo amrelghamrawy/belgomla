@@ -119,6 +119,7 @@ export function storeProduct(overrides: Partial<StoreProductDetail> = {}): Store
     slug: "الأضواء-علوم-أولى-إعدادي",
     description: null,
     status: "active",
+    type: "simple",
     main_image_url: null,
     category: { id: 3, name: "أولى إعدادي", kind: "books" },
     custom_fields: [{ key: "grade", label: "السنة الدراسية", value: "أولى إعدادي" }],
@@ -170,6 +171,7 @@ export function cartItem(overrides: Partial<CartItem> = {}): CartItem {
     sku_unit_id: 601,
     product_name: "الأضواء علوم أولى إعدادي",
     variant: null,
+    is_bundle: false,
     product_slug: "الأضواء-علوم-أولى-إعدادي",
     unit: "كرتونة",
     conversion_factor: 20,
@@ -262,6 +264,8 @@ export function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
         delivered_quantity: null,
         removed_at: null,
         converted_quantity: 0,
+        is_bundle: false,
+        parent_item_id: null,
       },
     ],
     changes: [],
@@ -349,6 +353,65 @@ export function penProduct(overrides: Partial<StoreProductDetail> = {}): StorePr
       },
     ],
     price_range: { min: "10.00", max: "12.00" },
+    ...overrides,
+  });
+}
+
+/** An order line (store and dashboard share the shape). */
+export function orderItem(overrides: Partial<OrderDetail["items"][number]> = {}): OrderDetail["items"][number] {
+  const [line] = order().items;
+
+  return { ...line!, ...overrides };
+}
+
+/**
+ * A grade set (V2 Task 15, BR-P15, D93): two books at 90.00 + 60.00 sold together at 135.00 (saving 15.00), the
+ * second book missing; `availability` 0 unless given.
+ */
+export function bundleProduct(overrides: Partial<StoreProductDetail> = {}): StoreProductDetail {
+  const sku = storeSku({
+    id: 900,
+    code: "SET-1",
+    unit: "طقم",
+    conversion_factor: 1,
+    moq: 1,
+    cover_price: null,
+    base_price: "135.00",
+    discount_percent: null,
+    tiers: [],
+    available: 0,
+    in_stock: false,
+  });
+
+  return storeProduct({
+    id: 90,
+    name: "طقم أولى إعدادي",
+    slug: "set-1",
+    type: "bundle",
+    sku,
+    components: [
+      {
+        product_name: "الأضواء علوم",
+        slug: "adwaa-science",
+        sku_code: "BK-001",
+        label: null,
+        unit: "نسخة",
+        quantity: 1,
+        in_stock: true,
+      },
+      {
+        product_name: "سلاح التلميذ رياضيات",
+        slug: "selah-math",
+        sku_code: "BK-002",
+        label: null,
+        unit: "نسخة",
+        quantity: 2,
+        in_stock: false,
+      },
+    ],
+    availability: 0,
+    components_total: "150.00",
+    saving: "15.00",
     ...overrides,
   });
 }

@@ -12,6 +12,7 @@ use App\Modules\Orders\Exceptions\DiscountRefused;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Models\Scopes\Live;
+use App\Modules\Orders\Services\OrderSnapshots;
 use App\Modules\Pricing\Services\DiscountCalculator;
 use App\Modules\Pricing\Services\PercentPricing;
 use App\Modules\Tenancy\Enums\TenantUserRole;
@@ -32,6 +33,10 @@ use Illuminate\Support\Facades\DB;
  * collection status re-derived, the history gets the note «خصم», `order.discount_changed` is audited with the old
  * and new values of what changed, and the customer is told when the store notifies `discount` (BR-N03). When
  * nothing changes nothing is written.
+ *
+ * A bundle (BR-P15, D93) takes a line discount on its bundle line; its component lines are not lines of their own here
+ * (`422` like an unknown line) and split the bundle's new price again (OrderSnapshots::reallocate), so a return of a
+ * component gives back its share of the discounted bundle.
  */
 final readonly class ApplyOrderDiscount
 {
@@ -44,6 +49,7 @@ final readonly class ApplyOrderDiscount
         private RecordStatusChange $history,
         private NotifyCustomerOfStatus $notify,
         private AuditLogger $audit,
+        private OrderSnapshots $snapshots,
     ) {}
 
     public function handle(Order $order, DiscountData $data, int $actorId, bool $notifyCustomer = true): Order
@@ -60,7 +66,7 @@ final readonly class ApplyOrderDiscount
             }
 
             /** @var array<int, OrderItem> $items */
-            $items = OrderItem::query()->where('order_id', $order->id)->tap(new Live)->orderBy('id')->get()->keyBy('id')->all(); // a removed line takes no discount (BR-O12)
+            $items = OrderItem::query()->where('order_id', $order->id)->whereNull('parent_item_id')->tap(new Live)->orderBy('id')->get()->keyBy('id')->all(); // a removed line takes no discount (BR-O12)
             $discounts = $this->lineDiscounts($items, $data->items);
             $oldItems = array_map($this->itemSnapshot(...), $items);
             $oldOrder = $this->orderSnapshot($order);
@@ -80,6 +86,10 @@ final readonly class ApplyOrderDiscount
 
             foreach (array_keys($changedItems) as $id) {
                 $items[$id]->save();
+
+                if ($items[$id]->is_bundle) {
+                    $this->reallocate($items[$id]);
+                }
             }
 
             $order->save();
@@ -96,6 +106,17 @@ final readonly class ApplyOrderDiscount
 
             return $order;
         });
+    }
+
+    /** D93: the bundle line's component lines split its new price again. */
+    private function reallocate(OrderItem $bundle): void
+    {
+        $children = OrderItem::query()->where('parent_item_id', $bundle->id)->tap(new Live)->orderBy('id')->get();
+        $this->snapshots->reallocate($bundle, $children);
+
+        foreach ($children as $child) {
+            $child->save();
+        }
     }
 
     /**

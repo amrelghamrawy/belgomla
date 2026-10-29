@@ -49,7 +49,11 @@ describe("PromotionsPage", () => {
     stubApi({
       "GET /api/dashboard/promotions": json(
         200,
-        page([promotion(), promotion({ id: 6, name: "جارٍ", status: "active" }), promotion({ id: 7, status: "ended" })]),
+        page([
+          promotion(),
+          promotion({ id: 6, name: "جارٍ", status: "active" }),
+          promotion({ id: 7, status: "ended" }),
+        ]),
       ),
     });
     renderWithQuery(<PromotionsPage />);
@@ -156,7 +160,9 @@ describe("NewPromotionButton", () => {
       "POST /api/dashboard/promotions/preview": json(200, {
         data: {
           skus_count: 12,
-          sample: [{ sku_id: 1, code: "ADW-1", product_name: "الأضواء علوم", base_price: "100.00", promotion_price: "85.00" }],
+          sample: [
+            { sku_id: 1, code: "ADW-1", product_name: "الأضواء علوم", base_price: "100.00", promotion_price: "85.00" },
+          ],
         },
       }),
       "POST /api/dashboard/promotions": json(201, { data: promotion() }),

@@ -37,6 +37,8 @@ function item(overrides: Partial<OrderItem> = {}): OrderItem {
     delivered_quantity: null,
     removed_at: null,
     converted_quantity: 0,
+    is_bundle: false,
+    parent_item_id: null,
     ...overrides,
   };
 }
@@ -158,5 +160,33 @@ describe("partial delivery (BR-O13)", () => {
       clampDelivered(2.6, 6),
       clampDelivered(Number.NaN, 6),
     ]).toEqual([6, 0, 2, 0]);
+  });
+});
+
+describe("bundle lines in the order dialogs (BR-P15, D93)", () => {
+  const order = {
+    items: [
+      item({
+        id: 70,
+        sku_unit_id: 50,
+        product_name: "طقم",
+        is_bundle: true,
+        quantity: 2,
+        unit_price: "135.00",
+        line_total: "270.00",
+      }),
+      item({ id: 71, sku_unit_id: 5, parent_item_id: 70, quantity: 2, unit_price: "90.00", line_total: "180.00" }),
+      item({ id: 72, sku_unit_id: 6, parent_item_id: 70, quantity: 4, unit_price: "22.50", line_total: "90.00" }),
+    ],
+  };
+
+  it("edits the bundle line only, never its components", () => {
+    expect(editLinesOf(order).map((line) => line.order_item_id)).toEqual([70]);
+  });
+
+  it("delivers short by naming the bundle line, and totals the bundle line once", () => {
+    expect(deliveredBody(order, { 70: 1 })).toEqual([{ order_item_id: 70, quantity: 1 }]);
+    expect(deliveredItemsTotal(order, { 70: 1 })).toBe("135.00");
+    expect(deliveredItemsTotal(order, {})).toBe("270.00");
   });
 });

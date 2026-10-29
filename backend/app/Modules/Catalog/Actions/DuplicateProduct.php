@@ -6,6 +6,7 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Exceptions\BundleRefused;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Catalog\Models\ProductOptionValue;
@@ -21,7 +22,8 @@ use Illuminate\Support\Facades\DB;
  * and every SKU (status, label and option values kept) with its active units, prices, tiers and MOQ (D91) into a new
  * `inactive` product. Each SKU gets a new code ("{code}-COPY", "-COPY-2", ...); the product its own slug. Images,
  * relations and stock are not copied (so no value keeps a swatch): each SKU gets an empty stock row through Inventory's
- * RecordOpeningStock. Prices and tiers are copied as stored, through Pricing's UpdateSkuPricing. Owns its transaction.
+ * RecordOpeningStock. Prices and tiers are copied as stored, through Pricing's UpdateSkuPricing. A bundle is not
+ * duplicated (`409 is_bundle`, D93). Owns its transaction.
  */
 final readonly class DuplicateProduct
 {
@@ -36,6 +38,10 @@ final readonly class DuplicateProduct
 
     public function handle(Product $source, ?int $createdBy = null): Product
     {
+        if ($source->isBundle()) {
+            throw BundleRefused::isBundle();
+        }
+
         $source->loadMissing(['skus.activeUnits.tiers', 'skus.optionValues', 'options.values']);
 
         return DB::transaction(function () use ($source, $createdBy): Product {

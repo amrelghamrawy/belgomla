@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Queries;
 
 use App\Modules\Catalog\Data\ProductFilterData;
+use App\Modules\Catalog\Enums\ProductType;
 use App\Modules\Catalog\Models\Product;
 use Illuminate\Support\LazyCollection;
 
@@ -12,6 +13,8 @@ use Illuminate\Support\LazyCollection;
  * The catalog export selection (V2 Task 06): the dashboard filter (every status), oldest product first, read lazily
  * in chunks of `CHUNK` with its options and every SKU's (variant's, BR-P14) units, tiers, stock row and option values
  * eager-loaded, so a catalog of any size streams in flat memory. Custom field values are on the product; their labels come from CatalogRowMapper's lookups.
+ * Bundles are left out (D93): they have their own sheet (BundleExportQuery) and are never imported. `count()` counts
+ * them, since the XLSX writes them too.
  */
 final readonly class CatalogExportQuery
 {
@@ -25,6 +28,7 @@ final readonly class CatalogExportQuery
     public function get(ProductFilterData $filter): LazyCollection
     {
         return $this->filtered->builder($filter)
+            ->where('products.type', '!=', ProductType::Bundle)
             ->with(['options', 'skus.activeUnits.unit', 'skus.activeUnits.tiers', 'skus.baseUnit', 'skus.inventory', 'skus.optionValues'])
             ->lazyById(self::CHUNK, 'products.id', 'id');
     }

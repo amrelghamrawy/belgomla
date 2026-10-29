@@ -22,7 +22,7 @@ test('the dashboard product resource key set without detail relations', function
     $data = rendered(new DashboardProductResource($product), dashboardRequest());
 
     expect(array_keys($data))->toBe([
-        'id', 'name', 'slug', 'description', 'status', 'category', 'custom_fields', 'preorder', 'sku', 'skus', 'options', 'main_image_url', 'created_at', 'updated_at',
+        'id', 'name', 'slug', 'description', 'status', 'type', 'category', 'custom_fields', 'preorder', 'sku', 'skus', 'options', 'main_image_url', 'created_at', 'updated_at',
     ])
         ->and($data['preorder'])->toBe(['enabled' => false, 'expected_at' => null, 'limit' => null])
         ->and(array_keys($data['sku']))->toBe([

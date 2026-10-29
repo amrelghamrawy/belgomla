@@ -13,6 +13,7 @@ import { isApiError } from "@/lib/api/errors";
 import type { StoreProductDetail, StoreSku } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { formatMoney } from "@/lib/format/money";
+import { bundleUnavailableMessage, isBundle, savingLabel } from "@/lib/store/bundles";
 import { useProduct } from "@/lib/store/catalog";
 import { useRouteParam } from "@/lib/store/route";
 import { skuInUnit, skuUnits, unitOf } from "@/lib/store/units";
@@ -111,8 +112,10 @@ export function ProductDetail() {
             </div>
             {sku && <OrderingFacts sku={sku} />}
             {sku?.tiers && sku.tiers.length > 0 && <TiersTable sku={sku} />}
+            {isBundle(product) && <BundleStatus product={product} />}
             <AddToCartBar key={`${variant?.id ?? 0}-${picked?.id ?? 0}`} product={shown} unitId={picked?.id} />
           </section>
+          {isBundle(product) && <BundleContents product={product} />}
           <AboutProduct product={product} />
         </div>
       </div>
@@ -196,6 +199,87 @@ function TiersTable({ sku }: { sku: StoreSku }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/**
+ * BR-P15, D93: what the bundle saves against its components bought alone, and either how many can be made now or
+ * which component is missing.
+ */
+function BundleStatus({ product }: { product: StoreProductDetail }) {
+  const saving = savingLabel(product);
+  const unavailable = bundleUnavailableMessage(product);
+
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      {saving !== null && (
+        <p className="flex flex-wrap items-center gap-2">
+          <span className="bg-highlight text-highlight-foreground rounded-full px-2.5 py-1 font-bold">{saving}</span>
+          {product.components_total && (
+            <span className="text-muted-foreground">
+              {ar.product.bundleSumNote(formatMoney(product.components_total))}
+            </span>
+          )}
+        </p>
+      )}
+      {unavailable === null ? (
+        <p className="text-primary font-semibold" data-testid="bundle-availability">
+          {ar.product.bundleAvailable(product.availability ?? 0)}
+        </p>
+      ) : (
+        <p role="status" className="text-destructive font-semibold" data-testid="bundle-unavailable">
+          {unavailable}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** BR-P15: the bundle's components with their quantity and unit, a link to each and whether it is in stock. */
+function BundleContents({ product }: { product: StoreProductDetail }) {
+  const components = product.components ?? [];
+
+  if (components.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-labelledby="bundle-components"
+      className="bg-card shadow-card flex flex-col gap-3 rounded-2xl border p-4 sm:p-6"
+    >
+      <div className="flex flex-col gap-0.5">
+        <h2 id="bundle-components" className="font-display text-lg font-bold">
+          {ar.product.bundleComponents}
+        </h2>
+        <p className="text-muted-foreground text-xs">{ar.product.bundleComponentsHint(components.length)}</p>
+      </div>
+      <ul className="divide-y text-sm">
+        {components.map((component) => (
+          <li
+            key={`${component.sku_code}-${component.unit}`}
+            className="flex items-start justify-between gap-3 py-2.5"
+            data-testid={`bundle-component-${component.sku_code}`}
+          >
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <Link href={`/p/${encodeURIComponent(component.slug)}`} className="font-medium hover:underline">
+                {component.product_name}
+              </Link>
+              {component.label && <span className="text-muted-foreground text-xs">{component.label}</span>}
+              <bdi dir="ltr" className="text-muted-foreground text-start text-xs">
+                {component.sku_code}
+              </bdi>
+            </span>
+            <span className="flex shrink-0 flex-col items-end gap-0.5">
+              <span className="font-semibold">{ar.product.bundleQuantity(component.quantity, component.unit)}</span>
+              <span className={component.in_stock ? "text-primary text-xs" : "text-destructive text-xs font-semibold"}>
+                {component.in_stock ? ar.product.componentInStock : ar.product.componentMissing}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

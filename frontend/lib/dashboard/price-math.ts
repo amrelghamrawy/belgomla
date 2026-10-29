@@ -40,7 +40,7 @@ export function toBasisPoints(percent: string): bigint | null {
 }
 
 /** a / b rounded half-up, for non-negative integers. */
-function divideHalfUp(a: bigint, b: bigint): bigint {
+export function divideHalfUp(a: bigint, b: bigint): bigint {
   const quotient = a / b;
 
   return (a % b) * 2n >= b ? quotient + 1n : quotient;

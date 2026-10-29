@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -120,7 +121,14 @@ function DeliverForm({
           {items.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 p-2 text-sm">
               <span className="flex min-w-0 flex-col">
-                <span className="font-medium">{item.product_name}</span>
+                <span className="font-medium">
+                  {item.product_name}
+                  {item.is_bundle && (
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {ar.dashboard.bundles.badge}
+                    </Badge>
+                  )}
+                </span>
                 <span className="text-muted-foreground text-xs">{copy.ordered(item.quantity, item.unit)}</span>
               </span>
               <Input

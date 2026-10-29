@@ -24,7 +24,7 @@ test('the store product resource key set with visible prices', function (): void
 
     $data = rendered(new StoreProductResource($product, new Collection, false), storeRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'main_image_url', 'category', 'custom_fields', 'sku', 'skus', 'options', 'price_range', 'preorder'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'description', 'status', 'type', 'main_image_url', 'category', 'custom_fields', 'sku', 'skus', 'options', 'price_range', 'preorder'])
         ->and($data['preorder'])->toBeNull()
         ->and(array_keys($data['sku']))->toBe(['id', 'code', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'units', 'available', 'in_stock', 'label', 'option_value_ids'])
         ->and(array_keys($data['sku']['units'][0]))->toBe(['id', 'unit', 'conversion_factor', 'moq', 'cover_price', 'base_price', 'discount_percent', 'tiers', 'is_default', 'in_stock'])

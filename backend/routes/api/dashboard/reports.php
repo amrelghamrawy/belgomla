@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Reports\Http\Controllers\Dashboard\Reports\BundlesController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\LowStockController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\OutstandingController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\OverviewController;
@@ -17,4 +18,5 @@ Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user', 'permission
     Route::get('sales', [SalesController::class, 'show'])->name('sales');
     Route::get('outstanding', [OutstandingController::class, 'show'])->name('outstanding');
     Route::get('low-stock', [LowStockController::class, 'show'])->name('low-stock');
+    Route::get('bundles', [BundlesController::class, 'show'])->name('bundles');
 });

@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Services;
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Models\BundleItem;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Contracts\CustomerExposure;
 use App\Modules\Orders\Data\CartLineInput;
+use App\Modules\Orders\Data\CheckoutComponent;
 use App\Modules\Orders\Data\CheckoutLine;
 use App\Modules\Orders\Data\CheckoutProblem;
 use App\Modules\Orders\Data\CheckoutReport;
@@ -28,6 +31,13 @@ use Illuminate\Support\Collection;
  * order value on the items total (BR-MOV02), and the customer's credit limit against what they already owe or have on
  * order (BR-C05, D77). Every failure is collected, so the customer sees all of them at once; nothing is written here.
  * `check()` reports (the merchant's quote, on unlocked rows), `validate()` refuses (checkout, on locked rows).
+ *
+ * A bundle line (BR-P15, V2 Task 15, D93) is priced as its own unit and checked on its components: the bundle and every
+ * component orderable (else `product_inactive` on the bundle line), the bundle's MOQ, and each component's base units
+ * (quantity × its quantity in the bundle × its factor) against its SKU's stock, shared with the order's loose lines of
+ * that SKU. The loose lines are checked first, so a shortfall the two share is reported on the bundle line, with the
+ * bundles that still fit as `available`. Each component is also priced on its own (its `weight`, what splits the
+ * bundle's price over the components at the snapshot).
  *
  * Expects the lines' units loaded with Catalog's CartSkuQuery::RELATIONS.
  */
@@ -74,28 +84,102 @@ final readonly class CheckoutValidator
     public function checkLines(array $lines, Collection $stock, ?PricingContext $pricing): CheckoutReport
     {
         $priced = [];
-        $problems = [];
         $total = '0.00';
-        $taken = []; // D91: base units the earlier lines take of each SKU (piece and carton share the stock)
 
         foreach ($lines as $line) {
-            $unit = $line->unit;
-            $price = $this->prices->resolve($unit, $line->quantity, $pricing);
+            $price = $this->prices->resolve($line->unit, $line->quantity, $pricing);
             $total = Money::add($total, $price->lineTotal);
-            $priced[] = new CheckoutLine($unit, $line->quantity, $price);
+            $priced[] = new CheckoutLine($line->unit, $line->quantity, $price, $this->components($line, $pricing));
+        }
 
-            $row = $stock->get($unit->sku_id);
-            $available = ($row instanceof SkuInventory ? $row->available : 0) - ($taken[$unit->sku_id] ?? 0);
-            $problem = $this->problem($line, $available);
+        return new CheckoutReport($priced, $this->stockProblems($lines, $stock), $total, null, null, null);
+    }
+
+    /**
+     * Every line's problem, keyed by SKU unit: the loose lines first, then the bundles (D93), each against what the earlier
+     * ones left of every SKU (D91: piece and carton share the stock; a line that does not fit takes nothing).
+     *
+     * @param  list<CartLineInput>  $lines
+     * @param  Collection<int, SkuInventory>  $stock  rows keyed by sku_id
+     * @return array<int, CheckoutProblem>
+     */
+    private function stockProblems(array $lines, Collection $stock): array
+    {
+        $problems = [];
+        $taken = [];
+        $ordered = [...array_filter($lines, fn (CartLineInput $line): bool => ! $line->isBundle()), ...array_filter($lines, fn (CartLineInput $line): bool => $line->isBundle())];
+
+        foreach ($ordered as $line) {
+            $left = [];
+
+            foreach ($line->parts() as [$sku, $base]) {
+                $row = $stock->get($sku->id);
+                $left[$sku->id] = ($row instanceof SkuInventory ? $row->available : 0) - ($taken[$sku->id] ?? 0);
+            }
+
+            $problem = $line->isBundle() ? $this->bundleProblem($line, $left) : $this->problem($line, $left[$line->sku->id] ?? 0);
 
             if ($problem instanceof CheckoutProblem) {
-                $problems[$unit->id] = $problem;
-            } else {
-                $taken[$unit->sku_id] = ($taken[$unit->sku_id] ?? 0) + $line->quantityBase();
+                $problems[$line->unit->id] = $problem;
+
+                continue;
+            }
+
+            foreach ($line->parts() as [$sku, $base]) {
+                $taken[$sku->id] = ($taken[$sku->id] ?? 0) + $base;
             }
         }
 
-        return new CheckoutReport($priced, $problems, $total, null, null, null);
+        return $problems;
+    }
+
+    /**
+     * D93: each component priced at its quantity in one bundle, at the customer's prices; none for a simple line.
+     *
+     * @return list<CheckoutComponent>
+     */
+    private function components(CartLineInput $line, ?PricingContext $pricing): array
+    {
+        if (! $line->isBundle()) {
+            return [];
+        }
+
+        return array_values($line->sku->bundleItems->map(fn (BundleItem $item): CheckoutComponent => new CheckoutComponent(
+            $item->componentUnit,
+            $item->quantity,
+            $this->prices->resolve($item->componentUnit, $item->quantity, $pricing)->lineTotal,
+        ))->all());
+    }
+
+    /**
+     * D93: the bundle and its components can be ordered, the bundle's MOQ, and every component fits in what is left of
+     * its SKU (`$left`, base units by sku_id); short, the bundles that still fit are reported.
+     *
+     * @param  array<int, int>  $left
+     */
+    private function bundleProblem(CartLineInput $line, array $left): ?CheckoutProblem
+    {
+        $unit = $line->unit;
+        $items = $line->sku->bundleItems;
+        $orderable = $items->every(fn (BundleItem $item): bool => $this->componentOrderable($item->componentUnit->sku, $item->componentUnit->isActive()));
+
+        if ($line->sku->product->status !== ProductStatus::Active || ! $line->sku->isActive() || ! $unit->isActive() || $items->isEmpty() || ! $orderable) {
+            return CheckoutProblem::productInactive($unit->sku_id, $unit->id);
+        }
+
+        if ($line->quantity < $unit->moq) {
+            return CheckoutProblem::belowMoq($unit->sku_id, $unit->id, $unit->moq);
+        }
+
+        $allowed = array_values($items->map(fn (BundleItem $item): int => intdiv(max(0, $left[$item->componentUnit->sku_id] ?? 0), max(1, $item->baseQuantity())))->all());
+        $fits = $allowed === [] ? 0 : min($allowed);
+
+        return $fits < $line->quantity ? CheckoutProblem::insufficientStock($unit->sku_id, $unit->id, $line->quantity, $fits) : null;
+    }
+
+    private function componentOrderable(Sku $sku, bool $unitActive): bool
+    {
+        return $sku->product->status === ProductStatus::Active && $sku->isActive() && $unitActive;
     }
 
     /**

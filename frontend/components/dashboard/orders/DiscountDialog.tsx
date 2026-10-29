@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -121,7 +122,14 @@ function DiscountForm({ order, onDone }: { order: DashboardOrderDetail; onDone: 
           return (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
               <span className="flex min-w-0 flex-col">
-                <span className="font-medium">{item.product_name}</span>
+                <span className="font-medium">
+                  {item.product_name}
+                  {item.is_bundle && (
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {ar.dashboard.bundles.badge}
+                    </Badge>
+                  )}
+                </span>
                 <span className="text-muted-foreground text-xs">
                   {ar.orders.quantityOf(item.quantity, item.unit)} × {formatMoney(item.list_unit_price)}
                   {hasDiscount(draft) && priced ? ` → ${formatMoney(priced.unit_price)}` : ""}

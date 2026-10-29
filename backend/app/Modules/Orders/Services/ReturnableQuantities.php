@@ -12,7 +12,7 @@ use App\Modules\Orders\Models\Scopes\Live;
 /**
  * BR-R02: how many selling units of each line can still come back = delivered − returned by live returns. A line
  * delivered short counts what went out (`delivered_quantity`, BR-O13), a removed line nothing (BR-O12); a voided
- * return gives its quantity back.
+ * return gives its quantity back. A bundle line (BR-P15, D93) comes back through its component lines, so it is not listed.
  */
 final readonly class ReturnableQuantities
 {
@@ -24,7 +24,7 @@ final readonly class ReturnableQuantities
         $returned = $this->returned($order);
         $returnable = [];
 
-        foreach (OrderItem::query()->where('order_id', $order->id)->tap(new Live)->orderBy('id')->get(['id', 'quantity', 'delivered_quantity']) as $item) {
+        foreach (OrderItem::query()->where('order_id', $order->id)->where('is_bundle', false)->tap(new Live)->orderBy('id')->get(['id', 'quantity', 'delivered_quantity']) as $item) {
             $returnable[$item->id] = ($item->delivered_quantity ?? $item->quantity) - ($returned[$item->id] ?? 0);
         }
 

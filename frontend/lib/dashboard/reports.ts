@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { apiFetch, apiFetchPage, withQuery } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/keys";
-import type { LowStockSku, OutstandingCustomer, OverviewReport, SalesReport } from "@/lib/api/types";
+import type { BundleReport, LowStockSku, OutstandingCustomer, OverviewReport, SalesReport } from "@/lib/api/types";
 
 // Reports (08 §11, D5). Export is V2.
 
@@ -30,6 +30,15 @@ export function useOutstandingReport(page: number) {
   return useQuery({
     queryKey: queryKeys.dashboardOutstanding(page),
     queryFn: () => apiFetchPage<OutstandingCustomer>(withQuery("/api/dashboard/reports/outstanding", { page })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** BR-P15, D93: bundles delivered in the range and the component base units they used (default the last 30 days). */
+export function useBundleReport(params: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: queryKeys.dashboardBundleReport(params),
+    queryFn: () => apiFetch<BundleReport>(withQuery("/api/dashboard/reports/bundles", params)),
     placeholderData: keepPreviousData,
   });
 }

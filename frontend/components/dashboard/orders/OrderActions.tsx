@@ -9,6 +9,7 @@ import { allowsLineEdit, allowsPriceChange, canCancel, canCollect, nextSteps } f
 import { balanceOf, useCancelOrder, useTransitionOrder } from "@/lib/dashboard/orders";
 import { useCan, useIsWarehouse } from "@/lib/dashboard/permissions";
 import { formatMoney } from "@/lib/format/money";
+import { bundleNames } from "@/lib/store/order-lines";
 
 import { ReasonDialog } from "../common/ReasonDialog";
 import { ApplyCreditDialog } from "./ApplyCreditDialog";
@@ -101,7 +102,7 @@ export function OrderActions({ order }: { order: DashboardOrderDetail }) {
       {discountable && <DiscountDialog order={order} />}
       {collectable && <RecordCollectionDialog order={order} />}
       {collectable && <ApplyCreditDialog order={order} />}
-      {returnable && <ReturnDialog orderNumber={order.number} />}
+      {returnable && <ReturnDialog orderNumber={order.number} bundles={bundleNames(order.items)} />}
       {cancellable && (
         <ReasonDialog
           trigger={(open) => (

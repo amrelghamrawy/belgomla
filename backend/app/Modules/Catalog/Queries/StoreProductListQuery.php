@@ -18,7 +18,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 final readonly class StoreProductListQuery
 {
-    public const array RELATIONS = ['category', 'activeSkus.activeUnits.unit', 'activeSkus.activeUnits.tiers', 'activeSkus.inventory', 'activeSkus.optionValues', 'options.values.image', 'mainImage'];
+    public const array RELATIONS = [
+        'category', 'activeSkus.activeUnits.unit', 'activeSkus.activeUnits.tiers', 'activeSkus.inventory', 'activeSkus.optionValues', 'options.values.image', 'mainImage',
+        'activeSkus.bundleItems.componentUnit.unit', 'activeSkus.bundleItems.componentUnit.tiers', 'activeSkus.bundleItems.componentUnit.sku.product', 'activeSkus.bundleItems.componentUnit.sku.inventory', // D93
+    ];
 
     public function __construct(private FilteredProductsQuery $filtered, private ActivePromotions $promotions) {}
 

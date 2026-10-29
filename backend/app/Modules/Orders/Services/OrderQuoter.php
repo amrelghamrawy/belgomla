@@ -22,7 +22,8 @@ use App\Modules\Pricing\Services\PriceResolver;
  * BR-O11: the merchant's order form. Finds the customer and the SKUs of the lines the merchant typed (PlaceOrderForCustomer
  * places them), and quotes them: the same checks as checkout (CheckoutValidator) on the stock as it is now, without
  * locking or writing anything, so the form shows the prices, tiers, stock and problems live, at the customer's own
- * prices (BR-PR14): their tiers are the ones that still lower their price.
+ * prices (BR-PR14): their tiers are the ones that still lower their price. A bundle line (BR-P15, D93) is checked on
+ * its components' stock.
  */
 final readonly class OrderQuoter
 {
@@ -67,7 +68,7 @@ final readonly class OrderQuoter
         $inputs = $this->lines($lines);
         $order = $orderNumber === null ? null : $this->order($customer, $orderNumber);
         $held = $order instanceof Order ? $this->held($order) : [];
-        $pricing = $this->pricing->for($customer, array_map(fn (CartLineInput $line): int => $line->sku->id, $inputs));
+        $pricing = $this->pricing->for($customer, array_values(array_unique(array_merge([], ...array_map(fn (CartLineInput $line): array => $line->pricedSkuIds(), $inputs)))));
 
         $tiers = [];
 
@@ -75,11 +76,13 @@ final readonly class OrderQuoter
             $tiers[$line->unit->id] = $this->prices->listed($line->unit, $pricing)->tiers;
         }
 
-        foreach (collect($inputs)->map(fn (CartLineInput $line): Sku => $line->sku)->unique('id') as $sku) {
+        $skus = collect($inputs)->flatMap(fn (CartLineInput $line): array => $line->stockSkus())->unique('id');
+
+        foreach ($skus as $sku) {
             $this->countHeld($sku, $held[$sku->id] ?? 0);
         }
 
-        $stock = collect($inputs)->mapWithKeys(fn (CartLineInput $line): array => [$line->sku->id => $line->sku->inventory])->filter();
+        $stock = $skus->mapWithKeys(fn (Sku $sku): array => [$sku->id => $sku->inventory])->filter();
 
         return new OrderQuote($this->validator->check($inputs, $stock, $customer, $pricing, $order?->netTotal() ?? '0.00'), $tiers);
     }

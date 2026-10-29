@@ -53,6 +53,9 @@ const DASHBOARD_ROUTES = [
     'products update' => ['PUT', '/api/dashboard/products/1', 'catalog.manage'],
     'products status' => ['PATCH', '/api/dashboard/products/1/status', 'catalog.manage'],
     'products duplicate' => ['POST', '/api/dashboard/products/1/duplicate', 'catalog.manage'],
+    'bundles create' => ['POST', '/api/dashboard/bundles', 'catalog.manage'],
+    'bundles generate' => ['POST', '/api/dashboard/bundles/generate', 'catalog.manage'],
+    'bundles update' => ['PUT', '/api/dashboard/bundles/1', 'catalog.manage'],
     'product images upload' => ['POST', '/api/dashboard/products/1/images', 'catalog.manage'],
     'product images reorder' => ['POST', '/api/dashboard/products/1/images/reorder', 'catalog.manage'],
     'product images delete' => ['DELETE', '/api/dashboard/products/1/images/1', 'catalog.manage'],
@@ -119,6 +122,7 @@ const DASHBOARD_ROUTES = [
     'reports sales' => ['GET', '/api/dashboard/reports/sales', 'reports.view'],
     'reports outstanding' => ['GET', '/api/dashboard/reports/outstanding', 'reports.view'],
     'reports low stock' => ['GET', '/api/dashboard/reports/low-stock', 'reports.view'],
+    'reports bundles' => ['GET', '/api/dashboard/reports/bundles', 'reports.view'],
     'audit log' => ['GET', '/api/dashboard/audit', 'audit.view'],
 ];
 

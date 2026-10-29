@@ -403,6 +403,16 @@ test('BR-P14 codes of two products of the store under one key are an error on th
         ->and($import->errors)->toEqual([['row' => 4, 'column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'هذا الكود لصنف من منتج آخر في المتجر']]);
 });
 
+test('D93 a row with a bundle\'s code is a row error, never an update', function (): void {
+    $bundle = $this->importedBundle($this->importedProduct());
+
+    $import = importJobRun($this, [$this->importRow(['sku_code' => 'SET-1', 'product_name' => 'اسم جديد'])]);
+
+    expect($import->only(['updated', 'created', 'skipped']))->toBe(['updated' => 0, 'created' => 0, 'skipped' => 1])
+        ->and($import->errors)->toEqual([['row' => 3, 'column' => 'sku_code', 'label' => 'كود الصنف', 'message' => 'الباقات لا تُستورد من الملف']])
+        ->and($bundle->refresh()->name)->toBe('باقة أولى إعدادي');
+});
+
 test('BR-P14 a product key that comes back after another product is a duplicate', function (): void {
     $import = importJobRun($this, [($this->penRow)('PEN-BLUE', 'أزرق'), $this->importRow(['sku_code' => 'NEW-1']), ($this->penRow)('PEN-RED', 'أحمر')]);
 

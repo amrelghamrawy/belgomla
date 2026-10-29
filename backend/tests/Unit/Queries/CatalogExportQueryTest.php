@@ -26,6 +26,7 @@ use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Catalog\Queries\BundleExportQuery;
 use App\Modules\Catalog\Queries\CatalogExportQuery;
 use App\Modules\Catalog\Queries\PriceListExportQuery;
 use App\Modules\Catalog\Services\CatalogExporter;
@@ -113,6 +114,31 @@ test('the export reads every product of the filter with its options and every sk
         ->and($rows[0]->skus->first()?->relationLoaded('baseUnit'))->toBeTrue()
         ->and(app(CatalogExportQuery::class)->count(new ProductFilterData))->toBe(2)
         ->and($other->exists)->toBeTrue();
+});
+
+test('D93 the products of the export leave bundles out, the count keeps them', function (): void {
+    $book = $this->importedProduct();
+    $this->importedBundle($book);
+
+    $rows = app(CatalogExportQuery::class)->get(new ProductFilterData)->map(fn (Product $product): int => $product->id)->all();
+
+    expect($rows)->toBe([$book->id])
+        ->and(app(CatalogExportQuery::class)->count(new ProductFilterData))->toBe(2);
+});
+
+test('D93 the bundles of the export are the filter\'s bundle products with their unit and components loaded', function (): void {
+    $book = $this->importedProduct();
+    $bundle = $this->importedBundle($book);
+    $this->importedBundle($book, code: 'SET-2')->update(['status' => ProductStatus::Inactive]);
+
+    $all = app(BundleExportQuery::class)->get(new ProductFilterData)->all();
+    $active = app(BundleExportQuery::class)->get(new ProductFilterData(status: ProductStatus::Active))->map(fn (Product $product): int => $product->id)->all();
+
+    expect(array_map(fn (Product $product): string => $product->skus->sole()->code, $all))->toBe(['SET-1', 'SET-2'])
+        ->and($active)->toBe([$bundle->id])
+        ->and($all[0]->skus->sole()->defaultUnit?->relationLoaded('unit'))->toBeTrue()
+        ->and($all[0]->skus->sole()->bundleItems->first()?->componentUnit->relationLoaded('unit'))->toBeTrue()
+        ->and($all[0]->skus->sole()->bundleItems->first()?->componentUnit->relationLoaded('sku'))->toBeTrue();
 });
 
 test('the export includes every status, oldest product first, and follows the status filter', function (): void {
@@ -204,8 +230,26 @@ test('D91 D95 BR-P14 export then import of the same file is an update of every p
         ->and($import->refresh()->only(['updated', 'created', 'skipped', 'failed']))->toBe(['updated' => 4, 'created' => 0, 'skipped' => 0, 'failed' => 0])
         ->and(exportSnapshot())->toEqual($before)
         ->and(InventoryMovement::query()->where('type', 'adjustment')->exists())->toBeFalse()
-        ->and(AuditLog::query()->where('id', '>', $audits)->pluck('action')->all())->toBe(['catalog.import_started', 'catalog.imported']);
+        ->and(AuditLog::query()->where('id', '>', $audits)->orderBy('id')->pluck('action')->all())->toBe(['catalog.import_started', 'catalog.imported']);
 })->with(['xlsx' => [SpreadsheetFormat::Xlsx], 'csv' => [SpreadsheetFormat::Csv]]);
+
+test('D93 an exported file with bundles imports its products sheet unchanged and never reads the bundles sheet', function (): void {
+    Queue::fake();
+    $this->importedBundle($this->importedProduct());
+    $before = exportSnapshot();
+    $path = sys_get_temp_dir().'/export-'.Str::uuid().'.xlsx';
+    app(CatalogExporter::class)->write($path, new ProductFilterData, SpreadsheetFormat::Xlsx);
+
+    $preview = app(PreviewCatalogImport::class)->handle(new UploadedFile($path, 'products.xlsx', null, null, true));
+    $import = app(RunCatalogImport::class)->handle($preview->token);
+    runJob(new ImportCatalog($import->id));
+
+    expect(spreadsheetRows($path, sheetName: 'bundles_v1'))->toHaveCount(3)
+        ->and($preview->errors)->toBe([])
+        ->and([$preview->total, $preview->update, $preview->create, $preview->skip])->toBe([1, 1, 0, 0])
+        ->and($import->refresh()->only(['updated', 'created', 'skipped', 'failed']))->toBe(['updated' => 1, 'created' => 0, 'skipped' => 0, 'failed' => 0])
+        ->and(exportSnapshot())->toEqual($before);
+});
 
 test('BR-P13 the price list export reads the visible products of the selection by name, uncapped', function (): void {
     config(['catalog.price_list_limit' => 1]);

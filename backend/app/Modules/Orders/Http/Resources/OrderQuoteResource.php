@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Http\Resources;
 
+use App\Modules\Orders\Data\CheckoutComponent;
 use App\Modules\Orders\Data\CheckoutLine;
 use App\Modules\Orders\Data\OrderQuote;
 use App\Modules\Pricing\Data\TierData;
@@ -55,7 +56,8 @@ final class OrderQuoteResource extends JsonResource
             'conversion_factor' => $unit->conversion_factor,
             'quantity' => $line->quantity,
             'moq' => $unit->moq,
-            'available' => intdiv(max(0, $sku->inventory->available ?? 0), $unit->conversion_factor),
+            'available' => $this->available($line),
+            'is_bundle' => $line->isBundle(),
             'cover_price' => $line->price->coverPrice,
             'unit_price' => $line->price->unitPrice,
             'discount_percent' => $line->price->discountPercent,
@@ -65,5 +67,17 @@ final class OrderQuoteResource extends JsonResource
             'tiers' => array_map(fn (TierData $tier): array => ['min_quantity' => $tier->minQuantity, 'unit_price' => $tier->unitPrice], $this->resource->tiers[$unit->id] ?? []),
             'problem' => $problem === [] ? null : $problem,
         ];
+    }
+
+    /** Selling units the stock covers now; for a bundle (D93) the bundles its components allow. */
+    private function available(CheckoutLine $line): int
+    {
+        if (! $line->isBundle()) {
+            return intdiv(max(0, $line->sku->inventory->available ?? 0), $line->unit->conversion_factor);
+        }
+
+        $fits = array_map(fn (CheckoutComponent $component): int => intdiv(max(0, $component->sku->inventory->available ?? 0), max(1, $component->perBundle * $component->unit->conversion_factor)), $line->components);
+
+        return $fits === [] ? 0 : min($fits);
     }
 }

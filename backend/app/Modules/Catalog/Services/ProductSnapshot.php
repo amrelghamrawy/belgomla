@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Services;
 
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\BundlePricer;
 use App\Modules\Pricing\Services\PriceResolver;
 
 /**
@@ -17,14 +19,18 @@ use App\Modules\Pricing\Services\PriceResolver;
  * flat `sku.*` keys, so the AuditLogger keeps only the changed fields; `sku.units` lists the active units (D91). A product
  * with variants (BR-P14, V2 Task 14) has `options` (name and values) and `skus` (code, label, status, base unit and
  * units of each). `withPricing: false` leaves out each unit's prices, MOQ and tiers for `product.updated`, because
- * UpdateSkuPricing audits those itself.
+ * UpdateSkuPricing audits those itself. A bundle (BR-P15, D93) adds `bundle`: its components (`sku_unit_id`, `quantity`)
+ * and pricing (`mode`, `value`).
  */
 final readonly class ProductSnapshot
 {
     /** What `of()` reads; load it once instead of lazily. */
     public const array RELATIONS = ['skus.activeUnits.tiers', 'options.values'];
 
-    public function __construct(private PriceResolver $prices) {}
+    public function __construct(
+        private PriceResolver $prices,
+        private BundlePricer $bundles,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -58,6 +64,25 @@ final readonly class ProductSnapshot
                     'units' => $this->units($sku, $withPricing),
                 ])->values()->all(),
             ]),
+        ];
+    }
+
+    /**
+     * BR-P15: the snapshot of a bundle, with its components and pricing.
+     *
+     * @return array<string, mixed>
+     */
+    public function ofBundle(Product $product): array
+    {
+        $sku = $product->skus->first();
+        $pricing = $sku instanceof Sku ? $this->bundles->pricingOf($sku) : null;
+
+        return [
+            ...$this->of($product),
+            'bundle' => [
+                'components' => $sku instanceof Sku ? $sku->bundleItems()->get()->map(fn (BundleItem $item): array => ['sku_unit_id' => $item->component_sku_unit_id, 'quantity' => $item->quantity])->values()->all() : [],
+                'pricing' => $pricing instanceof \App\Modules\Pricing\Data\BundlePricingData ? ['mode' => $pricing->mode->value, 'value' => $pricing->value] : null,
+            ],
         ];
     }
 

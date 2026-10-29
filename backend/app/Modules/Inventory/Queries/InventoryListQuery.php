@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Queries;
 
 use App\Modules\Catalog\Data\ProductFilterData;
+use App\Modules\Catalog\Enums\ProductType;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\FilteredProductsQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * GET /api/dashboard/inventory: every SKU of the tenant (any product status) with its stock, searched
  * with the catalog's `q` (name, SKU code, option labels; D32), optionally only low stock (D36).
- * Sort `code` (default), `available`, `-available`.
+ * Sort `code` (default), `available`, `-available`. Bundle SKUs are left out: a bundle has no stock of its own (D93).
  */
 final readonly class InventoryListQuery
 {
@@ -32,6 +34,7 @@ final readonly class InventoryListQuery
         $query = Sku::query()
             ->select('skus.*')
             ->leftJoin('sku_inventory', 'sku_inventory.sku_id', '=', 'skus.id')
+            ->whereHas('product', fn (Builder $products): Builder => $products->where('type', '!=', ProductType::Bundle))
             ->with(['product', 'inventory', 'smallestUnit']);
 
         if ($q !== null) {

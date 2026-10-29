@@ -10,8 +10,10 @@ use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Models\CustomerCredit;
 use App\Modules\Orders\Http\Resources\DashboardOrderResource;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Reports\Data\BundleReportData;
 use App\Modules\Reports\Data\SalesReportData;
 use App\Modules\Reports\Enums\SalesGrouping;
+use App\Modules\Reports\Http\Resources\BundleReportResource;
 use App\Modules\Reports\Http\Resources\LowStockSkuResource;
 use App\Modules\Reports\Http\Resources\OutstandingCustomerResource;
 use App\Modules\Reports\Http\Resources\OverviewResource;
@@ -130,6 +132,20 @@ test('D5 the sales report renders its range, grouping, buckets and totals', func
         'group' => 'week',
         'buckets' => [['period_start' => '2026-10-10', 'orders' => 1, 'gross' => '10.00', 'returns' => '4.00', 'net' => '6.00']],
         'totals' => ['orders' => 1, 'gross' => '10.00', 'returns' => '4.00', 'net' => '6.00'],
+    ]);
+});
+
+test('D93 the bundle report renders its range, bundles and components', function (): void {
+    $report = [
+        'bundles' => [['product_id' => 3, 'name' => 'باقة أولى', 'sku_code' => 'SET-1', 'quantity' => 2, 'total' => '300.00']],
+        'components' => [['sku_id' => 5, 'sku_code' => 'ADW-SCI-1', 'product_name' => 'علوم', 'quantity_base' => 40]],
+    ];
+
+    expect(rendered(new BundleReportResource($report, new BundleReportData('2026-10-01', '2026-10-10', 'Africa/Cairo')), dashboardRequest()))->toBe([
+        'from' => '2026-10-01',
+        'to' => '2026-10-10',
+        'bundles' => [['product_id' => 3, 'name' => 'باقة أولى', 'sku_code' => 'SET-1', 'quantity' => 2, 'total' => '300.00']],
+        'components' => [['sku_id' => 5, 'sku_code' => 'ADW-SCI-1', 'product_name' => 'علوم', 'quantity_base' => 40]],
     ]);
 });
 

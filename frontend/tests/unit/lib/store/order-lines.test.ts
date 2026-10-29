@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { OrderItemChange } from "@/lib/api/types";
-import { changedLineIds, liveItems, variantOf } from "@/lib/store/order-lines";
+import { bundleNames, changedLineIds, groupOrderLines, liveItems, variantOf } from "@/lib/store/order-lines";
 
-import { order as orderDetail } from "../../fixtures";
+import { order as orderDetail, orderItem } from "../../fixtures";
 
 describe("order lines after an edit (BR-O12, BR-O13)", () => {
   it("leaves the removed lines out of the live ones", () => {
@@ -35,5 +35,33 @@ describe("variantOf", () => {
     expect(variantOf({ product_name: "قلم جاف", sku_name: "أزرق / M" })).toBe("أزرق / M");
     expect(variantOf({ product_name: "الأضواء علوم", sku_name: "الأضواء علوم " })).toBeNull();
     expect(variantOf({ product_name: "قلم", sku_name: "" })).toBeNull();
+  });
+});
+
+describe("bundle lines (BR-P15, D93)", () => {
+  const bundle = orderItem({ id: 70, product_name: "طقم أولى إعدادي", is_bundle: true, line_total: "135.00" });
+  const first = orderItem({ id: 71, product_name: "الأضواء علوم", parent_item_id: 70 });
+  const second = orderItem({ id: 72, product_name: "سلاح التلميذ", parent_item_id: 70 });
+  const loose = orderItem({ id: 73, product_name: "قلم" });
+
+  it("groups each bundle line with its component lines and keeps the others as they are", () => {
+    const groups = groupOrderLines([bundle, first, second, loose]);
+
+    expect(groups.map((group) => [group.item.id, group.components.map((item) => item.id)])).toEqual([
+      [70, [71, 72]],
+      [73, []],
+    ]);
+  });
+
+  it("shows a component whose bundle line is not in the list on its own", () => {
+    expect(groupOrderLines([first, loose]).map((group) => group.item.id)).toEqual([71, 73]);
+  });
+
+  it("leaves the component lines out of the live lines (they are not charged, edited or discounted)", () => {
+    expect(liveItems({ items: [bundle, first, second, loose] }).map((item) => item.id)).toEqual([70, 73]);
+  });
+
+  it("names the bundle of each component line", () => {
+    expect(bundleNames([bundle, first, second, loose])).toEqual({ 71: "طقم أولى إعدادي", 72: "طقم أولى إعدادي" });
   });
 });

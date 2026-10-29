@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Pricing\Enums\BundlePriceMode;
 use App\Modules\Pricing\Enums\DiscountType;
 use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Enums\PromotionStatus;
@@ -41,3 +42,7 @@ test('D90 f which promotions can be edited, cancelled or be live', function (Pro
     'ended' => [PromotionStatus::Ended, false, false, false],
     'cancelled' => [PromotionStatus::Cancelled, false, false, false],
 ]);
+
+test('BR-P15 a bundle is priced fixed or at the components\' sum less a %, each with an arabic label', function (): void {
+    expect(BundlePriceMode::toArray())->toBe(['fixed' => 'سعر ثابت', 'percent_off_sum' => 'خصم من مجموع الأصناف']);
+});

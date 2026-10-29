@@ -930,6 +930,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a bundle product (BR-P15, D93): its SKU sold in one unit, its components and pricing */
+        post: operations["dashboardCreateBundle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/bundles/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes a draft (inactive) grade set from a product filter: every matching active simple product, quantity 1 (D93) */
+        post: operations["dashboardGenerateBundle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/bundles/{product}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Replaces a bundle's fields, components and pricing (not its status); a simple product is 404 */
+        put: operations["dashboardUpdateBundle"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/products/bulk/status": {
         parameters: {
             query?: never;
@@ -2154,6 +2207,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/reports/bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bundles sold and the component units they consumed, over orders delivered in the range (Africa/Cairo days, D60; default the last 30 days); BR-P15, D93 */
+        get: operations["dashboardReportBundles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/reports/outstanding": {
         parameters: {
             query?: never;
@@ -2214,7 +2284,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "promotion_locked" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_bundle" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "promotion_locked" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2443,7 +2513,16 @@ export interface components {
             description: string | null;
             /** @enum {string} */
             status: "active" | "coming_soon";
+            type: components["schemas"]["ProductType"];
             main_image_url: string | null;
+            /** @description A bundle's components (BR-P15, D93); left out for a simple product */
+            components?: components["schemas"]["StoreBundleComponent"][];
+            /** @description Bundles the components allow now (D93); left out for a simple product */
+            availability?: number;
+            /** @description The components bought on their own at the shopper's prices; bundles only, left out when prices are hidden */
+            components_total?: components["schemas"]["Money"] | null;
+            /** @description components_total less the bundle's price, never below 0 («وفّر»); bundles only, left out when prices are hidden */
+            saving?: components["schemas"]["Money"] | null;
             /** @description Null unless the product is Coming Soon */
             preorder: components["schemas"]["StorePreorder"] | null;
             category: components["schemas"]["CategoryRef"] | null;
@@ -2568,6 +2647,8 @@ export interface components {
             product_name: string;
             /** @description The variant label («أزرق / M», BR-P14), null without options */
             variant: string | null;
+            /** @description A bundle (D93): available is then the bundles its components allow */
+            is_bundle: boolean;
             product_slug: string;
             unit: string;
             conversion_factor: number;
@@ -2665,6 +2746,10 @@ export interface components {
             removed_at: string | null;
             /** @description Selling units of a pre-order line already converted into a normal order (BR-O14); line_total charges the rest. 0 on a normal order */
             converted_quantity: number;
+            /** @description The line of a bundle (D93): priced, holding no stock; its components follow it */
+            is_bundle: boolean;
+            /** @description The bundle line a component line belongs to (D93); out of the items total */
+            parent_item_id: number | null;
         };
         /**
          * @description D85: EGP off, or % off (below 100)
@@ -3006,12 +3091,15 @@ export interface components {
             slug: string;
             description: string | null;
             status: components["schemas"]["ProductStatus"];
+            type: components["schemas"]["ProductType"];
             category: components["schemas"]["CategoryRef"] | null;
             /** @description Field key → option id (select), number, boolean or text */
             custom_fields: {
                 [key: string]: string | number | boolean;
             };
             preorder: components["schemas"]["ProductPreorder"];
+            /** @description A bundle's pricing and components (BR-P15, D93); detail responses of a bundle only */
+            bundle?: components["schemas"]["DashboardBundle"] | null;
             /** @description The SKU standing for the product in lists: the first active SKU, else the first (V2 Task 14) */
             sku: components["schemas"]["DashboardSku"] | null;
             /** @description Every SKU (variant), active and inactive, in the merchant's order (BR-P14); one for a product without options */
@@ -3150,6 +3238,102 @@ export interface components {
             is_default?: boolean;
         };
         PricingRequest: components["schemas"]["PriceSetRequest"] & Record<string, never>;
+        BundleReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description One row per bundle delivered in the range, most sold first */
+            bundles: {
+                product_id: number;
+                /** @description The bundle name as snapshotted on its latest line */
+                name: string;
+                sku_code: string;
+                /** @description Bundles delivered (less returns are not taken off) */
+                quantity: number;
+                /** @description Σ line_total of the bundle lines */
+                total: components["schemas"]["Money"];
+            }[];
+            /** @description One row per component SKU the delivered bundles consumed, most first */
+            components: {
+                sku_id: number;
+                sku_code: string;
+                product_name: string;
+                /** @description Base units delivered inside bundles */
+                quantity_base: number;
+            }[];
+        };
+        /**
+         * @description A bundle (BR-P15, D93) is one SKU made of component SKU units, with no stock of its own
+         * @enum {string}
+         */
+        ProductType: "simple" | "bundle";
+        BundlePricing: {
+            /** @enum {string} */
+            mode: "fixed" | "percent_off_sum";
+            /** @description The price (fixed, at least 0.01) or the % off the components' sum (0 ≤ % < 100) */
+            value: components["schemas"]["Money"];
+        };
+        BundleRequest: {
+            name: string;
+            category_id: number;
+            description?: string | null;
+            /** @description Optional for a bundle (none is required) */
+            custom_fields?: {
+                [key: string]: string | number | boolean | null;
+            };
+            code: string;
+            /** @description The store unit the bundle is sold in (factor 1) */
+            unit_id: number;
+            moq?: number;
+            components: {
+                /** @description A unit of an active SKU of an active simple product, once per bundle */
+                sku_unit_id: number;
+                quantity: number;
+            }[];
+            pricing: {
+                /** @enum {string} */
+                mode: "fixed" | "percent_off_sum";
+                value: string | number;
+            };
+        };
+        DashboardBundle: {
+            pricing: components["schemas"]["BundlePricing"] | null;
+            components: components["schemas"]["DashboardBundleComponent"][];
+            /** @description Σ component base price × quantity */
+            components_total: components["schemas"]["Money"];
+            /** @description Bundles the components allow now */
+            availability: number;
+        };
+        DashboardBundleComponent: {
+            id: number;
+            sku_unit_id: number;
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            sku_code: string;
+            /** @description The variant label, null without options */
+            label: string | null;
+            unit: string;
+            conversion_factor: number;
+            /** @description Units of the component in one bundle */
+            quantity: number;
+            base_price: components["schemas"]["Money"];
+            /** @description Base units of the component in stock */
+            available: number;
+            /** @description The component can still be ordered (product active, SKU active, unit sold) */
+            orderable: boolean;
+        };
+        StoreBundleComponent: {
+            product_name: string;
+            slug: string;
+            sku_code: string;
+            label: string | null;
+            unit: string;
+            quantity: number;
+            /** @description The component allows at least one bundle now; false names what is missing */
+            in_stock: boolean;
+        };
         /** @description Must not be empty (BR-P12) */
         ProductFilter: {
             category?: number;
@@ -3565,8 +3749,9 @@ export interface components {
             conversion_factor: number;
             quantity: number;
             moq: number;
-            /** @description Selling units left now (not locked) */
+            /** @description Selling units left now (not locked); for a bundle the bundles its components allow (D93) */
             available: number;
+            is_bundle: boolean;
             cover_price: components["schemas"]["Money"] | null;
             unit_price: components["schemas"]["Money"];
             discount_percent: string | null;
@@ -5910,6 +6095,73 @@ export interface operations {
             201: components["responses"]["DashboardProduct"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleRequest"] & {
+                    /** @enum {string} */
+                    status?: "active" | "inactive";
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardGenerateBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    filter: components["schemas"]["ProductFilter"];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
             409: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
@@ -8350,6 +8602,34 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["SalesReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportBundles: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bundle sales and component consumption */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["BundleReport"];
                     };
                 };
             };

@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  * A unit that is not saved yet (product create or edit, duplicate) is saved with its prices and tiers and not
  * audited here: its creation is audited by the Catalog action that creates it.
  *
+ * A changed base price reprices the bundles priced off it (RepriceBundles, BR-P15, D93).
+ *
  * Opens a transaction, which nests into the caller's when there is one (CreateProduct, bulk pricing).
  */
 final readonly class UpdateSkuPricing
@@ -26,6 +28,7 @@ final readonly class UpdateSkuPricing
     public function __construct(
         private SkuPricePlanner $planner,
         private AuditLogger $audit,
+        private RepriceBundles $bundles,
     ) {}
 
     public function handle(SkuUnit $unit, SkuPricingData $data, ?string $batchId = null): SkuUnit
@@ -50,6 +53,10 @@ final readonly class UpdateSkuPricing
 
             if ($before !== null) {
                 $this->auditChanges($unit, $before, $after, $batchId);
+            }
+
+            if ($before !== null && $before['base_price'] !== $after['base_price']) {
+                $this->bundles->handle([$unit->id], $batchId);
             }
 
             return $unit;

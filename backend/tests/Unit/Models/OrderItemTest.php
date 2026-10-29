@@ -20,7 +20,7 @@ test('to array', function (): void {
         'id', 'tenant_id', 'order_id', 'sku_id', 'product_id', 'product_name', 'sku_code', 'sku_name', 'unit_name',
         'conversion_factor', 'quantity', 'quantity_base', 'cover_price', 'unit_price', 'discount_percent',
         'tier_min_quantity', 'line_total', 'created_at', 'updated_at', 'list_unit_price', 'manual_discount_type', 'manual_discount_value',
-        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity', 'price_source', 'promotion_id', 'sku_unit_id',
+        'delivered_quantity', 'removed_at', 'reserved', 'converted_quantity', 'price_source', 'promotion_id', 'sku_unit_id', 'parent_item_id', 'is_bundle',
     ]);
 });
 
@@ -115,3 +115,24 @@ test('D91 a line belongs to the SKU unit it was ordered in', function (): void {
     expect($item->skuUnit?->id)->toBe($item->sku_unit_id)
         ->and($item->skuUnit?->sku_id)->toBe($item->sku_id);
 });
+
+test('BR-P15 D93 a bundle line has its component lines as children, each knowing its parent', function (): void {
+    $bundle = OrderItem::factory()->create(['is_bundle' => true, 'reserved' => false]);
+    $first = OrderItem::factory()->create(['order_id' => $bundle->order_id, 'parent_item_id' => $bundle->id]);
+    $second = OrderItem::factory()->create(['order_id' => $bundle->order_id, 'parent_item_id' => $bundle->id]);
+
+    expect($bundle->children->pluck('id')->all())->toBe([$first->id, $second->id])
+        ->and($first->parent?->is($bundle))->toBeTrue()
+        ->and($first->isComponent())->toBeTrue()
+        ->and($bundle->isComponent())->toBeFalse()
+        ->and($bundle->fresh()?->is_bundle)->toBeTrue();
+});
+
+test('D93 a bundle line is top level and holds no stock', function (array $attributes): void {
+    $parent = OrderItem::factory()->create();
+
+    expect(fn () => OrderItem::factory()->create(['order_id' => $parent->order_id, 'is_bundle' => true, 'reserved' => false, ...$attributes, ...(isset($attributes['parent_item_id']) ? ['parent_item_id' => $parent->id] : [])]))->toThrow(QueryException::class);
+})->with([
+    'under another line' => [['parent_item_id' => true]],
+    'holding stock' => [['reserved' => true]],
+]);
