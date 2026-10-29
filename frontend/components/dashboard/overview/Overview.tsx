@@ -72,18 +72,31 @@ function Welcome() {
 }
 
 function ReportsOverview() {
+  return (
+    <>
+      <PageHeader title={copy.title} />
+      <OverviewBody />
+    </>
+  );
+}
+
+/** The overview's cards and charts without the page title: the landing page, and the reports page's first tab. */
+export function OverviewBody() {
   const report = useOverviewReport();
 
   return (
     <>
-      <PageHeader title={copy.title} />
       {report.isError && <ErrorBlock error={report.error} onRetry={() => void report.refetch()} />}
       {report.isPending && <LoadingBlock rows={3} />}
       {report.data && (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
             <Stat label={copy.todayOrders} value={report.data.today.orders} href="/dashboard/orders" />
-            <Stat label={copy.todaySales} value={formatMoney(report.data.today.total)} href="/dashboard/reports" />
+            <Stat
+              label={copy.todaySales}
+              value={formatMoney(report.data.today.total)}
+              href="/dashboard/reports?tab=sales"
+            />
             <Stat
               label={copy.stalePending}
               value={report.data.stale_pending}
@@ -93,13 +106,13 @@ function ReportsOverview() {
             <Stat
               label={copy.outstanding}
               value={formatMoney(report.data.outstanding_total)}
-              href="/dashboard/reports?tab=outstanding"
+              href="/dashboard/reports?tab=collections"
             />
             <Stat
               label={copy.overdue}
               value={formatMoney(report.data.overdue_total)}
               hint={copy.overdueCustomers(report.data.overdue_customers)}
-              href="/dashboard/reports?tab=outstanding"
+              href="/dashboard/reports?tab=collections"
               tone={report.data.overdue_customers > 0 ? "warning" : undefined}
             />
             <Stat
@@ -151,7 +164,7 @@ function SalesTrend() {
       <CardHeader>
         <CardTitle>{copy.salesTrend}</CardTitle>
         <CardAction>
-          <Link href="/dashboard/reports" className="text-primary text-sm hover:underline">
+          <Link href="/dashboard/reports?tab=sales" className="text-primary text-sm hover:underline">
             {copy.viewReport}
           </Link>
         </CardAction>
@@ -186,7 +199,7 @@ function TopDebtors() {
       <CardHeader>
         <CardTitle>{copy.topDebtors}</CardTitle>
         <CardAction>
-          <Link href="/dashboard/reports?tab=outstanding" className="text-primary text-sm hover:underline">
+          <Link href="/dashboard/reports?tab=collections" className="text-primary text-sm hover:underline">
             {copy.viewAll}
           </Link>
         </CardAction>

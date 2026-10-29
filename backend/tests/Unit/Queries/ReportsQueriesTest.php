@@ -271,3 +271,14 @@ test('D88 the overview leaves pre-orders out: no status count, no today\'s order
         ->and($overview['today'])->toBe(['orders' => 1, 'total' => '100.00', 'returns' => '0.00'])
         ->and($overview['stale_pending'])->toBe(0);
 });
+
+test('V2 Task 16 BR-C06 the outstanding totals add up every customer\'s aging, or one group\'s', function (): void {
+    $group = App\Modules\Customers\Models\CustomerGroup::factory()->create();
+    $member = $this->makeCustomer(['customer_group_id' => $group->id]);
+    ($this->delivered)('2026-10-09 10:00:00', '500.00', '200.00');
+    ($this->delivered)('2026-07-01 10:00:00', '100.00', '0.00', $member->id);
+    $this->inTenant(fn () => Order::factory()->delivered()->create(['items_total' => '900.00', 'order_total' => '900.00', 'delivered_at' => '2026-10-09 10:00:00']), $this->otherTenant());
+
+    expect(app(OutstandingReportQuery::class)->totals())->toBe(['current' => '0.00', '0_30' => '300.00', '31_60' => '0.00', '61_90' => '0.00', 'over_90' => '100.00', 'overdue' => '400.00', 'outstanding' => '400.00'])
+        ->and(app(OutstandingReportQuery::class)->totals($group->id)['outstanding'])->toBe('100.00');
+});

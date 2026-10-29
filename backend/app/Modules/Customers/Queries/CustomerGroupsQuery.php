@@ -27,6 +27,22 @@ final readonly class CustomerGroupsQuery
             ->get();
     }
 
+    /**
+     * Every group's name by id, archived ones too (the reports name the group a customer is in, V2 Task 16).
+     *
+     * @return array<int, string>
+     */
+    public function names(): array
+    {
+        $names = [];
+
+        foreach (CustomerGroup::query()->get(['id', 'name']) as $group) {
+            $names[$group->id] = $group->name;
+        }
+
+        return $names;
+    }
+
     public function withCount(CustomerGroup $group): CustomerGroup
     {
         return $group->loadCount('customers');

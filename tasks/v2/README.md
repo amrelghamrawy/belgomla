@@ -20,7 +20,7 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | 13 | [Multiple selling units per SKU](13-multi-unit-skus.md) | Catalog, Pricing, Inventory, Customers, Orders | done    | see log |
 | 14 | [Product variants](14-variants.md)                     | Catalog, Pricing, frontend                 | done    | see log |
 | 15 | [Bundles & full-grade sets](15-bundles.md)             | Catalog, Pricing, Inventory, Orders        | done    | see log |
-| 16 | [Advanced reports](16-advanced-reports.md)             | Reports                                    | planned |        |
+| 16 | [Advanced reports](16-advanced-reports.md)             | Reports                                    | done    | see log |
 | 17 | [V2 release](17-v2-release.md)                         | docs, seeders, deploy                      | planned |        |
 
 ## Why this order

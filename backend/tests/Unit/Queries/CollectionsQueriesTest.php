@@ -6,6 +6,7 @@ use App\Modules\Collections\Data\CollectionFiltersData;
 use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Models\CustomerCredit;
 use App\Modules\Collections\Queries\CollectedAmountQuery;
+use App\Modules\Collections\Queries\CollectionFlowQuery;
 use App\Modules\Collections\Queries\CollectionsQuery;
 use App\Modules\Collections\Queries\CustomerCreditsQuery;
 use App\Modules\Collections\Queries\CustomerStatementQuery;
@@ -202,4 +203,19 @@ test('BR-C07 a customer\'s credits are listed newest first, voided included, and
 
     expect(app(CustomerCreditsQuery::class)->of($this->customer)->pluck('id')->all())->toBe([$new->id, $old->id])
         ->and(app(CustomerCreditsQuery::class)->find($new->id)->is($new))->toBeTrue();
+});
+
+test('V2 Task 16 the collection flow lists the live collections of the range with their kind, method and customer group', function (): void {
+    $group = App\Modules\Customers\Models\CustomerGroup::factory()->create();
+    $customer = $this->makeCustomer(['customer_group_id' => $group->id]);
+    $order = ($this->order)('300.00', '0.00', 'delivered', $customer->id);
+    CashCollection::factory()->for($order)->create(['amount' => '100.00', 'collected_at' => '2026-10-09 10:00:00']);
+    CashCollection::factory()->for($order)->voided()->create(['collected_at' => '2026-10-09 11:00:00']);
+    CashCollection::factory()->for($order)->create(['collected_at' => '2026-10-11 10:00:00']);
+    $this->inTenant(fn () => CashCollection::factory()->create(['collected_at' => '2026-10-09 10:00:00']), $this->otherTenant());
+
+    $rows = app(CollectionFlowQuery::class)->between(CarbonImmutable::parse('2026-10-09 00:00:00'), CarbonImmutable::parse('2026-10-10 23:59:59'))->get();
+
+    expect($rows)->toHaveCount(1)
+        ->and((array) $rows->sole())->toEqual(['at' => '2026-10-09 10:00:00', 'kind' => 'payment', 'method' => 'cash', 'amount' => '100.00', 'customer_group_id' => $group->id]);
 });

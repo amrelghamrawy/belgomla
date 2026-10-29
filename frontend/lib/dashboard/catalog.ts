@@ -29,10 +29,11 @@ import type { ListQuery } from "./list-query";
 // ---- Categories ----
 
 /** The whole tree, archived nodes included (the screen filters them on the client). */
-export function useDashboardCategories() {
+export function useDashboardCategories(enabled = true) {
   return useQuery({
     queryKey: queryKeys.dashboardCategories,
     queryFn: () => apiFetch<DashboardCategory[]>("/api/dashboard/categories"),
+    enabled,
   });
 }
 

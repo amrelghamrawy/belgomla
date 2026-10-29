@@ -123,6 +123,16 @@ const DASHBOARD_ROUTES = [
     'reports outstanding' => ['GET', '/api/dashboard/reports/outstanding', 'reports.view'],
     'reports low stock' => ['GET', '/api/dashboard/reports/low-stock', 'reports.view'],
     'reports bundles' => ['GET', '/api/dashboard/reports/bundles', 'reports.view'],
+    'reports sales analytics' => ['GET', '/api/dashboard/reports/sales-analytics', 'reports.view'],
+    'reports sales analytics export' => ['GET', '/api/dashboard/reports/sales-analytics/export', 'reports.view'],
+    'reports products' => ['GET', '/api/dashboard/reports/products', 'reports.view'],
+    'reports products export' => ['GET', '/api/dashboard/reports/products/export', 'reports.view'],
+    'reports customers' => ['GET', '/api/dashboard/reports/customers', 'reports.view'],
+    'reports customers export' => ['GET', '/api/dashboard/reports/customers/export', 'reports.view'],
+    'reports inventory' => ['GET', '/api/dashboard/reports/inventory', 'reports.view'],
+    'reports inventory export' => ['GET', '/api/dashboard/reports/inventory/export', 'reports.view'],
+    'reports collections' => ['GET', '/api/dashboard/reports/collections', 'reports.view'],
+    'reports collections export' => ['GET', '/api/dashboard/reports/collections/export', 'reports.view'],
     'audit log' => ['GET', '/api/dashboard/audit', 'audit.view'],
 ];
 

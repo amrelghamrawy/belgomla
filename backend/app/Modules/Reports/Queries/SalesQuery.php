@@ -8,10 +8,8 @@ use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Reports\Data\SalesReportData;
-use App\Modules\Reports\Enums\SalesGrouping;
 use App\Support\BusinessCalendar;
 use App\Support\Money;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
@@ -35,7 +33,7 @@ final readonly class SalesQuery
         $gross = '0.00';
         $returned = '0.00';
 
-        foreach ($this->periods($report) as $period) {
+        foreach ($report->group->periods($report->from, $report->to) as $period) {
             [$count, $sum] = $sales[$period] ?? [0, '0.00'];
             $back = $returns[$period] ?? '0.00';
             $buckets[] = ['period_start' => $period, 'orders' => $count, 'gross' => $sum, 'returns' => $back, 'net' => Money::subtract($sum, $back)];
@@ -95,12 +93,7 @@ final readonly class SalesQuery
      */
     private function bucketed(Builder $query, string $column, SalesReportData $report): QueryBuilder
     {
-        $local = "({$column} AT TIME ZONE 'UTC') AT TIME ZONE ?";
-        $bucket = match ($report->group) {
-            SalesGrouping::Day => "date_trunc('day', {$local})",
-            SalesGrouping::Week => "date_trunc('week', {$local} + interval '2 days') - interval '2 days'",
-            SalesGrouping::Month => "date_trunc('month', {$local})",
-        };
+        $bucket = $report->group->bucket("({$column} AT TIME ZONE 'UTC') AT TIME ZONE ?");
 
         return $query->toBase()
             ->whereBetween($column, [
@@ -109,38 +102,5 @@ final readonly class SalesQuery
             ])
             ->selectRaw("to_char({$bucket}, 'YYYY-MM-DD') as period", [$report->timezone])
             ->groupBy('period');
-    }
-
-    /**
-     * The first day of every bucket that overlaps the range.
-     *
-     * @return list<string>
-     */
-    private function periods(SalesReportData $report): array
-    {
-        $day = CarbonImmutable::createFromFormat('!Y-m-d', $report->from, 'UTC');
-        $last = CarbonImmutable::createFromFormat('!Y-m-d', $report->to, 'UTC');
-
-        if (! $day instanceof CarbonImmutable || ! $last instanceof CarbonImmutable) {
-            return [];
-        }
-
-        $period = match ($report->group) {
-            SalesGrouping::Day => $day,
-            SalesGrouping::Week => $day->subDays(($day->dayOfWeek + 1) % 7),
-            SalesGrouping::Month => $day->startOfMonth(),
-        };
-        $periods = [];
-
-        while ($period->lessThanOrEqualTo($last)) {
-            $periods[] = $period->toDateString();
-            $period = match ($report->group) {
-                SalesGrouping::Day => $period->addDay(),
-                SalesGrouping::Week => $period->addWeek(),
-                SalesGrouping::Month => $period->addMonthNoOverflow(),
-            };
-        }
-
-        return $periods;
     }
 }

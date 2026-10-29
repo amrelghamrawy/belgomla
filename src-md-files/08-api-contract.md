@@ -715,7 +715,7 @@ Delivered in Task 7:
 
 ---
 
-## 11. Dashboard — Reports (D5)
+## 11. Dashboard — Reports (D5, V2 Task 16 D94)
 
 | Method | Path                                 | Returns                                                                                    |
 | ------ | ------------------------------------ | ------------------------------------------------------------------------------------------ | ---- | -------------------------- |
@@ -724,6 +724,12 @@ Delivered in Task 7:
 | GET    | `/api/dashboard/reports/outstanding` | per customer: orders, total, collected, outstanding                                        |
 | GET    | `/api/dashboard/reports/low-stock`   | SKUs with `available ≤ moq` (threshold param optional)                                     |
 | GET    | `/api/dashboard/reports/bundles`     | V2 Task 15: `?from=&to=` → bundles sold and component consumption                           |
+| GET    | `/api/dashboard/reports/sales-analytics` | V2 Task 16: gross, discounts, returns, net per bucket; previous period; by section and customer group |
+| GET    | `/api/dashboard/reports/products`    | V2 Task 16: per SKU quantities, net revenue, return rate, customers (paginated, top 20 first) |
+| GET    | `/api/dashboard/reports/customers`   | V2 Task 16: per customer revenue, order rhythm, dormant flag, outstanding/overdue (paginated) |
+| GET    | `/api/dashboard/reports/inventory`   | V2 Task 16: per SKU stock value, days of cover, dead stock, movements (paginated + summary) |
+| GET    | `/api/dashboard/reports/collections` | V2 Task 16: collected by method per bucket vs delivered, collection rate, aging |
+| GET    | `/api/dashboard/reports/{name}/export` | V2 Task 16: one of the five as XLSX/CSV (`format`) |
 
 Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 
@@ -742,6 +748,13 @@ Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 - **bundles** (V2 Task 15, D93):
   - Shape: `{ from, to, bundles: [ { product_id, name, sku_code, quantity, total } ], components: [ { sku_id, sku_code, product_name, quantity_base } ] }`, most first.
   - Delivered orders by `delivered_at` (Cairo days, default the last 30); bundles = delivered bundle lines, components = base units delivered inside bundles.
+- **Advanced reports** (V2 Task 16, D94). Every one takes `?from&to` (Cairo days, default the last 30) and, where it applies, `group=day|week|month`, `category_id` (with its sub-categories) and `customer_group_id` (the customer's current group); a filter that does not apply is ignored. Each is cached 10 minutes per tenant, filter set and page and says when it was computed (`generated_at`). Sales are delivered orders by `delivered_at`, returns live returns by `returned_at`; bundles count once at the bundle line (D93).
+  - `GET /api/dashboard/reports/sales-analytics` → `{ from, to, group, generated_at, buckets: [ { period_start, orders, gross, discounts, returns, net } ], totals { orders, gross, discounts, returns, net, average_order }, previous { from, to, totals, buckets: [ { period_start, net } ] }, by_section: [ { kind, label, orders, gross, discounts, returns, net } ], by_customer_group: [ { customer_group_id, name, … } ] }`. `gross` = list prices × what went out, `discounts` = line + order discounts, `net` = gross − discounts − returns; `previous` is the same number of days just before.
+  - `GET /api/dashboard/reports/products?sort=revenue|quantity|return_rate&page&per_page` (20 a page: the first is the top 20) → paginated `{ sku_id, product_id, product_name, sku_code, sku_name, is_bundle, quantity, quantity_base, bundle_quantity_base, revenue, returns, returned_base, return_rate, customers, last_sold_at }` plus `from, to, sort, generated_at`.
+  - `GET /api/dashboard/reports/customers?view=top|dormant&dormant_days=45` → paginated `{ customer, customer_group, orders, revenue, average_order, first_order_at, last_order_at, lifetime_orders, average_interval_days, days_since_last_order, dormant, outstanding, overdue }` plus `from, to, view, dormant_days, generated_at`.
+  - `GET /api/dashboard/reports/inventory?dead_days=60&dead_only=0|1` → paginated `{ sku_id, product_id, product_name, sku_code, sku_name, on_hand, available, stock_value, sold_base, days_of_cover, last_sold_at, dead, movements { opening, adjustment, sale, return } }` by stock value, plus `summary { skus, on_hand, stock_value, dead_count, dead_value, sold_base, movements }`, `from, to, dead_days, generated_at`. `stock_value` is at the base selling price (D94); `days_of_cover` null = ∞.
+  - `GET /api/dashboard/reports/collections` → `{ from, to, group, generated_at, buckets: [ { period_start, cash, credit, refunds, net, delivered } ], totals { cash, credit, refunds, net, delivered, collection_rate }, aging { current, 0_30, 31_60, 61_90, over_90, overdue, outstanding } }`. Refunds are negative; `delivered` is the net sales of the bucket; `collection_rate` = net ÷ delivered in %.
+  - `GET /api/dashboard/reports/{sales-analytics|products|customers|inventory|collections}/export?format=xlsx|csv&<the same filters and options>` → the file (`report-<name>-<from>-<to>.<format>`), every row, Arabic headers; an unknown report is `404`.
 - **low-stock**:
   - Paginated `{ sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold }`, ordered by code.
   - It covers SKUs of products that are not inactive.
@@ -807,9 +820,9 @@ php artisan pricing:promotions-tick # D90: move promotions scheduled → active 
 | Store public   |         7 |
 | Store auth     |        10 |
 | Store customer |        16 |
-| Dashboard      |       109 |
+| Dashboard      |       115 |
 | Webhooks       |         2 |
-| **Total**      |   **144** |
+| **Total**      |   **150** |
 
 ---
 

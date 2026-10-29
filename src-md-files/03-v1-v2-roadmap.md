@@ -218,11 +218,11 @@ V2 should focus on increasing merchant flexibility and operational capability af
 
 ### Reporting
 
-- Sales analytics.
-- Product performance.
-- Customer purchasing patterns.
-- Inventory analytics.
-- Collection reports.
+- Sales analytics. **Done (V2 Task 16, D94).**
+- Product performance. **Done (V2 Task 16, D94).**
+- Customer purchasing patterns. **Done (V2 Task 16, D94).**
+- Inventory analytics. **Done (V2 Task 16, D94).**
+- Collection reports. **Done (V2 Task 16, D94).**
 
 ---
 

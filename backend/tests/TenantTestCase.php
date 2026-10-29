@@ -33,6 +33,8 @@ use App\Modules\Orders\Actions\PlacePreorder;
 use App\Modules\Orders\Data\CheckoutData;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderReturn;
+use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Pricing\Data\BundlePricingData;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Enums\BundlePriceMode;
@@ -42,6 +44,7 @@ use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
@@ -268,6 +271,123 @@ abstract class TenantTestCase extends TestCase
 
             return $placed;
         }, $tenant);
+    }
+
+    /**
+     * V2 Task 16: a SKU sold by the piece at `$price` in a new category of `$kind` (or in `$category`), with `$onHand`
+     * pieces, for the report datasets.
+     */
+    protected function reportSku(string $code, CategoryKind $kind = CategoryKind::Books, string $price = '100.00', ?Category $category = null, int $onHand = 0, ?Tenant $tenant = null): Sku
+    {
+        return $this->asTenant($tenant ?? $this->tenant, function () use ($code, $kind, $price, $category, $onHand): Sku {
+            $category ??= Category::factory()->kind($kind)->create();
+
+            return Product::factory()
+                ->withSku(['code' => $code, 'conversion_factor' => 1, 'base_price' => $price, 'moq' => 1], onHand: $onHand)
+                ->create(['category_id' => $category->id, 'name' => 'منتج '.$code])
+                ->skus()
+                ->sole()
+                ->refresh();
+        });
+    }
+
+    /**
+     * V2 Task 16: an order delivered at `$deliveredAt` (UTC) with hand-priced lines, as checkout and delivery leave it:
+     * each line `[sku, quantity, price, list?, delivered?, removed?]` (the list price defaults to the price; `delivered`
+     * to the quantity; the line charged for what went out), the items total, an order discount of `$discount` EGP and the
+     * order total = items − discount (BR-O08). `$order` overrides order attributes (status, kind, customer_id, ...).
+     *
+     * @param  list<array{0: Sku, 1: int, 2: string, list?: string, delivered?: int, removed?: bool}>  $lines
+     * @param  array<string, mixed>  $order
+     */
+    protected function reportOrder(array $lines, ?string $deliveredAt = '2026-10-09 10:00:00', ?Customer $customer = null, string $discount = '0.00', array $order = [], ?Tenant $tenant = null): Order
+    {
+        return $this->asTenant($tenant ?? $this->tenant, function () use ($lines, $deliveredAt, $customer, $discount, $order): Order {
+            $placed = Order::factory()->create([
+                'status' => $deliveredAt === null ? 'pending' : 'delivered',
+                'delivered_at' => $deliveredAt,
+                'confirmed_at' => $deliveredAt,
+                'placed_at' => $deliveredAt ?? now(),
+                ...($customer instanceof Customer ? ['customer_id' => $customer->id] : []),
+                ...$order,
+            ]);
+            $items = '0.00';
+
+            foreach ($lines as $line) {
+                [$sku, $quantity, $price] = $line;
+                $removed = $line['removed'] ?? false;
+                $wentOut = $deliveredAt === null || $removed ? null : ($line['delivered'] ?? $quantity);
+                $item = OrderItem::factory()->for($placed)->create([
+                    'sku_id' => $sku->id,
+                    'quantity' => $quantity,
+                    'unit_price' => $price,
+                    'list_unit_price' => $line['list'] ?? $price,
+                    'manual_discount_type' => isset($line['list']) ? 'amount' : null,
+                    'manual_discount_value' => isset($line['list']) ? Money::subtract($line['list'], $price) : null,
+                    'delivered_quantity' => $wentOut,
+                    'line_total' => Money::times($price, $wentOut ?? $quantity),
+                    'removed_at' => $removed ? now() : null,
+                ]);
+
+                if (! $removed) {
+                    $items = Money::add($items, $item->line_total);
+                }
+            }
+
+            $placed->forceFill([
+                'items_total' => $items,
+                'discount_type' => Money::compare($discount, '0.00') > 0 ? 'amount' : null,
+                'discount_value' => Money::compare($discount, '0.00') > 0 ? $discount : null,
+                'discount_reason' => Money::compare($discount, '0.00') > 0 ? 'خصم' : null,
+                'discount_amount' => $discount,
+                'order_total' => Money::subtract($items, $discount),
+            ])->save();
+
+            return $placed->refresh();
+        });
+    }
+
+    /**
+     * V2 Task 16: a live return of an order recorded at `$returnedAt` (UTC): lines `[order_item, quantity, amount]`
+     * (the amount is what the line gives back after the discounts, D85); the order's returned total follows.
+     *
+     * @param  list<array{0: OrderItem, 1: int, 2: string}>  $lines
+     */
+    protected function reportReturn(Order $order, array $lines, string $returnedAt = '2026-10-09 12:00:00', bool $voided = false): OrderReturn
+    {
+        return $this->asTenant(Tenant::query()->findOrFail($order->tenant_id), function () use ($order, $lines, $returnedAt, $voided): OrderReturn {
+            $total = array_reduce($lines, fn (string $sum, array $line): string => Money::add($sum, $line[2]), '0.00');
+            $return = OrderReturn::factory()->for($order)->create([
+                'number' => OrderReturn::query()->where('order_id', $order->id)->count() + 1,
+                'total' => $total,
+                'returned_at' => $returnedAt,
+                ...($voided ? ['voided_at' => now(), 'void_reason' => 'خطأ'] : []),
+            ]);
+
+            foreach ($lines as [$item, $quantity, $amount]) {
+                OrderReturnItem::factory()->for($return, 'orderReturn')->create(['order_item_id' => $item->id, 'quantity' => $quantity, 'line_total' => $amount]);
+            }
+
+            if (! $voided) {
+                $order->forceFill(['returned_total' => Money::add($order->returned_total, $total)])->save();
+            }
+
+            return $return;
+        });
+    }
+
+    /**
+     * How many queries a callback runs (the reports' guard against N+1, V2 Task 16).
+     */
+    protected function queriesRun(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $callback();
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
     }
 
     /**

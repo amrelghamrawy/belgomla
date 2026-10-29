@@ -3437,6 +3437,218 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
 
+  /api/dashboard/reports/sales-analytics:
+    get:
+      operationId: dashboardReportSalesAnalytics
+      tags: [dashboard-reports]
+      summary: 'V2 Task 16: gross, discounts, returns and net per bucket (Africa/Cairo days, D60; Saturday weeks, D58), the previous period of the same length, the split by section (D68) and customer group; cached 10 minutes (D94)'
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCategory'
+        - $ref: '#/components/parameters/ReportCustomerGroup'
+      responses:
+        '200':
+          description: The sales analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/SalesAnalyticsReport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/products:
+    get:
+      operationId: dashboardReportProducts
+      tags: [dashboard-reports]
+      summary: 'V2 Task 16: per SKU sold or returned in the range, quantities, net revenue, return rate, customers; the first page of 20 is the top 20; cached 10 minutes (D94)'
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportCategory'
+        - $ref: '#/components/parameters/ReportCustomerGroup'
+        - name: sort
+          in: query
+          schema: { $ref: '#/components/schemas/ProductReportSort' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/ReportPerPage'
+      responses:
+        '200':
+          description: A page of SKUs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta, from, to, sort, generated_at]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductPerformanceRow' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  sort: { $ref: '#/components/schemas/ProductReportSort' }
+                  generated_at: { type: string, format: date-time, description: 'When the cached figures were computed (D94)' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/customers:
+    get:
+      operationId: dashboardReportCustomers
+      tags: [dashboard-reports]
+      summary: 'V2 Task 16: per customer, the range''s orders and net revenue, the order rhythm, dormant flag, outstanding and overdue; view top or dormant; cached 10 minutes (D94)'
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportCustomerGroup'
+        - name: view
+          in: query
+          schema: { $ref: '#/components/schemas/CustomerReportView' }
+        - name: dormant_days
+          in: query
+          description: A customer with no order for more than this many days is dormant (default 45)
+          schema: { type: integer, minimum: 1, maximum: 3650 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/ReportPerPage'
+      responses:
+        '200':
+          description: A page of customers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta, from, to, view, dormant_days, generated_at]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/CustomerPatternRow' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  view: { $ref: '#/components/schemas/CustomerReportView' }
+                  dormant_days: { type: integer }
+                  generated_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/inventory:
+    get:
+      operationId: dashboardReportInventory
+      tags: [dashboard-reports]
+      summary: 'V2 Task 16: per SKU, stock and its value at the base price (D94), units sold, days of cover, dead stock, movements by type; with a summary; cached 10 minutes'
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportCategory'
+        - name: dead_days
+          in: query
+          description: Stock on hand with no sale for more than this many days is dead (default 60)
+          schema: { type: integer, minimum: 1, maximum: 3650 }
+        - name: dead_only
+          in: query
+          schema: { type: integer, enum: [0, 1] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/ReportPerPage'
+      responses:
+        '200':
+          description: A page of SKUs and the summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, links, meta, from, to, dead_days, summary, generated_at]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/InventoryAnalyticsRow' }
+                  links: { $ref: '#/components/schemas/PaginationLinks' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  dead_days: { type: integer }
+                  summary: { $ref: '#/components/schemas/InventorySummary' }
+                  generated_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/collections:
+    get:
+      operationId: dashboardReportCollections
+      tags: [dashboard-reports]
+      summary: 'V2 Task 16: money collected per bucket by method (refunds negative) next to the net sales delivered, the collection rate and the aging now; cached 10 minutes (D94)'
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCustomerGroup'
+      responses:
+        '200':
+          description: The collections report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/CollectionsReport' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/reports/{report}/export:
+    get:
+      operationId: dashboardReportExport
+      tags: [dashboard-reports]
+      summary: 'V2 Task 16: an advanced report as an XLSX (default) or CSV file, with the same filters and options; every row, not one page'
+      parameters:
+        - name: report
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ReportName' }
+        - $ref: '#/components/parameters/SpreadsheetFormat'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportGrouping'
+        - $ref: '#/components/parameters/ReportCategory'
+        - $ref: '#/components/parameters/ReportCustomerGroup'
+        - name: sort
+          in: query
+          schema: { $ref: '#/components/schemas/ProductReportSort' }
+        - name: view
+          in: query
+          schema: { $ref: '#/components/schemas/CustomerReportView' }
+        - name: dormant_days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 3650 }
+        - name: dead_days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 3650 }
+        - name: dead_only
+          in: query
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        '200':
+          description: The file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+
   # ---- Dashboard: audit (08 §12) ----
 
   /api/dashboard/audit:
@@ -3534,6 +3746,25 @@ components:
       in: query
       description: Only SKUs whose available stock is at or below MOQ × conversion factor (D36)
       schema: { type: integer, enum: [0, 1] }
+    ReportGrouping:
+      name: group
+      in: query
+      description: Bucket size (default day); weeks start on Saturday (D58)
+      schema: { $ref: '#/components/schemas/SalesGrouping' }
+    ReportCategory:
+      name: category_id
+      in: query
+      description: 'V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing'
+      schema: { type: integer, minimum: 1 }
+    ReportCustomerGroup:
+      name: customer_group_id
+      in: query
+      description: 'V2 Task 16: the customers currently in this group (BR-PR12)'
+      schema: { type: integer, minimum: 1 }
+    ReportPerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
     From:
       name: from
       in: query
@@ -6463,6 +6694,222 @@ components:
             '61_90': { $ref: '#/components/schemas/Money' }
             over_90: { $ref: '#/components/schemas/Money' }
         overdue: { $ref: '#/components/schemas/Money' }
+
+    ReportName:
+      type: string
+      enum: [sales-analytics, products, customers, inventory, collections]
+      description: The advanced reports of V2 Task 16
+
+    ProductReportSort:
+      type: string
+      enum: [revenue, quantity, return_rate]
+
+    CustomerReportView:
+      type: string
+      enum: [top, dormant]
+
+    SalesFigures:
+      type: object
+      required: [orders, gross, discounts, returns, net]
+      properties:
+        orders: { type: integer, description: 'Orders delivered (with a line of the filter)' }
+        gross: { $ref: '#/components/schemas/Money', description: 'List prices × what went out, before manual discounts' }
+        discounts: { $ref: '#/components/schemas/Money', description: 'Line discounts and the order discounts (shared over the lines, D85)' }
+        returns: { $ref: '#/components/schemas/Money', description: 'Live returns by returned_at (BR-R05)' }
+        net: { $ref: '#/components/schemas/Money', description: 'gross − discounts − returns' }
+
+    SalesTotals:
+      allOf:
+        - $ref: '#/components/schemas/SalesFigures'
+        - type: object
+          required: [average_order]
+          properties:
+            average_order: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: '(gross − discounts) ÷ orders; null without orders' }
+
+    SalesAnalyticsReport:
+      type: object
+      required: [from, to, group, generated_at, buckets, totals, previous, by_section, by_customer_group]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        group: { $ref: '#/components/schemas/SalesGrouping' }
+        generated_at: { type: string, format: date-time, description: 'When the cached figures were computed (D94)' }
+        buckets:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SalesFigures'
+              - type: object
+                required: [period_start]
+                properties:
+                  period_start: { type: string, format: date }
+        totals: { $ref: '#/components/schemas/SalesTotals' }
+        previous:
+          type: object
+          description: The period of the same number of days just before
+          required: [from, to, totals, buckets]
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            totals: { $ref: '#/components/schemas/SalesTotals' }
+            buckets:
+              type: array
+              items:
+                type: object
+                required: [period_start, net]
+                properties:
+                  period_start: { type: string, format: date }
+                  net: { $ref: '#/components/schemas/Money' }
+        by_section:
+          type: array
+          description: Per section kind (D68), most net first
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SalesFigures'
+              - type: object
+                required: [kind, label]
+                properties:
+                  kind: { $ref: '#/components/schemas/CategoryKind' }
+                  label: { type: string }
+        by_customer_group:
+          type: array
+          description: Per current customer group (null = no group), most net first
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SalesFigures'
+              - type: object
+                required: [customer_group_id, name]
+                properties:
+                  customer_group_id: { type: [integer, 'null'] }
+                  name: { type: [string, 'null'] }
+
+    ProductPerformanceRow:
+      type: object
+      required: [sku_id, product_id, product_name, sku_code, sku_name, is_bundle, quantity, quantity_base, bundle_quantity_base, revenue, returns, returned_base, return_rate, customers, last_sold_at]
+      properties:
+        sku_id: { type: integer }
+        product_id: { type: integer }
+        product_name: { type: string }
+        sku_code: { type: string }
+        sku_name: { type: [string, 'null'], description: 'The variant label (BR-P14)' }
+        is_bundle: { type: boolean }
+        quantity: { type: integer, description: 'Selling units that went out on its own lines' }
+        quantity_base: { type: integer, description: 'Base units that went out, its own lines and inside bundles' }
+        bundle_quantity_base: { type: integer, description: 'Of which inside bundles (D93: a component is flagged, its revenue stays with the bundle)' }
+        revenue: { $ref: '#/components/schemas/Money', description: 'Net: own line totals less the order discount share less the returns of them' }
+        returns: { $ref: '#/components/schemas/Money' }
+        returned_base: { type: integer }
+        return_rate: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: 'returned_base ÷ quantity_base, %; null when nothing went out' }
+        customers: { type: integer }
+        last_sold_at: { type: [string, 'null'], format: date-time }
+
+    CustomerPatternRow:
+      type: object
+      required: [customer, customer_group, orders, revenue, average_order, first_order_at, last_order_at, lifetime_orders, average_interval_days, days_since_last_order, dormant, outstanding, overdue]
+      properties:
+        customer: { $ref: '#/components/schemas/CustomerRef' }
+        customer_group:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+        orders: { type: integer, description: 'Orders delivered in the range' }
+        revenue: { $ref: '#/components/schemas/Money', description: 'Their totals less the returns recorded in the range' }
+        average_order: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
+        first_order_at: { type: string, format: date-time }
+        last_order_at: { type: string, format: date-time }
+        lifetime_orders: { type: integer, description: 'Orders ever placed, not cancelled' }
+        average_interval_days: { type: [number, 'null'], description: 'null with a single order' }
+        days_since_last_order: { type: integer, description: 'Cairo days (D60)' }
+        dormant: { type: boolean }
+        outstanding: { $ref: '#/components/schemas/Money', description: D59 }
+        overdue: { $ref: '#/components/schemas/Money', description: BR-C06 }
+
+    ReportMovements:
+      type: object
+      required: [opening, adjustment, sale, return]
+      properties:
+        opening: { type: integer }
+        adjustment: { type: integer }
+        sale: { type: integer }
+        return: { type: integer }
+
+    InventoryAnalyticsRow:
+      type: object
+      required: [sku_id, product_id, product_name, sku_code, sku_name, on_hand, available, stock_value, sold_base, days_of_cover, last_sold_at, dead, movements]
+      properties:
+        sku_id: { type: integer }
+        product_id: { type: integer }
+        product_name: { type: string }
+        sku_code: { type: string }
+        sku_name: { type: [string, 'null'] }
+        on_hand: { type: integer }
+        available: { type: integer }
+        stock_value: { $ref: '#/components/schemas/Money', description: 'At the default unit''s base price per base unit («قيمة المخزون بسعر البيع», D94)' }
+        sold_base: { type: integer, description: 'Base units delivered in the range, inside bundles too' }
+        days_of_cover: { type: [number, 'null'], description: 'available ÷ average daily sales; null (∞) without sales' }
+        last_sold_at: { type: [string, 'null'], format: date-time }
+        dead: { type: boolean, description: 'Stock on hand and no sale for more than dead_days' }
+        movements: { $ref: '#/components/schemas/ReportMovements' }
+
+    InventorySummary:
+      type: object
+      required: [skus, on_hand, stock_value, dead_count, dead_value, sold_base, movements]
+      properties:
+        skus: { type: integer }
+        on_hand: { type: integer }
+        stock_value: { $ref: '#/components/schemas/Money' }
+        dead_count: { type: integer }
+        dead_value: { $ref: '#/components/schemas/Money' }
+        sold_base: { type: integer }
+        movements: { $ref: '#/components/schemas/ReportMovements' }
+
+    ReportAging:
+      type: object
+      required: [current, '0_30', '31_60', '61_90', over_90, overdue, outstanding]
+      properties:
+        current: { $ref: '#/components/schemas/Money' }
+        '0_30': { $ref: '#/components/schemas/Money' }
+        '31_60': { $ref: '#/components/schemas/Money' }
+        '61_90': { $ref: '#/components/schemas/Money' }
+        over_90: { $ref: '#/components/schemas/Money' }
+        overdue: { $ref: '#/components/schemas/Money' }
+        outstanding: { $ref: '#/components/schemas/Money' }
+
+    CollectionsReport:
+      type: object
+      required: [from, to, group, generated_at, buckets, totals, aging]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        group: { $ref: '#/components/schemas/SalesGrouping' }
+        generated_at: { type: string, format: date-time }
+        buckets:
+          type: array
+          items:
+            type: object
+            required: [period_start, cash, credit, refunds, net, delivered]
+            properties:
+              period_start: { type: string, format: date }
+              cash: { $ref: '#/components/schemas/Money' }
+              credit: { $ref: '#/components/schemas/Money', description: 'Payments drawn from customer credit (BR-C07)' }
+              refunds: { $ref: '#/components/schemas/Money', description: 'Negative (BR-R04)' }
+              net: { $ref: '#/components/schemas/Money' }
+              delivered: { $ref: '#/components/schemas/Money', description: 'Net sales delivered in the bucket' }
+        totals:
+          type: object
+          required: [cash, credit, refunds, net, delivered, collection_rate]
+          properties:
+            cash: { $ref: '#/components/schemas/Money' }
+            credit: { $ref: '#/components/schemas/Money' }
+            refunds: { $ref: '#/components/schemas/Money' }
+            net: { $ref: '#/components/schemas/Money' }
+            delivered: { $ref: '#/components/schemas/Money' }
+            collection_rate: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: 'net ÷ delivered, %' }
+        aging: { $ref: '#/components/schemas/ReportAging' }
 
     LowStockSku:
       type: object

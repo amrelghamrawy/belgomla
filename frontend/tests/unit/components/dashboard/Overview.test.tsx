@@ -166,7 +166,7 @@ describe("Overview", () => {
     const tile = await screen.findByRole("link", { name: /متأخر السداد/ });
     expect(tile).toHaveTextContent("750.00 ج.م");
     expect(tile).toHaveTextContent("2 عميل");
-    expect(tile).toHaveAttribute("href", "/dashboard/reports?tab=outstanding");
+    expect(tile).toHaveAttribute("href", "/dashboard/reports?tab=collections");
   });
 
   it("shows the error with a retry", async () => {

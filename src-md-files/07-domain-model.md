@@ -775,6 +775,8 @@ V2 Task 07: everything after loading the cart is `Orders\Actions\PlaceOrder`, sh
 | orders            | `(tenant_id, status, placed_at desc)`             | dashboard lists    |
 | orders            | `(tenant_id, customer_id, placed_at desc)`        | customer history   |
 | orders            | `(tenant_id, collection_status)`                  | outstanding report |
+| orders            | `(tenant_id, status, delivered_at)`               | V2 Task 16 reports (D94) |
+| inventory_movements | `(tenant_id, type, created_at)`                 | V2 Task 16 inventory analytics |
 | collections       | `(order_id) where voided_at is null`              | balance            |
 | customers         | `(tenant_id, phone)` unique                       | login              |
 | audit_logs        | `(tenant_id, entity_type, entity_id, created_at)` | entity timeline    |

@@ -480,10 +480,12 @@ arch('no module depends on reports')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Support'])
     ->not->toUse('App\Modules\Reports');
 
-test('reports contain only queries, their input, enums and http', function (): void {
+// V2 Task 16: Services holds ReportCache (D94, the TTL cache of the advanced reports) and ReportExporter (the files,
+// through Catalog's Spreadsheet); neither writes to the database.
+test('reports contain only queries, their input, enums, http and the cache and export services', function (): void {
     $folders = array_map(basename(...), glob(dirname(__DIR__, 2).'/app/Modules/Reports/*', GLOB_ONLYDIR) ?: []);
 
-    expect($folders)->toBe(['Data', 'Enums', 'Http', 'Queries']);
+    expect($folders)->toBe(['Data', 'Enums', 'Http', 'Queries', 'Services']);
 });
 
 /*

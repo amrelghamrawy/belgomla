@@ -32,6 +32,9 @@ export const queryKeys = {
   dashboardLowStock: (page: number, perPage: number) => ["dashboard", "reports", "low-stock", page, perPage] as const,
   // V2 Task 15 (BR-P15): bundles sold and the component units they consumed.
   dashboardBundleReport: (params: ListParams) => ["dashboard", "reports", "bundles", params] as const,
+  // V2 Task 16 (D94): the advanced reports, by name (sales-analytics, products, …) and their filters + page.
+  dashboardAdvancedReport: (report: string, params: ListParams) =>
+    ["dashboard", "reports", "advanced", report, params] as const,
   dashboardCategories: ["dashboard", "categories"] as const,
   dashboardUnits: ["dashboard", "units"] as const,
   dashboardFields: ["dashboard", "fields"] as const,

@@ -122,6 +122,14 @@ test('BR-PR12 the groups list is active first, then by sort order and name, with
         ->and(app(CustomerGroupsQuery::class)->withCount($second)->customers_count)->toBe(0);
 });
 
+test('V2 Task 16 the group names come by id, archived groups too, never another store\'s', function (): void {
+    $active = CustomerGroup::factory()->create(['name' => 'جملة']);
+    $archived = CustomerGroup::factory()->create(['name' => 'قديم', 'status' => 'archived']);
+    $this->inTenant(fn () => CustomerGroup::factory()->create(), $this->otherTenant());
+
+    expect(app(CustomerGroupsQuery::class)->names())->toEqual([$active->id => 'جملة', $archived->id => 'قديم']);
+});
+
 test('BR-PR13 a customer\'s prices are newest first with their sku, filtered by product or code', function (): void {
     $customer = $this->makeCustomer();
     $old = CustomerSkuPrice::factory()->create(['customer_id' => $customer->id, 'sku_id' => pricingQuerySku('الأضواء علوم', 'ADW-1')->id]);

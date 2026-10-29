@@ -2258,6 +2258,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/reports/sales-analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: gross, discounts, returns and net per bucket (Africa/Cairo days, D60; Saturday weeks, D58), the previous period of the same length, the split by section (D68) and customer group; cached 10 minutes (D94) */
+        get: operations["dashboardReportSalesAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: per SKU sold or returned in the range, quantities, net revenue, return rate, customers; the first page of 20 is the top 20; cached 10 minutes (D94) */
+        get: operations["dashboardReportProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: per customer, the range's orders and net revenue, the order rhythm, dormant flag, outstanding and overdue; view top or dormant; cached 10 minutes (D94) */
+        get: operations["dashboardReportCustomers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: per SKU, stock and its value at the base price (D94), units sold, days of cover, dead stock, movements by type; with a summary; cached 10 minutes */
+        get: operations["dashboardReportInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: money collected per bucket by method (refunds negative) next to the net sales delivered, the collection rate and the aging now; cached 10 minutes (D94) */
+        get: operations["dashboardReportCollections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/{report}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: an advanced report as an XLSX (default) or CSV file, with the same filters and options; every row, not one page */
+        get: operations["dashboardReportExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/audit": {
         parameters: {
             query?: never;
@@ -4077,6 +4179,197 @@ export interface components {
             };
             overdue: components["schemas"]["Money"];
         };
+        /**
+         * @description The advanced reports of V2 Task 16
+         * @enum {string}
+         */
+        ReportName: "sales-analytics" | "products" | "customers" | "inventory" | "collections";
+        /** @enum {string} */
+        ProductReportSort: "revenue" | "quantity" | "return_rate";
+        /** @enum {string} */
+        CustomerReportView: "top" | "dormant";
+        SalesFigures: {
+            /** @description Orders delivered (with a line of the filter) */
+            orders: number;
+            /** @description List prices × what went out, before manual discounts */
+            gross: components["schemas"]["Money"];
+            /** @description Line discounts and the order discounts (shared over the lines, D85) */
+            discounts: components["schemas"]["Money"];
+            /** @description Live returns by returned_at (BR-R05) */
+            returns: components["schemas"]["Money"];
+            /** @description gross − discounts − returns */
+            net: components["schemas"]["Money"];
+        };
+        SalesTotals: components["schemas"]["SalesFigures"] & {
+            /** @description (gross − discounts) ÷ orders; null without orders */
+            average_order: components["schemas"]["Money"] | null;
+        };
+        SalesAnalyticsReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            group: components["schemas"]["SalesGrouping"];
+            /**
+             * Format: date-time
+             * @description When the cached figures were computed (D94)
+             */
+            generated_at: string;
+            buckets: (components["schemas"]["SalesFigures"] & {
+                /** Format: date */
+                period_start: string;
+            })[];
+            totals: components["schemas"]["SalesTotals"];
+            /** @description The period of the same number of days just before */
+            previous: {
+                /** Format: date */
+                from: string;
+                /** Format: date */
+                to: string;
+                totals: components["schemas"]["SalesTotals"];
+                buckets: {
+                    /** Format: date */
+                    period_start: string;
+                    net: components["schemas"]["Money"];
+                }[];
+            };
+            /** @description Per section kind (D68), most net first */
+            by_section: (components["schemas"]["SalesFigures"] & {
+                kind: components["schemas"]["CategoryKind"];
+                label: string;
+            })[];
+            /** @description Per current customer group (null = no group), most net first */
+            by_customer_group: (components["schemas"]["SalesFigures"] & {
+                customer_group_id: number | null;
+                name: string | null;
+            })[];
+        };
+        ProductPerformanceRow: {
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            sku_code: string;
+            /** @description The variant label (BR-P14) */
+            sku_name: string | null;
+            is_bundle: boolean;
+            /** @description Selling units that went out on its own lines */
+            quantity: number;
+            /** @description Base units that went out, its own lines and inside bundles */
+            quantity_base: number;
+            /** @description Of which inside bundles (D93: a component is flagged, its revenue stays with the bundle) */
+            bundle_quantity_base: number;
+            /** @description Net: own line totals less the order discount share less the returns of them */
+            revenue: components["schemas"]["Money"];
+            returns: components["schemas"]["Money"];
+            returned_base: number;
+            /** @description returned_base ÷ quantity_base, %; null when nothing went out */
+            return_rate: components["schemas"]["Money"] | null;
+            customers: number;
+            /** Format: date-time */
+            last_sold_at: string | null;
+        };
+        CustomerPatternRow: {
+            customer: components["schemas"]["CustomerRef"];
+            customer_group: null | {
+                id: number;
+                name: string;
+            };
+            /** @description Orders delivered in the range */
+            orders: number;
+            /** @description Their totals less the returns recorded in the range */
+            revenue: components["schemas"]["Money"];
+            average_order: components["schemas"]["Money"] | null;
+            /** Format: date-time */
+            first_order_at: string;
+            /** Format: date-time */
+            last_order_at: string;
+            /** @description Orders ever placed, not cancelled */
+            lifetime_orders: number;
+            /** @description null with a single order */
+            average_interval_days: number | null;
+            /** @description Cairo days (D60) */
+            days_since_last_order: number;
+            dormant: boolean;
+            /** @description D59 */
+            outstanding: components["schemas"]["Money"];
+            /** @description BR-C06 */
+            overdue: components["schemas"]["Money"];
+        };
+        ReportMovements: {
+            opening: number;
+            adjustment: number;
+            sale: number;
+            return: number;
+        };
+        InventoryAnalyticsRow: {
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            sku_code: string;
+            sku_name: string | null;
+            on_hand: number;
+            available: number;
+            /** @description At the default unit's base price per base unit («قيمة المخزون بسعر البيع», D94) */
+            stock_value: components["schemas"]["Money"];
+            /** @description Base units delivered in the range, inside bundles too */
+            sold_base: number;
+            /** @description available ÷ average daily sales; null (∞) without sales */
+            days_of_cover: number | null;
+            /** Format: date-time */
+            last_sold_at: string | null;
+            /** @description Stock on hand and no sale for more than dead_days */
+            dead: boolean;
+            movements: components["schemas"]["ReportMovements"];
+        };
+        InventorySummary: {
+            skus: number;
+            on_hand: number;
+            stock_value: components["schemas"]["Money"];
+            dead_count: number;
+            dead_value: components["schemas"]["Money"];
+            sold_base: number;
+            movements: components["schemas"]["ReportMovements"];
+        };
+        ReportAging: {
+            current: components["schemas"]["Money"];
+            "0_30": components["schemas"]["Money"];
+            "31_60": components["schemas"]["Money"];
+            "61_90": components["schemas"]["Money"];
+            over_90: components["schemas"]["Money"];
+            overdue: components["schemas"]["Money"];
+            outstanding: components["schemas"]["Money"];
+        };
+        CollectionsReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            group: components["schemas"]["SalesGrouping"];
+            /** Format: date-time */
+            generated_at: string;
+            buckets: {
+                /** Format: date */
+                period_start: string;
+                cash: components["schemas"]["Money"];
+                /** @description Payments drawn from customer credit (BR-C07) */
+                credit: components["schemas"]["Money"];
+                /** @description Negative (BR-R04) */
+                refunds: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
+                /** @description Net sales delivered in the bucket */
+                delivered: components["schemas"]["Money"];
+            }[];
+            totals: {
+                cash: components["schemas"]["Money"];
+                credit: components["schemas"]["Money"];
+                refunds: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
+                delivered: components["schemas"]["Money"];
+                /** @description net ÷ delivered, % */
+                collection_rate: components["schemas"]["Money"] | null;
+            };
+            aging: components["schemas"]["ReportAging"];
+        };
         LowStockSku: {
             sku_id: number;
             product_id: number;
@@ -4363,6 +4656,13 @@ export interface components {
         CategoryIdFilter: number;
         /** @description Only SKUs whose available stock is at or below MOQ × conversion factor (D36) */
         LowStock: 0 | 1;
+        /** @description Bucket size (default day); weeks start on Saturday (D58) */
+        ReportGrouping: components["schemas"]["SalesGrouping"];
+        /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+        ReportCategory: number;
+        /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+        ReportCustomerGroup: number;
+        ReportPerPage: number;
         From: string;
         To: string;
         CategoryId: number;
@@ -8695,6 +8995,252 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportSalesAnalytics: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description Bucket size (default day); weeks start on Saturday (D58) */
+                group?: components["parameters"]["ReportGrouping"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sales analytics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesAnalyticsReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportProducts: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+                sort?: components["schemas"]["ProductReportSort"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["ReportPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of SKUs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProductPerformanceRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        sort: components["schemas"]["ProductReportSort"];
+                        /**
+                         * Format: date-time
+                         * @description When the cached figures were computed (D94)
+                         */
+                        generated_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportCustomers: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+                view?: components["schemas"]["CustomerReportView"];
+                /** @description A customer with no order for more than this many days is dormant (default 45) */
+                dormant_days?: number;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["ReportPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of customers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerPatternRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        view: components["schemas"]["CustomerReportView"];
+                        dormant_days: number;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportInventory: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description Stock on hand with no sale for more than this many days is dead (default 60) */
+                dead_days?: number;
+                dead_only?: 0 | 1;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["ReportPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of SKUs and the summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryAnalyticsRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        dead_days: number;
+                        summary: components["schemas"]["InventorySummary"];
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportCollections: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description Bucket size (default day); weeks start on Saturday (D58) */
+                group?: components["parameters"]["ReportGrouping"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The collections report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CollectionsReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportExport: {
+        parameters: {
+            query?: {
+                /** @description xlsx (default) or csv (V2 Task 06) */
+                format?: components["parameters"]["SpreadsheetFormat"];
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description Bucket size (default day); weeks start on Saturday (D58) */
+                group?: components["parameters"]["ReportGrouping"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+                sort?: components["schemas"]["ProductReportSort"];
+                view?: components["schemas"]["CustomerReportView"];
+                dormant_days?: number;
+                dead_days?: number;
+                dead_only?: 0 | 1;
+            };
+            header?: never;
+            path: {
+                report: components["schemas"]["ReportName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };

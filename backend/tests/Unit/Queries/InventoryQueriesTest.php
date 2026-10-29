@@ -10,7 +10,9 @@ use App\Modules\Inventory\Queries\InventoryListQuery;
 use App\Modules\Inventory\Queries\InventoryRowQuery;
 use App\Modules\Inventory\Queries\LowStockQuery;
 use App\Modules\Inventory\Queries\MovementsQuery;
+use App\Modules\Inventory\Queries\MovementSummaryQuery;
 use App\Modules\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 
 beforeEach(function (): void {
     $this->inTenant(fn () => Sku::factory()->withStock(0)->create(), $this->otherTenant());
@@ -138,4 +140,17 @@ test('the inventory row loads the product and stock of the sku', function (): vo
     expect($row->relationLoaded('product'))->toBeTrue()
         ->and($row->relationLoaded('smallestUnit'))->toBeTrue()
         ->and($row->inventory?->on_hand)->toBe(5);
+});
+
+test('V2 Task 16 BR-INV06 the movement summary sums the signed base units of the range per sku and type', function (): void {
+    $sku = Sku::factory()->withStock(0)->create();
+    InventoryMovement::factory()->create(['sku_id' => $sku->id, 'type' => 'opening', 'quantity' => 100, 'created_at' => '2026-10-09 10:00:00']);
+    InventoryMovement::factory()->create(['sku_id' => $sku->id, 'type' => 'sale', 'quantity' => -6, 'on_hand_after' => 94, 'created_at' => '2026-10-09 11:00:00']);
+    InventoryMovement::factory()->create(['sku_id' => $sku->id, 'type' => 'sale', 'quantity' => -4, 'on_hand_after' => 90, 'created_at' => '2026-10-10 11:00:00']);
+    InventoryMovement::factory()->create(['sku_id' => $sku->id, 'type' => 'return', 'quantity' => 2, 'on_hand_after' => 92, 'created_at' => '2026-10-12 11:00:00']);
+
+    $rows = app(MovementSummaryQuery::class)->bySku(CarbonImmutable::parse('2026-10-09 00:00:00'), CarbonImmutable::parse('2026-10-10 23:59:59'))->get();
+
+    expect($rows)->toHaveCount(1)
+        ->and((array) $rows->sole())->toEqual(['sku_id' => $sku->id, 'opening' => 100, 'adjustment' => 0, 'sale' => -10, 'return' => 0]);
 });

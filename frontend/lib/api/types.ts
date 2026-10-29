@@ -176,3 +176,16 @@ export type DashboardBundle = Schemas["DashboardBundle"];
 export type DashboardBundleComponent = Schemas["DashboardBundleComponent"];
 export type StoreBundleComponent = Schemas["StoreBundleComponent"];
 export type BundleReport = Schemas["BundleReport"];
+
+// V2 Task 16 — advanced reports (D94)
+export type ReportName = Schemas["ReportName"];
+export type ProductReportSort = Schemas["ProductReportSort"];
+export type CustomerReportView = Schemas["CustomerReportView"];
+export type SalesAnalyticsReport = Schemas["SalesAnalyticsReport"];
+export type ProductPerformanceRow = Schemas["ProductPerformanceRow"];
+export type CustomerPatternRow = Schemas["CustomerPatternRow"];
+export type ReportMovements = Schemas["ReportMovements"];
+export type InventoryAnalyticsRow = Schemas["InventoryAnalyticsRow"];
+export type InventorySummary = Schemas["InventorySummary"];
+export type ReportAging = Schemas["ReportAging"];
+export type CollectionsReport = Schemas["CollectionsReport"];
