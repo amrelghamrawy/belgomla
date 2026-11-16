@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# pre-push: refuse a push whose suites are red. Runs scripts/preflight.sh on the
+# range being pushed. Installed once per clone with:
+#     git config core.hooksPath scripts/hooks
+#
+# Escape hatch for the human only (a docs-only emergency, a broken machine):
+#     SKIP_PREFLIGHT=1 git push      or      git push --no-verify
+# Claude never uses either; a PreToolUse hook in .claude/settings.json blocks them.
+
+set -uo pipefail
+
+if [ "${SKIP_PREFLIGHT:-0}" = "1" ]; then
+    echo "pre-push: SKIP_PREFLIGHT=1, preflight skipped."
+    exit 0
+fi
+
+ZERO="0000000000000000000000000000000000000000"
+BASE=""
+PUSHING=0
+
+# stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref pushed.
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [ "$local_sha" = "$ZERO" ] && continue            # deleting a remote branch
+    PUSHING=1
+    if [ "$remote_sha" = "$ZERO" ]; then              # new branch: compare with main
+        candidate="$(git merge-base "$local_sha" origin/main 2>/dev/null || git merge-base "$local_sha" main 2>/dev/null || echo "")"
+    else
+        candidate="$remote_sha"
+    fi
+    # Several refs in one push: take the oldest base so every pushed commit is covered.
+    if [ -z "$BASE" ] || { [ -n "$candidate" ] && git merge-base --is-ancestor "$candidate" "$BASE" 2>/dev/null; }; then
+        BASE="$candidate"
+    fi
+done
+
+# Nothing but deletions.
+[ "$PUSHING" -eq 0 ] && exit 0
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+    exec bash "$REPO_ROOT/scripts/preflight.sh" --base "$BASE"
+fi
+exec bash "$REPO_ROOT/scripts/preflight.sh"
