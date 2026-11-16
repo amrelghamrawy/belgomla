@@ -125,6 +125,26 @@ test('BR-R03 every returned line goes back into stock in base units as a return 
         ]);
 });
 
+test('BR-INV09 returned goods come back at the cost frozen on the line and move the average like a receipt', function (): void {
+    $this->lineA->forceFill(['unit_cost' => '5.0000'])->save();
+    SkuInventory::query()->whereKey($this->a->id)->update(['avg_cost' => '8.0000']);
+
+    ($this->record)([[$this->lineA, 2]]);
+
+    // 2 × 20 = 40 base units back at 5.0000 onto 280 at 8.0000: (280 × 8 + 40 × 5) ÷ 320 = 2440 ÷ 320 = 7.6250
+    expect(InventoryMovement::query()->where('type', MovementType::Return)->sole()->only(['quantity', 'unit_cost']))->toBe(['quantity' => 40, 'unit_cost' => '5.0000'])
+        ->and(SkuInventory::query()->findOrFail($this->a->id)->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 320, 'avg_cost' => '7.6250']);
+});
+
+test('D96 c goods of a line sold without a cost come back without one and leave the average', function (): void {
+    SkuInventory::query()->whereKey($this->a->id)->update(['avg_cost' => '8.0000']);
+
+    ($this->record)([[$this->lineA, 2]]);
+
+    expect(InventoryMovement::query()->where('type', MovementType::Return)->sole()->unit_cost)->toBeNull()
+        ->and(SkuInventory::query()->findOrFail($this->a->id)->avg_cost)->toBe('8.0000');
+});
+
 test('D74 a return is priced at the line\'s snapshot price, a tier price staying the tier price even after the catalog changed', function (): void {
     App\Modules\Catalog\Models\SkuUnit::query()->whereKey($this->defaultUnitId($this->b))->update(['base_price' => '120.00']);
     SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($this->b))->delete();

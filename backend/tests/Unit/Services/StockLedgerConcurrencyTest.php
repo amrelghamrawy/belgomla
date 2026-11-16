@@ -94,3 +94,31 @@ test('BR-INV03 two sessions that fit together both reserve', function (): void {
 
     expect(($this->stock)()->only(['on_hand', 'reserved']))->toBe(['on_hand' => 5, 'reserved' => 5]);
 });
+
+test('BR-INV09 a second receipt waits on the row lock while the first is open, then averages over both', function (): void {
+    $a = DB::connection('pgsql_session_a');
+    $a->beginTransaction();
+    onSession('pgsql_session_a', fn () => $this->ledger->receive($this->sku, 5, '4.0000'));
+
+    $blocked = onSession('pgsql_session_b', function (Connection $db): ?string {
+        $db->beginTransaction();
+        $db->statement("SET LOCAL lock_timeout = '200ms'");
+
+        try {
+            $this->ledger->receive($this->sku, 10, '7.0000');
+
+            return null;
+        } catch (QueryException $e) {
+            return $e->getCode();
+        } finally {
+            $db->rollBack();
+        }
+    });
+
+    $a->commit();
+    onSession('pgsql_session_b', fn () => $this->ledger->receive($this->sku, 10, '7.0000'));
+
+    // A: no average yet → 4.0000 on 10; B after A: (10 × 4 + 10 × 7) ÷ 20 = 110 ÷ 20 = 5.5000
+    expect($blocked)->toBe('55P03')
+        ->and(($this->stock)()->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 20, 'avg_cost' => '5.5000']);
+});

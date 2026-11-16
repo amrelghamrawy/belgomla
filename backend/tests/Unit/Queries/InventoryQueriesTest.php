@@ -152,5 +152,5 @@ test('V2 Task 16 BR-INV06 the movement summary sums the signed base units of the
     $rows = app(MovementSummaryQuery::class)->bySku(CarbonImmutable::parse('2026-10-09 00:00:00'), CarbonImmutable::parse('2026-10-10 23:59:59'))->get();
 
     expect($rows)->toHaveCount(1)
-        ->and((array) $rows->sole())->toEqual(['sku_id' => $sku->id, 'opening' => 100, 'adjustment' => 0, 'sale' => -10, 'return' => 0]);
+        ->and((array) $rows->sole())->toEqual(['sku_id' => $sku->id, 'opening' => 100, 'adjustment' => 0, 'sale' => -10, 'return' => 0, 'receive' => 0]);
 });

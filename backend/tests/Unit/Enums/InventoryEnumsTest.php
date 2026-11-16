@@ -11,6 +11,6 @@ test('every inventory enum exposes labels for all cases', function (string $enum
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
 })->with([MovementType::class]);
 
-test('BR-INV06 the movement types match the domain model, return reserved for V2', function (): void {
-    expect(array_map(fn (MovementType $type): string => $type->value, MovementType::cases()))->toBe(['opening', 'adjustment', 'sale', 'return']);
+test('BR-INV06 BR-INV09 the movement types match the domain model', function (): void {
+    expect(array_map(fn (MovementType $type): string => $type->value, MovementType::cases()))->toBe(['opening', 'adjustment', 'sale', 'return', 'receive']);
 });

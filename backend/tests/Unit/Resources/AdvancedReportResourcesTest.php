@@ -42,7 +42,7 @@ test('a customer pattern row renders its documented keys', function (): void {
 });
 
 test('an inventory analytics row renders its documented keys', function (): void {
-    $row = ['sku_id' => 1, 'product_id' => 2, 'product_name' => 'علوم', 'sku_code' => 'BK-1', 'sku_name' => null, 'on_hand' => 10, 'available' => 8, 'stock_value' => '1000.00', 'sold_base' => 0, 'days_of_cover' => null, 'last_sold_at' => null, 'dead' => true, 'movements' => ['opening' => 10, 'adjustment' => 0, 'sale' => 0, 'return' => 0]];
+    $row = ['sku_id' => 1, 'product_id' => 2, 'product_name' => 'علوم', 'sku_code' => 'BK-1', 'sku_name' => null, 'on_hand' => 10, 'available' => 8, 'stock_value' => '1000.00', 'sold_base' => 0, 'days_of_cover' => null, 'last_sold_at' => null, 'dead' => true, 'movements' => ['opening' => 10, 'adjustment' => 0, 'sale' => 0, 'return' => 0, 'receive' => 0]];
 
     expect(rendered(new InventoryAnalyticsResource($row), dashboardRequest('/api/dashboard/reports/inventory')))->toBe($row);
 });

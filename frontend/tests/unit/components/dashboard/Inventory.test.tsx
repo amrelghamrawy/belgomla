@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdjustForm } from "@/components/dashboard/inventory/AdjustStockSheet";
 import { BelowReservedError } from "@/components/dashboard/inventory/BelowReservedError";
 import { BulkAdjustTable } from "@/components/dashboard/inventory/InventoryPage";
+import { CostForm } from "@/components/dashboard/inventory/ReceiveStockSheet";
 import { ApiError } from "@/lib/api/errors";
-import type { InventoryRow } from "@/lib/api/types";
+import type { DashboardSku, InventoryRow } from "@/lib/api/types";
 import { belowReservedDetails } from "@/lib/dashboard/inventory";
 
 import { callsTo, envelopeError, json, stubApi } from "../../http";
@@ -181,5 +182,97 @@ describe("variant rows (V2 Task 14)", () => {
 
     expect(screen.getByText("أزرق / M")).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(3);
+  });
+});
+
+function sku(): DashboardSku {
+  return {
+    id: 5,
+    code: "ADW-SCI-1",
+    selling_unit: { id: 2, name: "كرتونة" },
+    base_unit: { id: 1, name: "قطعة" },
+    conversion_factor: 20,
+    cover_price: null,
+    base_price: "100.00",
+    base_price_percent: null,
+    moq: 5,
+    units: [
+      { id: 11, unit: { id: 1, name: "قطعة" }, conversion_factor: 1, cover_price: null, base_price: "6.00", base_price_percent: null, moq: 1, is_default: false },
+      { id: 12, unit: { id: 2, name: "كرتونة" }, conversion_factor: 20, cover_price: null, base_price: "100.00", base_price_percent: null, moq: 5, is_default: true },
+    ],
+  } as DashboardSku;
+}
+
+describe("CostForm (BR-INV09, D96)", () => {
+  it("BR-INV09 receives cartons at the price per carton, sending the unit, the quantity, the price and the note as typed", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/inventory/5/receive": json(200, { data: row({ on_hand: 140, avg_cost: "5.5000" }) }),
+    });
+    const onDone = vi.fn();
+    const user = userEvent.setup();
+    renderWithQuery(<CostForm row={row({ avg_cost: "5.0000" })} sku={sku()} mode="receive" onDone={onDone} />);
+
+    expect(screen.getByTestId("current-cost")).toHaveTextContent("متوسط التكلفة: 5.00 ج.م للوحدة الأساسية");
+    await user.selectOptions(screen.getByLabelText("الوحدة"), "كرتونة (20)");
+    await user.type(screen.getByLabelText("الكمية المستلمة"), "2");
+    await user.type(screen.getByLabelText("سعر الشراء للوحدة"), "120");
+    await user.type(screen.getByLabelText("ملاحظة (اختياري)"), "مكتبة النور");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const call = callsTo(fetchMock, "POST /api/dashboard/inventory/5/receive")[0];
+    expect(call?.body).toEqual({ quantity: 2, unit_cost: "120", sku_unit_id: 12, note: "مكتبة النور" });
+    expect(call?.headers["Idempotency-Key"]).toMatch(/^receive-5-[0-9a-f]{32}$/);
+  });
+
+  it("lists the base unit first and the larger units, never the base unit twice", () => {
+    stubApi({});
+    renderWithQuery(<CostForm row={row()} sku={sku()} mode="receive" onDone={vi.fn()} />);
+
+    expect(within(screen.getByLabelText("الوحدة")).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "قطعة (الوحدة الأساسية)",
+      "كرتونة (20)",
+    ]);
+  });
+
+  it("checks the quantity and the price before sending", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<CostForm row={row()} sku={sku()} mode="receive" onDone={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("الكمية المستلمة"), "0");
+    await user.type(screen.getByLabelText("سعر الشراء للوحدة"), "1.005");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    expect(screen.getByText("اكتب سعرًا صحيحًا (رقم بحد أقصى خانتين عشريتين)")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST /api/dashboard/inventory/5/receive")).toHaveLength(0);
+  });
+
+  it("D96 d sets the cost per base unit without a quantity and says when none is known yet", async () => {
+    const fetchMock = stubApi({ "PUT /api/dashboard/inventory/5/cost": json(200, { data: row({ avg_cost: "4.7500" }) }) });
+    const onDone = vi.fn();
+    const user = userEvent.setup();
+    renderWithQuery(<CostForm row={row({ avg_cost: null })} sku={sku()} mode="cost" onDone={onDone} />);
+
+    expect(screen.getByTestId("current-cost")).toHaveTextContent("متوسط التكلفة: غير محددة");
+    expect(screen.queryByLabelText("الكمية المستلمة")).toBeNull();
+    await user.type(screen.getByLabelText("سعر الشراء للوحدة"), "4.75");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(callsTo(fetchMock, "PUT /api/dashboard/inventory/5/cost")[0]?.body).toEqual({ unit_cost: "4.75", sku_unit_id: null });
+  });
+
+  it("D93 shows the refusal of a bundle", async () => {
+    stubApi({
+      "PUT /api/dashboard/inventory/5/cost": envelopeError(409, "is_bundle", "هذا المنتج باقة وليس له مخزون: استلم مكوناته"),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CostForm row={row()} sku={sku()} mode="cost" onDone={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("سعر الشراء للوحدة"), "1");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("هذا المنتج باقة وليس له مخزون: استلم مكوناته");
   });
 });

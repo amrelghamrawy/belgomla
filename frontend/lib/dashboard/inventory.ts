@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch, apiFetchPage, withQuery } from "@/lib/api/client";
+import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { type ApiError, isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/keys";
 import type {
@@ -15,7 +16,8 @@ import type {
 
 import type { ListQuery } from "./list-query";
 
-// Stock (08 §7): the list, one SKU's row and movements, single and bulk adjustments (BR-INV06, BR-INV08).
+// Stock (08 §7): the list, one SKU's row and movements, single and bulk adjustments (BR-INV06, BR-INV08), receiving goods
+// and the cost (BR-INV09, D96).
 
 export const INVENTORY_LIST_KEYS = ["q", "low_stock", "sort"] as const;
 
@@ -62,6 +64,44 @@ export function useAdjustStock(skuId: number) {
   return useMutation({
     mutationFn: (body: { new_on_hand: number; reason: string }) =>
       apiFetch<InventoryRow>(`/api/dashboard/inventory/${skuId}/adjust`, { method: "POST", body }),
+    onSuccess: (row) => {
+      queryClient.setQueryData(queryKeys.dashboardInventoryRow(skuId), row);
+      invalidate();
+    },
+  });
+}
+
+export type ReceiveStockInput = { quantity: number; unit_cost: string; sku_unit_id: number | null; note: string | null };
+
+/** BR-INV09: goods bought come in at the price paid per the unit named; retry-safe (D55). Returns the row with the new average. */
+export function useReceiveStock(skuId: number) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateStock();
+  const idempotency = useIdempotencyKey(`receive-${skuId}`);
+
+  return useMutation({
+    mutationFn: (body: ReceiveStockInput) =>
+      apiFetch<InventoryRow>(`/api/dashboard/inventory/${skuId}/receive`, {
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotency.keyFor(body) },
+      }),
+    onSuccess: (row) => {
+      idempotency.reset();
+      queryClient.setQueryData(queryKeys.dashboardInventoryRow(skuId), row);
+      invalidate();
+    },
+  });
+}
+
+/** D96 d: sets the average cost by hand, per the unit named; no movement. */
+export function useSetStockCost(skuId: number) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateStock();
+
+  return useMutation({
+    mutationFn: (body: { unit_cost: string; sku_unit_id: number | null }) =>
+      apiFetch<InventoryRow>(`/api/dashboard/inventory/${skuId}/cost`, { method: "PUT", body }),
     onSuccess: (row) => {
       queryClient.setQueryData(queryKeys.dashboardInventoryRow(skuId), row);
       invalidate();

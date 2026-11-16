@@ -23,7 +23,7 @@ test('BR-INV06 the movements of a sku, newest first, paginated with meta', funct
     $this->tenantJson('GET', "/api/dashboard/inventory/{$sku->id}/movements?per_page=1")
         ->assertOk()
         ->assertExactJsonStructure([
-            'data' => ['*' => ['id', 'type', 'type_label', 'quantity', 'on_hand_after', 'reason', 'order_id', 'actor' => ['type', 'id'], 'created_at']],
+            'data' => ['*' => ['id', 'type', 'type_label', 'quantity', 'on_hand_after', 'reason', 'unit_cost', 'order_id', 'actor' => ['type', 'id'], 'created_at']],
             'links' => ['first', 'last', 'prev', 'next'],
             'meta' => ['current_page', 'from', 'last_page', 'links', 'path', 'per_page', 'to', 'total'],
         ])

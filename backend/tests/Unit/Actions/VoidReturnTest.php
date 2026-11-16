@@ -54,6 +54,19 @@ beforeEach(function (): void {
     $this->onHand = fn (): int => SkuInventory::query()->findOrFail($this->sku->id)->on_hand;
 });
 
+test('D96 c a voided return takes its goods off at the cost they came back at and leaves the average', function (): void {
+    $this->line->forceFill(['unit_cost' => '5.0000'])->save();
+    $return = ($this->recordReturn)();
+    $average = SkuInventory::query()->findOrFail($this->sku->id)->avg_cost;
+
+    ($this->void)($return);
+
+    expect(InventoryMovement::query()->where('type', MovementType::Return)->orderBy('id')->get()->map->only(['quantity', 'unit_cost'])->all())->toBe([
+        ['quantity' => 40, 'unit_cost' => '5.0000'],
+        ['quantity' => -40, 'unit_cost' => '5.0000'],
+    ])->and(SkuInventory::query()->findOrFail($this->sku->id)->avg_cost)->toBe($average);
+});
+
 test('BR-R06 a voided return keeps its row with when, why and by whom', function (): void {
     $return = ($this->recordReturn)();
     $this->freezeSecond();

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $tenant_id
  * @property int $on_hand
  * @property int $reserved
+ * @property string|null $avg_cost the weighted average cost per base unit, 4 decimals; null = not known yet (BR-INV09)
  * @property-read int $available
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -75,6 +76,7 @@ final class SkuInventory extends Model
         return [
             'on_hand' => 'integer',
             'reserved' => 'integer',
+            'avg_cost' => 'decimal:4',
         ];
     }
 }

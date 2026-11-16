@@ -154,6 +154,22 @@ test('every *_at column is cast to datetime', function (): void {
     expect($uncast)->toBe([]);
 });
 
+test('D96 every cost per base unit is cast to decimal:4', function (): void {
+    $uncast = [];
+
+    foreach (moduleModels() as $model) {
+        $casts = (new $model)->getCasts();
+
+        foreach (columnsEndingWith($model, ['_cost']) as $column) {
+            if (($casts[$column] ?? null) !== 'decimal:4') {
+                $uncast[] = "{$model}::{$column}";
+            }
+        }
+    }
+
+    expect($uncast)->toBe([]);
+});
+
 test('every money column is cast to decimal:2', function (): void {
     $uncast = [];
 

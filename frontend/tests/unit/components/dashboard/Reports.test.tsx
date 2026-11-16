@@ -471,7 +471,7 @@ const inventoryRow = (overrides: Record<string, unknown> = {}) => ({
   days_of_cover: null,
   last_sold_at: null,
   dead: true,
-  movements: { opening: 0, adjustment: 0, sale: 0, return: 0 },
+  movements: { opening: 0, adjustment: 0, sale: 0, return: 0, receive: 0 },
   ...overrides,
 });
 
@@ -502,7 +502,7 @@ describe("InventoryTab", () => {
           dead_count: 1,
           dead_value: "6000.00",
           sold_base: 30,
-          movements: { opening: 0, adjustment: 5, sale: -30, return: 2 },
+          movements: { opening: 0, adjustment: 5, sale: -30, return: 2, receive: 0 },
         },
         generated_at: GENERATED,
       }),
@@ -540,7 +540,7 @@ describe("InventoryTab", () => {
           dead_count: 0,
           dead_value: "0.00",
           sold_base: 0,
-          movements: { opening: 0, adjustment: 0, sale: 0, return: 0 },
+          movements: { opening: 0, adjustment: 0, sale: 0, return: 0, receive: 0 },
         },
         generated_at: GENERATED,
       }),

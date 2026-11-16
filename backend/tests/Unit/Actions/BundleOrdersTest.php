@@ -107,6 +107,16 @@ describe('delivery', function (): void {
             ->and(InventoryMovement::query()->where('type', 'sale')->orderBy('sku_id')->pluck('quantity', 'sku_id')->all())->toBe([$this->arabic->id => -60, $this->maths->id => -120]);
     });
 
+    test('BR-INV09 D96 f delivery freezes the own cost of each component line; the bundle line has none', function (): void {
+        SkuInventory::query()->whereKey($this->arabic->id)->update(['avg_cost' => '2.0000']);
+
+        ($this->deliver)();
+
+        $costs = ($this->lines)($this->order)->map(fn (OrderItem $item): array => [$item->sku_code, $item->unit_cost])->all();
+
+        expect($costs)->toBe([['SET-1', null], ['AR-1', '2.0000'], ['MA-1', null]]);
+    });
+
     test('BR-O13 D93 a partial delivery is given in bundles; the components follow', function (): void {
         ($this->deliver)([($this->bundleLine)($this->order)->id => 2]);
 

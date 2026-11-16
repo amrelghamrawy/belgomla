@@ -54,6 +54,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $reserved whether the line holds stock: false on a pre-order line (BR-O14, D88)
  * @property int $converted_quantity selling units of a pre-order line already converted into a normal order
  * @property int|null $parent_item_id the bundle line this component line belongs to (D93)
+ * @property string|null $unit_cost the cost per base unit frozen at delivery (BR-INV09, D96 f): set on the lines that left the stock, null when unknown
  * @property bool $is_bundle a bundle's own line: priced, holds nothing, its components are its children (D93)
  * @property CarbonImmutable|null $removed_at the merchant removed the line (BR-O12): kept for history, out of every total
  * @property CarbonImmutable $created_at
@@ -166,6 +167,7 @@ final class OrderItem extends Model
             'reserved' => 'boolean',
             'converted_quantity' => 'integer',
             'is_bundle' => 'boolean',
+            'unit_cost' => 'decimal:4',
         ];
     }
 }

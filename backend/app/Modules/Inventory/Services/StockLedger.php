@@ -13,6 +13,7 @@ use App\Modules\Inventory\Exceptions\InsufficientStock;
 use App\Modules\Inventory\Exceptions\NotInTransaction;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
+use App\Support\UnitCost;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -28,6 +29,10 @@ use RuntimeException;
  * A SKU without a stock row gets an empty one the first time it is locked.
  *
  * Only On Hand changes are movements (BR-INV06); reservation changes are not.
+ *
+ * Cost (BR-INV09, D96): the row keeps the weighted average cost per base unit (`avg_cost`, null = unknown) and every
+ * movement records the cost it moved at. The average moves only on goods coming in at a known cost (`receive`, a
+ * `restock` at the sale's frozen cost), under the same row lock as the quantity, so concurrent receipts queue.
  */
 final readonly class StockLedger
 {
@@ -102,7 +107,41 @@ final readonly class StockLedger
             $row->on_hand = $newOnHand;
             $row->save();
 
-            return $this->record($sku, MovementType::Adjustment, $change, $newOnHand, $actorId, $reason);
+            return $this->record($sku, MovementType::Adjustment, $change, $newOnHand, $actorId, $reason, unitCost: $row->avg_cost);
+        });
+    }
+
+    /**
+     * BR-INV09: goods the merchant bought come in at `unitCost` per base unit, as a positive `receive` movement; the
+     * average moves (D96 c). Reserved is unchanged.
+     */
+    public function receive(Sku $sku, int $quantityBase, string $unitCost, ?string $note = null, ?int $actorId = null): InventoryMovement
+    {
+        $this->assertPositive($quantityBase);
+
+        return DB::transaction(function () use ($sku, $quantityBase, $unitCost, $note, $actorId): InventoryMovement {
+            $row = $this->row($sku);
+            $row->avg_cost = UnitCost::average($row->on_hand, $row->avg_cost, $quantityBase, $unitCost);
+            $row->on_hand += $quantityBase;
+            $row->save();
+
+            return $this->record($sku, MovementType::Receive, $quantityBase, $row->on_hand, $actorId, $note, unitCost: UnitCost::normalizeOrNull($unitCost));
+        });
+    }
+
+    /**
+     * D96 d: the merchant sets the average cost per base unit by hand (stock from before costing, a correction). No
+     * movement: On Hand does not change. Returns the average it replaced.
+     */
+    public function setCost(Sku $sku, string $unitCost): ?string
+    {
+        return DB::transaction(function () use ($sku, $unitCost): ?string {
+            $row = $this->row($sku);
+            $old = $row->avg_cost;
+            $row->avg_cost = UnitCost::normalizeOrNull($unitCost);
+            $row->save();
+
+            return $old;
         });
     }
 
@@ -135,7 +174,10 @@ final readonly class StockLedger
         $row->save();
     }
 
-    /** BR-INV05: a delivered order leaves the stock, as a negative `sale` movement linked to it. */
+    /**
+     * BR-INV05: a delivered order leaves the stock, as a negative `sale` movement linked to it, at the average cost of
+     * that moment (BR-INV09): the caller freezes the movement's `unit_cost` on the order line.
+     */
     public function deduct(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null): InventoryMovement
     {
         $this->assertInTransaction('deduct');
@@ -148,27 +190,37 @@ final readonly class StockLedger
         $row->reserved -= $quantityBase;
         $row->save();
 
-        return $this->record($sku, MovementType::Sale, -$quantityBase, $row->on_hand, $actorId, orderId: $orderId);
+        return $this->record($sku, MovementType::Sale, -$quantityBase, $row->on_hand, $actorId, orderId: $orderId, unitCost: $row->avg_cost);
     }
 
-    /** BR-R03: goods a customer brought back go back on the shelf, as a positive `return` movement linked to the order. */
-    public function restock(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null): InventoryMovement
+    /**
+     * BR-R03: goods a customer brought back go back on the shelf, as a positive `return` movement linked to the order,
+     * at the cost frozen on the order line (`unitCost`, null when the sale had none). A known cost moves the average
+     * like a receipt (BR-INV09); an unknown one leaves it.
+     */
+    public function restock(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null, ?string $unitCost = null): InventoryMovement
     {
         $this->assertInTransaction('restock');
         $this->assertPositive($quantityBase);
 
         $row = $this->row($sku);
+
+        if ($unitCost !== null) {
+            $row->avg_cost = UnitCost::average($row->on_hand, $row->avg_cost, $quantityBase, $unitCost);
+        }
+
         $row->on_hand += $quantityBase;
         $row->save();
 
-        return $this->record($sku, MovementType::Return, $quantityBase, $row->on_hand, $actorId, orderId: $orderId);
+        return $this->record($sku, MovementType::Return, $quantityBase, $row->on_hand, $actorId, orderId: $orderId, unitCost: UnitCost::normalizeOrNull($unitCost));
     }
 
     /**
-     * BR-R06: a voided return takes its goods off the shelf again, as a negative `return` movement. Units sold or
-     * reserved since are not taken back: less than the quantity Available is `insufficient_stock` (D76).
+     * BR-R06: a voided return takes its goods off the shelf again, as a negative `return` movement at the cost they came
+     * back at (`unitCost`); the average stays (D96 c). Units sold or reserved since are not taken back: less than the
+     * quantity Available is `insufficient_stock` (D76).
      */
-    public function unrestock(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null): InventoryMovement
+    public function unrestock(Sku $sku, int $quantityBase, int $orderId, ?int $actorId = null, ?string $unitCost = null): InventoryMovement
     {
         $this->assertInTransaction('unrestock');
         $this->assertPositive($quantityBase);
@@ -182,7 +234,7 @@ final readonly class StockLedger
         $row->on_hand -= $quantityBase;
         $row->save();
 
-        return $this->record($sku, MovementType::Return, -$quantityBase, $row->on_hand, $actorId, orderId: $orderId);
+        return $this->record($sku, MovementType::Return, -$quantityBase, $row->on_hand, $actorId, orderId: $orderId, unitCost: UnitCost::normalizeOrNull($unitCost));
     }
 
     /**
@@ -199,7 +251,7 @@ final readonly class StockLedger
         return $this->lock([$sku->id])->get($sku->id) ?? throw new RuntimeException("SKU {$sku->id} is not a SKU of the current tenant.");
     }
 
-    private function record(Sku $sku, MovementType $type, int $quantity, int $onHandAfter, ?int $actorId, ?string $reason = null, ?int $orderId = null): InventoryMovement
+    private function record(Sku $sku, MovementType $type, int $quantity, int $onHandAfter, ?int $actorId, ?string $reason = null, ?int $orderId = null, ?string $unitCost = null): InventoryMovement
     {
         return InventoryMovement::query()->create([
             'sku_id' => $sku->id,
@@ -208,6 +260,7 @@ final readonly class StockLedger
             'on_hand_after' => $onHandAfter,
             'order_id' => $orderId,
             'reason' => $reason,
+            'unit_cost' => $unitCost,
             'actor_type' => $actorId === null ? ActorType::System : ActorType::TenantUser,
             'actor_id' => $actorId,
         ]);

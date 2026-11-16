@@ -70,9 +70,10 @@ final class SkuFactory extends Factory
     }
 
     /** Stock in base units (BR-INV02); without it the SKU has no inventory row, i.e. no stock. */
-    public function withStock(int $onHand, int $reserved = 0): static
+    /** `avgCost` is the average cost per base unit (BR-INV09), null = not known. */
+    public function withStock(int $onHand, int $reserved = 0, ?string $avgCost = null): static
     {
-        return $this->has(SkuInventoryFactory::new()->stock($onHand, $reserved), 'inventory');
+        return $this->has(SkuInventoryFactory::new()->stock($onHand, $reserved, $avgCost), 'inventory');
     }
 
     /** The id of the SKU's default unit: what a row made for a SKU (a tier, a cart line, an order line) belongs to. */

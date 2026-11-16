@@ -156,7 +156,7 @@ final readonly class RecordReturn
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
             ]);
-            $this->ledger->restock($item->sku, $quantity * $item->conversion_factor, $order->id, $actorId);
+            $this->ledger->restock($item->sku, $quantity * $item->conversion_factor, $order->id, $actorId, $item->unit_cost); // BR-INV09: back at the cost it left at
         }
 
         return $return->load('items.orderItem');

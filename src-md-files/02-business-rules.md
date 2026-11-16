@@ -567,8 +567,11 @@ Every change to On Hand is recorded as an inventory movement with type:
 - `adjustment` (manual merchant change, with reason)
 - `sale` (delivery deduction, linked to the order)
 - `return` (V2, BR-R03/R06: goods a customer brought back, positive and linked to the order; negative when the return is voided)
+- `receive` (V2 costing, BR-INV09: goods the merchant bought, positive, at the price paid)
 
 Reservation changes are not movements; they are derived from order status.
+
+Each movement carries the cost per base unit it moved at, when known (BR-INV09).
 
 Returns (المرتجع) were left out of V1 and shipped as the first V2 increment (D20, §H2).
 
@@ -581,6 +584,17 @@ Dashboard behavior:
 - The adjustment form shows On Hand, Reserved and Available side by side, and states the minimum allowed value: "أقل كمية ممكنة: {reserved} (محجوزة لطلبات قائمة)".
 - If the merchant enters a lower value, the request is rejected with an Arabic message listing the open orders holding the reservation, each linked to the order page: "لا يمكن تقليل المخزون إلى {x} لأن {reserved} وحدة محجوزة للطلبات: #1024، #1031. ألغِ الطلبات أو سلّمها أولًا."
 - The same rule applies to bulk adjustments; the response reports the SKUs that were skipped and why (`below_reserved` with `reserved`/`min_allowed`, `not_found`, `unchanged`), and the valid ones are applied.
+
+### BR-INV09 — Purchase Cost and Average Cost (V2 costing, D96)
+
+Each SKU has one **average cost per base unit**, unknown until the merchant enters one.
+
+- **Receiving goods** (استلام بضاعة): the merchant enters the quantity in one of the SKU's units and the price paid per that unit. `On Hand += quantity × conversion_factor`, written as a positive `receive` movement at cost = price ÷ conversion_factor.
+- **Average:** `new = (On Hand before × average + received × cost) ÷ (On Hand before + received)`, half-up to 4 decimals. With no average yet, or nothing on hand, the received cost becomes the average. Example: 100 pieces at 5.0000, then 2 cartons of 50 at 300.00 per carton (6.0000 a piece) → (100 × 5 + 100 × 6) ÷ 200 = 5.5000.
+- Only goods coming in at a known cost move the average: a receipt, or a return of a sale whose cost is known (at that sale's cost). Sales, adjustments, opening stock and voided returns leave it as it is.
+- The merchant may set the average by hand (stock that existed before costing, or a correction); it is audited.
+- **Delivery freezes the cost:** each order line that leaves the stock records the average at that moment, so a later receipt never changes the cost of what was already sold. A return brings goods back at the cost frozen on the line it returns (BR-R03).
+- The average is visible to users who can adjust stock or view reports, never to sales staff.
 
 ### BR-INV07 — Unconfirmed Orders Hold Stock
 

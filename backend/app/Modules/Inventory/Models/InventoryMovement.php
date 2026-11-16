@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $on_hand_after
  * @property int|null $order_id
  * @property string|null $reason
+ * @property string|null $unit_cost the cost per base unit it moved at, 4 decimals; null when unknown (BR-INV09)
  * @property ActorType $actor_type
  * @property int|null $actor_id
  * @property CarbonImmutable $created_at
@@ -64,6 +65,7 @@ final class InventoryMovement extends Model
             'quantity' => 'integer',
             'on_hand_after' => 'integer',
             'order_id' => 'integer',
+            'unit_cost' => 'decimal:4',
             'actor_type' => ActorType::class,
             'actor_id' => 'integer',
             'created_at' => 'datetime',

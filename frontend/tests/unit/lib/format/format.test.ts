@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatClock, formatDate, formatDateTime, formatDay } from "@/lib/format/date";
-import { formatMoney, formatPercent } from "@/lib/format/money";
+import { formatMoney, formatPercent, formatUnitCost } from "@/lib/format/money";
 import { phoneField } from "@/lib/forms/phone";
 import { formatPhone, whatsappLink } from "@/lib/format/phone";
 
@@ -18,6 +18,21 @@ describe("formatMoney", () => {
 
   it.each(["150", "150.5", "1,250.00", "abc", ""])("rejects %j, which is not a money string", (amount) => {
     expect(() => formatMoney(amount)).toThrow(RangeError);
+  });
+});
+
+describe("formatUnitCost", () => {
+  it.each([
+    ["5.5000", "5.50 ج.م"],
+    ["4.1667", "4.1667 ج.م"],
+    ["0.0025", "0.0025 ج.م"],
+    ["1234.5000", "1,234.50 ج.م"],
+  ])("D96 a %s per base unit shows as %s, the last two decimals only when not zero", (cost, expected) => {
+    expect(formatUnitCost(cost)).toBe(expected);
+  });
+
+  it("refuses anything that is not a 4-decimal cost", () => {
+    expect(() => formatUnitCost("5.50")).toThrow(RangeError);
   });
 });
 

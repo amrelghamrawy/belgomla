@@ -73,6 +73,8 @@ dataset('dashboard authenticated routes', [
     'inventory movements' => ['GET', '/api/dashboard/inventory/1/movements'],
     'inventory adjust' => ['POST', '/api/dashboard/inventory/1/adjust'],
     'inventory bulk adjust' => ['POST', '/api/dashboard/inventory/bulk-adjust'],
+    'inventory receive' => ['POST', '/api/dashboard/inventory/1/receive'],
+    'inventory cost' => ['PUT', '/api/dashboard/inventory/1/cost'],
     'customers list' => ['GET', '/api/dashboard/customers'],
     'customers create' => ['POST', '/api/dashboard/customers'],
     'customers show' => ['GET', '/api/dashboard/customers/1'],

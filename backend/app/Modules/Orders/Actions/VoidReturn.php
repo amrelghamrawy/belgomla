@@ -72,7 +72,7 @@ final readonly class VoidReturn
         $this->ledger->lock(array_values($items->map(fn (OrderReturnItem $item): int => $item->orderItem->sku_id)->all()));
 
         foreach ($items as $item) {
-            $this->ledger->unrestock($item->orderItem->sku, $item->quantity_base, $order->id, $actorId);
+            $this->ledger->unrestock($item->orderItem->sku, $item->quantity_base, $order->id, $actorId, $item->orderItem->unit_cost);
         }
     }
 }

@@ -63,7 +63,7 @@ test('each sku carries its stock, its value at the base price, its sales, days o
         'days_of_cover' => 30.0,
         'last_sold_at' => '2026-10-08T10:00:00+00:00',
         'dead' => false,
-        'movements' => ['opening' => 100, 'adjustment' => 6, 'sale' => -6, 'return' => 0],
+        'movements' => ['opening' => 100, 'adjustment' => 6, 'sale' => -6, 'return' => 0, 'receive' => 0],
     ]);
 });
 
@@ -112,7 +112,7 @@ test('the summary adds up every sku of the filter', function (): void {
         'dead_count' => 2,
         'dead_value' => '1050.00',
         'sold_base' => 6,
-        'movements' => ['opening' => 0, 'adjustment' => 0, 'sale' => 0, 'return' => 2],
+        'movements' => ['opening' => 0, 'adjustment' => 0, 'sale' => 0, 'return' => 2, 'receive' => 0],
     ]);
 });
 

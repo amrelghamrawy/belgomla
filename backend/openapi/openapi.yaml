@@ -2133,6 +2133,68 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
+  /api/dashboard/inventory/{sku}/receive:
+    parameters:
+      - $ref: '#/components/parameters/SkuId'
+    post:
+      operationId: dashboardReceiveStock
+      tags: [dashboard-inventory]
+      summary: Receive goods the merchant bought at the price paid (BR-INV09, D96 b); moves the average cost
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity, unit_cost]
+              properties:
+                quantity: { type: integer, minimum: 1, maximum: 10000000, description: 'Whole units of sku_unit_id (the base unit when left out)' }
+                unit_cost: { $ref: '#/components/schemas/Money', description: 'The price paid per one unit of sku_unit_id' }
+                sku_unit_id: { type: [integer, 'null'], minimum: 1, description: 'Any unit of this SKU, archived too' }
+                note: { type: [string, 'null'], maxLength: 200, description: 'e.g. the supplier' }
+      responses:
+        '200': { $ref: '#/components/responses/InventoryRow' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409':
+          description: is_bundle (a bundle has no stock of its own, D93 b)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/inventory/{sku}/cost:
+    parameters:
+      - $ref: '#/components/parameters/SkuId'
+    put:
+      operationId: dashboardSetStockCost
+      tags: [dashboard-inventory]
+      summary: Set the average cost by hand (D96 d); no movement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unit_cost]
+              properties:
+                unit_cost: { $ref: '#/components/schemas/Money', description: 'The cost per one unit of sku_unit_id' }
+                sku_unit_id: { type: [integer, 'null'], minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/InventoryRow' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409':
+          description: is_bundle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422': { $ref: '#/components/responses/Error' }
+
   /api/dashboard/inventory/{sku}/movements:
     parameters:
       - $ref: '#/components/parameters/SkuId'
@@ -5844,6 +5906,20 @@ components:
         moq: { type: integer }
         conversion_factor: { type: integer }
         low_stock: { type: boolean }
+        avg_cost:
+          $ref: '#/components/schemas/UnitCostOrNull'
+          description: 'The average cost per base unit (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g)'
+
+    UnitCost:
+      type: string
+      pattern: '^\d+\.\d{4}$'
+      description: 'A cost per base unit, 4 decimals (D96 a), e.g. "5.5000"'
+      examples: ['5.5000']
+
+    UnitCostOrNull:
+      oneOf:
+        - $ref: '#/components/schemas/UnitCost'
+        - type: 'null'
 
     BelowReservedDetails:
       type: object
@@ -5880,11 +5956,14 @@ components:
         id: { type: integer }
         type:
           type: string
-          enum: [opening, adjustment, sale, return]
+          enum: [opening, adjustment, sale, return, receive]
         type_label: { type: string }
         quantity: { type: integer, description: Signed change in base units }
         on_hand_after: { type: integer }
-        reason: { type: [string, 'null'] }
+        reason: { type: [string, 'null'], description: 'The reason of an adjustment, the note of a receive' }
+        unit_cost:
+          $ref: '#/components/schemas/UnitCostOrNull'
+          description: 'The cost per base unit it moved at (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g)'
         order_id: { type: [integer, 'null'] }
         actor: { $ref: '#/components/schemas/Actor' }
         created_at: { type: string, format: date-time }
@@ -6830,12 +6909,13 @@ components:
 
     ReportMovements:
       type: object
-      required: [opening, adjustment, sale, return]
+      required: [opening, adjustment, sale, return, receive]
       properties:
         opening: { type: integer }
         adjustment: { type: integer }
         sale: { type: integer }
         return: { type: integer }
+        receive: { type: integer, description: 'Goods the merchant received (BR-INV09)' }
 
     InventoryAnalyticsRow:
       type: object

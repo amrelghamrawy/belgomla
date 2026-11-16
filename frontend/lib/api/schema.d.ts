@@ -1453,6 +1453,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/inventory/{sku}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive goods the merchant bought at the price paid (BR-INV09, D96 b); moves the average cost */
+        post: operations["dashboardReceiveStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory/{sku}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the average cost by hand (D96 d); no movement */
+        put: operations["dashboardSetStockCost"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/inventory/{sku}/movements": {
         parameters: {
             query?: never;
@@ -3566,7 +3604,15 @@ export interface components {
             moq: number;
             conversion_factor: number;
             low_stock: boolean;
+            /** @description The average cost per base unit (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g) */
+            avg_cost?: components["schemas"]["UnitCostOrNull"];
         };
+        /**
+         * @description A cost per base unit, 4 decimals (D96 a), e.g. "5.5000"
+         * @example 5.5000
+         */
+        UnitCost: string;
+        UnitCostOrNull: components["schemas"]["UnitCost"] | null;
         /** @description The details of 422 inventory_below_reserved (BR-INV08) */
         BelowReservedDetails: {
             reserved: number;
@@ -3586,12 +3632,15 @@ export interface components {
         StockMovement: {
             id: number;
             /** @enum {string} */
-            type: "opening" | "adjustment" | "sale" | "return";
+            type: "opening" | "adjustment" | "sale" | "return" | "receive";
             type_label: string;
             /** @description Signed change in base units */
             quantity: number;
             on_hand_after: number;
+            /** @description The reason of an adjustment, the note of a receive */
             reason: string | null;
+            /** @description The cost per base unit it moved at (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g) */
+            unit_cost?: components["schemas"]["UnitCostOrNull"];
             order_id: number | null;
             actor: components["schemas"]["Actor"];
             /** Format: date-time */
@@ -4300,6 +4349,8 @@ export interface components {
             adjustment: number;
             sale: number;
             return: number;
+            /** @description Goods the merchant received (BR-INV09) */
+            receive: number;
         };
         InventoryAnalyticsRow: {
             sku_id: number;
@@ -7290,6 +7341,84 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+        };
+    };
+    dashboardReceiveStock: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Whole units of sku_unit_id (the base unit when left out) */
+                    quantity: number;
+                    /** @description The price paid per one unit of sku_unit_id */
+                    unit_cost: components["schemas"]["Money"];
+                    /** @description Any unit of this SKU, archived too */
+                    sku_unit_id?: number | null;
+                    /** @description e.g. the supplier */
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["InventoryRow"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description is_bundle (a bundle has no stock of its own, D93 b) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardSetStockCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The cost per one unit of sku_unit_id */
+                    unit_cost: components["schemas"]["Money"];
+                    sku_unit_id?: number | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["InventoryRow"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description is_bundle */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
         };
     };
     dashboardStockMovements: {

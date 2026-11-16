@@ -6,6 +6,7 @@ type Schemas = components["schemas"];
 export type ErrorCode = Schemas["ErrorCode"];
 export type ErrorEnvelope = Schemas["ErrorEnvelope"];
 export type Money = Schemas["Money"];
+export type UnitCost = Schemas["UnitCost"];
 export type TenantSettings = Schemas["TenantSettings"];
 export type Customer = Schemas["Customer"];
 export type CustomerLoginRequest = Schemas["CustomerLoginRequest"];

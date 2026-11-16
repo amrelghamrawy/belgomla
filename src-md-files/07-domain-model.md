@@ -373,6 +373,7 @@ resolve(unit, qty, context = null):        # unit: the SKU unit (V2 Task 13, D91
 | tenant_id | FK   |                                                  |
 | on_hand   | int  | base units, **check ≥ 0**                        |
 | reserved  | int  | base units, **check ≥ 0 and reserved ≤ on_hand** |
+| avg_cost  | numeric(14,4) | V2 costing (BR-INV09, D96): the weighted average cost per base unit, null = not known yet, check ≥ 0. Moves only on goods coming in at a known cost, under this row's lock |
 
 `available = on_hand - reserved` (computed, BR-INV02). This row is the lock target in checkout (`SELECT … FOR UPDATE`).
 
@@ -385,11 +386,12 @@ The `reserved ≤ on_hand` check is deliberate: an adjustment that would drop On
 | id            | bigint PK    |                                                                                               |
 | tenant_id     | FK           |                                                                                               |
 | sku_id        | FK           |                                                                                               |
-| type          | enum         | `opening`, `adjustment`, `sale`, `return` (V2: a customer return, BR-R03/R06)                 |
+| type          | enum         | `opening`, `adjustment`, `sale`, `return` (V2: a customer return, BR-R03/R06), `receive` (goods bought, BR-INV09) |
 | quantity      | int          | signed, base units (`sale` and a voided `return` are negative)                                |
 | on_hand_after | int          | snapshot for traceability                                                                     |
 | order_id      | FK           | nullable; set for `sale` and `return`                                                         |
-| reason        | varchar(200) | required for `adjustment`                                                                     |
+| reason        | varchar(200) | required for `adjustment`; the merchant's note on a `receive`                                 |
+| unit_cost     | numeric(14,4) | nullable: the cost per base unit it moved at (D96 e); required on `receive` (check, with quantity > 0) |
 | actor_type    | enum         | `tenant_user`, `system`                                                                       |
 | actor_id      | bigint       | nullable                                                                                      |
 
@@ -547,6 +549,7 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | converted_quantity | int          | V2 Task 10: default 0, **check 0 ≤ converted_quantity ≤ quantity** and 0 on a reserved line; selling units of a pre-order line already in a normal order; a pre-order line's line_total = unit_price × (quantity − converted_quantity) |
 | is_bundle         | boolean       | V2 Task 15: default false; the line of a bundle (BR-P15, D93): priced and totalled, holds no stock (**check** not reserved, top level) |
 | parent_item_id    | FK order_items | V2 Task 15: nullable; a component line of the bundle line it names: carries the quantity (bundles × component quantity), the reservation, the delivery and its allocated share (`line_total` = share × bundles, **not** in items_total; `unit_price` = share per unit) |
+| unit_cost         | numeric(14,4)  | V2 costing (D96 f): nullable; the cost per base unit frozen when the line left the stock (loose and component lines); null before costing, when unknown, and on a bundle line |
 
 ### `order_status_history` (BR-O04)
 

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use App\Modules\Inventory\Data\BulkStockAdjustmentData;
 use App\Modules\Inventory\Data\StockAdjustmentData;
+use App\Modules\Inventory\Data\StockReceiptData;
 use App\Modules\Inventory\Http\Requests\AdjustStockRequest;
 use App\Modules\Inventory\Http\Requests\BulkAdjustStockRequest;
+use App\Modules\Inventory\Http\Requests\ReceiveStockRequest;
+use App\Modules\Inventory\Http\Requests\SetStockCostRequest;
 
 test('an adjustment reads an integer on hand and a trimmed reason', function (): void {
     $request = AdjustStockRequest::create('/', 'POST', ['new_on_hand' => '50', 'reason' => '  جرد  ']);
@@ -24,3 +27,24 @@ test('a bulk adjustment is keyed by sku id in the order sent', function (): void
         4 => new StockAdjustmentData(0, 'تالف'),
     ]);
 });
+
+test('BR-INV09 a receipt reads the quantity, the cost as money, the unit and a trimmed note', function (): void {
+    $request = ReceiveStockRequest::create('/', 'POST', ['quantity' => '2', 'unit_cost' => '300', 'sku_unit_id' => '7', 'note' => '  مكتبة النور  ']);
+
+    expect(StockReceiptData::fromRequest($request))->toEqual(new StockReceiptData(2, '300.00', 7, 'مكتبة النور'));
+});
+
+test('D96 a a receipt without a unit or a note is in base units with no note', function (): void {
+    $request = ReceiveStockRequest::create('/', 'POST', ['quantity' => 12, 'unit_cost' => '7.25', 'sku_unit_id' => null, 'note' => '   ']);
+
+    expect(StockReceiptData::fromRequest($request))->toEqual(new StockReceiptData(12, '7.25'));
+});
+
+test('D96 d the cost request reads the cost as money and the unit when sent', function (array $body, ?int $unit): void {
+    $request = SetStockCostRequest::create('/', 'PUT', $body);
+
+    expect([$request->unitCost(), $request->skuUnitId()])->toBe(['57.00', $unit]);
+})->with([
+    'with a unit' => [['unit_cost' => '57', 'sku_unit_id' => '3'], 3],
+    'without one' => [['unit_cost' => '57.0'], null],
+]);

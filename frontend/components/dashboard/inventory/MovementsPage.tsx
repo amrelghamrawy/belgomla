@@ -11,6 +11,7 @@ import { useInventoryRow, useMovements } from "@/lib/dashboard/inventory";
 import { pageOf } from "@/lib/dashboard/list-query";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
+import { formatUnitCost } from "@/lib/format/money";
 import { useRouteParam } from "@/lib/store/route";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,8 @@ export function MovementsPage() {
   const [adjusting, setAdjusting] = useState(false);
   const row = useInventoryRow(skuId);
   const movements = useMovements(skuId, page);
+  // D96 g: the cost comes only to users allowed to see it; the column follows the data.
+  const showsCost = movements.data?.data.some((movement) => movement.unit_cost !== undefined) ?? false;
 
   return (
     <>
@@ -71,6 +74,7 @@ export function MovementsPage() {
                 <TableHead>{copy.quantity}</TableHead>
                 <TableHead>{copy.after}</TableHead>
                 <TableHead>{copy.movementReason}</TableHead>
+                {showsCost && <TableHead>{copy.unitCostColumn}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -86,6 +90,11 @@ export function MovementsPage() {
                   </TableCell>
                   <TableCell>{movement.on_hand_after}</TableCell>
                   <TableCell>{movement.reason ?? ar.dashboard.none}</TableCell>
+                  {showsCost && (
+                    <TableCell className="whitespace-nowrap">
+                      {movement.unit_cost ? formatUnitCost(movement.unit_cost) : ar.dashboard.none}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

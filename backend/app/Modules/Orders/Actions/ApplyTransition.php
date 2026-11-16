@@ -101,9 +101,10 @@ final readonly class ApplyTransition
         foreach ($items as $item) {
             $units = $delivered[$item->id];
             $deducted = $units * $item->conversion_factor;
+            $unitCost = null; // BR-INV09: the cost of what went out, frozen on the line (D96 f)
 
             if ($deducted > 0) {
-                $this->ledger->deduct($item->sku, $deducted, $order->id, $tenantUserId);
+                $unitCost = $this->ledger->deduct($item->sku, $deducted, $order->id, $tenantUserId)->unit_cost;
             }
 
             if ($deducted < $item->quantity_base) {
@@ -113,7 +114,7 @@ final readonly class ApplyTransition
             if ($item->parent_item_id !== null) {
                 $parent = $bundles->get($item->parent_item_id);
                 $perBundle = $parent instanceof OrderItem ? bcdiv($item->line_total, (string) max(1, $parent->quantity), 2) : $item->unit_price;
-                $item->forceFill(['delivered_quantity' => $units, 'line_total' => Money::times($perBundle, $parent instanceof OrderItem ? $delivered[$parent->id] : $units)])->save();
+                $item->forceFill(['delivered_quantity' => $units, 'unit_cost' => $unitCost, 'line_total' => Money::times($perBundle, $parent instanceof OrderItem ? $delivered[$parent->id] : $units)])->save();
 
                 continue;
             }
@@ -127,7 +128,7 @@ final readonly class ApplyTransition
                 ]);
             }
 
-            $item->forceFill(['delivered_quantity' => $units, 'line_total' => Money::times($item->unit_price, $units)])->save();
+            $item->forceFill(['delivered_quantity' => $units, 'unit_cost' => $unitCost, 'line_total' => Money::times($item->unit_price, $units)])->save();
         }
 
         if ($short !== []) {

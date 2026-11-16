@@ -30,7 +30,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * over every SKU of the filter. Sorted by stock value, highest first, then code; `dead_only` keeps the dead stock. A
  * category filter keeps the SKUs of that category and its sub-categories. Cached per tenant, filter set and page.
  *
- * @phpstan-type Movements array{opening: int, adjustment: int, sale: int, return: int}
+ * @phpstan-type Movements array{opening: int, adjustment: int, sale: int, return: int, receive: int}
  * @phpstan-type InventoryRow array{sku_id: int, product_id: int, product_name: string, sku_code: string, sku_name: string|null, on_hand: int, available: int, stock_value: string, sold_base: int, days_of_cover: float|null, last_sold_at: string|null, dead: bool, movements: Movements}
  * @phpstan-type InventorySummary array{skus: int, on_hand: int, stock_value: string, dead_count: int, dead_value: string, sold_base: int, movements: Movements}
  */
@@ -70,9 +70,9 @@ final readonly class InventoryAnalyticsQuery
                 ->fromSub($base, 'i')
                 ->selectRaw('count(*) as skus, coalesce(sum(i.on_hand), 0) as on_hand, coalesce(sum(i.stock_value), 0) as stock_value, coalesce(sum(i.sold_base), 0) as sold_base')
                 ->selectRaw('count(*) filter (where i.dead) as dead_count, coalesce(sum(i.stock_value) filter (where i.dead), 0) as dead_value')
-                ->selectRaw('coalesce(sum(i.opening), 0) as opening, coalesce(sum(i.adjustment), 0) as adjustment, coalesce(sum(i.sale), 0) as sale, coalesce(sum(i.return), 0) as "return"')
+                ->selectRaw('coalesce(sum(i.opening), 0) as opening, coalesce(sum(i.adjustment), 0) as adjustment, coalesce(sum(i.sale), 0) as sale, coalesce(sum(i.return), 0) as "return", coalesce(sum(i.receive), 0) as receive')
                 ->first();
-            /** @var object{skus: int|string, on_hand: int|string, stock_value: string, sold_base: int|string, dead_count: int|string, dead_value: string, opening: int|string, adjustment: int|string, sale: int|string, return: int|string} $totals */
+            /** @var object{skus: int|string, on_hand: int|string, stock_value: string, sold_base: int|string, dead_count: int|string, dead_value: string, opening: int|string, adjustment: int|string, sale: int|string, return: int|string, receive: int|string} $totals */
 
             return [
                 'skus' => (int) $totals->skus,
@@ -162,7 +162,7 @@ final readonly class InventoryAnalyticsQuery
      */
     private function row(object $row): array
     {
-        /** @var object{sku_id: int|string, sku_code: string, sku_name: string|null, product_id: int|string, product_name: string, on_hand: int|string, available: int|string, stock_value: string, sold_base: int|string, days_of_cover: string|null, last_sold_at: string|null, dead: bool, opening: int|string, adjustment: int|string, sale: int|string, return: int|string} $row */
+        /** @var object{sku_id: int|string, sku_code: string, sku_name: string|null, product_id: int|string, product_name: string, on_hand: int|string, available: int|string, stock_value: string, sold_base: int|string, days_of_cover: string|null, last_sold_at: string|null, dead: bool, opening: int|string, adjustment: int|string, sale: int|string, return: int|string, receive: int|string} $row */
         return [
             'sku_id' => (int) $row->sku_id,
             'product_id' => (int) $row->product_id,
@@ -181,11 +181,11 @@ final readonly class InventoryAnalyticsQuery
     }
 
     /**
-     * @param  object{opening: int|string, adjustment: int|string, sale: int|string, return: int|string}  $row
+     * @param  object{opening: int|string, adjustment: int|string, sale: int|string, return: int|string, receive: int|string}  $row
      * @return Movements
      */
     private function movementsOf(object $row): array
     {
-        return ['opening' => (int) $row->opening, 'adjustment' => (int) $row->adjustment, 'sale' => (int) $row->sale, 'return' => (int) $row->return];
+        return ['opening' => (int) $row->opening, 'adjustment' => (int) $row->adjustment, 'sale' => (int) $row->sale, 'return' => (int) $row->return, 'receive' => (int) $row->receive];
     }
 }

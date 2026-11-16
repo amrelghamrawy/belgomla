@@ -17,23 +17,31 @@ import type { BulkAdjustResult, InventoryRow } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { INVENTORY_LIST_KEYS, useBulkAdjustStock, useInventory } from "@/lib/dashboard/inventory";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
+import { useCan } from "@/lib/dashboard/permissions";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
+import { formatUnitCost } from "@/lib/format/money";
 
 import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { AdjustStockSheet } from "./AdjustStockSheet";
+import { type CostMode, ReceiveStockSheet } from "./ReceiveStockSheet";
 
 const copy = ar.dashboard.inventory;
 
-/** Stock per SKU with on hand, reserved, available and the minimum allowed; adjust one or many. */
+/** Stock per SKU with on hand, reserved, available, the minimum allowed and the average cost; adjust, receive, set the cost. */
 export function InventoryPage() {
   const [query, setQuery] = useListQuery(INVENTORY_LIST_KEYS);
   const inventory = useInventory(query);
   const [adjusting, setAdjusting] = useState<InventoryRow | null>(null);
+  const [costing, setCosting] = useState<{ row: InventoryRow; mode: CostMode } | null>(null);
+  const can = useCan();
+  const canReceive = can("inventory.adjust");
   const [bulk, setBulk] = useState(false);
   const [q, setQ] = useState(query.q ?? "");
   const rows = inventory.data?.data ?? [];
+  // D96 g: the average comes only to users allowed to see it; the column follows the data.
+  const showsCost = rows.some((row) => row.avg_cost !== undefined);
 
   const search = (event: FormEvent) => {
     event.preventDefault();
@@ -113,6 +121,7 @@ export function InventoryPage() {
                   <TableHead>{copy.reserved}</TableHead>
                   <TableHead>{copy.available}</TableHead>
                   <TableHead>{copy.minAllowed}</TableHead>
+                  {showsCost && <TableHead>{copy.avgCost}</TableHead>}
                   <TableHead>{ar.dashboard.list.actions}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -137,10 +146,25 @@ export function InventoryPage() {
                       )}
                     </TableCell>
                     <TableCell>{row.min_allowed}</TableCell>
-                    <TableCell className="flex gap-1">
+                    {showsCost && (
+                      <TableCell className="whitespace-nowrap" data-testid={`cost-${row.sku_id}`}>
+                        {row.avg_cost ? formatUnitCost(row.avg_cost) : copy.noCost}
+                      </TableCell>
+                    )}
+                    <TableCell className="flex flex-wrap gap-1">
                       <Button variant="outline" size="sm" onClick={() => setAdjusting(row)}>
                         {copy.adjust}
                       </Button>
+                      {canReceive && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => setCosting({ row, mode: "receive" })}>
+                            {copy.receive}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setCosting({ row, mode: "cost" })}>
+                            {copy.setCost}
+                          </Button>
+                        </>
+                      )}
                       <Button asChild variant="ghost" size="sm">
                         <Link href={`/dashboard/inventory/${row.sku_id}`}>{copy.movements}</Link>
                       </Button>
@@ -153,6 +177,9 @@ export function InventoryPage() {
         ))}
       <Pager meta={inventory.data?.meta} onPage={(page) => setQuery({ page })} />
       {adjusting !== null && <AdjustStockSheet row={adjusting} onClose={() => setAdjusting(null)} />}
+      {costing !== null && (
+        <ReceiveStockSheet row={costing.row} mode={costing.mode} onClose={() => setCosting(null)} />
+      )}
     </>
   );
 }

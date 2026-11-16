@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Models\Product;
 
-const INVENTORY_ROW_KEYS = ['sku_id', 'product_id', 'code', 'name', 'variant', 'status', 'on_hand', 'reserved', 'available', 'min_allowed', 'moq', 'conversion_factor', 'low_stock'];
+const INVENTORY_ROW_KEYS = ['sku_id', 'product_id', 'code', 'name', 'variant', 'status', 'on_hand', 'reserved', 'available', 'min_allowed', 'moq', 'conversion_factor', 'low_stock', 'avg_cost'];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -30,7 +30,7 @@ test('BR-INV02 the inventory lists every sku of the tenant with its stock in bas
         ->assertJsonPath('data.0.on_hand', 0)
         ->assertJsonPath('data.1', [
             'sku_id' => $this->inTenant(fn () => $science->skus()->sole()->id), 'product_id' => $science->id, 'code' => 'SCI-1', 'name' => 'علوم', 'variant' => null, 'status' => 'active',
-            'on_hand' => 140, 'reserved' => 30, 'available' => 110, 'min_allowed' => 30, 'moq' => 5, 'conversion_factor' => 20, 'low_stock' => false,
+            'on_hand' => 140, 'reserved' => 30, 'available' => 110, 'min_allowed' => 30, 'moq' => 5, 'conversion_factor' => 20, 'low_stock' => false, 'avg_cost' => null,
         ]);
 });
 

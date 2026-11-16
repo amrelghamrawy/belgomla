@@ -21,7 +21,7 @@ import { KpiTile } from "./KpiTile";
 import { ReportToolbar, type SetQuery } from "./ReportToolbar";
 
 const copy = ar.dashboard.reports;
-const MOVEMENTS: (keyof ReportMovements)[] = ["opening", "adjustment", "sale", "return"];
+const MOVEMENTS: (keyof ReportMovements)[] = ["opening", "adjustment", "sale", "return", "receive"];
 
 /**
  * V2 Task 16 «المخزون»: stock valued at the selling price (D94 a: no purchase cost), dead stock, days of cover (∞
