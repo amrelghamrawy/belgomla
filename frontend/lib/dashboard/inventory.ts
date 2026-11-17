@@ -11,6 +11,7 @@ import type {
   BulkAdjustItem,
   BulkAdjustResult,
   InventoryRow,
+  MerchantAdjustmentReason,
   StockMovement,
 } from "@/lib/api/types";
 
@@ -62,7 +63,7 @@ export function useAdjustStock(skuId: number) {
   const invalidate = useInvalidateStock();
 
   return useMutation({
-    mutationFn: (body: { new_on_hand: number; reason: string }) =>
+    mutationFn: (body: { new_on_hand: number; reason: MerchantAdjustmentReason; note: string | null }) =>
       apiFetch<InventoryRow>(`/api/dashboard/inventory/${skuId}/adjust`, { method: "POST", body }),
     onSuccess: (row) => {
       queryClient.setQueryData(queryKeys.dashboardInventoryRow(skuId), row);

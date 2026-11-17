@@ -4636,8 +4636,15 @@
                                         "maximum": 10000000
                                     },
                                     "reason": {
-                                        "type": "string",
-                                        "maxLength": 200
+                                        "$ref": "#/components/schemas/MerchantAdjustmentReason"
+                                    },
+                                    "note": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 150,
+                                        "description": "Required when reason is other (D97)"
                                     }
                                 }
                             }
@@ -14242,6 +14249,7 @@
                     "quantity",
                     "on_hand_after",
                     "reason",
+                    "reason_code",
                     "order_id",
                     "actor",
                     "created_at"
@@ -14275,7 +14283,18 @@
                             "string",
                             "null"
                         ],
-                        "description": "The reason of an adjustment, the note of a receive"
+                        "description": "The reason of an adjustment as text (its label, then the note), the note of a receive"
+                    },
+                    "reason_code": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdjustmentReason"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "An adjustment's reason from the list (D97); null on adjustments made before it and on other types"
                     },
                     "unit_cost": {
                         "$ref": "#/components/schemas/UnitCostOrNull",
@@ -14314,10 +14333,42 @@
                         "maximum": 10000000
                     },
                     "reason": {
-                        "type": "string",
-                        "maxLength": 200
+                        "$ref": "#/components/schemas/MerchantAdjustmentReason"
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 150,
+                        "description": "Required when reason is other (D97)"
                     }
                 }
+            },
+            "AdjustmentReason": {
+                "type": "string",
+                "description": "Why On Hand was changed by hand (D97): جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى; import is written by the catalog import only",
+                "enum": [
+                    "stocktake",
+                    "damaged",
+                    "expired",
+                    "recording_error",
+                    "found",
+                    "other",
+                    "import"
+                ]
+            },
+            "MerchantAdjustmentReason": {
+                "type": "string",
+                "description": "The reasons a merchant may choose (D97): every AdjustmentReason but import",
+                "enum": [
+                    "stocktake",
+                    "damaged",
+                    "expired",
+                    "recording_error",
+                    "found",
+                    "other"
+                ]
             },
             "BulkAdjustSkipped": {
                 "type": "object",

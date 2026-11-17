@@ -5,26 +5,34 @@ declare(strict_types=1);
 use App\Modules\Inventory\Data\BulkStockAdjustmentData;
 use App\Modules\Inventory\Data\StockAdjustmentData;
 use App\Modules\Inventory\Data\StockReceiptData;
+use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Modules\Inventory\Http\Requests\AdjustStockRequest;
 use App\Modules\Inventory\Http\Requests\BulkAdjustStockRequest;
 use App\Modules\Inventory\Http\Requests\ReceiveStockRequest;
 use App\Modules\Inventory\Http\Requests\SetStockCostRequest;
 
-test('an adjustment reads an integer on hand and a trimmed reason', function (): void {
-    $request = AdjustStockRequest::create('/', 'POST', ['new_on_hand' => '50', 'reason' => '  جرد  ']);
+test('D97 an adjustment reads an integer on hand, the reason code and a trimmed note', function (): void {
+    $request = AdjustStockRequest::create('/', 'POST', ['new_on_hand' => '50', 'reason' => 'damaged', 'note' => '  وقع الكرتون  ']);
 
-    expect(StockAdjustmentData::fromRequest($request))->toEqual(new StockAdjustmentData(50, 'جرد'));
+    expect(StockAdjustmentData::fromRequest($request))->toEqual(new StockAdjustmentData(50, AdjustmentReason::Damaged, 'وقع الكرتون'));
 });
+
+test('D97 the movement text is the reason, then the note when there is one', function (?string $note, string $text): void {
+    expect((new StockAdjustmentData(1, AdjustmentReason::Expired, $note))->text())->toBe($text);
+})->with([
+    'no note' => [null, 'انتهاء صلاحية'],
+    'a note' => ['دفعة أغسطس', 'انتهاء صلاحية: دفعة أغسطس'],
+]);
 
 test('a bulk adjustment is keyed by sku id in the order sent', function (): void {
     $request = BulkAdjustStockRequest::create('/', 'POST', ['items' => [
-        ['sku_id' => '9', 'new_on_hand' => 5, 'reason' => 'جرد'],
-        ['sku_id' => 4, 'new_on_hand' => '0', 'reason' => ' تالف '],
+        ['sku_id' => '9', 'new_on_hand' => 5, 'reason' => 'stocktake'],
+        ['sku_id' => 4, 'new_on_hand' => '0', 'reason' => 'other', 'note' => ' هدية لعميل '],
     ]]);
 
     expect(BulkStockAdjustmentData::fromRequest($request)->items)->toEqual([
-        9 => new StockAdjustmentData(5, 'جرد'),
-        4 => new StockAdjustmentData(0, 'تالف'),
+        9 => new StockAdjustmentData(5, AdjustmentReason::Stocktake),
+        4 => new StockAdjustmentData(0, AdjustmentReason::Other, 'هدية لعميل'),
     ]);
 });
 

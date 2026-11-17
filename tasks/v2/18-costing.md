@@ -1,13 +1,13 @@
 # V2 Task 18 — Costing: purchase cost, average cost, adjustment reasons, stocktake
 
-Status: **slice A done** (2026-11-16); slices B–D to follow. Ideas taken from the ILORA ERP's inventory and costing (`D:\algoriza\ilora`), cut down to what a wholesale merchant uses: one weighted average cost per SKU, no double entry, no FIFO layers, no suppliers. Requires V2 Tasks 01 (returns), 13 (selling units), 15 (bundles), 16 (reports). Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
+Status: **slices A–B done** (2026-11-16/17); slices C–D to follow. Ideas taken from the ILORA ERP's inventory and costing (`D:\algoriza\ilora`), cut down to what a wholesale merchant uses: one weighted average cost per SKU, no double entry, no FIFO layers, no suppliers. Requires V2 Tasks 01 (returns), 13 (selling units), 15 (bundles), 16 (reports). Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
 
 ## Slices
 
 | Slice | What | Decision |
 | ----- | ---- | -------- |
 | A | Average cost per SKU, receiving goods at a price (`receive` movement), setting the cost by hand, cost frozen on every movement and on delivered order lines, returns at the frozen cost | D96, BR-INV09 |
-| B | Fixed reasons for stock adjustments (كسر، منتهي الصلاحية، خطأ تسجيل، بضاعة وُجدت، أخرى + ملاحظة) | — |
+| B | Fixed reasons for stock adjustments (جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى + ملاحظة) | D97 |
 | C | Profit and margin in the existing sales and product reports, from the frozen costs | — |
 | D | Stocktake posts the difference against the count's starting figure instead of overwriting; the base unit is locked while stock exists | — |
 
@@ -61,3 +61,21 @@ Against `php artisan serve`, alnoor demo data, owner session via `scripts/smoke.
 | `GET …/1/movements?per_page=1` | the `receive` row «استلام بضاعة», +10, `unit_cost` "6.0000", reason "smoke" |
 | `POST …/1/receive {"quantity":5,"unit_cost":"7.00"}` | 200, `on_hand` 740, `avg_cost` "5.2618" = (735 × 5.25 + 5 × 7) ÷ 740 = 3893.75 ÷ 740, worked out before the call |
 | `POST …/1/receive {"quantity":0,…}` | 422 `validation_failed` on `quantity` |
+
+## Slice B — delivered
+
+- `Inventory\Enums\AdjustmentReason` (`stocktake`, `damaged`, `expired`, `recording_error`, `found`, `other`, and the import's own `import`); `inventory_movements.reason_code` (migration `2026_11_07_100000_add_adjustment_reason_codes`, check: known codes, adjustments only). Old import adjustments (text «استيراد») backfilled to `import`; every other old adjustment keeps its text and no code (D97 e).
+- `StockAdjustmentData(newOnHand, reason, note)`; the movement text is `text()` = label, then «: note». `StockLedger::adjust` takes the code; `AdjustStock` audits the code and the note. The catalog import passes `AdjustmentReason::Import` (the old `ImportCatalogRow::STOCK_REASON` constant is gone; its label is the same text). The demo seeder counts with `stocktake`.
+- API: adjust and bulk-adjust take `reason` (merchant codes only; `import` is 422) and `note` (≤ 150, required for `other`); movements add `reason_code`.
+- Writers of `reason_code` (rules/04 §3): only `StockLedger::record`, from `adjust`.
+- Frontend: `ReasonFields` (select from the list + note, «اختر السبب» / «اكتب ما حدث») in the adjust sheet and the bulk form (one reason and note for the batch).
+- Tests: backend `composer test` green, 6212 passed (+11); frontend 1034 passed (+2 (reasons list without import, «أخرى» needs a note), existing adjust/bulk tests send codes.
+
+### Manual checks (slice B)
+
+| Call | Answer |
+| ---- | ------ |
+| `POST …/1/adjust {"new_on_hand":735,"reason":"damaged","note":…}` | 200; the movement −5, `reason_code` "damaged", `unit_cost` "5.2618" (the average of that moment) |
+| `POST …/1/adjust {"new_on_hand":730,"reason":"import"}` | 422 `validation_failed` on `reason` |
+| `POST …/1/adjust {"new_on_hand":730,"reason":"other"}` | 422 `validation_failed` on `note` |
+| the note «وقع» sent as a UTF-8 file (`curl --data-binary @file`) | stored `كسر أو تلف: وقع` (hex checked in psql). An Arabic note typed on the Git Bash command line arrives as `???`: Windows turns curl's arguments into the ANSI code page before they leave; the app is not involved |

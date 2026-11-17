@@ -103,11 +103,11 @@ test('inventory rows, movements, bulk results and the below-reserved details mat
 
     $row = $this->tenantJson('GET', "/api/dashboard/inventory/{$sku->id}")->assertOk()->json('data');
     $list = $this->tenantJson('GET', '/api/dashboard/inventory')->assertOk()->json('data.0');
-    $below = $this->tenantJson('POST', "/api/dashboard/inventory/{$sku->id}/adjust", ['new_on_hand' => 1, 'reason' => 'جرد'])->assertUnprocessable()->json('error.details');
+    $below = $this->tenantJson('POST', "/api/dashboard/inventory/{$sku->id}/adjust", ['new_on_hand' => 1, 'reason' => 'stocktake'])->assertUnprocessable()->json('error.details');
     $bulk = $this->tenantJson('POST', '/api/dashboard/inventory/bulk-adjust', [
-        ['sku_id' => $sku->id, 'new_on_hand' => 1, 'reason' => 'جرد'],
+        ['sku_id' => $sku->id, 'new_on_hand' => 1, 'reason' => 'stocktake'],
     ])->assertOk()->json('data');
-    $this->tenantJson('POST', "/api/dashboard/inventory/{$sku->id}/adjust", ['new_on_hand' => 500, 'reason' => 'جرد'])->assertOk();
+    $this->tenantJson('POST', "/api/dashboard/inventory/{$sku->id}/adjust", ['new_on_hand' => 500, 'reason' => 'stocktake'])->assertOk();
     $movement = $this->tenantJson('GET', "/api/dashboard/inventory/{$sku->id}/movements")->assertOk()->json('data.0');
 
     expectDocumentedShape($row, 'InventoryRow');

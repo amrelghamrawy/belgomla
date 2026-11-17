@@ -390,8 +390,9 @@ The `reserved ≤ on_hand` check is deliberate: an adjustment that would drop On
 | quantity      | int          | signed, base units (`sale` and a voided `return` are negative)                                |
 | on_hand_after | int          | snapshot for traceability                                                                     |
 | order_id      | FK           | nullable; set for `sale` and `return`                                                         |
-| reason        | varchar(200) | required for `adjustment`; the merchant's note on a `receive`                                 |
+| reason        | varchar(200) | required for `adjustment` (the reason's label, then the note, D97); the merchant's note on a `receive` |
 | unit_cost     | numeric(14,4) | nullable: the cost per base unit it moved at (D96 e); required on `receive` (check, with quantity > 0) |
+| reason_code   | varchar(20)  | nullable: an adjustment's reason (D97: `stocktake`, `damaged`, `expired`, `recording_error`, `found`, `other`, `import`); only on `adjustment` (check); null on adjustments made before D97 |
 | actor_type    | enum         | `tenant_user`, `system`                                                                       |
 | actor_id      | bigint       | nullable                                                                                      |
 

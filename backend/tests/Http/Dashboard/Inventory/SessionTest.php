@@ -11,7 +11,7 @@ test('a dashboard session from one tenant host cannot adjust stock on another te
 
     $this->tenantJson('POST', '/api/dashboard/auth/login', ['email' => 'owner@alnoor.test', 'password' => 'secret123'])->assertOk();
 
-    $this->tenantJson('POST', "/api/dashboard/inventory/{$foreign->id}/adjust", ['new_on_hand' => 0, 'reason' => 'جرد'], $other)
+    $this->tenantJson('POST', "/api/dashboard/inventory/{$foreign->id}/adjust", ['new_on_hand' => 0, 'reason' => 'stocktake'], $other)
         ->assertUnauthorized()
         ->assertJsonPath('error.code', 'unauthenticated');
 

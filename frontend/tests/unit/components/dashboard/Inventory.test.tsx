@@ -86,7 +86,7 @@ describe("AdjustForm", () => {
     expect(screen.getByText("متاح").nextSibling).toHaveTextContent("20");
   });
 
-  it("requires a reason and sends the new on hand", async () => {
+  it("D97 requires a reason from the list and sends its code with the optional note", async () => {
     const fetchMock = stubApi({ "POST /api/dashboard/inventory/5/adjust": json(200, { data: row({ on_hand: 150 }) }) });
     const onDone = vi.fn();
     const user = userEvent.setup();
@@ -95,15 +95,55 @@ describe("AdjustForm", () => {
     await user.clear(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"));
     await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"), "150");
     await user.click(screen.getByRole("button", { name: "حفظ" }));
-    expect(screen.getByText("اكتب السبب")).toBeInTheDocument();
+    expect(screen.getByText("اختر السبب", { selector: "[data-slot=field-error]" })).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("سبب التعديل"), "جرد");
+    await user.selectOptions(screen.getByLabelText("سبب التعديل"), "جرد");
     await user.click(screen.getByRole("button", { name: "حفظ" }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(callsTo(fetchMock, "POST /api/dashboard/inventory/5/adjust")[0]?.body).toEqual({
       new_on_hand: 150,
-      reason: "جرد",
+      reason: "stocktake",
+      note: null,
+    });
+  });
+
+  it("D97 offers the merchant's reasons only, never the import", () => {
+    stubApi({});
+    renderWithQuery(<AdjustForm row={row()} onDone={vi.fn()} />);
+
+    expect(within(screen.getByLabelText("سبب التعديل")).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "اختر السبب",
+      "جرد",
+      "كسر أو تلف",
+      "انتهاء صلاحية",
+      "تصحيح خطأ تسجيل",
+      "بضاعة وُجدت",
+      "أخرى",
+    ]);
+  });
+
+  it("D97 other needs a note before anything is sent", async () => {
+    const fetchMock = stubApi({ "POST /api/dashboard/inventory/5/adjust": json(200, { data: row({ on_hand: 90 }) }) });
+    const onDone = vi.fn();
+    const user = userEvent.setup();
+    renderWithQuery(<AdjustForm row={row()} onDone={onDone} />);
+
+    await user.clear(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"));
+    await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"), "90");
+    await user.selectOptions(screen.getByLabelText("سبب التعديل"), "أخرى");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+    expect(screen.getByText("اكتب ما حدث")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST /api/dashboard/inventory/5/adjust")).toHaveLength(0);
+
+    await user.type(screen.getByLabelText("ملاحظة"), " هدية لعميل ");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(callsTo(fetchMock, "POST /api/dashboard/inventory/5/adjust")[0]?.body).toEqual({
+      new_on_hand: 90,
+      reason: "other",
+      note: "هدية لعميل",
     });
   });
 
@@ -120,7 +160,7 @@ describe("AdjustForm", () => {
 
     await user.clear(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"));
     await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"), "3");
-    await user.type(screen.getByLabelText("سبب التعديل"), "جرد");
+    await user.selectOptions(screen.getByLabelText("سبب التعديل"), "جرد");
     await user.click(screen.getByRole("button", { name: "حفظ" }));
 
     const alert = await screen.findByTestId("below-reserved");
@@ -150,14 +190,15 @@ describe("BulkAdjustTable", () => {
 
     await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية) ADW-SCI-1"), "120");
     await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية) ADW-AR-1"), "10");
-    await user.type(screen.getByLabelText("سبب التعديل (لكل الأصناف)"), "جرد سنوي");
+    await user.selectOptions(screen.getByLabelText("سبب التعديل (لكل الأصناف)"), "جرد");
+    await user.type(screen.getByLabelText("ملاحظة (اختياري)"), "جرد سنوي");
     await user.click(screen.getByRole("button", { name: "تطبيق التعديلات" }));
 
     const skipped = await screen.findByTestId("bulk-skipped");
     expect(skipped).toHaveTextContent("ADW-AR-1: أقل من المحجوز (أقل كمية ممكنة 40)");
     expect(callsTo(fetchMock, "POST /api/dashboard/inventory/bulk-adjust")[0]?.body).toEqual([
-      { sku_id: 5, new_on_hand: 120, reason: "جرد سنوي" },
-      { sku_id: 6, new_on_hand: 10, reason: "جرد سنوي" },
+      { sku_id: 5, new_on_hand: 120, reason: "stocktake", note: "جرد سنوي" },
+      { sku_id: 6, new_on_hand: 10, reason: "stocktake", note: "جرد سنوي" },
     ]);
   });
 

@@ -13,6 +13,7 @@ import { belowReservedDetails, useAdjustStock, useInventoryRow } from "@/lib/das
 
 import { ErrorBlock, LoadingBlock } from "../common/States";
 import { BelowReservedError } from "./BelowReservedError";
+import { ReasonFields, type ReasonValue, reasonProblem } from "./ReasonFields";
 
 const copy = ar.dashboard.inventory;
 
@@ -43,8 +44,8 @@ export function AdjustStockSheet({ row, onClose }: { row: InventoryRow; onClose:
 export function AdjustForm({ row, onDone }: { row: InventoryRow; onDone: () => void }) {
   const adjust = useAdjustStock(row.sku_id);
   const [onHand, setOnHand] = useState(String(row.on_hand));
-  const [reason, setReason] = useState("");
-  const [problems, setProblems] = useState<{ onHand?: string; reason?: string }>({});
+  const [reason, setReason] = useState<ReasonValue>({ reason: "", note: "" });
+  const [problems, setProblems] = useState<{ onHand?: string; reason?: string; note?: string }>({});
   const [failure, setFailure] = useState<unknown>(null);
 
   const submit = (event: FormEvent) => {
@@ -55,10 +56,7 @@ export function AdjustForm({ row, onDone }: { row: InventoryRow; onDone: () => v
       next.onHand = ar.dashboard.productForm.invalidInteger;
     }
 
-    if (reason.trim() === "") {
-      next.reason = ar.dashboard.reasonRequired;
-    }
-
+    Object.assign(next, reasonProblem(reason));
     setProblems(next);
     setFailure(null);
 
@@ -66,8 +64,12 @@ export function AdjustForm({ row, onDone }: { row: InventoryRow; onDone: () => v
       return;
     }
 
+    if (reason.reason === "") {
+      return;
+    }
+
     adjust.mutate(
-      { new_on_hand: Number(onHand), reason: reason.trim() },
+      { new_on_hand: Number(onHand), reason: reason.reason, note: reason.note.trim() || null },
       {
         onSuccess: () => {
           toast.success(copy.adjusted);
@@ -112,19 +114,7 @@ export function AdjustForm({ row, onDone }: { row: InventoryRow; onDone: () => v
         />
         {problems.onHand !== undefined && <FieldError>{problems.onHand}</FieldError>}
       </Field>
-      <Field data-invalid={problems.reason !== undefined}>
-        <FieldLabel htmlFor="adjust-reason">{copy.reason}</FieldLabel>
-        <Input
-          id="adjust-reason"
-          className="h-11"
-          maxLength={200}
-          placeholder={copy.reasonPlaceholder}
-          value={reason}
-          aria-invalid={problems.reason !== undefined}
-          onChange={(event) => setReason(event.target.value)}
-        />
-        {problems.reason !== undefined && <FieldError>{problems.reason}</FieldError>}
-      </Field>
+      <ReasonFields id="adjust" label={copy.reason} value={reason} problems={problems} onChange={setReason} />
       <BelowReservedError error={failure} />
       {failure !== null && belowReservedDetails(failure) === null && (
         <FieldError role="alert">{messageFor(failure)}</FieldError>

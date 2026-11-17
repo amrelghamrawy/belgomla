@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Models;
 
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
@@ -26,7 +27,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $quantity
  * @property int $on_hand_after
  * @property int|null $order_id
- * @property string|null $reason
+ * @property string|null $reason the adjustment's reason (and note) as text, a receipt's note
+ * @property AdjustmentReason|null $reason_code an adjustment's reason from the fixed list (D97); null on old adjustments and other types
  * @property string|null $unit_cost the cost per base unit it moved at, 4 decimals; null when unknown (BR-INV09)
  * @property ActorType $actor_type
  * @property int|null $actor_id
@@ -66,6 +68,7 @@ final class InventoryMovement extends Model
             'on_hand_after' => 'integer',
             'order_id' => 'integer',
             'unit_cost' => 'decimal:4',
+            'reason_code' => AdjustmentReason::class,
             'actor_type' => ActorType::class,
             'actor_id' => 'integer',
             'created_at' => 'datetime',

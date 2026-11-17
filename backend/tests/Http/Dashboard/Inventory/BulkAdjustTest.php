@@ -16,9 +16,9 @@ beforeEach(function (): void {
 
 test('BR-INV08 bulk adjust applies the valid counts and reports skipped skus, in one audit batch', function (): void {
     $response = $this->tenantJson('POST', '/api/dashboard/inventory/bulk-adjust', [
-        ['sku_id' => $this->counted->id, 'new_on_hand' => 25, 'reason' => 'جرد'],
-        ['sku_id' => $this->held->id, 'new_on_hand' => 5, 'reason' => 'جرد'],
-        ['sku_id' => $this->foreign->id, 'new_on_hand' => 0, 'reason' => 'جرد'],
+        ['sku_id' => $this->counted->id, 'new_on_hand' => 25, 'reason' => 'stocktake'],
+        ['sku_id' => $this->held->id, 'new_on_hand' => 5, 'reason' => 'stocktake'],
+        ['sku_id' => $this->foreign->id, 'new_on_hand' => 0, 'reason' => 'stocktake'],
     ])
         ->assertOk()
         ->assertExactJsonStructure(['data' => ['applied', 'skipped', 'batch_id']])
@@ -46,10 +46,12 @@ test('bulk adjust validation', function (Closure $body, string $field): void {
         ->assertJsonStructure(['error' => ['details' => [$field]]]);
 })->with([
     'empty list' => [fn (int $id): array => [], 'items'],
-    'an object instead of a list' => [fn (int $id): array => ['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'جرد'], 'items'],
-    'more than 500 items' => [fn (int $id): array => array_fill(0, 501, ['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'جرد']), 'items'],
-    'missing sku id' => [fn (int $id): array => [['new_on_hand' => 1, 'reason' => 'جرد']], 'items.0.sku_id'],
-    'the same sku twice' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'جرد'], ['sku_id' => $id, 'new_on_hand' => 2, 'reason' => 'جرد']], 'items.1.sku_id'],
-    'BR-INV02 negative on hand' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => -1, 'reason' => 'جرد']], 'items.0.new_on_hand'],
+    'an object instead of a list' => [fn (int $id): array => ['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'stocktake'], 'items'],
+    'more than 500 items' => [fn (int $id): array => array_fill(0, 501, ['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'stocktake']), 'items'],
+    'missing sku id' => [fn (int $id): array => [['new_on_hand' => 1, 'reason' => 'stocktake']], 'items.0.sku_id'],
+    'the same sku twice' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'stocktake'], ['sku_id' => $id, 'new_on_hand' => 2, 'reason' => 'stocktake']], 'items.1.sku_id'],
+    'BR-INV02 negative on hand' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => -1, 'reason' => 'stocktake']], 'items.0.new_on_hand'],
+    'D97 a reason outside the list' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'جرد']], 'items.0.reason'],
+    'D97 other needs a note' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => 1, 'reason' => 'other']], 'items.0.note'],
     'BR-INV06 missing reason' => [fn (int $id): array => [['sku_id' => $id, 'new_on_hand' => 1]], 'items.0.reason'],
 ]);

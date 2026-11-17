@@ -18,6 +18,7 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
 use App\Modules\Inventory\Actions\AdjustStock;
 use App\Modules\Inventory\Data\StockAdjustmentData;
+use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Orders\Actions\CancelOrder;
 use App\Modules\Orders\Actions\Checkout;
@@ -304,7 +305,7 @@ final class DemoActivitySeeder extends Seeder
     {
         foreach ($skus as $sku) {
             $inventory = SkuInventory::query()->where('sku_id', $sku->id)->sole();
-            $adjust->handle($sku, new StockAdjustmentData($inventory->reserved + 25, 'جرد آخر الشهر'), $this->actorId);
+            $adjust->handle($sku, new StockAdjustmentData($inventory->reserved + 25, AdjustmentReason::Stocktake, 'آخر الشهر'), $this->actorId);
         }
     }
 

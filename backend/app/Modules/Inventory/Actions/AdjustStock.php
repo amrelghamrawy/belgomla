@@ -27,7 +27,7 @@ final readonly class AdjustStock
     public function handle(Sku $sku, StockAdjustmentData $data, ?int $actorId = null, ?string $batchId = null): bool
     {
         return DB::transaction(function () use ($sku, $data, $actorId, $batchId): bool {
-            $movement = $this->ledger->adjust($sku, $data->newOnHand, $data->reason, $actorId);
+            $movement = $this->ledger->adjust($sku, $data->newOnHand, $data->text(), $actorId, $data->reason);
 
             if (! $movement instanceof InventoryMovement) {
                 return false;
@@ -37,7 +37,7 @@ final readonly class AdjustStock
                 'stock.adjusted',
                 $sku,
                 ['on_hand' => $movement->on_hand_after - $movement->quantity],
-                ['on_hand' => $movement->on_hand_after, 'reason' => $data->reason],
+                ['on_hand' => $movement->on_hand_after, 'reason' => $data->reason->value, 'note' => $data->note],
                 $batchId,
             );
 

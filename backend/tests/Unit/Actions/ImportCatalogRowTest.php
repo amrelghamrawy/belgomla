@@ -34,7 +34,7 @@ test('a known code updates the product and reports update', function (): void {
 
     expect($result->action)->toBe(ImportRowAction::Update)
         ->and($product->refresh()->status)->toBe(ProductStatus::Inactive)
-        ->and(InventoryMovement::query()->where('reason', ImportCatalogRow::STOCK_REASON)->value('quantity'))->toBe(-300);
+        ->and(InventoryMovement::query()->where('reason_code', 'import')->value('quantity'))->toBe(-300);
 });
 
 test('BR-P04 a status the product cannot move to is an error on the status column', function (): void {

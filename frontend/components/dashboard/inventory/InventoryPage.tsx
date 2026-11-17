@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { BulkAdjustResult, InventoryRow } from "@/lib/api/types";
+import type { BulkAdjustResult, InventoryRow, MerchantAdjustmentReason } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { INVENTORY_LIST_KEYS, useBulkAdjustStock, useInventory } from "@/lib/dashboard/inventory";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
@@ -25,6 +25,7 @@ import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { AdjustStockSheet } from "./AdjustStockSheet";
+import { ReasonFields, type ReasonValue, reasonProblem } from "./ReasonFields";
 import { type CostMode, ReceiveStockSheet } from "./ReceiveStockSheet";
 
 const copy = ar.dashboard.inventory;
@@ -191,7 +192,8 @@ export function InventoryPage() {
 export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone: () => void }) {
   const bulk = useBulkAdjustStock();
   const [values, setValues] = useState<Record<number, string>>({});
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<ReasonValue>({ reason: "", note: "" });
+  const [reasonProblems, setReasonProblems] = useState<{ reason?: string; note?: string }>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<BulkAdjustResult | null>(null);
   const codes = new Map(rows.map((row) => [row.sku_id, row.code]));
@@ -200,7 +202,7 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
     event.preventDefault();
     const items = Object.entries(values)
       .filter(([, value]) => value.trim() !== "")
-      .map(([skuId, value]) => ({ sku_id: Number(skuId), new_on_hand: Number(value), reason: reason.trim() }));
+      .map(([skuId, value]) => ({ sku_id: Number(skuId), new_on_hand: Number(value) }));
 
     if (items.length === 0) {
       setProblem(copy.bulkNothing);
@@ -212,13 +214,17 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
       return;
     }
 
-    if (reason.trim() === "") {
-      setProblem(ar.dashboard.reasonRequired);
+    const reasonCheck = reasonProblem(reason);
+    setReasonProblems(reasonCheck ?? {});
+
+    if (reasonCheck !== null || reason.reason === "") {
+      setProblem(null);
       return;
     }
 
+    const note = reason.note.trim() || null;
     setProblem(null);
-    bulk.mutate(items, {
+    bulk.mutate(items.map((item) => ({ ...item, reason: reason.reason as MerchantAdjustmentReason, note })), {
       onSuccess: (outcome) => {
         setResult(outcome);
         toast.success(copy.bulkApplied(outcome.applied));
@@ -272,11 +278,10 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex min-w-60 flex-1 flex-col gap-1">
-          <Label htmlFor="bulk-reason">{copy.bulkReason}</Label>
-          <Input id="bulk-reason" maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} />
-        </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ReasonFields id="bulk" label={copy.bulkReason} value={reason} problems={reasonProblems} onChange={setReason} />
+      </div>
+      <div className="flex justify-end">
         <Button type="submit" disabled={bulk.isPending}>
           {bulk.isPending ? ar.saving : copy.bulkApply}
         </Button>

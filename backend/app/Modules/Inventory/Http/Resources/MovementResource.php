@@ -32,6 +32,7 @@ final class MovementResource extends JsonResource
             'quantity' => $movement->quantity,
             'on_hand_after' => $movement->on_hand_after,
             'reason' => $movement->reason,
+            'reason_code' => $movement->reason_code?->value,
             'unit_cost' => $this->when(Gate::any(['inventory.adjust', 'reports.view']), $movement->unit_cost),
             'order_id' => $movement->order_id,
             'actor' => ['type' => $movement->actor_type->value, 'id' => $movement->actor_id],

@@ -3637,8 +3637,10 @@ export interface components {
             /** @description Signed change in base units */
             quantity: number;
             on_hand_after: number;
-            /** @description The reason of an adjustment, the note of a receive */
+            /** @description The reason of an adjustment as text (its label, then the note), the note of a receive */
             reason: string | null;
+            /** @description An adjustment's reason from the list (D97); null on adjustments made before it and on other types */
+            reason_code: components["schemas"]["AdjustmentReason"] | null;
             /** @description The cost per base unit it moved at (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g) */
             unit_cost?: components["schemas"]["UnitCostOrNull"];
             order_id: number | null;
@@ -3649,8 +3651,20 @@ export interface components {
         BulkAdjustItem: {
             sku_id: number;
             new_on_hand: number;
-            reason: string;
+            reason: components["schemas"]["MerchantAdjustmentReason"];
+            /** @description Required when reason is other (D97) */
+            note?: string | null;
         };
+        /**
+         * @description Why On Hand was changed by hand (D97): جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى; import is written by the catalog import only
+         * @enum {string}
+         */
+        AdjustmentReason: "stocktake" | "damaged" | "expired" | "recording_error" | "found" | "other" | "import";
+        /**
+         * @description The reasons a merchant may choose (D97): every AdjustmentReason but import
+         * @enum {string}
+         */
+        MerchantAdjustmentReason: "stocktake" | "damaged" | "expired" | "recording_error" | "found" | "other";
         BulkAdjustSkipped: {
             sku_id: number;
             /** @enum {string} */
@@ -7323,7 +7337,9 @@ export interface operations {
             content: {
                 "application/json": {
                     new_on_hand: number;
-                    reason: string;
+                    reason: components["schemas"]["MerchantAdjustmentReason"];
+                    /** @description Required when reason is other (D97) */
+                    note?: string | null;
                 };
             };
         };

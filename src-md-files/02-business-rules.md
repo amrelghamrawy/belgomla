@@ -564,7 +564,7 @@ V2 (Task 09, BR-O13): when a line is delivered short, only the delivered units l
 Every change to On Hand is recorded as an inventory movement with type:
 
 - `opening` (initial stock)
-- `adjustment` (manual merchant change, with reason)
+- `adjustment` (manual merchant change, with a reason from a fixed list and an optional note, required for «أخرى», D97)
 - `sale` (delivery deduction, linked to the order)
 - `return` (V2, BR-R03/R06: goods a customer brought back, positive and linked to the order; negative when the return is voided)
 - `receive` (V2 costing, BR-INV09: goods the merchant bought, positive, at the price paid)

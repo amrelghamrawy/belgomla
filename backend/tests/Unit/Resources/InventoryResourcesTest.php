@@ -64,6 +64,7 @@ test('BR-INV06 the movement key set', function (): void {
         'quantity' => -10,
         'on_hand_after' => 90,
         'reason' => 'تالف',
+        'reason_code' => null,
         'order_id' => null,
         'actor' => ['type' => 'tenant_user', 'id' => $user->id],
         'created_at' => $movement->created_at->toIso8601String(),

@@ -527,8 +527,8 @@ Storefront (BR-PR15): the product list and page `sku`, the price-list row (and i
 | ------ | -------------------------------------------- | ---------------------------------------------------------------- |
 | GET    | `/api/dashboard/inventory`                   | per SKU: on_hand, reserved, available; `?low_stock=1&q=`         |
 | GET    | `/api/dashboard/inventory/{skuId}/movements` | paginated                                                        |
-| POST   | `/api/dashboard/inventory/{skuId}/adjust`    | `{ "new_on_hand": 50, "reason": "جرد" }`                         |
-| POST   | `/api/dashboard/inventory/bulk-adjust`       | `[ { sku_id, new_on_hand, reason } ]` → `{ applied, skipped[] }` |
+| POST   | `/api/dashboard/inventory/{skuId}/adjust`    | `{ "new_on_hand": 50, "reason": "stocktake", "note": null }` (D97) |
+| POST   | `/api/dashboard/inventory/bulk-adjust`       | `[ { sku_id, new_on_hand, reason, note? } ]` → `{ applied, skipped[] }` |
 | POST   | `/api/dashboard/inventory/{skuId}/receive`   | V2 costing (BR-INV09): `{ quantity, unit_cost, sku_unit_id?, note? }` → the row |
 | PUT    | `/api/dashboard/inventory/{skuId}/cost`      | V2 costing (D96 d): `{ unit_cost, sku_unit_id? }` → the row      |
 
@@ -558,8 +558,8 @@ Delivered (Task 3):
 - `GET /api/dashboard/inventory/{skuId}` exists (the adjust form needs it) and returns one row; `adjust` returns the same row after the change.
 - Row: `{ sku_id, product_id, code, name, status, on_hand, reserved, available, min_allowed, moq, conversion_factor, low_stock }`, all quantities in base units. `min_allowed` = `reserved`. `low_stock` is D36: `available ≤ moq × conversion_factor`.
 - List: every SKU of the tenant (any product status), Laravel pagination envelope; `q` searches like the product list (name, SKU code, option labels, D32); `low_stock=1`; `sort=code|-code|available|-available` (default `code`).
-- Movements: newest first, `{ id, type, type_label, quantity (signed), on_hand_after, reason, order_id, actor: { type, id }, created_at }`.
-- Adjust: `new_on_hand` integer 0..10,000,000, `reason` required (≤ 200). Setting the current value is a no-op (D35). Audit `stock.adjusted` (old/new `on_hand`, `reason`).
+- Movements: newest first, `{ id, type, type_label, quantity (signed), on_hand_after, reason, reason_code, order_id, actor: { type, id }, created_at }` (+ `unit_cost` for users who may see costs, D96 g).
+- Adjust: `new_on_hand` integer 0..10,000,000, `reason` one of `stocktake`, `damaged`, `expired`, `recording_error`, `found`, `other` (D97; `import` is refused), `note` ≤ 150, required for `other`. Setting the current value is a no-op (D35). Audit `stock.adjusted` (old/new `on_hand`, `reason` code, `note`). Movements add `reason_code` (null before D97 and on other types).
 - Bulk adjust: body is a bare JSON array (≤ 500 items, each `sku_id` once; validation errors are keyed `items.N.field`). Response `{ applied: <count>, skipped: [{ sku_id, reason: below_reserved|not_found|unchanged, reserved?, min_allowed? }], batch_id }`. An id of another tenant is `not_found` and untouched (BR-T04). Audit: `stock.adjusted` per applied SKU plus one `inventory.bulk_adjusted`, same `batch_id`.
 - `422 insufficient_stock` (`items: [{ sku_id, reason, available }]`) is what `StockLedger::reserve` throws; Task 6 turns it into `checkout_failed`.
 - V2 costing (BR-INV09, D96), both `inventory.adjust`:

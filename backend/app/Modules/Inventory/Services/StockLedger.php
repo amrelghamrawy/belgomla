@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Services;
 use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Contracts\ReservationHolders;
+use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Exceptions\BelowReserved;
 use App\Modules\Inventory\Exceptions\InsufficientStock;
@@ -88,11 +89,11 @@ final readonly class StockLedger
      * A merchant sets On Hand to a counted value (BR-INV06 `adjustment`). Never below Reserved (BR-INV08);
      * setting the current value changes nothing and returns null (D35).
      */
-    public function adjust(Sku $sku, int $newOnHand, string $reason, ?int $actorId = null): ?InventoryMovement
+    public function adjust(Sku $sku, int $newOnHand, string $reason, ?int $actorId = null, ?AdjustmentReason $reasonCode = null): ?InventoryMovement
     {
         $this->assertNotNegative($newOnHand);
 
-        return DB::transaction(function () use ($sku, $newOnHand, $reason, $actorId): ?InventoryMovement {
+        return DB::transaction(function () use ($sku, $newOnHand, $reason, $actorId, $reasonCode): ?InventoryMovement {
             $row = $this->row($sku);
 
             if ($newOnHand === $row->on_hand) {
@@ -107,7 +108,7 @@ final readonly class StockLedger
             $row->on_hand = $newOnHand;
             $row->save();
 
-            return $this->record($sku, MovementType::Adjustment, $change, $newOnHand, $actorId, $reason, unitCost: $row->avg_cost);
+            return $this->record($sku, MovementType::Adjustment, $change, $newOnHand, $actorId, $reason, unitCost: $row->avg_cost, reasonCode: $reasonCode);
         });
     }
 
@@ -251,7 +252,7 @@ final readonly class StockLedger
         return $this->lock([$sku->id])->get($sku->id) ?? throw new RuntimeException("SKU {$sku->id} is not a SKU of the current tenant.");
     }
 
-    private function record(Sku $sku, MovementType $type, int $quantity, int $onHandAfter, ?int $actorId, ?string $reason = null, ?int $orderId = null, ?string $unitCost = null): InventoryMovement
+    private function record(Sku $sku, MovementType $type, int $quantity, int $onHandAfter, ?int $actorId, ?string $reason = null, ?int $orderId = null, ?string $unitCost = null, ?AdjustmentReason $reasonCode = null): InventoryMovement
     {
         return InventoryMovement::query()->create([
             'sku_id' => $sku->id,
@@ -261,6 +262,7 @@ final readonly class StockLedger
             'order_id' => $orderId,
             'reason' => $reason,
             'unit_cost' => $unitCost,
+            'reason_code' => $reasonCode,
             'actor_type' => $actorId === null ? ActorType::System : ActorType::TenantUser,
             'actor_id' => $actorId,
         ]);

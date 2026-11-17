@@ -17,6 +17,7 @@ use App\Modules\Catalog\Services\BundleSheet;
 use App\Modules\Catalog\Services\CatalogRowMapper;
 use App\Modules\Inventory\Actions\AdjustStock;
 use App\Modules\Inventory\Data\StockAdjustmentData;
+use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Support\ApiException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -38,8 +39,6 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class ImportCatalogRow
 {
-    public const string STOCK_REASON = 'استيراد';
-
     public function __construct(
         private CatalogRowMapper $mapper,
         private CreateProduct $create,
@@ -169,7 +168,7 @@ final readonly class ImportCatalogRow
     private function adjust(Sku $sku, int $onHand, ?int $row, ?string $batchId, ?int $actorId): void
     {
         try {
-            $this->adjust->handle($sku, new StockAdjustmentData($onHand, self::STOCK_REASON), $actorId, $batchId);
+            $this->adjust->handle($sku, new StockAdjustmentData($onHand, AdjustmentReason::Import), $actorId, $batchId);
         } catch (ApiException $e) {
             if ($row === null) {
                 throw $e;
