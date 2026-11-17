@@ -68,6 +68,8 @@ export const queryKeys = {
   dashboardPreordersLists: ["dashboard", "preorders", "list"] as const,
   dashboardPreordersList: (params: ListParams) => ["dashboard", "preorders", "list", params] as const,
   dashboardCollectionsLists: ["dashboard", "collections", "list"] as const,
+  dashboardExpensesList: (params: ListParams) => ["dashboard", "expenses", "list", params] as const,
+  dashboardExpenseCategories: ["dashboard", "expenses", "categories"] as const,
   dashboardCollectionsList: (params: ListParams) => ["dashboard", "collections", "list", params] as const,
   dashboardOrderReturns: (number: number) => ["dashboard", "orders", "returns", number] as const,
   dashboardReturnsLists: ["dashboard", "returns", "list"] as const,

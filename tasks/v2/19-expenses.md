@@ -1,6 +1,6 @@
 # V2 Task 19 — Operating expenses and net profit (المصروفات وصافي الربح)
 
-Status: **planned** (2026-11-17). Requires V2 Task 18 slice C (gross profit from the frozen costs, D98) to be merged; slice B (adjustment reasons, D97) gives the stock losses their reasons. Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
+Status: **slice A done** (2026-11-17); slice B next. Requires V2 Task 18 slice C (gross profit from the frozen costs, D98) to be merged; slice B (adjustment reasons, D97) gives the stock losses their reasons. Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
 
 ## Why
 
@@ -94,8 +94,7 @@ Backend, new module `app/Modules/Expenses/` (rules/02 §1):
   - `POST /api/dashboard/expenses`
   - `POST /api/dashboard/expenses/{id}/void` (`ExpenseVoidController@store`)
   - `GET /api/dashboard/expenses/categories`
-- **Report cache:** recording or voiding an expense must invalidate the tenant's report cache, as other writes do.
-  - Not checked yet: how `Reports\Services\ReportCache` is busted today. Trace it (rules/04 §2) before writing this.
+- **Report cache:** checked (rules/04 §2): no write busts it. `Reports/Services/ReportCache.php` keeps every report for `reports.cache_seconds` with a TTL only (D94 b). Expenses follow the same rule (D100 k) rather than adding the only busting path.
 - **API:** `openapi.yaml` → `php artisan api:openapi` → `npm run api:types`.
 
 Frontend:
@@ -169,3 +168,36 @@ Plus:
 ## Manual checks (to fill in when done)
 
 Against `php artisan serve`, alnoor demo data, owner session via `scripts/smoke.sh`: record two expenses, void one, then call the report for the month and compare it with the hand-worked figure.
+
+## Slice A — delivered
+
+- Module `app/Modules/Expenses`:
+  - `Enums\ExpenseCategory`
+  - `Models\Expense` (+ factory)
+  - `Data\ExpenseData`, `ExpenseFiltersData`
+  - `Actions\RecordExpense`, `VoidExpense` (row lock, `Exceptions\ExpenseAlreadyVoided` 409)
+  - `Queries\ExpenseListQuery` (`paginate`, `liveTotal`), `ExpenseTotalsQuery` (`byCategory`, for slice B)
+  - requests, resources, three controllers, `routes/api/dashboard/expenses.php`
+  - migration `2026_11_08_100000_create_expenses_table` (checks: amount range, known category, note for other, void complete)
+- `Permission::ExpensesManage` (`expenses.manage`, «المصروفات»): owner and manager by default, added to the accountant.
+- Arch: Expenses depends on no business module, and only Expenses, `Reports\Queries` and the factories use it.
+- Deviation: the list's live total is `meta.total_amount`, because `meta.total` is the paginator's row count.
+- Frontend: «المصروفات» in the nav (`expenses.manage`), with:
+  - the list (filters by day, category and status; the live total; a voided badge with its reason; «إلغاء» with a reason);
+  - «تسجيل مصروف» (today in Cairo by default, never after; the category with «ثمن البضاعة يُسجَّل من «استلام بضاعة»…»; note required for «أخرى»).
+- Hand-worked tests:
+  - Totals: rent 1500.00 + transport 350.50 + salaries 600.00 = 2450.50, the voided 120.25 out.
+  - A category gives 350.50; days 5–9 give 950.50; 30 Sep is out of October.
+  - Amount boundaries: 0.01 and 10,000,000.00 in; 0, −1 and 10,000,000.01 out.
+  - Cairo «today» at 22:30 UTC on 10 Oct is the 11th: the 11th in, the 12th out.
+  - Idempotency, a second void 409, another tenant 404, roles (owner, manager, accountant 200; sales, warehouse 403).
+- Tests: backend `composer test` green (6314 passed); frontend 1044 passed (+6).
+
+### Manual checks (slice A)
+
+| Call | Answer |
+| ---- | ------ |
+| `POST /api/dashboard/expenses` rent 1500, transport 350.50, transport 120.25 (today in Cairo) | 201 each |
+| `POST /api/dashboard/expenses/3/void {"reason":"duplicate"}`, then again | 200, then 409 |
+| `GET /api/dashboard/expenses` | 3 rows, `meta.total_amount` "1850.50" = 1500 + 350.50, the voided 120.25 out |
+| `POST /api/dashboard/expenses {"spent_on":"2030-01-01",…}` | 422 |

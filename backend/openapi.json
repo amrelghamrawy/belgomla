@@ -57,6 +57,9 @@
             "name": "dashboard-collections"
         },
         {
+            "name": "dashboard-expenses"
+        },
+        {
             "name": "dashboard-reports"
         },
         {
@@ -7632,6 +7635,297 @@
                 }
             }
         },
+        "/api/dashboard/expenses": {
+            "get": {
+                "operationId": "dashboardExpenses",
+                "tags": [
+                    "dashboard-expenses"
+                ],
+                "summary": "Expenses, newest day first, voided included; meta.total_amount is the live total of the filter",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/ExpenseCategory"
+                        }
+                    },
+                    {
+                        "name": "voided",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of expenses",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Expense"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/PaginationMeta"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "total_amount"
+                                                    ],
+                                                    "properties": {
+                                                        "total_amount": {
+                                                            "$ref": "#/components/schemas/Money"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "dashboardRecordExpense",
+                "tags": [
+                    "dashboard-expenses"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/IdempotencyKey"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "spent_on",
+                                    "amount",
+                                    "category"
+                                ],
+                                "properties": {
+                                    "spent_on": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "description": "A business day, not after today in the store zone (D60)"
+                                    },
+                                    "amount": {
+                                        "$ref": "#/components/schemas/Money",
+                                        "description": "0.01..10,000,000.00"
+                                    },
+                                    "category": {
+                                        "$ref": "#/components/schemas/ExpenseCategory"
+                                    },
+                                    "note": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 200,
+                                        "description": "Required for other"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The expense recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Expense"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/expenses/categories": {
+            "get": {
+                "operationId": "dashboardExpenseCategories",
+                "tags": [
+                    "dashboard-expenses"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The fixed categories in order (D100 b)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ExpenseCategoryOption"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/api/dashboard/expenses/{expense}/void": {
+            "parameters": [
+                {
+                    "name": "expense",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    }
+                },
+                {
+                    "$ref": "#/components/parameters/IdempotencyKey"
+                }
+            ],
+            "post": {
+                "operationId": "dashboardVoidExpense",
+                "tags": [
+                    "dashboard-expenses"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "reason"
+                                ],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 300
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The expense, voided",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Expense"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/dashboard/orders/{order}/collections": {
             "parameters": [
                 {
@@ -11830,6 +12124,7 @@
                     "customers.manage",
                     "customers.credit",
                     "collections.manage",
+                    "expenses.manage",
                     "reports.view",
                     "settings.manage",
                     "users.manage",
@@ -16864,6 +17159,102 @@
                         }
                     }
                 ]
+            },
+            "ExpenseCategory": {
+                "type": "string",
+                "description": "D100 b: إيجار، رواتب وأجور، نقل وشحن، كهرباء ومياه وإنترنت، صيانة، تغليف ومستلزمات، دعاية وتسويق، رسوم وضرائب، أخرى",
+                "enum": [
+                    "rent",
+                    "salaries",
+                    "transport",
+                    "utilities",
+                    "maintenance",
+                    "packaging",
+                    "marketing",
+                    "fees",
+                    "other"
+                ]
+            },
+            "ExpenseCategoryOption": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "label",
+                    "needs_note"
+                ],
+                "properties": {
+                    "code": {
+                        "$ref": "#/components/schemas/ExpenseCategory"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "needs_note": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "Expense": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "spent_on",
+                    "amount",
+                    "category",
+                    "category_label",
+                    "note",
+                    "created_by",
+                    "created_at",
+                    "voided_at",
+                    "void_reason"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "spent_on": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "amount": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/ExpenseCategory"
+                    },
+                    "category_label": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "voided_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                }
             },
             "ReportProfit": {
                 "type": "object",

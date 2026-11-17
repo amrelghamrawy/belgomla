@@ -2168,6 +2168,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expenses, newest day first, voided included; meta.total_amount is the live total of the filter */
+        get: operations["dashboardExpenses"];
+        put?: never;
+        post: operations["dashboardRecordExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/expenses/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardExpenseCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/expenses/{expense}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                expense: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardVoidExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/orders/{order}/collections": {
         parameters: {
             query?: never;
@@ -3033,7 +3087,7 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
         };
         /** @enum {string} */
-        Permission: "catalog.manage" | "pricing.manage" | "pricing.customers" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.edit" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
+        Permission: "catalog.manage" | "pricing.manage" | "pricing.customers" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.edit" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "expenses.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
             /** @description BR-N03 the statuses customers are told about, plus `discount` (D85) and `edited` (D87, on by default) */
             order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount" | "edited")[];
@@ -4268,6 +4322,31 @@ export interface components {
         SalesTotals: components["schemas"]["SalesFigures"] & {
             /** @description (gross − discounts) ÷ orders; null without orders */
             average_order: components["schemas"]["Money"] | null;
+        };
+        /**
+         * @description D100 b: إيجار، رواتب وأجور، نقل وشحن، كهرباء ومياه وإنترنت، صيانة، تغليف ومستلزمات، دعاية وتسويق، رسوم وضرائب، أخرى
+         * @enum {string}
+         */
+        ExpenseCategory: "rent" | "salaries" | "transport" | "utilities" | "maintenance" | "packaging" | "marketing" | "fees" | "other";
+        ExpenseCategoryOption: {
+            code: components["schemas"]["ExpenseCategory"];
+            label: string;
+            needs_note: boolean;
+        };
+        Expense: {
+            id: number;
+            /** Format: date */
+            spent_on: string;
+            amount: components["schemas"]["Money"];
+            category: components["schemas"]["ExpenseCategory"];
+            category_label: string;
+            note: string | null;
+            created_by: number | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
         };
         /** @description D98: cost of what went out less what came back at the costs frozen on the lines; profit and margin null while any line went out without a cost */
         ReportProfit: {
@@ -8951,6 +9030,147 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardExpenses: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                category?: components["schemas"]["ExpenseCategory"];
+                voided?: boolean;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of expenses */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Expense"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"] & {
+                            total_amount: components["schemas"]["Money"];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRecordExpense: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date
+                     * @description A business day, not after today in the store zone (D60)
+                     */
+                    spent_on: string;
+                    /** @description 0.01..10,000,000.00 */
+                    amount: components["schemas"]["Money"];
+                    category: components["schemas"]["ExpenseCategory"];
+                    /** @description Required for other */
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The expense recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Expense"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardExpenseCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The fixed categories in order (D100 b) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ExpenseCategoryOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardVoidExpense: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                expense: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The expense, voided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Expense"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };

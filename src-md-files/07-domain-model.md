@@ -613,6 +613,23 @@ Invariant (app, inside a transaction with the order row locked): `Σ live paymen
 
 ---
 
+### `expenses` (V2 Task 19, D100)
+
+| Column      | Type          | Notes |
+| ----------- | ------------- | ----- |
+| id          | bigint PK     | |
+| tenant_id   | FK            | index `(tenant_id, spent_on)` |
+| spent_on    | date          | a business day (D60) |
+| amount      | numeric(12,2) | check 0 < amount ≤ 10,000,000 |
+| category    | varchar(20)   | check: `rent`, `salaries`, `transport`, `utilities`, `maintenance`, `packaging`, `marketing`, `fees`, `other` |
+| note        | varchar(200)  | nullable; check: not null for `other` |
+| created_by  | FK tenant_users | nullable |
+| voided_at   | timestamp     | nullable; check: set exactly with `void_reason` |
+| void_reason | varchar(300)  | nullable |
+| voided_by   | FK tenant_users | nullable |
+
+Never edited or deleted (D100 c). Module `Expenses` (model `Expense`).
+
 ## 9. Notifications and Messaging
 
 ### `notifications` (BR-N02)

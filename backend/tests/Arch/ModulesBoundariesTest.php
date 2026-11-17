@@ -520,3 +520,16 @@ arch('customers fill the customer pricing contract of pricing')
 arch('pricing contracts are interfaces')
     ->expect('App\Modules\Pricing\Contracts')
     ->toBeInterfaces();
+
+/*
+| Expenses (V2 Task 19, D100): what the shop spends to run. It needs only Tenancy's context and concern and Audit's
+| logger; Reports reads its totals through ExpenseTotalsQuery. Nothing else depends on it.
+*/
+
+arch('expenses depend on no business module')
+    ->expect('App\Modules\Expenses')
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports', 'App\Modules\Tenancy\Models', 'App\Modules\Audit\Models']);
+
+arch('only reports read expenses, and only through their totals query')
+    ->expect('App\Modules\Expenses')
+    ->toOnlyBeUsedIn(['App\Modules\Expenses', 'App\Modules\Reports\Queries', 'Database\Factories']);

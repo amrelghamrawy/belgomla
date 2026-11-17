@@ -25,6 +25,7 @@ enum Permission: string
     case CustomersManage = 'customers.manage';
     case CustomersCredit = 'customers.credit';
     case CollectionsManage = 'collections.manage';
+    case ExpensesManage = 'expenses.manage';
     case ReportsView = 'reports.view';
     case SettingsManage = 'settings.manage';
     case UsersManage = 'users.manage';
@@ -47,6 +48,7 @@ enum Permission: string
             self::CustomersManage => 'إدارة العملاء',
             self::CustomersCredit => 'حدود الائتمان ومهل السداد',
             self::CollectionsManage => 'التحصيل',
+            self::ExpensesManage => 'المصروفات',
             self::ReportsView => 'التقارير',
             self::SettingsManage => 'إعدادات المتجر',
             self::UsersManage => 'إدارة المستخدمين',

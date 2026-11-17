@@ -722,6 +722,21 @@ Delivered in Task 7:
 
 ---
 
+## 10b. Dashboard — Expenses (V2 Task 19, D100)
+
+All `expenses.manage` (owner, manager, accountant).
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET    | `/api/dashboard/expenses` | `?from=&to=&category=&voided=` (business days, both inclusive; `voided` 1/0), newest `spent_on` first; `meta.total_amount` = the live total of the filter |
+| GET    | `/api/dashboard/expenses/categories` | `[ { code, label, needs_note } ]` in order |
+| POST   | `/api/dashboard/expenses` | `{ spent_on, amount, category, note? }` → 201 the expense; `Idempotency-Key` honoured; audit `expense.recorded` |
+| POST   | `/api/dashboard/expenses/{id}/void` | `{ reason }` (≤ 300) → the expense; a second void `409 already_voided`; another tenant's id 404; audit `expense.voided` |
+
+An expense: `{ id, spent_on, amount, category, category_label, note, created_by, created_at, voided_at, void_reason }`.
+
+---
+
 ## 11. Dashboard — Reports (D5, V2 Task 16 D94)
 
 | Method | Path                                 | Returns                                                                                    |

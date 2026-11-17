@@ -9,6 +9,7 @@ import {
   LayoutDashboardIcon,
   type LucideIcon,
   PackageIcon,
+  ReceiptIcon,
   RulerIcon,
   SettingsIcon,
   ShoppingBagIcon,
@@ -52,6 +53,7 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         icon: WalletIcon,
         permissions: ["collections.manage"],
       },
+      { href: "/dashboard/expenses", label: copy.expenses, icon: ReceiptIcon, permissions: ["expenses.manage"] },
       {
         href: "/dashboard/customers",
         label: copy.customers,
