@@ -1,6 +1,6 @@
 # V2 Task 18 — Costing: purchase cost, average cost, adjustment reasons, stocktake
 
-Status: **slices A–B done** (2026-11-16/17); slices C–D to follow. Ideas taken from the ILORA ERP's inventory and costing (`D:\algoriza\ilora`), cut down to what a wholesale merchant uses: one weighted average cost per SKU, no double entry, no FIFO layers, no suppliers. Requires V2 Tasks 01 (returns), 13 (selling units), 15 (bundles), 16 (reports). Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
+Status: **slices A–C done** (2026-11-16/17); slice D to follow. Ideas taken from the ILORA ERP's inventory and costing (`D:\algoriza\ilora`), cut down to what a wholesale merchant uses: one weighted average cost per SKU, no double entry, no FIFO layers, no suppliers. Requires V2 Tasks 01 (returns), 13 (selling units), 15 (bundles), 16 (reports). Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
 
 ## Slices
 
@@ -8,7 +8,7 @@ Status: **slices A–B done** (2026-11-16/17); slices C–D to follow. Ideas tak
 | ----- | ---- | -------- |
 | A | Average cost per SKU, receiving goods at a price (`receive` movement), setting the cost by hand, cost frozen on every movement and on delivered order lines, returns at the frozen cost | D96, BR-INV09 |
 | B | Fixed reasons for stock adjustments (جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى + ملاحظة) | D97 |
-| C | Profit and margin in the existing sales and product reports, from the frozen costs | — |
+| C | Profit and margin in the existing sales and product reports, from the frozen costs | D98 |
 | D | Stocktake posts the difference against the count's starting figure instead of overwriting; the base unit is locked while stock exists | — |
 
 ## Slice A — delivered
@@ -79,3 +79,20 @@ Against `php artisan serve`, alnoor demo data, owner session via `scripts/smoke.
 | `POST …/1/adjust {"new_on_hand":730,"reason":"import"}` | 422 `validation_failed` on `reason` |
 | `POST …/1/adjust {"new_on_hand":730,"reason":"other"}` | 422 `validation_failed` on `note` |
 | the note «وقع» sent as a UTF-8 file (`curl --data-binary @file`) | stored `كسر أو تلف: وقع` (hex checked in psql). An Arabic note typed on the Git Bash command line arrives as `???`: Windows turns curl's arguments into the ANSI code page before they leave; the app is not involved |
+
+## Slice C — delivered
+
+- `SalesFactsQuery::costs()` (lines that left the stock, at their frozen cost, against the top-level SKU and product) and `returnedCosts()` (live returns at the returned line's cost). Sales analytics adds `profit { cost, profit, margin, uncosted_lines }`; product rows add `cost, profit, margin, uncosted_lines`; the product export adds four columns. No partial profit: null while any line in scope lacks a cost (D98 c).
+- Frontend: المبيعات shows تكلفة البضاعة المباعة / الربح / هامش الربح, «غير مكتمل» and the hint with the count when costs are missing; المنتجات adds التكلفة / الربح / هامش الربح columns.
+- Hand-computed tests (rules/04 §4), book cost 40.00 and pen 20.00:
+  - Sales 8–10 Oct: cost 140 out − 40 back = 100, net 226 → profit 126.00, 55.75 %.
+  - Books only: 80, 181 → 101.00, 55.80 %.
+  - The pen uncosted: profit null, 1 line.
+  - Products: BK-1 80 / 101.00 / 55.80; SET-1 (components) 160 / 140.00 / 46.67; PN-1 20 / 25.00 / 55.56.
+- Tests: backend `composer test` green, 6216 passed (+4 profit cases, shape tests and the export updated); frontend 1036 passed (+2).
+
+### Manual checks (slice C)
+
+| Call | Answer |
+| ---- | ------ |
+| `GET /api/dashboard/reports/sales-analytics?from=2026-10-01&to=2026-10-31` (alnoor demo, every line delivered before costing) | `profit` `{ cost "0.00", profit null, margin null, uncosted_lines 76 }`; 76 = the SQL count of the stock-holding lines delivered in Cairo October |

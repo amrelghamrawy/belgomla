@@ -113,6 +113,9 @@ export function ProductsTab({ query, setQuery }: { query: ListQuery; setQuery: S
                         <TableHead>{copy.revenue}</TableHead>
                         <TableHead>{copy.returns}</TableHead>
                         <TableHead>{copy.returnRate}</TableHead>
+                        <TableHead>{copy.costShort}</TableHead>
+                        <TableHead>{copy.profit}</TableHead>
+                        <TableHead>{copy.margin}</TableHead>
                         <TableHead>{copy.customersCount}</TableHead>
                         <TableHead>{copy.lastSold}</TableHead>
                       </TableRow>
@@ -152,6 +155,13 @@ export function ProductsTab({ query, setQuery }: { query: ListQuery; setQuery: S
                           <TableCell className="whitespace-nowrap">{formatMoney(row.returns)}</TableCell>
                           <TableCell className="whitespace-nowrap">
                             {row.return_rate === null ? "—" : `${formatPercent(row.return_rate)}%`}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">{formatMoney(row.cost)}</TableCell>
+                          <TableCell className="whitespace-nowrap" data-testid={`profit-${row.sku_id}`}>
+                            {row.profit === null ? copy.profitUnknown : formatMoney(row.profit)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {row.margin === null ? "—" : `${formatPercent(row.margin)}%`}
                           </TableCell>
                           <TableCell>{row.customers}</TableCell>
                           <TableCell className="whitespace-nowrap">

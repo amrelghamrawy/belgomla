@@ -6,6 +6,7 @@ use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Reports\Data\ReportFiltersData;
 use App\Modules\Reports\Enums\SalesGrouping;
 use App\Modules\Reports\Queries\SalesAnalyticsQuery;
@@ -198,4 +199,26 @@ test('the report runs a fixed number of queries whatever the number of orders', 
     cache()->flush();
 
     expect($this->queriesRun(fn () => ($this->analytics)()))->toBe($few)->toBeLessThanOrEqual(12);
+});
+
+test('D98 the profit is the net less what went out at its frozen cost plus what came back', function (): void {
+    OrderItem::query()->where('sku_id', $this->book->id)->update(['unit_cost' => '40.0000']);
+    OrderItem::query()->where('sku_id', $this->pen->id)->update(['unit_cost' => '20.0000']);
+
+    // out: A 2 books × 40 + 1 pen × 20, B 1 book × 40 = 140; back: 1 book × 40 → cost 100; net 226 → profit 126, 126 ÷ 226 = 55.752…%
+    expect(($this->analytics)()['profit'])->toBe(['cost' => '100.00', 'profit' => '126.00', 'margin' => '55.75', 'uncosted_lines' => 0]);
+});
+
+test('D98 a category filter keeps the cost of that category only', function (): void {
+    OrderItem::query()->where('sku_id', $this->book->id)->update(['unit_cost' => '40.0000']);
+
+    // books: out 3 × 40 = 120, back 40 → 80; net of books 162 + 100 − 81 = 181 → profit 101, 101 ÷ 181 = 55.801…%
+    expect(($this->analytics)(category: $this->books->id)['profit'])->toBe(['cost' => '80.00', 'profit' => '101.00', 'margin' => '55.80', 'uncosted_lines' => 0]);
+});
+
+test('D96 f D98 a line without a cost leaves the profit unknown and counts the lines missing one', function (): void {
+    OrderItem::query()->where('sku_id', $this->book->id)->update(['unit_cost' => '40.0000']);
+
+    // the pen of order A has no cost: the books still cost 120 − 40 = 80
+    expect(($this->analytics)()['profit'])->toBe(['cost' => '80.00', 'profit' => null, 'margin' => null, 'uncosted_lines' => 1]);
 });

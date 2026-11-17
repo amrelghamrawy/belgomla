@@ -1082,6 +1082,13 @@ export const dashboard = {
     quantity: "الكمية",
     inBundles: "منها داخل باقات",
     returnRate: "نسبة المرتجع",
+    // D98: profit from the costs frozen on delivery.
+    cost: "تكلفة البضاعة المباعة",
+    costShort: "التكلفة",
+    profit: "الربح",
+    margin: "هامش الربح",
+    profitUnknown: "غير مكتمل",
+    uncostedHint: (lines: number) => `${lines} سطر مباع بدون تكلفة: حدد تكلفة الأصناف من صفحة المخزون ليظهر الربح.`,
     customersCount: "العملاء",
     lastSold: "آخر بيع",
     bundleBadge: "باقة",

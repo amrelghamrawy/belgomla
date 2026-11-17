@@ -32,6 +32,7 @@ final class SalesAnalyticsResource extends JsonResource
             'generated_at' => $this->resource['generated_at'],
             'buckets' => $report['buckets'],
             'totals' => $report['totals'],
+            'profit' => $report['profit'], // D98
             'previous' => $report['previous'],
             'by_section' => $report['by_section'],
             'by_customer_group' => $report['by_customer_group'],

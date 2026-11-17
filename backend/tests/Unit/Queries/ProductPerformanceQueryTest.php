@@ -6,6 +6,7 @@ use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Models\CustomerGroup;
+use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Reports\Data\ReportFiltersData;
 use App\Modules\Reports\Enums\ProductSort;
 use App\Modules\Reports\Enums\SalesGrouping;
@@ -64,6 +65,10 @@ test('each sku sold carries its quantities, net revenue, returns, return rate, c
         'return_rate' => '20.00',
         'customers' => 2,
         'last_sold_at' => '2026-10-09T12:00:00+00:00',
+        'cost' => '0.00',
+        'profit' => null,
+        'margin' => null,
+        'uncosted_lines' => 2,
     ]);
 });
 
@@ -139,4 +144,18 @@ test('the report runs a fixed number of queries whatever the number of skus', fu
     cache()->flush();
 
     expect($this->queriesRun(fn () => ($this->products)()))->toBe($few)->toBeLessThanOrEqual(4);
+});
+
+test('D98 each row carries its cost, profit and margin; a bundle carries its components\' cost', function (): void {
+    OrderItem::query()->where('sku_id', $this->book->id)->update(['unit_cost' => '40.0000']);
+    OrderItem::query()->where('sku_id', $this->pen->id)->update(['unit_cost' => '20.0000']);
+
+    // BK-1: own lines 3 × 40 = 120, one back 40 → 80; revenue 181 → 101, 101 ÷ 181 = 55.801…%
+    // SET-1: 2 bundles × (1 book × 40 + 2 pens × 20) = 160; revenue 300 → 140, 46.666…%
+    // PN-1: own line 1 × 20; revenue 45 → 25, 55.555…%
+    expect(collect(($this->products)())->mapWithKeys(fn (array $row): array => [$row['sku_code'] => [$row['cost'], $row['profit'], $row['margin'], $row['uncosted_lines']]])->all())->toBe([
+        'SET-1' => ['160.00', '140.00', '46.67', 0],
+        'BK-1' => ['80.00', '101.00', '55.80', 0],
+        'PN-1' => ['20.00', '25.00', '55.56', 0],
+    ]);
 });

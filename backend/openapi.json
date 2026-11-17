@@ -16835,6 +16835,46 @@
                     }
                 ]
             },
+            "ReportProfit": {
+                "type": "object",
+                "description": "D98: cost of what went out less what came back at the costs frozen on the lines; profit and margin null while any line went out without a cost",
+                "required": [
+                    "cost",
+                    "profit",
+                    "margin",
+                    "uncosted_lines"
+                ],
+                "properties": {
+                    "cost": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "profit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "margin": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "profit ÷ net, %"
+                    },
+                    "uncosted_lines": {
+                        "type": "integer",
+                        "description": "Lines that went out without a cost (D96 f)"
+                    }
+                }
+            },
             "SalesAnalyticsReport": {
                 "type": "object",
                 "required": [
@@ -16844,11 +16884,15 @@
                     "generated_at",
                     "buckets",
                     "totals",
+                    "profit",
                     "previous",
                     "by_section",
                     "by_customer_group"
                 ],
                 "properties": {
+                    "profit": {
+                        "$ref": "#/components/schemas/ReportProfit"
+                    },
                     "from": {
                         "type": "string",
                         "format": "date"
@@ -17009,7 +17053,11 @@
                     "returned_base",
                     "return_rate",
                     "customers",
-                    "last_sold_at"
+                    "last_sold_at",
+                    "cost",
+                    "profit",
+                    "margin",
+                    "uncosted_lines"
                 ],
                 "properties": {
                     "sku_id": {
@@ -17076,6 +17124,35 @@
                             "null"
                         ],
                         "format": "date-time"
+                    },
+                    "cost": {
+                        "$ref": "#/components/schemas/Money",
+                        "description": "D98: its goods at their frozen costs, less what came back; a bundle carries its components"
+                    },
+                    "profit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "revenue − cost; null while uncosted_lines > 0"
+                    },
+                    "margin": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "profit ÷ revenue, %"
+                    },
+                    "uncosted_lines": {
+                        "type": "integer"
                     }
                 }
             },

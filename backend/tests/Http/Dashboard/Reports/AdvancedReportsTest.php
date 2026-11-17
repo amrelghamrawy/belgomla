@@ -187,7 +187,7 @@ test('D83 a report exports as a csv with a bom and the labels as header', functi
     $rows = spreadsheetRows(downloadedFile($response, SpreadsheetFormat::Csv), SpreadsheetFormat::Csv);
 
     expect(str_starts_with($content, "\u{FEFF}"))->toBeTrue()
-        ->and(array_values($rows)[1])->toBe(['BK-1', 'منتج BK-1', '', 'لا', '2', '2', '0', '180', '0', '0', '0', '1', '2026-10-09']);
+        ->and(array_values($rows)[1])->toBe(['BK-1', 'منتج BK-1', '', 'لا', '2', '2', '0', '180', '0', '0', '0', '1', '2026-10-09', '0', '', '', '1']);
 });
 
 test('the export of an unknown report is not found', function (): void {

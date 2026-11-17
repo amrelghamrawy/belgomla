@@ -14,10 +14,10 @@ use App\Modules\Reports\Http\Resources\SalesAnalyticsResource;
 
 test('the sales analytics resource renders the range, age and every section', function (): void {
     $totals = ['orders' => 1, 'gross' => '10.00', 'discounts' => '0.00', 'returns' => '0.00', 'net' => '10.00', 'average_order' => '10.00'];
-    $report = ['from' => '2026-10-01', 'to' => '2026-10-02', 'group' => 'day', 'buckets' => [], 'totals' => $totals, 'previous' => ['from' => '2026-09-29', 'to' => '2026-09-30', 'totals' => $totals, 'buckets' => []], 'by_section' => [], 'by_customer_group' => []];
+    $report = ['from' => '2026-10-01', 'to' => '2026-10-02', 'group' => 'day', 'buckets' => [], 'totals' => $totals, 'profit' => ['cost' => '4.00', 'profit' => '6.00', 'margin' => '60.00', 'uncosted_lines' => 0], 'previous' => ['from' => '2026-09-29', 'to' => '2026-09-30', 'totals' => $totals, 'buckets' => []], 'by_section' => [], 'by_customer_group' => []];
 
     expect(rendered(new SalesAnalyticsResource(['generated_at' => '2026-10-02T10:00:00+00:00', 'data' => $report]), dashboardRequest('/api/dashboard/reports/sales-analytics')))
-        ->toBe(['from' => '2026-10-01', 'to' => '2026-10-02', 'group' => 'day', 'generated_at' => '2026-10-02T10:00:00+00:00', 'buckets' => [], 'totals' => $totals, 'previous' => $report['previous'], 'by_section' => [], 'by_customer_group' => []]);
+        ->toBe(['from' => '2026-10-01', 'to' => '2026-10-02', 'group' => 'day', 'generated_at' => '2026-10-02T10:00:00+00:00', 'buckets' => [], 'totals' => $totals, 'profit' => $report['profit'], 'previous' => $report['previous'], 'by_section' => [], 'by_customer_group' => []]);
 });
 
 test('the collections report resource renders the range, age, buckets, totals and aging', function (): void {
@@ -30,7 +30,7 @@ test('the collections report resource renders the range, age, buckets, totals an
 });
 
 test('a product performance row renders its documented keys', function (): void {
-    $row = ['sku_id' => 1, 'product_id' => 2, 'product_name' => 'علوم', 'sku_code' => 'BK-1', 'sku_name' => null, 'is_bundle' => false, 'quantity' => 3, 'quantity_base' => 5, 'bundle_quantity_base' => 2, 'revenue' => '181.00', 'returns' => '81.00', 'returned_base' => 1, 'return_rate' => '20.00', 'customers' => 2, 'last_sold_at' => null];
+    $row = ['sku_id' => 1, 'product_id' => 2, 'product_name' => 'علوم', 'sku_code' => 'BK-1', 'sku_name' => null, 'is_bundle' => false, 'quantity' => 3, 'quantity_base' => 5, 'bundle_quantity_base' => 2, 'revenue' => '181.00', 'returns' => '81.00', 'returned_base' => 1, 'return_rate' => '20.00', 'customers' => 2, 'last_sold_at' => null, 'cost' => '80.00', 'profit' => '101.00', 'margin' => '55.80', 'uncosted_lines' => 0];
 
     expect(rendered(new ProductPerformanceResource($row), dashboardRequest('/api/dashboard/reports/products')))->toBe($row);
 });

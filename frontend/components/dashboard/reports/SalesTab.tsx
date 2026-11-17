@@ -8,7 +8,7 @@ import type { ListQuery } from "@/lib/dashboard/list-query";
 import { deltaPercent, reportParams } from "@/lib/dashboard/report-range";
 import { useSalesAnalytics } from "@/lib/dashboard/reports";
 import { formatDay } from "@/lib/format/date";
-import { formatMoney } from "@/lib/format/money";
+import { formatMoney, formatPercent } from "@/lib/format/money";
 
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
 import { KpiTile } from "./KpiTile";
@@ -113,6 +113,7 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
           testId="sales-average"
         />
       </div>
+      <ProfitTiles report={report} />
       <Card className="min-w-0">
         <CardHeader>
           <CardTitle>{copy.trendTitle}</CardTitle>
@@ -208,5 +209,36 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
         </CardContent>
       </Card>
     </>
+  );
+}
+
+/**
+ * D98: the cost of what was sold, the profit and its margin. While a line went out without a cost the profit is
+ * unknown, said so with how many lines, never a partial figure.
+ */
+export function ProfitTiles({ report }: { report: SalesAnalyticsReport }) {
+  const { profit } = report;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <KpiTile label={copy.cost} value={formatMoney(profit.cost)} testId="sales-cost" />
+        <KpiTile
+          label={copy.profit}
+          value={profit.profit === null ? copy.profitUnknown : formatMoney(profit.profit)}
+          testId="sales-profit"
+        />
+        <KpiTile
+          label={copy.margin}
+          value={profit.margin === null ? "—" : `${formatPercent(profit.margin)}%`}
+          testId="sales-margin"
+        />
+      </div>
+      {profit.uncosted_lines > 0 && (
+        <p className="text-muted-foreground text-xs" data-testid="uncosted-hint">
+          {copy.uncostedHint(profit.uncosted_lines)}
+        </p>
+      )}
+    </div>
   );
 }

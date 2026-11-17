@@ -4267,7 +4267,17 @@ export interface components {
             /** @description (gross − discounts) ÷ orders; null without orders */
             average_order: components["schemas"]["Money"] | null;
         };
+        /** @description D98: cost of what went out less what came back at the costs frozen on the lines; profit and margin null while any line went out without a cost */
+        ReportProfit: {
+            cost: components["schemas"]["Money"];
+            profit: components["schemas"]["Money"] | null;
+            /** @description profit ÷ net, % */
+            margin: components["schemas"]["Money"] | null;
+            /** @description Lines that went out without a cost (D96 f) */
+            uncosted_lines: number;
+        };
         SalesAnalyticsReport: {
+            profit: components["schemas"]["ReportProfit"];
             /** Format: date */
             from: string;
             /** Format: date */
@@ -4330,6 +4340,13 @@ export interface components {
             customers: number;
             /** Format: date-time */
             last_sold_at: string | null;
+            /** @description D98: its goods at their frozen costs, less what came back; a bundle carries its components */
+            cost: components["schemas"]["Money"];
+            /** @description revenue − cost; null while uncosted_lines > 0 */
+            profit: components["schemas"]["Money"] | null;
+            /** @description profit ÷ revenue, % */
+            margin: components["schemas"]["Money"] | null;
+            uncosted_lines: number;
         };
         CustomerPatternRow: {
             customer: components["schemas"]["CustomerRef"];

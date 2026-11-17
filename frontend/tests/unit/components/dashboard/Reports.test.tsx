@@ -9,7 +9,7 @@ import { InventoryTab, LowStockSection } from "@/components/dashboard/reports/In
 import { ProductsTab } from "@/components/dashboard/reports/ProductsTab";
 import { ReportsPage } from "@/components/dashboard/reports/ReportsPage";
 import { compact } from "@/components/dashboard/reports/SalesChart";
-import { SalesTab } from "@/components/dashboard/reports/SalesTab";
+import { ProfitTiles, SalesTab } from "@/components/dashboard/reports/SalesTab";
 import { saveDownload } from "@/lib/api/download";
 import { cairoToday, presetRange } from "@/lib/dashboard/report-range";
 
@@ -63,6 +63,7 @@ const salesAnalytics = {
     { period_start: "2026-10-03", ...figures(1, "400.00", "49.50", "0.00", "350.50") },
   ],
   totals: { ...figures(3, "1400.00", "149.50", "100.00", "1150.50"), average_order: "416.83" },
+  profit: { cost: "800.00", profit: "350.50", margin: "30.46", uncosted_lines: 0 },
   previous: {
     from: "2026-09-28",
     to: "2026-09-30",
@@ -274,6 +275,27 @@ describe("SalesTab", () => {
     expect(screen.getByTestId("sales-average")).toHaveTextContent("—");
   });
 
+  it("D98 shows the cost of what was sold, the profit and its margin", () => {
+    renderBare(<ProfitTiles report={salesAnalytics as never} />);
+
+    expect(screen.getByTestId("sales-cost")).toHaveTextContent("800.00 ج.م");
+    expect(screen.getByTestId("sales-profit")).toHaveTextContent("350.50 ج.م");
+    expect(screen.getByTestId("sales-margin")).toHaveTextContent("30.46%");
+    expect(screen.queryByTestId("uncosted-hint")).toBeNull();
+  });
+
+  it("D96 f D98 says the profit is incomplete and how many lines lack a cost, never a partial figure", () => {
+    renderBare(
+      <ProfitTiles
+        report={{ ...salesAnalytics, profit: { cost: "500.00", profit: null, margin: null, uncosted_lines: 4 } } as never}
+      />,
+    );
+
+    expect(screen.getByTestId("sales-profit")).toHaveTextContent("غير مكتمل");
+    expect(screen.getByTestId("sales-margin")).toHaveTextContent("—");
+    expect(screen.getByTestId("uncosted-hint")).toHaveTextContent("4 سطر مباع بدون تكلفة");
+  });
+
   it("compacts axis ticks", () => {
     expect([compact(950), compact(1200), compact(3_400_000)]).toEqual(["950", "1.2K", "3.4M"]);
   });
@@ -295,6 +317,10 @@ const productRow = (overrides: Record<string, unknown> = {}) => ({
   return_rate: "2.50",
   customers: 3,
   last_sold_at: "2026-10-20T10:00:00Z",
+  cost: "1600.00",
+  profit: "800.00",
+  margin: "33.33",
+  uncosted_lines: 0,
   ...overrides,
 });
 

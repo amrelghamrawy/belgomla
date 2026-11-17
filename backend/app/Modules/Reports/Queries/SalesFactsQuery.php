@@ -30,6 +30,13 @@ use Illuminate\Database\Query\Expression;
  *   own SKU and base units, and the amount (its `line_total`, after the discounts, D85) with the section and SKU of
  *   the top-level line it belongs to (a returned component counts against its bundle's revenue).
  *
+ * - `costs()` (V2 costing, D98): what the goods that went out cost, one row per line that left the stock (loose lines and
+ *   component lines; a bundle line holds nothing, D93) at the cost frozen on it at delivery (D96 f), counted against the
+ *   top-level line's SKU and product (a component's cost against its bundle, where the revenue is); `uncosted` = 1 when
+ *   the line has no cost.
+ * - `returnedCosts()`: what the live returns of the range brought back, at the returned line's frozen cost (BR-INV09),
+ *   against the same top-level line.
+ *
  * Amounts are unrounded numerics; the reports round their sums to the piaster.
  */
 final readonly class SalesFactsQuery
@@ -53,6 +60,30 @@ final readonly class SalesFactsQuery
             ->selectRaw('order_items.list_unit_price * '.self::WENT_OUT.' as gross')
             ->selectRaw('order_items.list_unit_price * '.self::WENT_OUT.' - order_items.line_total as line_discount')
             ->selectRaw('case when orders.items_total > 0 then order_items.line_total * orders.discount_amount / orders.items_total else 0 end as order_discount');
+    }
+
+    public function costs(CarbonImmutable $start, CarbonImmutable $end): QueryBuilder
+    {
+        return $this->delivered($start, $end)
+            ->where(fn (QueryBuilder $query): QueryBuilder => $query->whereNotNull('order_items.parent_item_id')->orWhere('order_items.is_bundle', false))
+            ->leftJoin('order_items as parent', 'parent.id', '=', 'order_items.parent_item_id')
+            ->join('products', 'products.id', '=', new Expression('coalesce(parent.product_id, order_items.product_id)'))
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->select(['order_items.id', 'order_items.order_id', 'orders.customer_id', 'customers.customer_group_id', 'orders.delivered_at as at', 'categories.path as category_path'])
+            ->selectRaw('coalesce(parent.sku_id, order_items.sku_id) as top_sku_id')
+            ->selectRaw("coalesce(categories.kind, 'general') as kind")
+            ->selectRaw('coalesce(order_items.unit_cost, 0) * '.self::WENT_OUT.' * order_items.conversion_factor as cost')
+            ->selectRaw('case when order_items.unit_cost is null then 1 else 0 end as uncosted');
+    }
+
+    public function returnedCosts(CarbonImmutable $start, CarbonImmutable $end): QueryBuilder
+    {
+        $returns = $this->returns($start, $end);
+
+        return $returns->newQuery()
+            ->fromSub($returns->addSelect('returned.unit_cost'), 'r')
+            ->select(['r.id', 'r.order_id', 'r.customer_id', 'r.customer_group_id', 'r.at', 'r.category_path', 'r.kind', 'r.top_sku_id'])
+            ->selectRaw('coalesce(r.unit_cost, 0) * r.quantity_base as cost');
     }
 
     public function components(CarbonImmutable $start, CarbonImmutable $end): QueryBuilder

@@ -85,6 +85,7 @@ final readonly class ReportExporter
             'sku_code' => 'كود الصنف', 'product_name' => 'المنتج', 'sku_name' => 'الصنف', 'is_bundle' => 'باقة', 'quantity' => 'الكمية',
             'quantity_base' => 'الكمية بالوحدة الأساسية', 'bundle_quantity_base' => 'منها داخل باقات', 'revenue' => 'صافي الإيراد', 'returns' => 'المرتجعات',
             'returned_base' => 'الكمية المرتجعة', 'return_rate' => 'نسبة المرتجع %', 'customers' => 'عدد العملاء', 'last_sold_at' => 'آخر بيع',
+            'cost' => 'التكلفة', 'profit' => 'الربح', 'margin' => 'هامش الربح %', 'uncosted_lines' => 'سطور بدون تكلفة',
         ];
 
         return [$headers, (function () use ($filters, $options): Generator {
@@ -96,6 +97,9 @@ final readonly class ReportExporter
                     'returns' => (float) $row['returns'],
                     'return_rate' => $row['return_rate'] === null ? null : (float) $row['return_rate'],
                     'last_sold_at' => $this->day($row['last_sold_at'], $filters),
+                    'cost' => (float) $row['cost'],
+                    'profit' => $row['profit'] === null ? null : (float) $row['profit'],
+                    'margin' => $row['margin'] === null ? null : (float) $row['margin'],
                 ];
             }
         })()];

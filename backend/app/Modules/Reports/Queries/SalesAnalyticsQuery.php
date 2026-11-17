@@ -24,12 +24,18 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
  * filter keeps the lines of that category (and the returns of them), a customer group filter the customers of that group.
  * Cached per tenant and filter set (D94).
  *
+ * `profit` (V2 costing, D98): the cost of what went out in the range less the cost of what came back (each line at the
+ * cost frozen on it, D96 f), the profit = net − that cost and the margin = profit ÷ net in %. When any line that went
+ * out has no cost (sold before costing, or a SKU never costed) the profit and margin are null and `uncosted_lines`
+ * says how many: a profit over part of the goods would look like the whole (D96 f, rules/04).
+ *
  * @phpstan-type Figures array{orders: int, gross: string, discounts: string, returns: string, net: string}
  * @phpstan-type Bucket array{period_start: string, orders: int, gross: string, discounts: string, returns: string, net: string}
  * @phpstan-type Totals array{orders: int, gross: string, discounts: string, returns: string, net: string, average_order: string|null}
  * @phpstan-type Section array{kind: string, label: string, orders: int, gross: string, discounts: string, returns: string, net: string}
  * @phpstan-type GroupRow array{customer_group_id: int|null, name: string|null, orders: int, gross: string, discounts: string, returns: string, net: string}
- * @phpstan-type SalesAnalytics array{from: string, to: string, group: string, buckets: list<Bucket>, totals: Totals, previous: array{from: string, to: string, totals: Totals, buckets: list<array{period_start: string, net: string}>}, by_section: list<Section>, by_customer_group: list<GroupRow>}
+ * @phpstan-type Profit array{cost: string, profit: string|null, margin: string|null, uncosted_lines: int}
+ * @phpstan-type SalesAnalytics array{from: string, to: string, group: string, buckets: list<Bucket>, totals: Totals, profit: Profit, previous: array{from: string, to: string, totals: Totals, buckets: list<array{period_start: string, net: string}>}, by_section: list<Section>, by_customer_group: list<GroupRow>}
  */
 final readonly class SalesAnalyticsQuery
 {
@@ -89,6 +95,7 @@ final readonly class SalesAnalyticsQuery
             'group' => $filters->group->value,
             'buckets' => $current['buckets'],
             'totals' => $current['totals'],
+            'profit' => $this->profit($filters, $start, $end, $current['totals']['net']),
             'previous' => [
                 'from' => $previousFrom,
                 'to' => $previousTo,
@@ -153,6 +160,33 @@ final readonly class SalesAnalyticsQuery
         usort($rows, fn (array $a, array $b): int => Money::compare($b['net'], $a['net']) ?: ($a['customer_group_id'] ?? 0) <=> ($b['customer_group_id'] ?? 0));
 
         return $rows;
+    }
+
+    /**
+     * D98: cost of what went out less what came back, and the profit on the net when every line has a cost.
+     *
+     * @return Profit
+     */
+    private function profit(ReportFiltersData $filters, CarbonImmutable $start, CarbonImmutable $end, string $net): array
+    {
+        /** @var object{cost: string|null, uncosted: int|string|null} $out */
+        $out = $this->facts->scoped($this->facts->costs($start, $end), $filters)
+            ->selectRaw('round(coalesce(sum(f.cost), 0), 2) as cost, coalesce(sum(f.uncosted), 0) as uncosted')
+            ->first() ?? (object) ['cost' => '0', 'uncosted' => 0];
+        /** @var object{cost: string|null} $back */
+        $back = $this->facts->scoped($this->facts->returnedCosts($start, $end), $filters)
+            ->selectRaw('round(coalesce(sum(f.cost), 0), 2) as cost')
+            ->first() ?? (object) ['cost' => '0'];
+        $cost = Money::subtract(Money::add('0.00', (string) $out->cost), Money::add('0.00', (string) $back->cost));
+        $uncosted = (int) $out->uncosted;
+        $profit = $uncosted > 0 ? null : Money::subtract($net, $cost);
+
+        return [
+            'cost' => $cost,
+            'profit' => $profit,
+            'margin' => $profit === null ? null : Money::percentOf($profit, $net),
+            'uncosted_lines' => $uncosted,
+        ];
     }
 
     /**

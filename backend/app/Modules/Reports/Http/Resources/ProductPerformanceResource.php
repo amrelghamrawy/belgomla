@@ -40,6 +40,10 @@ final class ProductPerformanceResource extends JsonResource
             'return_rate' => $row['return_rate'],
             'customers' => $row['customers'],
             'last_sold_at' => $row['last_sold_at'],
+            'cost' => $row['cost'], // D98
+            'profit' => $row['profit'],
+            'margin' => $row['margin'],
+            'uncosted_lines' => $row['uncosted_lines'],
         ];
     }
 }

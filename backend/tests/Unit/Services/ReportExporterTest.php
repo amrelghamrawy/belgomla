@@ -45,7 +45,7 @@ test('D83 the sales sheet has a row per bucket and a totals row', function (): v
 });
 
 test('D83 the product sheet has a row per sku, the last sale as a cairo day', function (): void {
-    expect(($this->export)(ReportName::Products)[1])->toBe(['BK-1', 'منتج BK-1', '', 'لا', '2', '2', '0', '200', '0', '0', '0', '1', '2026-10-10']);
+    expect(($this->export)(ReportName::Products)[1])->toBe(['BK-1', 'منتج BK-1', '', 'لا', '2', '2', '0', '200', '0', '0', '0', '1', '2026-10-10', '0', '', '', '1']);
 });
 
 test('D83 the customer sheet has a row per customer', function (): void {

@@ -28,13 +28,16 @@ use Illuminate\Pagination\LengthAwarePaginator;
  *   `returns` is that returned amount;
  * - `returned_base` and `return_rate` = returned base units / base units that went out, in % (null when nothing went
  *   out in the range);
- * - `customers` who received it; `last_sold_at` its latest delivery in the range.
+ * - `customers` who received it; `last_sold_at` its latest delivery in the range;
+ * - `cost` (V2 costing, D98): what its goods cost at the costs frozen on delivery, less what came back (a bundle's row
+ *   carries its components' cost, where its revenue is); `profit` = revenue − cost and `margin` = profit ÷ revenue in %,
+ *   both null while `uncosted_lines` (lines of it that went out without a cost) is above zero.
  *
  * Sorted by revenue, base units or return rate (highest first, then by code); the first page of 20 is the top 20.
  * A category filter keeps the SKUs of that category and its sub-categories, a customer group filter the sales to that
  * group's customers. Cached per tenant, filter set and page (D94).
  *
- * @phpstan-type ProductRow array{sku_id: int, product_id: int, product_name: string, sku_code: string, sku_name: string|null, is_bundle: bool, quantity: int, quantity_base: int, bundle_quantity_base: int, revenue: string, returns: string, returned_base: int, return_rate: string|null, customers: int, last_sold_at: string|null}
+ * @phpstan-type ProductRow array{sku_id: int, product_id: int, product_name: string, sku_code: string, sku_name: string|null, is_bundle: bool, quantity: int, quantity_base: int, bundle_quantity_base: int, revenue: string, returns: string, returned_base: int, return_rate: string|null, customers: int, last_sold_at: string|null, cost: string, profit: string|null, margin: string|null, uncosted_lines: int}
  */
 final readonly class ProductPerformanceQuery
 {
@@ -94,7 +97,9 @@ final readonly class ProductPerformanceQuery
             ->selectRaw('sum(u.returned_base) as returned_base')
             ->selectRaw('case when sum(u.quantity_base) > 0 then round(sum(u.returned_base) * 100.0 / sum(u.quantity_base), 2) end as return_rate')
             ->selectRaw('count(distinct u.customer_id) as customers')
-            ->selectRaw('max(u.at) as last_sold_at');
+            ->selectRaw('max(u.at) as last_sold_at')
+            ->selectRaw('round(sum(u.cost), 2) as cost')
+            ->selectRaw('sum(u.uncosted) as uncosted_lines');
 
         $query->orderByRaw(match ($sort) {
             ProductSort::Revenue => 'round(sum(u.revenue) - sum(u.returns), 2) desc',
@@ -107,24 +112,30 @@ final readonly class ProductPerformanceQuery
 
     /**
      * One row per fact, the same columns in every part: own lines, component lines, returned lines (by the SKU that
-     * came back) and returned amounts (by the SKU of the top-level line).
+     * came back), returned amounts (by the SKU of the top-level line), and the costs out and back (by the top-level SKU).
      */
     private function facts(ReportFiltersData $filters, CarbonImmutable $start, CarbonImmutable $end): QueryBuilder
     {
         $lines = $this->facts->scoped($this->facts->lines($start, $end), $filters, byCategory: false)
             ->select(['f.sku_id', 'f.customer_id', 'f.quantity', 'f.quantity_base'])
-            ->selectRaw('0 as bundle_quantity_base, f.gross - f.line_discount - f.order_discount as revenue, 0 as returned_base, 0 as returns, f.at');
+            ->selectRaw('0 as bundle_quantity_base, f.gross - f.line_discount - f.order_discount as revenue, 0 as returned_base, 0 as returns, f.at, 0 as cost, 0 as uncosted');
         $components = $this->facts->scoped($this->facts->components($start, $end), $filters, byCategory: false)
             ->select(['f.sku_id', 'f.customer_id'])
-            ->selectRaw('0 as quantity, f.quantity_base, f.quantity_base as bundle_quantity_base, 0 as revenue, 0 as returned_base, 0 as returns, f.at');
+            ->selectRaw('0 as quantity, f.quantity_base, f.quantity_base as bundle_quantity_base, 0 as revenue, 0 as returned_base, 0 as returns, f.at, 0 as cost, 0 as uncosted');
         $returned = $this->facts->scoped($this->facts->returns($start, $end), $filters, byCategory: false)
             ->select(['f.sku_id'])
-            ->selectRaw('null::bigint as customer_id, 0 as quantity, 0 as quantity_base, 0 as bundle_quantity_base, 0 as revenue, f.quantity_base as returned_base, 0 as returns, null::timestamp as at');
+            ->selectRaw('null::bigint as customer_id, 0 as quantity, 0 as quantity_base, 0 as bundle_quantity_base, 0 as revenue, f.quantity_base as returned_base, 0 as returns, null::timestamp as at, 0 as cost, 0 as uncosted');
         $refunded = $this->facts->scoped($this->facts->returns($start, $end), $filters, byCategory: false)
             ->select(['f.top_sku_id as sku_id'])
-            ->selectRaw('null::bigint as customer_id, 0 as quantity, 0 as quantity_base, 0 as bundle_quantity_base, 0 as revenue, 0 as returned_base, f.amount as returns, null::timestamp as at');
+            ->selectRaw('null::bigint as customer_id, 0 as quantity, 0 as quantity_base, 0 as bundle_quantity_base, 0 as revenue, 0 as returned_base, f.amount as returns, null::timestamp as at, 0 as cost, 0 as uncosted');
+        $costs = $this->facts->scoped($this->facts->costs($start, $end), $filters, byCategory: false)
+            ->select(['f.top_sku_id as sku_id'])
+            ->selectRaw('null::bigint as customer_id, 0 as quantity, 0 as quantity_base, 0 as bundle_quantity_base, 0 as revenue, 0 as returned_base, 0 as returns, null::timestamp as at, f.cost, f.uncosted');
+        $costsBack = $this->facts->scoped($this->facts->returnedCosts($start, $end), $filters, byCategory: false)
+            ->select(['f.top_sku_id as sku_id'])
+            ->selectRaw('null::bigint as customer_id, 0 as quantity, 0 as quantity_base, 0 as bundle_quantity_base, 0 as revenue, 0 as returned_base, 0 as returns, null::timestamp as at, -f.cost as cost, 0 as uncosted');
 
-        return $lines->unionAll($components)->unionAll($returned)->unionAll($refunded);
+        return $lines->unionAll($components)->unionAll($returned)->unionAll($refunded)->unionAll($costs)->unionAll($costsBack);
     }
 
     /**
@@ -132,7 +143,11 @@ final readonly class ProductPerformanceQuery
      */
     private function row(object $row): array
     {
-        /** @var object{sku_id: int|string, sku_code: string, sku_name: string|null, product_id: int|string, product_name: string, product_type: string, quantity: int|string, quantity_base: int|string, bundle_quantity_base: int|string, revenue: string, returns: string, returned_base: int|string, return_rate: string|null, customers: int|string, last_sold_at: string|null} $row */
+        /** @var object{sku_id: int|string, sku_code: string, sku_name: string|null, product_id: int|string, product_name: string, product_type: string, quantity: int|string, quantity_base: int|string, bundle_quantity_base: int|string, revenue: string, returns: string, returned_base: int|string, return_rate: string|null, customers: int|string, last_sold_at: string|null, cost: string, uncosted_lines: int|string} $row */
+        $revenue = Money::add('0.00', $row->revenue);
+        $cost = Money::add('0.00', $row->cost);
+        $profit = (int) $row->uncosted_lines > 0 ? null : Money::subtract($revenue, $cost);
+
         return [
             'sku_id' => (int) $row->sku_id,
             'product_id' => (int) $row->product_id,
@@ -143,12 +158,16 @@ final readonly class ProductPerformanceQuery
             'quantity' => (int) $row->quantity,
             'quantity_base' => (int) $row->quantity_base,
             'bundle_quantity_base' => (int) $row->bundle_quantity_base,
-            'revenue' => Money::add('0.00', $row->revenue),
+            'revenue' => $revenue,
             'returns' => Money::add('0.00', $row->returns),
             'returned_base' => (int) $row->returned_base,
             'return_rate' => $row->return_rate === null ? null : Money::add('0.00', $row->return_rate),
             'customers' => (int) $row->customers,
             'last_sold_at' => $row->last_sold_at === null ? null : CarbonImmutable::parse($row->last_sold_at, 'UTC')->toIso8601String(),
+            'cost' => $cost,
+            'profit' => $profit,
+            'margin' => $profit === null ? null : Money::percentOf($profit, $revenue),
+            'uncosted_lines' => (int) $row->uncosted_lines,
         ];
     }
 }

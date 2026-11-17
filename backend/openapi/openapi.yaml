@@ -6822,10 +6822,21 @@ components:
           properties:
             average_order: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: '(gross − discounts) ÷ orders; null without orders' }
 
+    ReportProfit:
+      type: object
+      description: 'D98: cost of what went out less what came back at the costs frozen on the lines; profit and margin null while any line went out without a cost'
+      required: [cost, profit, margin, uncosted_lines]
+      properties:
+        cost: { $ref: '#/components/schemas/Money' }
+        profit: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
+        margin: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: 'profit ÷ net, %' }
+        uncosted_lines: { type: integer, description: 'Lines that went out without a cost (D96 f)' }
+
     SalesAnalyticsReport:
       type: object
-      required: [from, to, group, generated_at, buckets, totals, previous, by_section, by_customer_group]
+      required: [from, to, group, generated_at, buckets, totals, profit, previous, by_section, by_customer_group]
       properties:
+        profit: { $ref: '#/components/schemas/ReportProfit' }
         from: { type: string, format: date }
         to: { type: string, format: date }
         group: { $ref: '#/components/schemas/SalesGrouping' }
@@ -6881,7 +6892,7 @@ components:
 
     ProductPerformanceRow:
       type: object
-      required: [sku_id, product_id, product_name, sku_code, sku_name, is_bundle, quantity, quantity_base, bundle_quantity_base, revenue, returns, returned_base, return_rate, customers, last_sold_at]
+      required: [sku_id, product_id, product_name, sku_code, sku_name, is_bundle, quantity, quantity_base, bundle_quantity_base, revenue, returns, returned_base, return_rate, customers, last_sold_at, cost, profit, margin, uncosted_lines]
       properties:
         sku_id: { type: integer }
         product_id: { type: integer }
@@ -6898,6 +6909,10 @@ components:
         return_rate: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: 'returned_base ÷ quantity_base, %; null when nothing went out' }
         customers: { type: integer }
         last_sold_at: { type: [string, 'null'], format: date-time }
+        cost: { $ref: '#/components/schemas/Money', description: 'D98: its goods at their frozen costs, less what came back; a bundle carries its components' }
+        profit: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: 'revenue − cost; null while uncosted_lines > 0' }
+        margin: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: 'profit ÷ revenue, %' }
+        uncosted_lines: { type: integer }
 
     CustomerPatternRow:
       type: object
