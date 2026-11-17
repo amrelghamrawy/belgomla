@@ -1,6 +1,6 @@
 # V2 Task 18 — Costing: purchase cost, average cost, adjustment reasons, stocktake
 
-Status: **slices A–C done** (2026-11-16/17); slice D to follow. Ideas taken from the ILORA ERP's inventory and costing (`D:\algoriza\ilora`), cut down to what a wholesale merchant uses: one weighted average cost per SKU, no double entry, no FIFO layers, no suppliers. Requires V2 Tasks 01 (returns), 13 (selling units), 15 (bundles), 16 (reports). Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
+Status: **done** (2026-11-16/17): slices A–D. Ideas taken from the ILORA ERP's inventory and costing (`D:\algoriza\ilora`), cut down to what a wholesale merchant uses: one weighted average cost per SKU, no double entry, no FIFO layers, no suppliers. Requires V2 Tasks 01 (returns), 13 (selling units), 15 (bundles), 16 (reports). Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
 
 ## Slices
 
@@ -9,7 +9,7 @@ Status: **slices A–C done** (2026-11-16/17); slice D to follow. Ideas taken fr
 | A | Average cost per SKU, receiving goods at a price (`receive` movement), setting the cost by hand, cost frozen on every movement and on delivered order lines, returns at the frozen cost | D96, BR-INV09 |
 | B | Fixed reasons for stock adjustments (جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى + ملاحظة) | D97 |
 | C | Profit and margin in the existing sales and product reports, from the frozen costs | D98 |
-| D | Stocktake posts the difference against the count's starting figure instead of overwriting; the base unit is locked while stock exists | — |
+| D | Stocktake posts the difference against the count's starting figure instead of overwriting; the base unit is locked while stock exists | D99 |
 
 ## Slice A — delivered
 
@@ -96,3 +96,28 @@ Against `php artisan serve`, alnoor demo data, owner session via `scripts/smoke.
 | Call | Answer |
 | ---- | ------ |
 | `GET /api/dashboard/reports/sales-analytics?from=2026-10-01&to=2026-10-31` (alnoor demo, every line delivered before costing) | `profit` `{ cost "0.00", profit null, margin null, uncosted_lines 76 }`; 76 = the SQL count of the stock-holding lines delivered in Cairo October |
+
+## Slice D — delivered
+
+- `StockLedger::adjust(..., expectedOnHand)`: On Hand += counted − expected; equal = no-op; below zero `Inventory\Exceptions\CountOutdated` (409 `count_outdated`); below Reserved still `BelowReserved`. `StockAdjustmentData::expectedOnHand`, requests take `expected_on_hand` (single and per bulk item), the audit adds `counted` and `expected_on_hand`, bulk skips `count_outdated`.
+- `Catalog\Actions\SaveProductSkus` refuses a base unit change of a SKU that `Inventory\Queries\StockHeldQuery::holds()` (on hand or reserved > 0): `Catalog\Exceptions\BaseUnitLocked`, 422 on `{path}.base_unit_id`.
+- Frontend: the adjust sheet sends the On Hand it opened with, the bulk form the On Hand of its page; «تغيّر الرصيد كثيرًا منذ بدء الجرد، أعد العدّ» for a skipped stale count; `count_outdated` in the error copy.
+- Hand-computed tests (rules/04 §4):
+  - 50 + (45 − 50) = 45.
+  - 10 sold meanwhile: 40 + (45 − 50) = 35, not 45.
+  - A return meanwhile: 56 + (52 − 50) = 58.
+  - Counted = expected: no-op.
+  - 5 + (2 − 10) = −3 → 409.
+  - 50 + (40 − 50) = 40 < 45 reserved → below reserved.
+  - HTTP: 100 + (108 − 110) = 98, audited with both figures.
+  - The base unit: refused while stock is held, allowed at zero.
+
+- Tests: backend `composer test` green, 6234 passed (+18); frontend 1038 passed (+2). Whole task on top of v2: backend 6097 → 6234 (+137), frontend 1022 → 1038 (+16).
+
+### Manual checks (slice D)
+
+| Call | Answer |
+| ---- | ------ |
+| `POST …/1/adjust {"new_on_hand":738,"reason":"stocktake","expected_on_hand":740}` with 733 on hand | 200, `on_hand` 731 = 733 + (738 − 740), worked out before the call |
+| `POST …/1/adjust {"new_on_hand":0,"reason":"stocktake","expected_on_hand":2000}` | 409 `count_outdated`, details `{ expected_on_hand 2000, counted 0, on_hand 731 }` |
+| The base unit lock | not exercised live (needs a full product payload); covered by `SaveProductSkusTest` |

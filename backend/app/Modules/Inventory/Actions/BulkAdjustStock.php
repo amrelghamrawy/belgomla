@@ -8,18 +8,20 @@ use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Data\BulkStockAdjustmentData;
 use App\Modules\Inventory\Exceptions\BelowReserved;
+use App\Modules\Inventory\Exceptions\CountOutdated;
 use App\Modules\Inventory\Services\StockLedger;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Several counted SKUs at once (08-api-contract.md §7). Each SKU is adjusted like AdjustStock; a SKU that
  * is not the tenant's (`not_found`, BR-T04), would go below Reserved (`below_reserved`, BR-INV08) or is
- * already at that value (`unchanged`, D35) is skipped and reported, the rest are applied.
+ * already at that value (`unchanged`, D35) or counted against an On Hand that has since dropped below what the
+ * difference needs (`count_outdated`, D99 b) is skipped and reported, the rest are applied.
  *
  * One transaction (owned here) that locks every row up front in `sku_id` order, one audit batch: the
  * `stock.adjusted` records plus one `inventory.bulk_adjusted` summary.
  *
- * @phpstan-type Skipped array{sku_id: int, reason: 'not_found'|'below_reserved'|'unchanged', reserved?: int, min_allowed?: int}
+ * @phpstan-type Skipped array{sku_id: int, reason: 'not_found'|'below_reserved'|'unchanged'|'count_outdated', reserved?: int, min_allowed?: int}
  */
 final readonly class BulkAdjustStock
 {
@@ -56,6 +58,10 @@ final readonly class BulkAdjustStock
                     $changed = $this->adjust->handle($sku, $item, $actorId, $batchId);
                 } catch (BelowReserved $e) {
                     $skipped[] = ['sku_id' => $skuId, 'reason' => 'below_reserved', 'reserved' => $e->reserved(), 'min_allowed' => $e->reserved()];
+
+                    continue;
+                } catch (CountOutdated) {
+                    $skipped[] = ['sku_id' => $skuId, 'reason' => 'count_outdated'];
 
                     continue;
                 }

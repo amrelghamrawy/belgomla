@@ -2424,7 +2424,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_bundle" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "promotion_locked" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "count_outdated" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_bundle" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "promotion_locked" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -3654,6 +3654,8 @@ export interface components {
             reason: components["schemas"]["MerchantAdjustmentReason"];
             /** @description Required when reason is other (D97) */
             note?: string | null;
+            /** @description D99 a */
+            expected_on_hand?: number | null;
         };
         /**
          * @description Why On Hand was changed by hand (D97): جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى; import is written by the catalog import only
@@ -3668,7 +3670,7 @@ export interface components {
         BulkAdjustSkipped: {
             sku_id: number;
             /** @enum {string} */
-            reason: "below_reserved" | "not_found" | "unchanged";
+            reason: "below_reserved" | "not_found" | "unchanged" | "count_outdated";
             reserved?: number;
             min_allowed?: number;
         };
@@ -7357,6 +7359,8 @@ export interface operations {
                     reason: components["schemas"]["MerchantAdjustmentReason"];
                     /** @description Required when reason is other (D97) */
                     note?: string | null;
+                    /** @description The on hand shown when the count began (D99 a): on hand then moves by new_on_hand − expected_on_hand from where it is now */
+                    expected_on_hand?: number | null;
                 };
             };
         };
@@ -7365,6 +7369,15 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            /** @description count_outdated (D99 b) with details { expected_on_hand, counted, on_hand } */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             /** @description inventory_below_reserved with `details` as BelowReservedDetails and the Arabic message listing the holding orders (BR-INV08); or validation_failed. */
             422: {
                 headers: {

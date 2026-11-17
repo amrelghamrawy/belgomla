@@ -10,6 +10,7 @@ use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Exceptions\BelowReserved;
+use App\Modules\Inventory\Exceptions\CountOutdated;
 use App\Modules\Inventory\Exceptions\InsufficientStock;
 use App\Modules\Inventory\Exceptions\NotInTransaction;
 use App\Modules\Inventory\Models\InventoryMovement;
@@ -88,13 +89,26 @@ final readonly class StockLedger
     /**
      * A merchant sets On Hand to a counted value (BR-INV06 `adjustment`). Never below Reserved (BR-INV08);
      * setting the current value changes nothing and returns null (D35).
+     *
+     * D99 a: with `expectedOnHand` (what the merchant saw when the count began) the count is a difference: On Hand
+     * moves by counted − expected from where it is now, so a sale or return recorded during the count is kept. A count
+     * equal to what was expected changes nothing; a difference that would go below zero is `count_outdated` (D99 b).
      */
-    public function adjust(Sku $sku, int $newOnHand, string $reason, ?int $actorId = null, ?AdjustmentReason $reasonCode = null): ?InventoryMovement
+    public function adjust(Sku $sku, int $newOnHand, string $reason, ?int $actorId = null, ?AdjustmentReason $reasonCode = null, ?int $expectedOnHand = null): ?InventoryMovement
     {
         $this->assertNotNegative($newOnHand);
 
-        return DB::transaction(function () use ($sku, $newOnHand, $reason, $actorId, $reasonCode): ?InventoryMovement {
+        return DB::transaction(function () use ($sku, $newOnHand, $reason, $actorId, $reasonCode, $expectedOnHand): ?InventoryMovement {
             $row = $this->row($sku);
+
+            if ($expectedOnHand !== null) {
+                $counted = $newOnHand;
+                $newOnHand = $row->on_hand + ($counted - $expectedOnHand);
+
+                if ($newOnHand < 0) {
+                    throw CountOutdated::for($expectedOnHand, $counted, $row->on_hand);
+                }
+            }
 
             if ($newOnHand === $row->on_hand) {
                 return null;

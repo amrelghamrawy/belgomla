@@ -105,6 +105,7 @@ describe("AdjustForm", () => {
       new_on_hand: 150,
       reason: "stocktake",
       note: null,
+      expected_on_hand: 100,
     });
   });
 
@@ -144,6 +145,7 @@ describe("AdjustForm", () => {
       new_on_hand: 90,
       reason: "other",
       note: "هدية لعميل",
+      expected_on_hand: 100,
     });
   });
 
@@ -197,8 +199,8 @@ describe("BulkAdjustTable", () => {
     const skipped = await screen.findByTestId("bulk-skipped");
     expect(skipped).toHaveTextContent("ADW-AR-1: أقل من المحجوز (أقل كمية ممكنة 40)");
     expect(callsTo(fetchMock, "POST /api/dashboard/inventory/bulk-adjust")[0]?.body).toEqual([
-      { sku_id: 5, new_on_hand: 120, reason: "stocktake", note: "جرد سنوي" },
-      { sku_id: 6, new_on_hand: 10, reason: "stocktake", note: "جرد سنوي" },
+      { sku_id: 5, new_on_hand: 120, expected_on_hand: 100, reason: "stocktake", note: "جرد سنوي" },
+      { sku_id: 6, new_on_hand: 10, expected_on_hand: 100, reason: "stocktake", note: "جرد سنوي" },
     ]);
   });
 
@@ -315,5 +317,38 @@ describe("CostForm (BR-INV09, D96)", () => {
     await user.click(screen.getByRole("button", { name: "حفظ" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("هذا المنتج باقة وليس له مخزون: استلم مكوناته");
+  });
+});
+
+describe("counts against what was shown (D99)", () => {
+  it("D99 b names a stale count among the skipped rows", async () => {
+    stubApi({
+      "POST /api/dashboard/inventory/bulk-adjust": json(200, {
+        data: { applied: 0, skipped: [{ sku_id: 5, reason: "count_outdated" }], batch_id: "b" },
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<BulkAdjustTable rows={[row()]} onDone={vi.fn()} />);
+
+    await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية) ADW-SCI-1"), "0");
+    await user.selectOptions(screen.getByLabelText("سبب التعديل (لكل الأصناف)"), "جرد");
+    await user.click(screen.getByRole("button", { name: "تطبيق التعديلات" }));
+
+    expect(await screen.findByTestId("bulk-skipped")).toHaveTextContent("ADW-SCI-1: تغيّر الرصيد كثيرًا منذ بدء الجرد، أعد العدّ");
+  });
+
+  it("D99 b shows the refusal of a single stale count", async () => {
+    stubApi({
+      "POST /api/dashboard/inventory/5/adjust": envelopeError(409, "count_outdated", "تغيّر الرصيد منذ بدء الجرد (كان 100 وأصبح 5)، ولا يمكن تطبيق الفرق. أعد عدّ الصنف."),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<AdjustForm row={row()} onDone={vi.fn()} />);
+
+    await user.clear(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"));
+    await user.type(screen.getByLabelText("الرصيد الجديد (بالوحدة الأساسية)"), "0");
+    await user.selectOptions(screen.getByLabelText("سبب التعديل"), "جرد");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("تغيّر الرصيد منذ بدء الجرد (كان 100 وأصبح 5)");
   });
 });

@@ -583,7 +583,8 @@ Dashboard behavior:
 
 - The adjustment form shows On Hand, Reserved and Available side by side, and states the minimum allowed value: "أقل كمية ممكنة: {reserved} (محجوزة لطلبات قائمة)".
 - If the merchant enters a lower value, the request is rejected with an Arabic message listing the open orders holding the reservation, each linked to the order page: "لا يمكن تقليل المخزون إلى {x} لأن {reserved} وحدة محجوزة للطلبات: #1024، #1031. ألغِ الطلبات أو سلّمها أولًا."
-- The same rule applies to bulk adjustments; the response reports the SKUs that were skipped and why (`below_reserved` with `reserved`/`min_allowed`, `not_found`, `unchanged`), and the valid ones are applied.
+- The same rule applies to bulk adjustments; the response reports the SKUs that were skipped and why (`below_reserved` with `reserved`/`min_allowed`, `not_found`, `unchanged`, `count_outdated`), and the valid ones are applied.
+- A count (V2, D99) is applied as the difference between what was counted and what the form showed when the count began, on top of the current On Hand, so sales and returns recorded during the count are not lost.
 
 ### BR-INV09 — Purchase Cost and Average Cost (V2 costing, D96)
 

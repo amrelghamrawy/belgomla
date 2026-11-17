@@ -8,6 +8,7 @@ use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Enums\SkuStatus;
+use App\Modules\Catalog\Exceptions\BaseUnitLocked;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Catalog\Models\ProductOptionValue;
@@ -15,6 +16,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\SkuHistoryQuery;
 use App\Modules\Catalog\Services\VariantGenerator;
 use App\Modules\Inventory\Actions\RecordOpeningStock;
+use App\Modules\Inventory\Queries\StockHeldQuery;
 use App\Support\ArabicText;
 use Illuminate\Support\Facades\DB;
 
@@ -38,6 +40,7 @@ final readonly class SaveProductSkus
         private RecordOpeningStock $openingStock,
         private SkuHistoryQuery $history,
         private VariantGenerator $variants,
+        private StockHeldQuery $stock,
     ) {}
 
     /**
@@ -125,6 +128,11 @@ final readonly class SaveProductSkus
     {
         $created = ! $sku instanceof Sku;
         $sku ??= $product->skus()->make();
+
+        if (! $created && $sku->base_unit_id !== $data->baseUnitId && $this->stock->holds($sku->id)) {
+            throw BaseUnitLocked::at($data->path); // D99 c
+        }
+
         $sku->fill([...$data->attributes($index), 'name' => $this->variants->label($data->optionValues)])->save();
 
         $this->link($sku, $data, $values);

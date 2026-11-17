@@ -611,6 +611,7 @@ export const dashboard = {
       below_reserved: (minAllowed: number) => `أقل من المحجوز (أقل كمية ممكنة ${minAllowed})`,
       not_found: "الصنف غير موجود",
       unchanged: "نفس الرصيد الحالي",
+      count_outdated: "تغيّر الرصيد كثيرًا منذ بدء الجرد، أعد العدّ",
     },
     empty: "لا توجد أصناف",
     // BR-INV09, D96: receiving goods and the cost.

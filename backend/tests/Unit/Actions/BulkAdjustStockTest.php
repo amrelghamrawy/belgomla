@@ -60,3 +60,13 @@ test('a failure part way rolls back every adjustment and audit record of the bat
         ->and(InventoryMovement::query()->count())->toBe(0)
         ->and(AuditLog::query()->count())->toBe(0);
 });
+
+test('D99 b a stale count in a batch is skipped as count_outdated, the rest applied', function (): void {
+    $result = app(BulkAdjustStock::class)->handle(new BulkStockAdjustmentData([
+        $this->counted->id => new StockAdjustmentData(15, AdjustmentReason::Stocktake),
+        $this->same->id => new StockAdjustmentData(0, AdjustmentReason::Stocktake, expectedOnHand: 500),
+    ]));
+
+    expect($result['applied'])->toBe(1)
+        ->and($result['skipped'])->toBe([['sku_id' => $this->same->id, 'reason' => 'count_outdated']]);
+});

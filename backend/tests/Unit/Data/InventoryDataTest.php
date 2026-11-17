@@ -17,6 +17,15 @@ test('D97 an adjustment reads an integer on hand, the reason code and a trimmed 
     expect(StockAdjustmentData::fromRequest($request))->toEqual(new StockAdjustmentData(50, AdjustmentReason::Damaged, 'وقع الكرتون'));
 });
 
+test('D99 a an adjustment reads the on hand the count started from when sent', function (array $extra, ?int $expected): void {
+    $request = AdjustStockRequest::create('/', 'POST', ['new_on_hand' => 5, 'reason' => 'stocktake', ...$extra]);
+
+    expect(StockAdjustmentData::fromRequest($request)->expectedOnHand)->toBe($expected);
+})->with([
+    'sent' => [['expected_on_hand' => '12'], 12],
+    'not sent' => [[], null],
+]);
+
 test('D97 the movement text is the reason, then the note when there is one', function (?string $note, string $text): void {
     expect((new StockAdjustmentData(1, AdjustmentReason::Expired, $note))->text())->toBe($text);
 })->with([
@@ -27,12 +36,12 @@ test('D97 the movement text is the reason, then the note when there is one', fun
 test('a bulk adjustment is keyed by sku id in the order sent', function (): void {
     $request = BulkAdjustStockRequest::create('/', 'POST', ['items' => [
         ['sku_id' => '9', 'new_on_hand' => 5, 'reason' => 'stocktake'],
-        ['sku_id' => 4, 'new_on_hand' => '0', 'reason' => 'other', 'note' => ' هدية لعميل '],
+        ['sku_id' => 4, 'new_on_hand' => '0', 'reason' => 'other', 'note' => ' هدية لعميل ', 'expected_on_hand' => 7],
     ]]);
 
     expect(BulkStockAdjustmentData::fromRequest($request)->items)->toEqual([
         9 => new StockAdjustmentData(5, AdjustmentReason::Stocktake),
-        4 => new StockAdjustmentData(0, AdjustmentReason::Other, 'هدية لعميل'),
+        4 => new StockAdjustmentData(0, AdjustmentReason::Other, 'هدية لعميل', 7),
     ]);
 });
 

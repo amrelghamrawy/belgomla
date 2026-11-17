@@ -9,7 +9,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\In;
 
-/** POST /api/dashboard/inventory/bulk-adjust: `[ { sku_id, new_on_hand, reason, note? } ]`, each SKU once; reasons as D97. */
+/** POST /api/dashboard/inventory/bulk-adjust: `[ { sku_id, new_on_hand, reason, note?, expected_on_hand? } ]`, each SKU once; reasons as D97. */
 final class BulkAdjustStockRequest extends FormRequest
 {
     public const int MAX_ITEMS = 500;
@@ -26,11 +26,12 @@ final class BulkAdjustStockRequest extends FormRequest
             'items.*.new_on_hand' => ['required', 'integer', 'min:0', 'max:'.AdjustStockRequest::MAX_ON_HAND],
             'items.*.reason' => ['required', 'string', Rule::in(AdjustmentReason::chosenByMerchant())],
             'items.*.note' => ['nullable', 'string', 'max:150', 'required_if:items.*.reason,'.AdjustmentReason::Other->value],
+            'items.*.expected_on_hand' => ['nullable', 'integer', 'min:0', 'max:'.AdjustStockRequest::MAX_ON_HAND],
         ];
     }
 
     /**
-     * @return list<array{sku_id: int, new_on_hand: int, reason: AdjustmentReason, note: string|null}>
+     * @return list<array{sku_id: int, new_on_hand: int, reason: AdjustmentReason, note: string|null, expected_on_hand: int|null}>
      */
     public function items(): array
     {
@@ -42,6 +43,7 @@ final class BulkAdjustStockRequest extends FormRequest
                 'new_on_hand' => $this->integer("items.{$index}.new_on_hand"),
                 'reason' => AdjustmentReason::from($this->string("items.{$index}.reason")->value()),
                 'note' => $this->noteAt($index),
+                'expected_on_hand' => $this->filled("items.{$index}.expected_on_hand") ? $this->integer("items.{$index}.expected_on_hand") : null,
             ];
         }
 

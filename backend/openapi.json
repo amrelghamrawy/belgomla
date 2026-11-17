@@ -4645,6 +4645,15 @@
                                         ],
                                         "maxLength": 150,
                                         "description": "Required when reason is other (D97)"
+                                    },
+                                    "expected_on_hand": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 0,
+                                        "maximum": 10000000,
+                                        "description": "The on hand shown when the count began (D99 a): on hand then moves by new_on_hand − expected_on_hand from where it is now"
                                     }
                                 }
                             }
@@ -4663,6 +4672,16 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "description": "count_outdated (D99 b) with details { expected_on_hand, counted, on_hand }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
                     },
                     "422": {
                         "description": "inventory_below_reserved with `details` as BelowReservedDetails and the Arabic message listing the holding orders (BR-INV08); or validation_failed.\n",
@@ -9309,6 +9328,7 @@
                     "cart_line_invalid",
                     "category_cycle",
                     "checkout_failed",
+                    "count_outdated",
                     "cover_price_required",
                     "credit_applied",
                     "credit_voided",
@@ -14342,6 +14362,15 @@
                         ],
                         "maxLength": 150,
                         "description": "Required when reason is other (D97)"
+                    },
+                    "expected_on_hand": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 10000000,
+                        "description": "D99 a"
                     }
                 }
             },
@@ -14385,7 +14414,8 @@
                         "enum": [
                             "below_reserved",
                             "not_found",
-                            "unchanged"
+                            "unchanged",
+                            "count_outdated"
                         ]
                     },
                     "reserved": {

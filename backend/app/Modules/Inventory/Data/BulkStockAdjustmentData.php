@@ -19,7 +19,7 @@ final readonly class BulkStockAdjustmentData
         $items = [];
 
         foreach ($request->items() as $item) {
-            $items[$item['sku_id']] = new StockAdjustmentData($item['new_on_hand'], $item['reason'], $item['note']);
+            $items[$item['sku_id']] = new StockAdjustmentData($item['new_on_hand'], $item['reason'], $item['note'], $item['expected_on_hand']);
         }
 
         return new self($items);

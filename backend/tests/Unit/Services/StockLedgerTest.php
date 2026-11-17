@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Exceptions\BelowReserved;
+use App\Modules\Inventory\Exceptions\CountOutdated;
 use App\Modules\Inventory\Exceptions\InsufficientStock;
 use App\Modules\Inventory\Exceptions\NotInTransaction;
 use App\Modules\Inventory\Models\InventoryMovement;
@@ -362,3 +363,43 @@ test('D96 e opening stock moves at no cost', function (): void {
     expect(InventoryMovement::query()->sole()->unit_cost)->toBeNull()
         ->and(($this->stock)($sku)->avg_cost)->toBeNull();
 });
+
+test('D99 a a count against what was expected moves on hand by the difference from where it is now', function (int $current, int $expected, int $counted, int $after, int $quantity): void {
+    $sku = Sku::factory()->withStock($current)->create();
+
+    $movement = ($this->ledger)()->adjust($sku, $counted, 'جرد', expectedOnHand: $expected);
+
+    expect(($this->stock)($sku)->on_hand)->toBe($after)
+        ->and($movement?->only(['quantity', 'on_hand_after']))->toBe(['quantity' => $quantity, 'on_hand_after' => $after]);
+})->with([
+    'nothing moved during the count: 50 + (45 − 50)' => [50, 50, 45, 45, -5],
+    '10 sold during the count: 40 + (45 − 50), not 45' => [40, 50, 45, 35, -5],
+    'a return during the count: 56 + (52 − 50)' => [56, 50, 52, 58, 2],
+]);
+
+test('D99 a a count equal to what was expected changes nothing, even when on hand moved since', function (): void {
+    $sku = Sku::factory()->withStock(40)->create();
+
+    expect(($this->ledger)()->adjust($sku, 50, 'جرد', expectedOnHand: 50))->toBeNull()
+        ->and(($this->stock)($sku)->on_hand)->toBe(40)
+        ->and(InventoryMovement::query()->count())->toBe(0);
+});
+
+test('D99 b a difference that would go below zero is refused with the three figures', function (): void {
+    $sku = Sku::factory()->withStock(5)->create();
+
+    // 5 + (2 − 10) = −3
+    expect(fn () => ($this->ledger)()->adjust($sku, 2, 'جرد', expectedOnHand: 10))->toThrow(function (CountOutdated $e): void {
+        expect([$e->status, $e->errorCode, $e->details])->toBe([409, 'count_outdated', ['expected_on_hand' => 10, 'counted' => 2, 'on_hand' => 5]])
+            ->and($e->getMessage())->toBe('تغيّر الرصيد منذ بدء الجرد (كان 10 وأصبح 5)، ولا يمكن تطبيق الفرق. أعد عدّ الصنف.');
+    });
+
+    expect(($this->stock)($sku)->on_hand)->toBe(5);
+});
+
+test('D99 a BR-INV08 the difference still never goes below reserved', function (): void {
+    $sku = Sku::factory()->withStock(50, 45)->create();
+
+    // 50 + (40 − 50) = 40 < 45 reserved
+    ($this->ledger)()->adjust($sku, 40, 'جرد', expectedOnHand: 50);
+})->throws(BelowReserved::class);

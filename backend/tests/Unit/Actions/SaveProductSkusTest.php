@@ -9,6 +9,7 @@ use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\SkuStatus;
+use App\Modules\Catalog\Exceptions\BaseUnitLocked;
 use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
@@ -142,4 +143,26 @@ test('BR-P14 a variant sent inactive stays in the form and is hidden from the st
 
     expect(Sku::query()->where('code', 'PEN-2')->sole()->status)->toBe(SkuStatus::Inactive)
         ->and($this->pen->activeSkus()->pluck('code')->all())->toBe(['PEN-1', 'PEN-3']);
+});
+
+test('D99 c the base unit of a sku holding stock cannot change, pointing at the field', function (): void {
+    $dozen = Unit::factory()->create(['name' => 'دستة']);
+    $sku = fn (string $code, string $colour): SkuData => ($this->sku)($code, [$colour], ['baseUnitId' => $dozen->id]);
+
+    expect(fn () => ($this->save)([$sku('PEN-1', 'أزرق'), ($this->sku)('PEN-2', ['أسود']), ($this->sku)('PEN-3', ['أحمر'])], [($this->colours)('أزرق', 'أسود', 'أحمر')]))
+        ->toThrow(function (BaseUnitLocked $e): void {
+            expect([$e->status, $e->errorCode, $e->details])->toBe([422, 'validation_failed', ['skus.0.base_unit_id' => ['لا يمكن تغيير الوحدة الأساسية لصنف عليه رصيد أو حجز: صفّر رصيده أولًا']]]);
+        });
+
+    expect(Sku::query()->where('code', 'PEN-1')->sole()->base_unit_id)->toBe($this->piece->id);
+});
+
+test('D99 c the base unit of a sku with nothing on hand or reserved can change', function (): void {
+    $dozen = Unit::factory()->create(['name' => 'دستة']);
+    $blue = Sku::query()->where('code', 'PEN-1')->sole();
+    SkuInventory::query()->whereKey($blue->id)->update(['on_hand' => 0, 'reserved' => 0]);
+
+    ($this->save)([($this->sku)('PEN-1', ['أزرق'], ['baseUnitId' => $dozen->id]), ($this->sku)('PEN-2', ['أسود']), ($this->sku)('PEN-3', ['أحمر'])], [($this->colours)('أزرق', 'أسود', 'أحمر')]);
+
+    expect($blue->fresh()?->base_unit_id)->toBe($dozen->id);
 });

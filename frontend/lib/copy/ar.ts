@@ -20,6 +20,7 @@ const errors: Record<ApiErrorCode, string> = {
   cart_line_invalid: "بعض أصناف السلة لم تعد متاحة بالكمية المطلوبة",
   category_cycle: "لا يمكن نقل القسم داخل أحد أقسامه الفرعية",
   checkout_failed: "تعذر إتمام الطلب، راجع السلة",
+  count_outdated: "تغيّر الرصيد منذ بدء الجرد، أعد عدّ الصنف",
   credit_applied: "استُخدم جزء من هذا الرصيد، ألغِ التحصيلات المخصومة منه أولًا",
   credit_voided: "تم إلغاء هذا الرصيد",
   cover_price_required: "أدخل السعر المرجعي (الغلاف أو القطاعي) أولًا لاستخدام النسبة",

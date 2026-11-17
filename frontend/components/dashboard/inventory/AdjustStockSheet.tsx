@@ -69,7 +69,8 @@ export function AdjustForm({ row, onDone }: { row: InventoryRow; onDone: () => v
     }
 
     adjust.mutate(
-      { new_on_hand: Number(onHand), reason: reason.reason, note: reason.note.trim() || null },
+      // D99 a: the count is against the on hand this form opened with; sales meanwhile are kept.
+      { new_on_hand: Number(onHand), reason: reason.reason, note: reason.note.trim() || null, expected_on_hand: row.on_hand },
       {
         onSuccess: () => {
           toast.success(copy.adjusted);

@@ -87,6 +87,7 @@ test('adjust validation', function (array $body, string $field): void {
     'D97 a reason outside the list' => [['new_on_hand' => 90, 'reason' => 'جرد'], 'reason'],
     'D97 the import reason is not the merchant\'s' => [['new_on_hand' => 90, 'reason' => 'import'], 'reason'],
     'D97 other needs a note' => [['new_on_hand' => 90, 'reason' => 'other'], 'note'],
+    'expected on hand negative' => [['new_on_hand' => 90, 'reason' => 'stocktake', 'expected_on_hand' => -1], 'expected_on_hand'],
     'note too long' => [['new_on_hand' => 90, 'reason' => 'damaged', 'note' => str_repeat('س', 151)], 'note'],
 ]);
 
@@ -109,4 +110,24 @@ test('BR-INV08 the refusal names the open orders holding the stock (Orders fills
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'inventory_below_reserved')
         ->assertJsonPath('error.details.orders', [['number' => $order->number, 'status' => 'pending', 'quantity_base' => 120]]);
+});
+
+test('D99 a a count taken while an order was delivered moves on hand by the difference, audited with both figures', function (): void {
+    // the form showed 110; 10 left on a delivery meanwhile (on hand now 100); the merchant counted 108 → 100 + (108 − 110) = 98
+    $this->tenantJson('POST', "/api/dashboard/inventory/{$this->sku->id}/adjust", ['new_on_hand' => 108, 'reason' => 'stocktake', 'expected_on_hand' => 110])
+        ->assertOk()
+        ->assertJsonPath('data.on_hand', 98);
+
+    expect($this->inTenant(fn () => AuditLog::query()->sole()->new_values))->toEqual([
+        'on_hand' => 98, 'reason' => 'stocktake', 'note' => null, 'counted' => 108, 'expected_on_hand' => 110,
+    ]);
+});
+
+test('D99 b a count the stock can no longer take is 409 count_outdated and changes nothing', function (): void {
+    $this->tenantJson('POST', "/api/dashboard/inventory/{$this->sku->id}/adjust", ['new_on_hand' => 0, 'reason' => 'stocktake', 'expected_on_hand' => 150])
+        ->assertConflict()
+        ->assertJsonPath('error.code', 'count_outdated')
+        ->assertJsonPath('error.details', ['expected_on_hand' => 150, 'counted' => 0, 'on_hand' => 100]);
+
+    $this->assertDatabaseCount('inventory_movements', 0);
 });

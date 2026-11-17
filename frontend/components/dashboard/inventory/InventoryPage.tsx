@@ -197,12 +197,18 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<BulkAdjustResult | null>(null);
   const codes = new Map(rows.map((row) => [row.sku_id, row.code]));
+  const shown = new Map(rows.map((row) => [row.sku_id, row.on_hand]));
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const items = Object.entries(values)
       .filter(([, value]) => value.trim() !== "")
-      .map(([skuId, value]) => ({ sku_id: Number(skuId), new_on_hand: Number(value) }));
+      // D99 a: each count is against the on hand this page showed.
+      .map(([skuId, value]) => ({
+        sku_id: Number(skuId),
+        new_on_hand: Number(value),
+        expected_on_hand: shown.get(Number(skuId)) ?? 0,
+      }));
 
     if (items.length === 0) {
       setProblem(copy.bulkNothing);
