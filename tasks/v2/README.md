@@ -22,6 +22,10 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 | 15 | [Bundles & full-grade sets](15-bundles.md)             | Catalog, Pricing, Inventory, Orders        | done    | see log |
 | 16 | [Advanced reports](16-advanced-reports.md)             | Reports                                    | done    | see log |
 | 17 | [V2 release](17-v2-release.md)                         | docs, seeders, deploy                      | planned |        |
+| 18 | [Costing](18-costing.md)                               | Inventory, Orders, Reports                 | in progress (A–B done) | see log |
+| 19 | [Expenses & net profit](19-expenses.md)                | Expenses (new), Tenancy, Reports           | planned (after 18 C) |        |
+| 20 | [Order printing, overdue reminders, payment methods](20-order-printing-overdue-reminders-payment-methods.md) | Orders, Collections, Messaging, Tenancy, Reports, frontend | planned |        |
+| 21 | [Reorder, link previews, return reasons](21-reorder-link-previews-return-reasons.md) | Customers, Orders, Reports, frontend | planned |        |
 
 ## Why this order
 
@@ -50,6 +54,7 @@ V2 = "Commercial Expansion" (`src-md-files/03-v1-v2-roadmap.md` §V2), limited t
 07 ─► 08 ─► 09 ─► 10
 11 ─► 12
 13 ─► 14 ─► 15
+18 (slice C) ─► 19
 ```
 
 Free to run out of order: 06 at any point after 00; 03 and 04 in parallel with 01/02.
