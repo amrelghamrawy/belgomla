@@ -184,6 +184,8 @@ export type BundleReport = Schemas["BundleReport"];
 
 // V2 Task 16 — advanced reports (D94)
 export type ReportName = Schemas["ReportName"];
+export type ProfitAndLossReport = Schemas["ProfitAndLossReport"];
+export type ProfitAndLossFigures = Schemas["ProfitAndLossFigures"];
 export type ProductReportSort = Schemas["ProductReportSort"];
 export type CustomerReportView = Schemas["CustomerReportView"];
 export type SalesAnalyticsReport = Schemas["SalesAnalyticsReport"];

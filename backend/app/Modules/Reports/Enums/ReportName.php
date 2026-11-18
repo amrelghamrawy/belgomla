@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Reports\Enums;
 
-/** The advanced reports of V2 Task 16 (D5 extended, D94), by their path under `/api/dashboard/reports/`. */
+/** The advanced reports of V2 Task 16 (D5 extended, D94) and the profit and loss of V2 Task 19 (D100), by their path under `/api/dashboard/reports/`. */
 enum ReportName: string
 {
     case SalesAnalytics = 'sales-analytics';
@@ -12,6 +12,7 @@ enum ReportName: string
     case Customers = 'customers';
     case Inventory = 'inventory';
     case Collections = 'collections';
+    case ProfitAndLoss = 'profit-and-loss';
 
     public function label(): string
     {
@@ -21,6 +22,7 @@ enum ReportName: string
             self::Customers => 'العملاء',
             self::Inventory => 'المخزون',
             self::Collections => 'التحصيل',
+            self::ProfitAndLoss => 'الأرباح والخسائر',
         };
     }
 

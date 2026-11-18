@@ -112,7 +112,7 @@ final readonly class SalesAnalyticsQuery
      *
      * @return array{0: string, 1: string}
      */
-    private function previousRange(ReportFiltersData $filters): array
+    public function previousRange(ReportFiltersData $filters): array
     {
         $from = CarbonImmutable::createFromFormat('!Y-m-d', $filters->from, 'UTC') ?: CarbonImmutable::now();
         $to = CarbonImmutable::createFromFormat('!Y-m-d', $filters->to, 'UTC') ?: $from;
@@ -163,11 +163,12 @@ final readonly class SalesAnalyticsQuery
     }
 
     /**
-     * D98: cost of what went out less what came back, and the profit on the net when every line has a cost.
+     * D98: cost of what went out less what came back, and the profit on the net when every line has a cost. Public for
+     * the profit and loss report (D100 h), which must not write a second formula.
      *
      * @return Profit
      */
-    private function profit(ReportFiltersData $filters, CarbonImmutable $start, CarbonImmutable $end, string $net): array
+    public function profit(ReportFiltersData $filters, CarbonImmutable $start, CarbonImmutable $end, string $net): array
     {
         /** @var object{cost: string|null, uncosted: int|string|null} $out */
         $out = $this->facts->scoped($this->facts->costs($start, $end), $filters)

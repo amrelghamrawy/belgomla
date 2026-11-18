@@ -135,5 +135,7 @@ dataset('dashboard authenticated routes', [
     'reports inventory export' => ['GET', '/api/dashboard/reports/inventory/export'],
     'reports collections' => ['GET', '/api/dashboard/reports/collections'],
     'reports collections export' => ['GET', '/api/dashboard/reports/collections/export'],
+    'reports profit and loss' => ['GET', '/api/dashboard/reports/profit-and-loss'],
+    'reports profit and loss export' => ['GET', '/api/dashboard/reports/profit-and-loss/export'],
     'audit log' => ['GET', '/api/dashboard/audit'],
 ]);

@@ -1,6 +1,6 @@
 # V2 Task 19 — Operating expenses and net profit (المصروفات وصافي الربح)
 
-Status: **slice A done** (2026-11-17); slice B next. Requires V2 Task 18 slice C (gross profit from the frozen costs, D98) to be merged; slice B (adjustment reasons, D97) gives the stock losses their reasons. Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
+Status: **done** (2026-11-17): slices A–B. Requires V2 Task 18 slice C (gross profit from the frozen costs, D98) to be merged; slice B (adjustment reasons, D97) gives the stock losses their reasons. Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
 
 ## Why
 
@@ -127,7 +127,7 @@ Tests (expected values worked out by hand from D100 before running, rules/04 §4
   - `net_profit` and `net_margin`;
   - the same block for the previous range of equal length, like the sales analytics `previous` (D94).
 - The stock losses come from `inventory_movements` of type `adjust` in the range, by `created_at` in the business zone, `reason_code <> 'import'`.
-  - Not checked yet: whether Reports may read `inventory_movements` directly or must go through an Inventory query. Check the boundary arch test.
+  - Checked: Reports may not use `Inventory\Models` (`tests/Arch/ModulesBoundariesTest.php`, "reports read other modules only through orders, their queries and enums"), so the losses come from `Inventory\Queries\AdjustmentLossesQuery`.
 - Endpoint: `GET /api/dashboard/reports/profit-and-loss` (`reports.view`), cached like the other reports. Export to XLSX through `ReportExporter` (a new `ReportName`).
 - Frontend: a «الأرباح والخسائر» tab in التقارير. It reads top to bottom:
   1. net sales
@@ -201,3 +201,39 @@ Against `php artisan serve`, alnoor demo data, owner session via `scripts/smoke.
 | `POST /api/dashboard/expenses/3/void {"reason":"duplicate"}`, then again | 200, then 409 |
 | `GET /api/dashboard/expenses` | 3 rows, `meta.total_amount` "1850.50" = 1500 + 350.50, the voided 120.25 out |
 | `POST /api/dashboard/expenses {"spent_on":"2030-01-01",…}` | 422 |
+
+## Slice B — delivered
+
+- `Inventory\Queries\AdjustmentLossesQuery::between()`: the adjustments of the range at their frozen cost, by reason code (`unspecified` for adjustments made before D97), `import` excluded, the count without a cost.
+- `Reports\Queries\ProfitAndLossQuery`:
+  - net sales from `SalesAnalyticsQuery::period()`;
+  - the cost of goods and gross profit from `SalesAnalyticsQuery::profit()` (made public; no second formula);
+  - the losses;
+  - `Expenses\Queries\ExpenseTotalsQuery::byCategory()`;
+  - the net and the margin;
+  - the previous range through `SalesAnalyticsQuery::previousRange()` (made public).
+
+  The category and customer group filters are dropped before computing and caching (D100 j).
+- `GET /api/dashboard/reports/profit-and-loss` (`reports.view`), `ReportName::ProfitAndLoss`, export sheet (one row per line, both ranges).
+- Frontend: the «الأرباح والخسائر» tab (range filters only):
+  - the statement top to bottom with the previous range beside each line;
+  - the losses by reason and the expenses by category under their lines;
+  - «خسارة» in red for a negative net;
+  - «غير مكتمل» and «N سطر مباع بدون تكلفة · N تسوية مخزون بدون تكلفة» with a link to المخزون.
+- Hand-worked tests, from the case above:
+  - 283.69 / 2.84 %;
+  - the loss case −1,216.31 / −12.16 %;
+  - import ignored;
+  - an uncosted adjustment: losses and net null, expenses shown;
+  - an uncosted sale: gross and net null;
+  - an expense on the day before the range falls in the previous range: −77.00 net, null margin on 0 sales;
+  - Cairo midnight for adjustments: 23:30 in, 00:10 out (26.31 + 1.00 = 27.31);
+  - the filters change nothing;
+  - `unspecified` 6.00;
+  - the endpoint's documented shape and the CSV export.
+
+### Manual checks (slice B)
+
+| Call | Answer |
+| ---- | ------ |
+| `GET /api/dashboard/reports/profit-and-loss?from=<today>&to=<today>` on the demo store | `stock_losses` 47.36 (`damaged` 36.83 = 7 × 5.2618, `stocktake` 10.52 = 2 × 5.2618; the total is rounded once from 9 × 5.2618 = 47.3562, so it is not the sum of the rounded reasons, 47.35), the same per reason as SQL on `inventory_movements`; `expenses` 1,850.50 (rent 1,500.00, transport 350.50); `net_profit` 0 − 47.36 − 1,850.50 = −1,897.86; `net_margin` null on 0 sales |

@@ -139,6 +139,8 @@ const DASHBOARD_ROUTES = [
     'reports inventory export' => ['GET', '/api/dashboard/reports/inventory/export', 'reports.view'],
     'reports collections' => ['GET', '/api/dashboard/reports/collections', 'reports.view'],
     'reports collections export' => ['GET', '/api/dashboard/reports/collections/export', 'reports.view'],
+    'reports profit and loss' => ['GET', '/api/dashboard/reports/profit-and-loss', 'reports.view'],
+    'reports profit and loss export' => ['GET', '/api/dashboard/reports/profit-and-loss/export', 'reports.view'],
     'audit log' => ['GET', '/api/dashboard/audit', 'audit.view'],
 ];
 

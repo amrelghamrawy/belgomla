@@ -125,6 +125,7 @@ export const REPORT_KEYS: Record<ReportName, readonly string[]> = {
   customers: ["from", "to", "customer_group_id", "view", "dormant_days"],
   inventory: ["from", "to", "category_id", "dead_days", "dead_only"],
   collections: ["from", "to", "group", "customer_group_id"],
+  "profit-and-loss": ["from", "to"], // D100 j: the range only
 };
 
 /** Every key the reports page keeps in the URL. */

@@ -8723,6 +8723,52 @@
                 }
             }
         },
+        "/api/dashboard/reports/profit-and-loss": {
+            "get": {
+                "operationId": "dashboardReportProfitAndLoss",
+                "tags": [
+                    "dashboard-reports"
+                ],
+                "summary": "V2 Task 19 (D100): net sales − cost of goods = gross profit; − stock losses − expenses = net profit, for the range and the one before; only the range applies; cached 10 minutes (D94)",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/From"
+                    },
+                    {
+                        "$ref": "#/components/parameters/To"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The profit and loss statement",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ProfitAndLossReport"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
         "/api/dashboard/reports/{report}/export": {
             "get": {
                 "operationId": "dashboardReportExport",
@@ -17083,7 +17129,8 @@
                     "products",
                     "customers",
                     "inventory",
-                    "collections"
+                    "collections",
+                    "profit-and-loss"
                 ],
                 "description": "The advanced reports of V2 Task 16"
             },
@@ -17842,6 +17889,136 @@
                     },
                     "outstanding": {
                         "$ref": "#/components/schemas/Money"
+                    }
+                }
+            },
+            "ProfitAndLossFigures": {
+                "type": "object",
+                "description": "D100 h; a null figure is unknown: gross while a sold line has no cost, losses while an adjustment has none, net when either is",
+                "required": [
+                    "from",
+                    "to",
+                    "net_sales",
+                    "cost_of_goods",
+                    "gross_profit",
+                    "stock_losses",
+                    "losses_by_reason",
+                    "expenses",
+                    "expenses_by_category",
+                    "net_profit",
+                    "net_margin",
+                    "uncosted_lines",
+                    "uncosted_adjustments"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "net_sales": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "cost_of_goods": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "gross_profit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "stock_losses": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "losses_by_reason": {
+                        "type": "object",
+                        "description": "By adjustment reason code (D97; `unspecified` before reason codes), a negative amount gave stock back",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Money"
+                        }
+                    },
+                    "expenses": {
+                        "$ref": "#/components/schemas/Money"
+                    },
+                    "expenses_by_category": {
+                        "type": "object",
+                        "description": "By expense category code (D100 b), live expenses only",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Money"
+                        }
+                    },
+                    "net_profit": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Negative = a loss"
+                    },
+                    "net_margin": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Money"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "net_profit ÷ net_sales, %"
+                    },
+                    "uncosted_lines": {
+                        "type": "integer"
+                    },
+                    "uncosted_adjustments": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "ProfitAndLossReport": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "generated_at",
+                    "current",
+                    "previous"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "generated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "current": {
+                        "$ref": "#/components/schemas/ProfitAndLossFigures"
+                    },
+                    "previous": {
+                        "$ref": "#/components/schemas/ProfitAndLossFigures"
                     }
                 }
             },

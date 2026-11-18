@@ -11,6 +11,7 @@ use App\Modules\Reports\Http\Controllers\Dashboard\Reports\LowStockController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\OutstandingController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\OverviewController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\ProductPerformanceController;
+use App\Modules\Reports\Http\Controllers\Dashboard\Reports\ProfitAndLossController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\ReportExportController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\SalesAnalyticsController;
 use App\Modules\Reports\Http\Controllers\Dashboard\Reports\SalesController;
@@ -32,5 +33,6 @@ Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user', 'permission
     Route::get('customers', [CustomerPatternsController::class, 'show'])->name('customers');
     Route::get('inventory', [InventoryAnalyticsController::class, 'show'])->name('inventory');
     Route::get('collections', [CollectionsReportController::class, 'show'])->name('collections');
+    Route::get('profit-and-loss', [ProfitAndLossController::class, 'show'])->name('profit-and-loss'); // V2 Task 19, D100
     Route::get('{report}/export', [ReportExportController::class, 'show'])->whereIn('report', array_column(ReportName::cases(), 'value'))->name('export');
 });

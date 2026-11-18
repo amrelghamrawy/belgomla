@@ -2435,6 +2435,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/reports/profit-and-loss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 19 (D100): net sales − cost of goods = gross profit; − stock losses − expenses = net profit, for the range and the one before; only the range applies; cached 10 minutes (D94) */
+        get: operations["dashboardReportProfitAndLoss"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/reports/{report}/export": {
         parameters: {
             query?: never;
@@ -4302,7 +4319,7 @@ export interface components {
          * @description The advanced reports of V2 Task 16
          * @enum {string}
          */
-        ReportName: "sales-analytics" | "products" | "customers" | "inventory" | "collections";
+        ReportName: "sales-analytics" | "products" | "customers" | "inventory" | "collections" | "profit-and-loss";
         /** @enum {string} */
         ProductReportSort: "revenue" | "quantity" | "return_rate";
         /** @enum {string} */
@@ -4501,6 +4518,42 @@ export interface components {
             over_90: components["schemas"]["Money"];
             overdue: components["schemas"]["Money"];
             outstanding: components["schemas"]["Money"];
+        };
+        /** @description D100 h; a null figure is unknown: gross while a sold line has no cost, losses while an adjustment has none, net when either is */
+        ProfitAndLossFigures: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            net_sales: components["schemas"]["Money"];
+            cost_of_goods: components["schemas"]["Money"];
+            gross_profit: components["schemas"]["Money"] | null;
+            stock_losses: components["schemas"]["Money"] | null;
+            /** @description By adjustment reason code (D97; `unspecified` before reason codes), a negative amount gave stock back */
+            losses_by_reason: {
+                [key: string]: components["schemas"]["Money"];
+            };
+            expenses: components["schemas"]["Money"];
+            /** @description By expense category code (D100 b), live expenses only */
+            expenses_by_category: {
+                [key: string]: components["schemas"]["Money"];
+            };
+            /** @description Negative = a loss */
+            net_profit: components["schemas"]["Money"] | null;
+            /** @description net_profit ÷ net_sales, % */
+            net_margin: components["schemas"]["Money"] | null;
+            uncosted_lines: number;
+            uncosted_adjustments: number;
+        };
+        ProfitAndLossReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: date-time */
+            generated_at: string;
+            current: components["schemas"]["ProfitAndLossFigures"];
+            previous: components["schemas"]["ProfitAndLossFigures"];
         };
         CollectionsReport: {
             /** Format: date */
@@ -9588,6 +9641,34 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CollectionsReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportProfitAndLoss: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profit and loss statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProfitAndLossReport"];
                     };
                 };
             };

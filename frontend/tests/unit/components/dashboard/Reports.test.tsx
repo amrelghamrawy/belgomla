@@ -82,7 +82,7 @@ const salesAnalytics = {
 };
 
 describe("ReportsPage (V2 Task 16)", () => {
-  it("opens on the overview tab with the V1 cards and offers the five reports as tabs", async () => {
+  it("opens on the overview tab with the V1 cards and offers the six reports as tabs", async () => {
     searchParams.value = new URLSearchParams();
     stubApi({
       "GET /api/dashboard/reports/overview": json(200, { data: overviewReport() }),
@@ -110,6 +110,7 @@ describe("ReportsPage (V2 Task 16)", () => {
       "العملاء",
       "المخزون",
       "التحصيل",
+      "الأرباح والخسائر",
     ]);
     expect(screen.getByRole("tab", { name: "نظرة عامة" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByRole("link", { name: /طلبات اليوم/ })).toBeInTheDocument();

@@ -11,11 +11,12 @@ import { CollectionsTab } from "./CollectionsTab";
 import { CustomersTab } from "./CustomersTab";
 import { InventoryTab } from "./InventoryTab";
 import { ProductsTab } from "./ProductsTab";
+import { ProfitAndLossTab } from "./ProfitAndLossTab";
 import { SalesTab } from "./SalesTab";
 
 const copy = ar.dashboard.reports;
 
-export const REPORT_TABS = ["overview", "sales", "products", "customers", "inventory", "collections"] as const;
+export const REPORT_TABS = ["overview", "sales", "products", "customers", "inventory", "collections", "profit-and-loss"] as const;
 
 type ReportTab = (typeof REPORT_TABS)[number];
 
@@ -64,6 +65,9 @@ export function ReportsPage() {
         </TabsContent>
         <TabsContent value="collections" className="min-w-0 pt-4">
           <CollectionsTab query={query} setQuery={setQuery} />
+        </TabsContent>
+        <TabsContent value="profit-and-loss" className="min-w-0 pt-4">
+          <ProfitAndLossTab query={query} setQuery={setQuery} />
         </TabsContent>
       </Tabs>
     </>

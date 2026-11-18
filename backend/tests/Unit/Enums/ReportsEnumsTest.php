@@ -19,7 +19,7 @@ test('every advanced reports enum exposes labels for all cases', function (strin
 })->with([ReportName::class, ProductSort::class, CustomerView::class]);
 
 test('the advanced reports are sales, products, customers, inventory and collections', function (): void {
-    expect(ReportName::toArray())->toBe(['sales-analytics' => 'المبيعات', 'products' => 'المنتجات', 'customers' => 'العملاء', 'inventory' => 'المخزون', 'collections' => 'التحصيل']);
+    expect(ReportName::toArray())->toBe(['sales-analytics' => 'المبيعات', 'products' => 'المنتجات', 'customers' => 'العملاء', 'inventory' => 'المخزون', 'collections' => 'التحصيل', 'profit-and-loss' => 'الأرباح والخسائر']);
 });
 
 test('a report export is named after the report and its range', function (): void {

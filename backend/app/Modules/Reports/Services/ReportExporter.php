@@ -13,6 +13,7 @@ use App\Modules\Reports\Queries\CollectionsReportQuery;
 use App\Modules\Reports\Queries\CustomerPatternsQuery;
 use App\Modules\Reports\Queries\InventoryAnalyticsQuery;
 use App\Modules\Reports\Queries\ProductPerformanceQuery;
+use App\Modules\Reports\Queries\ProfitAndLossQuery;
 use App\Modules\Reports\Queries\SalesAnalyticsQuery;
 use Carbon\CarbonImmutable;
 use Generator;
@@ -34,6 +35,7 @@ final readonly class ReportExporter
         private CustomerPatternsQuery $customers,
         private InventoryAnalyticsQuery $inventory,
         private CollectionsReportQuery $collections,
+        private ProfitAndLossQuery $profitAndLoss,
     ) {}
 
     public function write(string $path, ReportName $report, ReportFiltersData $filters, ReportOptionsData $options, SpreadsheetFormat $format): void
@@ -44,6 +46,7 @@ final readonly class ReportExporter
             ReportName::Customers => $this->customersSheet($filters, $options),
             ReportName::Inventory => $this->inventorySheet($filters, $options),
             ReportName::Collections => $this->collectionsSheet($filters),
+            ReportName::ProfitAndLoss => $this->profitAndLossSheet($filters),
         };
 
         $this->spreadsheet->write($path, $format, $headers, $rows, $report->label());
@@ -52,6 +55,36 @@ final readonly class ReportExporter
     public function fileName(ReportName $report, ReportFiltersData $filters, SpreadsheetFormat $format): string
     {
         return $report->fileName($filters->from, $filters->to).'.'.$format->value;
+    }
+
+    /**
+     * D100: one row per line of the statement, top to bottom, for the range and the one before (an unknown figure is
+     * empty).
+     *
+     * @return array{0: array<string, string>, 1: iterable<array<string, Cell>>}
+     */
+    private function profitAndLossSheet(ReportFiltersData $filters): array
+    {
+        $report = $this->profitAndLoss->get($filters)['data'];
+        $current = $report['current'];
+        $previous = $report['previous'];
+        $number = fn (?string $amount): ?float => $amount === null ? null : (float) $amount;
+        $lines = [
+            ['net_sales', 'صافي المبيعات'],
+            ['cost_of_goods', 'تكلفة البضاعة المباعة'],
+            ['gross_profit', 'مجمل الربح'],
+            ['stock_losses', 'خسائر المخزون'],
+            ['expenses', 'المصروفات'],
+            ['net_profit', 'صافي الربح'],
+            ['net_margin', 'هامش صافي الربح %'],
+        ];
+        $rows = [];
+
+        foreach ($lines as [$key, $label]) {
+            $rows[] = ['line' => $label, 'current' => $number($current[$key]), 'previous' => $number($previous[$key])];
+        }
+
+        return [['line' => 'البند', 'current' => "{$current['from']} — {$current['to']}", 'previous' => "{$previous['from']} — {$previous['to']}"], $rows];
     }
 
     /**

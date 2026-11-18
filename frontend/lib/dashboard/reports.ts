@@ -8,6 +8,7 @@ import { queryKeys } from "@/lib/api/keys";
 import type {
   BundleReport,
   CollectionsReport,
+  ProfitAndLossReport,
   CustomerPatternRow,
   CustomerReportView,
   InventoryAnalyticsRow,
@@ -134,6 +135,15 @@ export function useCollectionsReport(params: ReportParams) {
   return useQuery({
     queryKey: queryKeys.dashboardAdvancedReport("collections", params),
     queryFn: () => apiFetch<CollectionsReport>(withQuery("/api/dashboard/reports/collections", params)),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** D100: the profit and loss statement of the range and of the one before. */
+export function useProfitAndLossReport(params: ReportParams) {
+  return useQuery({
+    queryKey: queryKeys.dashboardAdvancedReport("profit-and-loss", params),
+    queryFn: () => apiFetch<ProfitAndLossReport>(withQuery("/api/dashboard/reports/profit-and-loss", params)),
     placeholderData: keepPreviousData,
   });
 }
