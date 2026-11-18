@@ -28,6 +28,22 @@ import { formatMoney } from "@/lib/format/money";
 
 import { LoadingBlock } from "../common/States";
 
+/** BR-R04, BR-C07, BR-C10: paid back by a method (D103) or kept as customer credit. */
+const REFUND_TO = ["cash", "instapay", "wallet", "bank_transfer", "credit"] as const;
+type RefundTo = (typeof REFUND_TO)[number];
+
+function refundLabel(option: RefundTo): string {
+  const labels = ar.dashboard.returns;
+
+  return {
+    cash: labels.refundCash,
+    instapay: labels.refundInstapay,
+    wallet: labels.refundWallet,
+    bank_transfer: labels.refundBankTransfer,
+    credit: labels.refundCredit,
+  }[option];
+}
+
 const copy = ar.dashboard.returns;
 
 /** Today's local date as `Y-m-d`, the default of the return date field. */
@@ -84,7 +100,8 @@ function ReturnForm({
   const [date, setDate] = useState(today);
   const [refundAmount, setRefundAmount] = useState<string | null>(null);
   const [refundConfirmed, setRefundConfirmed] = useState(false);
-  const [refundTo, setRefundTo] = useState<"cash" | "credit">("cash");
+  const [refundTo, setRefundTo] = useState<RefundTo>("cash");
+  const [refundReference, setRefundReference] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   if (returns.isError) {
@@ -132,7 +149,14 @@ function ReturnForm({
         reason: reason.trim(),
         items,
         ...(date !== today() && date !== "" ? { returned_at: `${date}T12:00:00` } : {}),
-        ...(refundAmount !== null ? { refund: true, refund_to: refundTo } : {}),
+        ...(refundAmount !== null
+          ? {
+              refund: true,
+              refund_to: refundTo,
+              refund_reference:
+                refundTo === "cash" || refundTo === "credit" || refundReference.trim() === "" ? null : refundReference.trim(),
+            }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -238,18 +262,27 @@ function ReturnForm({
             <RadioGroup
               dir="rtl"
               value={refundTo}
-              onValueChange={(value) => setRefundTo(value === "credit" ? "credit" : "cash")}
+              onValueChange={(value) => setRefundTo(REFUND_TO.find((option) => option === value) ?? "cash")}
               className="gap-2"
             >
-              <span className="flex items-center gap-2">
-                <RadioGroupItem id="return-refund-cash" value="cash" />
-                <Label htmlFor="return-refund-cash">{copy.refundCash}</Label>
-              </span>
-              <span className="flex items-center gap-2">
-                <RadioGroupItem id="return-refund-credit" value="credit" />
-                <Label htmlFor="return-refund-credit">{copy.refundCredit}</Label>
-              </span>
+              {REFUND_TO.map((option) => (
+                <span key={option} className="flex items-center gap-2">
+                  <RadioGroupItem id={`return-refund-${option}`} value={option} />
+                  <Label htmlFor={`return-refund-${option}`}>{refundLabel(option)}</Label>
+                </span>
+              ))}
             </RadioGroup>
+            {refundTo !== "cash" && refundTo !== "credit" && (
+              <Input
+                aria-label={copy.refundReference}
+                placeholder={copy.refundReference}
+                dir="ltr"
+                maxLength={60}
+                className="text-start"
+                value={refundReference}
+                onChange={(event) => setRefundReference(event.target.value)}
+              />
+            )}
             <span className="flex items-center gap-2">
               <Checkbox
                 id="return-refund"

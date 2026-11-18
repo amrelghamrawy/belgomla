@@ -64,6 +64,12 @@ export function LedgerTable({
                 <td className="p-2 whitespace-nowrap">{formatDate(row.date)}</td>
                 <td className="p-2">
                   <span>{row.type_label}</span>
+                  {row.method !== null && row.method !== "credit" && (
+                    <span className="text-muted-foreground ms-2 text-xs" data-testid="ledger-method">
+                      {row.method_label}
+                      {row.reference !== null && <bdi dir="ltr"> · {row.reference}</bdi>}
+                    </span>
+                  )}
                   {reference !== null && (
                     <span className="text-muted-foreground ms-2 text-xs">
                       {orderHref !== undefined && row.order_number !== null ? (

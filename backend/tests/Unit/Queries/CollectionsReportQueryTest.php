@@ -88,3 +88,18 @@ test('BR-T03 another tenant\'s collections never count', function (): void {
 test('the report runs a fixed number of queries', function (): void {
     expect($this->queriesRun(fn () => ($this->report)()))->toBeLessThanOrEqual(6);
 });
+
+test('D103 e the same payments split by method: cash 200 + 100, credit 30, the others 0.00, refunds left out', function (): void {
+    expect(($this->report)()['by_method'])->toBe([
+        ['method' => 'cash', 'label' => 'نقدي', 'amount' => '300.00'],
+        ['method' => 'instapay', 'label' => 'إنستاباي', 'amount' => '0.00'],
+        ['method' => 'wallet', 'label' => 'محفظة إلكترونية', 'amount' => '0.00'],
+        ['method' => 'bank_transfer', 'label' => 'تحويل بنكي', 'amount' => '0.00'],
+        ['method' => 'credit', 'label' => 'رصيد العميل', 'amount' => '30.00'],
+    ]);
+});
+
+test('D103 e by_method keeps the customer group filter: customer A paid 200.00 cash', function (): void {
+    expect(array_column(($this->report)($this->group->id)['by_method'], 'amount', 'method'))
+        ->toBe(['cash' => '200.00', 'instapay' => '0.00', 'wallet' => '0.00', 'bank_transfer' => '0.00', 'credit' => '0.00']);
+});

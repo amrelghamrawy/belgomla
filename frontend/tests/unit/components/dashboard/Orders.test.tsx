@@ -38,6 +38,7 @@ function collection(overrides: Partial<Collection> = {}): Collection {
     amount: "100.00",
     method: "cash",
     method_label: "نقدي",
+    reference: null,
     collected_at: "2026-10-03T08:00:00Z",
     recorded_by: 1,
     note: null,
@@ -380,8 +381,33 @@ describe("OrderDetail actions", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("المبلغ أكبر من المتبقي على الطلب");
     const call = callsTo(fetchMock, "POST /api/dashboard/orders/1001/collections")[0];
-    expect(call?.body).toEqual({ amount: "400", note: null });
+    expect(call?.body).toEqual({ amount: "400", note: null, method: "cash", reference: null });
     expect(call?.headers["Idempotency-Key"]).toMatch(/^collection-1001-/);
+  });
+
+  it("D103 records a bank transfer with its reference, hidden for cash", async () => {
+    const fetchMock = stubApi({
+      "POST /api/dashboard/orders/1001/collections": json(201, { data: collection({ method: "bank_transfer", reference: "TRX-7781" }) }),
+      "GET /api/dashboard/orders/1001": json(200, { data: order() }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrderDetail order={order()} />);
+
+    await user.click(screen.getByRole("button", { name: "تسجيل تحصيل" }));
+    expect(screen.getByLabelText("طريقة الدفع")).toHaveValue("cash");
+    expect(screen.queryByLabelText("رقم العملية (اختياري)")).toBeNull();
+
+    await user.selectOptions(screen.getByLabelText("طريقة الدفع"), "bank_transfer");
+    await user.type(screen.getByLabelText("رقم العملية (اختياري)"), " TRX-7781 ");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل تحصيل" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/collections")).toHaveLength(1));
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/collections")[0]?.body).toEqual({
+      amount: "450.00",
+      note: null,
+      method: "bank_transfer",
+      reference: "TRX-7781",
+    });
   });
 
   it("voids a collection with a reason", async () => {

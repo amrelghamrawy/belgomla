@@ -10,8 +10,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * POST /api/dashboard/orders/{number}/returns: `{ reason, returned_at?, refund?, refund_to?, items: [{ order_item_id, quantity }] }`
- * (08-api-contract.md §9, BR-R01..R04); `refund_to` is `cash` (default) or `credit` (BR-C07). `returned_at` defaults to now and cannot be in the future; a line appears once.
+ * POST /api/dashboard/orders/{number}/returns: `{ reason, returned_at?, refund?, refund_to?, refund_reference?, items: [{ order_item_id, quantity }] }`
+ * (08-api-contract.md §9, BR-R01..R04); `refund_to` is `cash` (default), `instapay`, `wallet`, `bank_transfer`
+ * (BR-C10) or `credit` (BR-C07); `refund_reference` (≤ 60) only when paid back. `returned_at` defaults to now and
+ * cannot be in the future; a line appears once.
  */
 final class RecordReturnRequest extends FormRequest
 {
@@ -24,7 +26,8 @@ final class RecordReturnRequest extends FormRequest
             'reason' => ['required', 'string', 'max:300'],
             'returned_at' => ['sometimes', 'date', 'before_or_equal:now'],
             'refund' => ['sometimes', 'boolean'],
-            'refund_to' => ['sometimes', 'string', 'in:cash,credit'],
+            'refund_to' => ['sometimes', 'string', 'in:'.implode(',', array_column(RefundMethod::cases(), 'value'))],
+            'refund_reference' => ['nullable', 'string', 'max:60', 'prohibited_if:refund_to,credit'],
             'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*' => ['array:order_item_id,quantity'],
             'items.*.order_item_id' => ['required', 'integer', 'min:1', 'distinct'],
@@ -50,6 +53,13 @@ final class RecordReturnRequest extends FormRequest
     public function refundTo(): RefundMethod
     {
         return $this->enum('refund_to', RefundMethod::class) ?? RefundMethod::Cash;
+    }
+
+    public function refundReference(): ?string
+    {
+        $reference = mb_trim($this->string('refund_reference')->value());
+
+        return $reference === '' ? null : $reference;
     }
 
     /**

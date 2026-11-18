@@ -19,8 +19,15 @@ test('every orders enum exposes labels for all cases', function (string $enum): 
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
 })->with([OrderStatus::class, CollectionStatus::class, CancelledBy::class, NotificationType::class, RefundMethod::class, OrderItemChangeType::class, OrderKind::class, PreorderState::class]);
 
-test('BR-C07 a refund goes back in cash or as customer credit', function (): void {
-    expect(RefundMethod::toArray())->toBe(['cash' => 'رد نقدي', 'credit' => 'رصيد للعميل']);
+test('BR-C07 BR-C10 a refund is paid back by a method or kept as customer credit', function (): void {
+    expect(RefundMethod::toArray())->toBe(['cash' => 'رد نقدي', 'instapay' => 'رد بإنستاباي', 'wallet' => 'رد على محفظة إلكترونية', 'bank_transfer' => 'رد بتحويل بنكي', 'credit' => 'رصيد للعميل'])
+        ->and(array_map(fn (RefundMethod $method): bool => $method->paysBack(), RefundMethod::cases()))->toBe([true, true, true, true, false]);
+});
+
+test('D103 every refund method paid back is a collection method of the same code', function (): void {
+    foreach (RefundMethod::cases() as $method) {
+        expect(App\Modules\Collections\Enums\CollectionMethod::from($method->value)->value)->toBe($method->value);
+    }
 });
 
 test('BR-O01 the order statuses match the domain model', function (): void {

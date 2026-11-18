@@ -60,7 +60,7 @@ final readonly class RecordReturn
             $return = $this->createReturn($order, $data, $items, $last, $actorId);
 
             $order->forceFill(['returned_total' => Money::add($order->returned_total, $return->total)])->save();
-            $this->settle($order, $return, $data->refund, $data->refundTo, $actorId);
+            $this->settle($order, $return, $data, $actorId);
 
             $this->history->handle($order, $order->status, $actorId === null ? ActorType::System : ActorType::TenantUser, $actorId, "مرتجع #{$return->number}");
             $this->audit->log('order.returned', $return, null, [
@@ -163,24 +163,24 @@ final readonly class RecordReturn
     }
 
     /**
-     * BR-R04: pay back what was collected beyond the new net total (confirmed by the merchant), in cash or kept as
-     * customer credit (BR-C07), then re-derive the status.
+     * BR-R04: pay back what was collected beyond the new net total (confirmed by the merchant), by the chosen method
+     * (BR-C10) or kept as customer credit (BR-C07), then re-derive the status.
      */
-    private function settle(Order $order, OrderReturn $return, bool $refund, RefundMethod $refundTo, ?int $actorId): void
+    private function settle(Order $order, OrderReturn $return, ReturnData $data, ?int $actorId): void
     {
         $excess = Money::subtract($order->collected_amount, $order->netTotal());
 
         if (Money::compare($excess, '0.00') > 0) {
-            if (! $refund) {
+            if (! $data->refund) {
                 throw RefundRequired::amount($excess);
             }
 
-            $return->forceFill(['refund_amount' => $excess, 'refund_method' => $refundTo])->save();
+            $return->forceFill(['refund_amount' => $excess, 'refund_method' => $data->refundTo])->save();
 
-            if ($refundTo === RefundMethod::Credit) {
+            if ($data->refundTo === RefundMethod::Credit) {
                 $this->refunds->keepAsCredit($order, $return->id, $excess, $actorId);
             } else {
-                $this->refunds->refund($order, $return->id, $excess, $actorId);
+                $this->refunds->refund($order, $return->id, $excess, $actorId, $data->refundTo, $data->refundReference);
             }
 
             $order->refresh();

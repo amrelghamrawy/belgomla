@@ -16,6 +16,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     $this->owner = $this->makeOwner();
@@ -133,10 +134,33 @@ test('BR-L a collection is audited as collection.recorded', function (): void {
             'order_number' => $this->order->number,
             'amount' => '200.00',
             'method' => 'cash',
+            'reference' => null,
             'collected_at' => now()->toIso8601String(),
             'note' => 'دفعة أولى',
         ],
     ]);
+});
+
+test('BR-C10 a payment keeps how it came in and its reference, and the audit row carries them', function (): void {
+    $collection = app(RecordCollection::class)->handle($this->order, new CollectionData('300.00', method: CollectionMethod::Instapay, reference: 'IP-55120'), $this->owner->id);
+
+    expect($collection->refresh()->only(['method', 'reference']))->toBe(['method' => CollectionMethod::Instapay, 'reference' => 'IP-55120'])
+        ->and(AuditLog::query()->sole()->new_values)->toMatchArray(['method' => 'instapay', 'reference' => 'IP-55120']);
+});
+
+test('D103 a credit is the system\'s method and is never recorded as a payment', function (): void {
+    expect(fn (): CollectionData => new CollectionData('100.00', method: CollectionMethod::Credit))->toThrow(InvalidArgumentException::class);
+});
+
+test('BR-C10 the database refuses an unknown method and a credit row with a reference', function (): void {
+    $collection = ($this->record)('100.00');
+    $credit = App\Modules\Collections\Models\CustomerCredit::factory()->create(['customer_id' => $this->order->customer_id, 'amount' => '50.00', 'remaining' => '50.00']);
+    $drawn = CashCollection::factory()->for($this->order)->create(['amount' => '50.00', 'method' => CollectionMethod::Credit, 'customer_credit_id' => $credit->id]);
+
+    // Each refused write runs in its own savepoint, so the next one is checked on a live transaction.
+    expect(CashCollection::query()->toBase()->where('id', $collection->id)->update(['method' => 'bank_transfer', 'reference' => str_repeat('9', 60)]))->toBe(1)
+        ->and(fn () => DB::transaction(fn () => CashCollection::query()->toBase()->where('id', $collection->id)->update(['method' => 'cheque'])))->toThrow(QueryException::class)
+        ->and(fn () => DB::transaction(fn () => CashCollection::query()->toBase()->where('id', $drawn->id)->update(['reference' => 'X-1'])))->toThrow(QueryException::class);
 });
 
 test('the recorded collection carries the order with its new balance', function (): void {

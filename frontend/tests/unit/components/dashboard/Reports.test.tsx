@@ -629,6 +629,13 @@ function collections(overrides: Record<string, unknown> = {}) {
       delivered: "1100.00",
       collection_rate: "50.00",
     },
+    by_method: [
+      { method: "cash", label: "نقدي", amount: "200.00" },
+      { method: "instapay", label: "إنستاباي", amount: "300.00" },
+      { method: "wallet", label: "محفظة إلكترونية", amount: "0.00" },
+      { method: "bank_transfer", label: "تحويل بنكي", amount: "0.00" },
+      { method: "credit", label: "رصيد العميل", amount: "100.00" },
+    ],
     aging: {
       current: "300.00",
       "0_30": "0.00",
@@ -653,6 +660,7 @@ describe("CollectionsTab", () => {
     renderWithQuery(<CollectionsTab query={{ group: "week", category_id: "4" }} setQuery={vi.fn()} />);
 
     expect(await screen.findByTestId("collected-net")).toHaveTextContent("550.00 ج.م");
+    expect(screen.getByTestId("collections-by-method")).toHaveTextContent("إنستاباي300.00 ج.م");
     expect(screen.getByTestId("collected-net")).toBeInTheDocument();
     expect(screen.getByTestId("collection-rate")).toHaveTextContent("50%");
     expect(screen.getByTestId("collected-delivered")).toHaveTextContent("1,100.00 ج.م");

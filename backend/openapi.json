@@ -7197,9 +7197,20 @@
                                         "type": "string",
                                         "enum": [
                                             "cash",
+                                            "instapay",
+                                            "wallet",
+                                            "bank_transfer",
                                             "credit"
                                         ],
-                                        "description": "cash (default) or kept as customer credit (BR-C07)"
+                                        "description": "How it goes back: paid back by a method (cash by default, BR-C10) or kept as customer credit (BR-C07)"
+                                    },
+                                    "refund_reference": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 60,
+                                        "description": "The transfer or wallet transaction number (BR-C10); not with credit"
                                     },
                                     "items": {
                                         "type": "array",
@@ -7587,6 +7598,14 @@
                         }
                     },
                     {
+                        "name": "method",
+                        "in": "query",
+                        "description": "How the money moved (D103 e)",
+                        "schema": {
+                            "$ref": "#/components/schemas/CollectionMethod"
+                        }
+                    },
+                    {
                         "$ref": "#/components/parameters/Page"
                     },
                     {
@@ -7940,7 +7959,7 @@
                 "tags": [
                     "dashboard-collections"
                 ],
-                "summary": "Records a cash collection on any non-cancelled order",
+                "summary": "Records a payment on any non-cancelled order, in cash, by InstaPay, to a wallet or by bank transfer (BR-C10)",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -7964,6 +7983,24 @@
                                             "null"
                                         ],
                                         "maxLength": 300
+                                    },
+                                    "method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "cash",
+                                            "instapay",
+                                            "wallet",
+                                            "bank_transfer"
+                                        ],
+                                        "description": "cash by default (older clients); credit is the system's (D103 a)"
+                                    },
+                                    "reference": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 60,
+                                        "description": "The transfer or wallet transaction number"
                                     }
                                 }
                             }
@@ -8677,7 +8714,7 @@
                 "tags": [
                     "dashboard-reports"
                 ],
-                "summary": "V2 Task 16: money collected per bucket by method (refunds negative) next to the net sales delivered, the collection rate and the aging now; cached 10 minutes (D94)",
+                "summary": "V2 Task 16: money collected per bucket (refunds negative) next to the net sales delivered, the collection rate, the payments per method (D103) and the aging now; cached 10 minutes (D94)",
                 "parameters": [
                     {
                         "$ref": "#/components/parameters/From"
@@ -16210,10 +16247,13 @@
                         ],
                         "enum": [
                             "cash",
+                            "instapay",
+                            "wallet",
+                            "bank_transfer",
                             "credit",
                             null
                         ],
-                        "description": "How refund_amount went back (BR-C07)"
+                        "description": "How refund_amount went back (BR-C07, BR-C10)"
                     },
                     "reason": {
                         "type": "string"
@@ -16336,6 +16376,9 @@
                         ],
                         "enum": [
                             "cash",
+                            "instapay",
+                            "wallet",
+                            "bank_transfer",
                             "credit",
                             null
                         ]
@@ -16507,6 +16550,7 @@
                     "amount",
                     "method",
                     "method_label",
+                    "reference",
                     "collected_at",
                     "recorded_by",
                     "note",
@@ -16583,14 +16627,17 @@
                         "$ref": "#/components/schemas/Money"
                     },
                     "method": {
-                        "type": "string",
-                        "enum": [
-                            "cash",
-                            "credit"
-                        ]
+                        "$ref": "#/components/schemas/CollectionMethod"
                     },
                     "method_label": {
                         "type": "string"
+                    },
+                    "reference": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The transfer or wallet transaction number (BR-C10)"
                     },
                     "collected_at": {
                         "type": "string",
@@ -16647,7 +16694,10 @@
                     "return_number",
                     "debit",
                     "credit",
-                    "balance"
+                    "balance",
+                    "method",
+                    "method_label",
+                    "reference"
                 ],
                 "properties": {
                     "date": {
@@ -16689,8 +16739,42 @@
                     },
                     "balance": {
                         "$ref": "#/components/schemas/Money"
+                    },
+                    "method": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CollectionMethod"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "How a payment or refund moved (BR-C10); null on the other rows"
+                    },
+                    "method_label": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reference": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 }
+            },
+            "CollectionMethod": {
+                "type": "string",
+                "description": "BR-C10 (D103): cash, instapay, wallet and bank_transfer are recorded by the merchant; credit is drawn from or kept as customer credit (BR-C07)",
+                "enum": [
+                    "cash",
+                    "instapay",
+                    "wallet",
+                    "bank_transfer",
+                    "credit"
+                ]
             },
             "LedgerMeta": {
                 "allOf": [
@@ -18031,6 +18115,7 @@
                     "generated_at",
                     "buckets",
                     "totals",
+                    "by_method",
                     "aging"
                 ],
                 "properties": {
@@ -18067,7 +18152,8 @@
                                     "format": "date"
                                 },
                                 "cash": {
-                                    "$ref": "#/components/schemas/Money"
+                                    "$ref": "#/components/schemas/Money",
+                                    "description": "Payments not drawn from credit, every method (deprecated: use by_method, D103 e)"
                                 },
                                 "credit": {
                                     "$ref": "#/components/schemas/Money",
@@ -18123,6 +18209,29 @@
                                     }
                                 ],
                                 "description": "net ÷ delivered, %"
+                            }
+                        }
+                    },
+                    "by_method": {
+                        "type": "array",
+                        "description": "D103 e: the range's payments per method, every recordable method (0.00 when unused) then credit; adds up to totals.cash + totals.credit",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "method",
+                                "label",
+                                "amount"
+                            ],
+                            "properties": {
+                                "method": {
+                                    "$ref": "#/components/schemas/CollectionMethod"
+                                },
+                                "label": {
+                                    "type": "string"
+                                },
+                                "amount": {
+                                    "$ref": "#/components/schemas/Money"
+                                }
                             }
                         }
                     },

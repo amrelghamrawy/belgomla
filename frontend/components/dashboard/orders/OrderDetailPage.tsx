@@ -477,6 +477,9 @@ export function CollectionLine({ collection }: { collection: Collection }) {
           )}
         </span>
         <span className="text-muted-foreground text-xs">{formatDateTime(collection.collected_at)}</span>
+        {collection.reference !== null && (
+          <span className="text-xs">{ar.dashboard.collections.referenceOf(collection.reference)}</span>
+        )}
         {collection.note !== null && <span className="text-xs">{collection.note}</span>}
         {collection.void_reason !== null && (
           <span className="text-xs">{labels.voidReason(collection.void_reason)}</span>

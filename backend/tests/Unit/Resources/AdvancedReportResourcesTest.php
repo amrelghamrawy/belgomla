@@ -23,10 +23,10 @@ test('the sales analytics resource renders the range, age and every section', fu
 test('the collections report resource renders the range, age, buckets, totals and aging', function (): void {
     $aging = ['current' => '0.00', '0_30' => '0.00', '31_60' => '0.00', '61_90' => '0.00', 'over_90' => '0.00', 'overdue' => '0.00', 'outstanding' => '0.00'];
     $totals = ['cash' => '0.00', 'credit' => '0.00', 'refunds' => '0.00', 'net' => '0.00', 'delivered' => '0.00', 'collection_rate' => null];
-    $report = ['from' => '2026-10-01', 'to' => '2026-10-02', 'group' => 'week', 'buckets' => [], 'totals' => $totals, 'aging' => $aging];
+    $report = ['from' => '2026-10-01', 'to' => '2026-10-02', 'group' => 'week', 'buckets' => [], 'totals' => $totals, 'by_method' => [], 'aging' => $aging];
 
     expect(array_keys(rendered(new CollectionsReportResource(['generated_at' => '2026-10-02T10:00:00+00:00', 'data' => $report]), dashboardRequest('/api/dashboard/reports/collections'))))
-        ->toBe(['from', 'to', 'group', 'generated_at', 'buckets', 'totals', 'aging']);
+        ->toBe(['from', 'to', 'group', 'generated_at', 'buckets', 'totals', 'by_method', 'aging']);
 });
 
 test('a product performance row renders its documented keys', function (): void {

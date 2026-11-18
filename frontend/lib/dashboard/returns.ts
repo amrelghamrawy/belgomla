@@ -19,7 +19,8 @@ export type ReturnInput = {
   reason: string;
   returned_at?: string;
   refund?: boolean;
-  refund_to?: "cash" | "credit";
+  refund_to?: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit";
+  refund_reference?: string | null;
   items: { order_item_id: number; quantity: number }[];
 };
 

@@ -57,7 +57,7 @@ test('D83 D94 the inventory sheet has a row per sku with its value at the base p
 });
 
 test('D83 the collections sheet has a row per bucket and a totals row', function (): void {
-    expect(($this->export)(ReportName::Collections)[0])->toBe(['الفترة', 'نقدي', 'من رصيد العميل', 'مردود', 'صافي التحصيل', 'صافي المسلَّم'])
+    expect(($this->export)(ReportName::Collections)[0])->toBe(['الفترة', 'نقدي وتحويلات', 'من رصيد العميل', 'مردود', 'صافي التحصيل', 'صافي المسلَّم'])
         ->and(($this->export)(ReportName::Collections))->toHaveCount(4);
 });
 

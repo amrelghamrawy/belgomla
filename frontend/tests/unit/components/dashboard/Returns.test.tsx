@@ -151,6 +151,7 @@ describe("ReturnDialog", () => {
       items: [{ order_item_id: 61, quantity: 1 }],
       refund: true,
       refund_to: "cash",
+      refund_reference: null,
     });
     expect(calls[1]?.headers["Idempotency-Key"]).toMatch(/^return-1001-/);
   });
@@ -178,6 +179,34 @@ describe("ReturnDialog", () => {
     expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/returns")[1]?.body).toMatchObject({
       refund: true,
       refund_to: "credit",
+    });
+  });
+
+  it("D103 pays the refund back by InstaPay with its reference", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/orders/1001/returns": returnsOf([line()]),
+      "POST /api/dashboard/orders/1001/returns": [
+        envelopeError(422, "refund_required", "يجب رد 90.00", { refund_amount: "90.00" }),
+        json(201, { data: orderReturn({ refund_amount: "90.00", refund_method: "instapay" }) }),
+      ],
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<ReturnDialog orderNumber={1001} />);
+
+    await user.click(screen.getByRole("button", { name: "تسجيل مرتجع" }));
+    await user.click(await screen.findByRole("button", { name: "الكمية المرتجعة + الأضواء علوم" }));
+    await user.type(screen.getByLabelText("سبب المرتجع"), "نهاية الموسم");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل مرتجع" }));
+    await user.click(await screen.findByRole("radio", { name: "رد بإنستاباي" }));
+    await user.type(screen.getByLabelText("رقم العملية (اختياري)"), "IP-55120");
+    await user.click(screen.getByRole("checkbox", { name: "تأكيد رد المبلغ" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "تسجيل مرتجع" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("تم تسجيل المرتجع"));
+    expect(callsTo(fetchMock, "POST /api/dashboard/orders/1001/returns")[1]?.body).toMatchObject({
+      refund: true,
+      refund_to: "instapay",
+      refund_reference: "IP-55120",
     });
   });
 

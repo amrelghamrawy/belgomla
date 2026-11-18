@@ -7,9 +7,11 @@ namespace App\Modules\Collections\Services;
 use App\Modules\Collections\Actions\KeepAsCredit;
 use App\Modules\Collections\Actions\RecordRefund;
 use App\Modules\Collections\Enums\CollectionKind;
+use App\Modules\Collections\Enums\CollectionMethod;
 use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Collections\Models\Scopes\NotVoided;
 use App\Modules\Orders\Contracts\RefundsPayments;
+use App\Modules\Orders\Enums\RefundMethod;
 use App\Modules\Orders\Models\Order;
 
 /**
@@ -24,9 +26,10 @@ final readonly class ReturnRefunds implements RefundsPayments
         private KeepAsCredit $keepAsCredit,
     ) {}
 
-    public function refund(Order $order, int $orderReturnId, string $amount, ?int $actorId): void
+    /** D103: the return's refund method is a recordable collection method of the same code. */
+    public function refund(Order $order, int $orderReturnId, string $amount, ?int $actorId, RefundMethod $method = RefundMethod::Cash, ?string $reference = null): void
     {
-        $this->record->handle($order, $orderReturnId, $amount, $actorId);
+        $this->record->handle($order, $orderReturnId, $amount, $actorId, method: CollectionMethod::from($method->value), reference: $reference);
     }
 
     public function keepAsCredit(Order $order, int $orderReturnId, string $amount, ?int $actorId): void

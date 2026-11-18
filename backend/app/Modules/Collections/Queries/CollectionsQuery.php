@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Collections\Queries;
 
 use App\Modules\Collections\Data\CollectionFiltersData;
+use App\Modules\Collections\Enums\CollectionMethod;
 use App\Modules\Collections\Models\CashCollection;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ final readonly class CollectionsQuery
             ->when($filters->to, fn (Builder $query, CarbonImmutable $to): Builder => $query->where('collected_at', '<=', $to))
             ->when($filters->customerId, fn (Builder $query, int $id): Builder => $query->whereHas('order', fn (Builder $orders): Builder => $orders->where('customer_id', $id)))
             ->when($filters->orderNumber, fn (Builder $query, int $number): Builder => $query->whereHas('order', fn (Builder $orders): Builder => $orders->where('number', $number)))
+            ->when($filters->method, fn (Builder $query, CollectionMethod $method): Builder => $query->where('method', $method))
             ->orderByDesc('collected_at')
             ->orderByDesc('id')
             ->paginate($perPage);

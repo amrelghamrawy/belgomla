@@ -265,6 +265,22 @@ test('BR-C07 an over-collected return can be kept as customer credit instead of 
     $this->assertDatabaseHas('collections', ['order_id' => $this->order->id, 'kind' => 'refund', 'method' => 'credit']);
 });
 
-test('the refund destination is validated', function (): void {
-    ($this->post)(($this->body)(1, ['refund_to' => 'bank']))->assertUnprocessable()->assertJsonStructure(['error' => ['details' => ['refund_to']]]);
+test('BR-C10 an over-collected return can be paid back by bank transfer with its reference', function (): void {
+    $this->inTenant(fn (): CashCollection => app(RecordCollection::class)->handle($this->order, new CollectionData('540.00'), $this->owner->id));
+
+    ($this->post)(($this->body)(2, ['refund' => true, 'refund_to' => 'bank_transfer', 'refund_reference' => 'TRX-7781']))
+        ->assertCreated()
+        ->assertJsonPath('data.refund_amount', '180.00')
+        ->assertJsonPath('data.refund_method', 'bank_transfer');
+
+    $this->assertDatabaseHas('collections', ['order_id' => $this->order->id, 'kind' => 'refund', 'method' => 'bank_transfer', 'reference' => 'TRX-7781', 'amount' => '180.00']);
+    $this->assertDatabaseCount('customer_credits', 0);
 });
+
+test('the refund destination is validated', function (array $extra, string $field): void {
+    ($this->post)(($this->body)(1, $extra))->assertUnprocessable()->assertJsonStructure(['error' => ['details' => [$field]]]);
+})->with([
+    'unknown destination' => [['refund_to' => 'bank'], 'refund_to'],
+    'a reference on credit' => [['refund_to' => 'credit', 'refund_reference' => 'X-1'], 'refund_reference'],
+    'reference 61' => [['refund_to' => 'wallet', 'refund_reference' => str_repeat('1', 61)], 'refund_reference'],
+]);

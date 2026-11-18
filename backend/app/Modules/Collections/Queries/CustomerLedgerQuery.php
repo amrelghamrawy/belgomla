@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  * BR-C08: a customer's account statement as a dated ledger of everything that changed what they owe — orders when
  * delivered (debit), returns (credit), payments (credit; a payment drawn from customer credit is `credit_applied`), cash
  * refunds (debit), returns kept as credit (`refund_to_credit`, debit) and the credit created by them (an info line
- * without amounts). Voided rows are left out. One `UNION ALL` ordered by date, then by kind, then by id, with a running
+ * without amounts). A payment or refund row carries its method and reference (BR-C10). Voided rows are left out. One `UNION ALL` ordered by date, then by kind, then by id, with a running
  * balance (a window function) that starts from everything before `from` (the opening balance, D60 Cairo days are
  * turned into UTC bounds by the caller). Positive balance = the customer owes the store.
  */
@@ -81,13 +81,13 @@ final readonly class CustomerLedgerQuery
         $delivered = Order::query()->toBase()
             ->where('orders.customer_id', $customer->id)
             ->where('orders.status', OrderStatus::Delivered->value)
-            ->selectRaw("orders.delivered_at as occurred_at, 1 as sort, 'order'::text as type, orders.number as order_number, null::integer as return_number, orders.order_total as debit, 0::numeric(12,2) as credit, orders.id as ref_id");
+            ->selectRaw("orders.delivered_at as occurred_at, 1 as sort, 'order'::text as type, orders.number as order_number, null::integer as return_number, orders.order_total as debit, 0::numeric(12,2) as credit, orders.id as ref_id, null::text as method, null::text as reference");
 
         $returns = Order::query()->toBase()
             ->join('order_returns', 'order_returns.order_id', '=', 'orders.id')
             ->where('orders.customer_id', $customer->id)
             ->whereNull('order_returns.voided_at')
-            ->selectRaw("order_returns.returned_at, 2, 'return'::text, orders.number, order_returns.number, 0::numeric(12,2), order_returns.total, order_returns.id");
+            ->selectRaw("order_returns.returned_at, 2, 'return'::text, orders.number, order_returns.number, 0::numeric(12,2), order_returns.total, order_returns.id, null::text, null::text");
 
         $collections = CashCollection::query()->toBase()
             ->join('orders', 'orders.id', '=', 'collections.order_id')
@@ -99,7 +99,8 @@ final readonly class CustomerLedgerQuery
                 .'else (case when collections.method = ? then \'credit_applied\' else \'payment\' end) end)::text, '
                 .'orders.number, null::integer, '
                 .'case when collections.kind = ? then collections.amount else 0::numeric(12,2) end, '
-                .'case when collections.kind = ? then 0::numeric(12,2) else collections.amount end, collections.id',
+                .'case when collections.kind = ? then 0::numeric(12,2) else collections.amount end, collections.id, '
+                .'collections.method::text, collections.reference::text',
                 [CollectionKind::Refund->value, CollectionKind::Refund->value, CollectionMethod::Credit->value, CollectionMethod::Credit->value, CollectionKind::Refund->value, CollectionKind::Refund->value],
             );
 
@@ -108,7 +109,7 @@ final readonly class CustomerLedgerQuery
             ->leftJoin('orders', 'orders.id', '=', 'order_returns.order_id')
             ->where('customer_credits.customer_id', $customer->id)
             ->whereNull('customer_credits.voided_at')
-            ->selectRaw("customer_credits.created_at, 4, 'credit_created'::text, orders.number, order_returns.number, 0::numeric(12,2), 0::numeric(12,2), customer_credits.id");
+            ->selectRaw("customer_credits.created_at, 4, 'credit_created'::text, orders.number, order_returns.number, 0::numeric(12,2), 0::numeric(12,2), customer_credits.id, null::text, null::text");
 
         return $delivered->unionAll($returns)->unionAll($collections)->unionAll($credits);
     }

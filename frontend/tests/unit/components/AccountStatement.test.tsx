@@ -19,6 +19,9 @@ const statement = {
       debit: "450.00",
       credit: "0.00",
       balance: "450.00",
+      method: null,
+      method_label: null,
+      reference: null,
     },
   ],
   links: {},
@@ -62,6 +65,37 @@ describe("AccountStatement", () => {
     expect(summary).toHaveTextContent("المتاح من الحد550.00 ج.م");
     expect(screen.getByRole("link", { name: "طلب #1001" })).toHaveAttribute("href", "/account/orders/1001");
     expect(screen.getByTestId("ledger-closing")).toHaveTextContent("450.00 ج.م");
+  });
+
+  it("BR-C10 says how a payment came in and its reference", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/account/statement": json(200, {
+        ...statement,
+        data: [
+          ...statement.data,
+          {
+            date: "2026-10-04T08:00:00Z",
+            type: "payment",
+            type_label: "تحصيل",
+            order_number: 1001,
+            return_number: null,
+            debit: "0.00",
+            credit: "150.00",
+            balance: "300.00",
+            method: "instapay",
+            method_label: "إنستاباي",
+            reference: "IP-55120",
+          },
+        ],
+      }),
+    });
+
+    renderWithQuery(<AccountStatement />);
+
+    const methods = await screen.findAllByTestId("ledger-method");
+    expect(methods).toHaveLength(1);
+    expect(methods[0]).toHaveTextContent("إنستاباي · IP-55120");
   });
 
   it("D60 sends the range from the URL and writes a new one back", async () => {

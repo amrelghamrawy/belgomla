@@ -46,6 +46,7 @@ final class CollectionResource extends JsonResource
             'amount' => $collection->amount,
             'method' => $collection->method->value,
             'method_label' => $collection->method->label(),
+            'reference' => $collection->reference,
             'collected_at' => $collection->collected_at->toIso8601String(),
             'recorded_by' => $collection->recorded_by,
             'note' => $collection->note,

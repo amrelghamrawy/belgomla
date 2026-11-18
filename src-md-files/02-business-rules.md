@@ -762,17 +762,18 @@ V1 has no payment gateway.
 
 ### BR-C02 — Collection Records
 
-The merchant records each cash collection as a collection record:
+The merchant records each payment as a collection record:
 
 - Order
 - Amount (> 0)
 - Collected at (date/time)
 - Recorded by (tenant user)
 - Note (optional)
+- Method and reference (V2 Task 20, BR-C10)
 
 A collection record can be voided (not deleted) with a reason.
 
-Method in V1 is always `cash`. A record is a `payment` (money received) or, from V2 Task 01, a `refund` (cash paid back after a return, BR-R04); both keep a positive amount.
+In V1 the method was always `cash`; from V2 Task 20 it says how the money moved (BR-C10). A record is a `payment` (money received) or, from V2 Task 01, a `refund` (money paid back after a return, BR-R04); both keep a positive amount.
 
 ### BR-C03 — Collection Status Is Derived
 
@@ -813,7 +814,13 @@ When a return leaves an order collected beyond its net total (BR-R04), the merch
 
 ### BR-C08 — Account Statement
 
-The customer statement is a dated ledger of everything that changed what the customer owes: delivered orders (debit), returns (credit), payments (credit; `credit_applied` when drawn from credit), cash refunds (debit), returns kept as credit (`refund_to_credit`, debit) and the credit they create (an info line). Voided rows are left out. Rows are ordered by date with a running balance (positive = the customer owes the store); a date range (Cairo days, D60) starts from the opening balance of everything before it. The merchant sees it on the customer page with print; the customer sees the same rows in `/account/statement`. With no credit left, the closing balance equals what the customer owes (D59).
+The customer statement is a dated ledger of everything that changed what the customer owes: delivered orders (debit), returns (credit), payments (credit; `credit_applied` when drawn from credit), cash refunds (debit), returns kept as credit (`refund_to_credit`, debit) and the credit they create (an info line). Voided rows are left out. Rows are ordered by date with a running balance (positive = the customer owes the store); a date range (Cairo days, D60) starts from the opening balance of everything before it. The merchant sees it on the customer page with print; the customer sees the same rows in `/account/statement`. With no credit left, the closing balance equals what the customer owes (D59). A payment or refund row also says how the money moved and its reference (BR-C10).
+
+### BR-C10 — Payment Methods (V2 Task 20, D103)
+
+A payment or a refund records how the money moved: `cash` نقدي, `instapay` إنستاباي, `wallet` محفظة إلكترونية or `bank_transfer` تحويل بنكي, with an optional reference (≤ 60, the transfer or wallet transaction number). Without a method a payment is `cash`, so older clients keep working. `credit` is the system's method for customer credit (BR-C07): the merchant cannot choose it, and a `credit` row has no reference. Cheques are not a method (D103 a). A return paid back takes the same four methods (`refund_to`), or keeps the amount as credit. Payments recorded before V2 Task 20 stay `cash`. The collections list filters by method; the order's payments and both statements show the method and the reference; the collections report lists the range's payments per method, adding up to the same total as before. There is no reconciliation against a bank or a wallet.
+
+Example (the collections report, one range): payments cash 1,500.00 and 250.00, InstaPay 800.00, bank transfer 2,000.00, 300.00 drawn from credit, and a voided wallet payment of 400.00 → cash 1,750.00, InstaPay 800.00, wallet 0.00, bank transfer 2,000.00, credit 300.00; total 4,850.00 = the old cash 4,550.00 (the new methods folded in) + credit 300.00.
 
 ---
 

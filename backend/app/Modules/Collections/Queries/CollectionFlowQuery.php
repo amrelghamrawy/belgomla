@@ -10,7 +10,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * V2 Task 16: the tenant's live collections (BR-C02) collected between two instants, one row each — `at`
- * (collected_at), `kind` (payment or refund, BR-R04), `method` (cash or customer credit, BR-C07), `amount` (always
+ * (collected_at), `kind` (payment or refund, BR-R04), `method` (a recordable method, BR-C10, or customer credit, BR-C07), `amount` (always
  * positive) and the order's customer's current `customer_group_id` — for the collections report. Voided rows are out.
  */
 final readonly class CollectionFlowQuery

@@ -1,6 +1,6 @@
 # V2 Task 20 — Order printing, overdue reminders, payment methods
 
-Status: **planned** (2026-11-17). Three small, independent slices about getting an order out of the door and getting its money in. The ideas come from ILORA (`D:\algoriza\ilora\backend\internal\modules`):
+Status: **in progress**: slice C done (2026-11-18); A and B next. Three small, independent slices about getting an order out of the door and getting its money in. The ideas come from ILORA (`D:\algoriza\ilora\backend\internal\modules`):
 - `sales/invoice_batch_print`, `inventory/pick_pack`, `inventory/picking` (printing);
 - `sales/dunning` (overdue reminders);
 - `sales/collection_methods` (payment methods).
@@ -49,7 +49,14 @@ Any order, one commit each. Copy D101–D103 into `src-md-files/06-open-decision
   - The collections report splits payments into `cash` and `credit` by method (`backend/app/Modules/Reports/Queries/CollectionsReportQuery.php:99-100`).
   - Routes: `backend/routes/api/dashboard/collections.php:21-27`, all under `collections.manage`.
 
-Not checked: which of `ApplyCustomerCredit` / `KeepAsCredit` writes `method = credit` and how. Slice C lists every writer before changing the check (rules/04 §3).
+Checked in slice C (rules/04 §3), every writer of `collections.method`:
+- `Collections/Actions/RecordCollection.php:62` (payment, was always `cash`);
+- `Collections/Actions/RecordRefund.php:38` (refund, was always `cash`; reached from Orders' `RecordReturn` through `RefundsPayments::refund`);
+- `Collections/Actions/KeepAsCredit.php:48` (refund kept as credit, `credit`, with `customer_credit_id`);
+- `Collections/Actions/ApplyCustomerCredit.php:53` (payment drawn from credit, `credit`, with `customer_credit_id`);
+- the model default (`CashCollection::$attributes`, `cash`) and `CashCollectionFactory` (`cash`).
+
+The check `collections_credit_has_source` (`method = credit` iff `customer_credit_id`) already stood; the slice keeps it.
 
 ---
 
@@ -352,3 +359,55 @@ Required tests:
   - `07` (`payment_reminders`, the settings columns, `collections.reference` and its check);
   - `08` (the new and changed endpoints).
 - The board row updated with the commit.
+
+---
+
+## Slice C — delivered (2026-11-18)
+
+- **Migration** `2026_11_09_100000_add_collection_payment_methods`:
+  - `collections_method_known` takes the five codes;
+  - `collections.reference varchar(60)` with `collections_credit_has_no_reference`;
+  - `order_returns.refund_method` widened to 20 with the five codes;
+  - the `down` refuses while a new code is in use.
+- **Enums.** `CollectionMethod` gains `instapay`, `wallet`, `bank_transfer` and `recordable()`. `Orders\Enums\RefundMethod` gains the same codes and `paysBack()`. Orders cannot use Collections (the boundary test), so a return names the method in its own enum, and `ReturnRefunds` maps it to the collection method of the same code (a test checks every code maps).
+- **Writes.**
+  - `RecordCollectionRequest` takes `method` (recordable, default `cash`) and `reference`. The accessor is `paymentMethod()`: `method()` would override the request's HTTP verb (caught by phpstan).
+  - `CollectionData` refuses `credit`.
+  - `RecordReturnRequest` takes `refund_to` in the five codes and `refund_reference`, refused with `credit`.
+  - `RefundsPayments::refund()` carries the method and the reference to `RecordRefund`, which refuses `credit`.
+  - Both audit rows carry the method and the reference.
+- **Reads.**
+  - The collection resource adds `reference`.
+  - The statement ledger carries `method`, `method_label`, `reference` on every row (null on non-money rows), on the dashboard and the storefront.
+  - `GET /collections?method=`.
+  - The collections report: `by_method` (recordable methods then `credit`). `cash` now counts every payment not drawn from credit; the export column reads «نقدي وتحويلات».
+- **Frontend.**
+  - The record dialog: a method select and «رقم العملية» for the non-cash methods.
+  - The return dialog: five ways to pay back, with the reference for the three transfers.
+  - The collections list: the method filter and the reference.
+  - The order's payments show the reference.
+  - `LedgerTable` (both statements) shows the method and the reference.
+  - The collections report: «المدفوعات حسب طريقة الدفع».
+- **Arabic validation attribute names:** `method`, `reference`, `refund_to`, `refund_reference`.
+- **Tests:**
+  - the C.3 example (`tests/Unit/Queries/CollectionsByMethodTest.php`): cash 1,750.00, instapay 800.00, wallet 0.00 (voided), bank 2,000.00, credit 300.00 = 4,850.00 = 4,550.00 + 300.00;
+  - the Task 16 dataset split by method, with the group filter;
+  - validation: credit, unknown method, reference 61, no method → cash;
+  - the DB checks;
+  - the audit rows;
+  - a refund by bank transfer, a reference refused with credit;
+  - both statements;
+  - the list filter;
+  - the migration's down refused and the round trip;
+  - frontend: the dialog sends the method and reference and hides it for cash; the return by InstaPay; the statement shows the method; the report lists the methods.
+
+### Manual checks (slice C)
+
+Against the alnoor demo data through `scripts/smoke.sh`, on 2026-11-18:
+
+| Call | Answer |
+| ---- | ------ |
+| `POST /api/dashboard/orders/66/collections` `{ amount: 500.00, method: instapay, reference: IP-55120 }` | `201`, `method_label` إنستاباي, `reference` IP-55120, order 66 `partially_collected` 500.00 |
+| the same with `method: credit` | `422 validation_failed` on `method` |
+| `GET /api/dashboard/collections?method=instapay` | 1 row, collection 48, 500.00, IP-55120 |
+| `GET /api/dashboard/reports/collections?from=today&to=today` | `by_method`: cash 0.00, instapay 500.00, wallet 0.00, bank_transfer 0.00, credit 0.00; `totals.cash` 500.00. SQL on `collections` for the Cairo day gives instapay 500.00 only. |

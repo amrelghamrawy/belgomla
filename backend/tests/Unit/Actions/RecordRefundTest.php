@@ -52,8 +52,20 @@ test('BR-L a refund is audited as collection.refunded', function (): void {
 
     expect(AuditLog::query()->sole()->only(['action', 'entity_type', 'entity_id', 'new_values']))->toEqual([
         'action' => 'collection.refunded', 'entity_type' => 'collections', 'entity_id' => $refund->id,
-        'new_values' => ['order_id' => $this->order->id, 'order_number' => $this->order->number, 'order_return_id' => $this->return->id, 'amount' => '200.00', 'method' => 'cash'],
+        'new_values' => ['order_id' => $this->order->id, 'order_number' => $this->order->number, 'order_return_id' => $this->return->id, 'amount' => '200.00', 'method' => 'cash', 'reference' => null],
     ]);
+});
+
+test('BR-C10 a refund paid back by bank transfer keeps the method and its reference', function (): void {
+    $refund = app(RecordRefund::class)->handle($this->order, $this->return->id, '200.00', $this->owner->id, method: CollectionMethod::BankTransfer, reference: 'TRX-7781');
+
+    expect($refund->refresh()->only(['method', 'reference']))->toBe(['method' => CollectionMethod::BankTransfer, 'reference' => 'TRX-7781'])
+        ->and(AuditLog::query()->sole()->new_values)->toMatchArray(['method' => 'bank_transfer', 'reference' => 'TRX-7781']);
+});
+
+test('D103 a refund is never paid back as credit through RecordRefund (KeepAsCredit owns that)', function (): void {
+    expect(fn (): CashCollection => app(RecordRefund::class)->handle($this->order, $this->return->id, '200.00', method: CollectionMethod::Credit))->toThrow(InvalidArgumentException::class)
+        ->and(CashCollection::query()->where('kind', CollectionKind::Refund)->count())->toBe(0);
 });
 
 test('the refund carries its order', function (): void {

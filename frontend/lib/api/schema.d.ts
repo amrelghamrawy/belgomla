@@ -2237,7 +2237,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Records a cash collection on any non-cancelled order */
+        /** Records a payment on any non-cancelled order, in cash, by InstaPay, to a wallet or by bank transfer (BR-C10) */
         post: operations["dashboardRecordCollection"];
         delete?: never;
         options?: never;
@@ -2425,7 +2425,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** V2 Task 16: money collected per bucket by method (refunds negative) next to the net sales delivered, the collection rate and the aging now; cached 10 minutes (D94) */
+        /** V2 Task 16: money collected per bucket (refunds negative) next to the net sales delivered, the collection rate, the payments per method (D103) and the aging now; cached 10 minutes (D94) */
         get: operations["dashboardReportCollections"];
         put?: never;
         post?: never;
@@ -4079,10 +4079,10 @@ export interface components {
             total: components["schemas"]["Money"];
             refund_amount: components["schemas"]["Money"];
             /**
-             * @description How refund_amount went back (BR-C07)
+             * @description How refund_amount went back (BR-C07, BR-C10)
              * @enum {string|null}
              */
-            refund_method: "cash" | "credit" | null;
+            refund_method: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit" | null;
             reason: string;
             /** Format: date-time */
             returned_at: string;
@@ -4116,7 +4116,7 @@ export interface components {
             total: components["schemas"]["Money"];
             refund_amount: components["schemas"]["Money"];
             /** @enum {string|null} */
-            refund_method: "cash" | "credit" | null;
+            refund_method: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit" | null;
             /** Format: date-time */
             returned_at: string;
             items: {
@@ -4182,9 +4182,10 @@ export interface components {
             /** @description BR-C07: the credit a credit collection draws from (payment) or creates (refund) */
             customer_credit_id: number | null;
             amount: components["schemas"]["Money"];
-            /** @enum {string} */
-            method: "cash" | "credit";
+            method: components["schemas"]["CollectionMethod"];
             method_label: string;
+            /** @description The transfer or wallet transaction number (BR-C10) */
+            reference: string | null;
             /** Format: date-time */
             collected_at: string;
             recorded_by: number | null;
@@ -4209,7 +4210,16 @@ export interface components {
             debit: components["schemas"]["Money"];
             credit: components["schemas"]["Money"];
             balance: components["schemas"]["Money"];
+            /** @description How a payment or refund moved (BR-C10); null on the other rows */
+            method: components["schemas"]["CollectionMethod"] | null;
+            method_label: string | null;
+            reference: string | null;
         };
+        /**
+         * @description BR-C10 (D103): cash, instapay, wallet and bank_transfer are recorded by the merchant; credit is drawn from or kept as customer credit (BR-C07)
+         * @enum {string}
+         */
+        CollectionMethod: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit";
         LedgerMeta: components["schemas"]["PaginationMeta"] & {
             /** @description Everything before `from` */
             opening_balance: components["schemas"]["Money"];
@@ -4566,6 +4576,7 @@ export interface components {
             buckets: {
                 /** Format: date */
                 period_start: string;
+                /** @description Payments not drawn from credit, every method (deprecated: use by_method, D103 e) */
                 cash: components["schemas"]["Money"];
                 /** @description Payments drawn from customer credit (BR-C07) */
                 credit: components["schemas"]["Money"];
@@ -4584,6 +4595,12 @@ export interface components {
                 /** @description net ÷ delivered, % */
                 collection_rate: components["schemas"]["Money"] | null;
             };
+            /** @description D103 e: the range's payments per method, every recordable method (0.00 when unused) then credit; adds up to totals.cash + totals.credit */
+            by_method: {
+                method: components["schemas"]["CollectionMethod"];
+                label: string;
+                amount: components["schemas"]["Money"];
+            }[];
             aging: components["schemas"]["ReportAging"];
         };
         LowStockSku: {
@@ -8874,10 +8891,12 @@ export interface operations {
                     /** @description Confirms paying back what was collected beyond the new net total */
                     refund?: boolean;
                     /**
-                     * @description cash (default) or kept as customer credit (BR-C07)
+                     * @description How it goes back: paid back by a method (cash by default, BR-C10) or kept as customer credit (BR-C07)
                      * @enum {string}
                      */
-                    refund_to?: "cash" | "credit";
+                    refund_to?: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit";
+                    /** @description The transfer or wallet transaction number (BR-C10); not with credit */
+                    refund_reference?: string | null;
                     items: {
                         order_item_id: number;
                         quantity: number;
@@ -9059,6 +9078,8 @@ export interface operations {
                 customer_id?: number;
                 /** @description Order number */
                 order?: number;
+                /** @description How the money moved (D103 e) */
+                method?: components["schemas"]["CollectionMethod"];
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -9247,6 +9268,13 @@ export interface operations {
                     /** Format: date-time */
                     collected_at?: string;
                     note?: string | null;
+                    /**
+                     * @description cash by default (older clients); credit is the system's (D103 a)
+                     * @enum {string}
+                     */
+                    method?: "cash" | "instapay" | "wallet" | "bank_transfer";
+                    /** @description The transfer or wallet transaction number */
+                    reference?: string | null;
                 };
             };
         };

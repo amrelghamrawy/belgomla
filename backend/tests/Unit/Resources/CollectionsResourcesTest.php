@@ -43,6 +43,7 @@ test('BR-C02 a collection renders its order balance, customer, money as a string
         'amount' => '200.00',
         'method' => 'cash',
         'method_label' => 'نقدي',
+        'reference' => null,
         'collected_at' => now()->toIso8601String(),
         'recorded_by' => $this->owner->id,
         'note' => 'دفعة',
@@ -70,7 +71,7 @@ test('BR-C02 the dashboard order detail lists its collections without the custom
 });
 
 test('BR-C08 a ledger row renders its date, kind, references and money as strings', function (): void {
-    $row = (object) ['occurred_at' => '2026-10-10 09:00:00', 'type' => 'return', 'order_number' => '1024', 'return_number' => '2', 'debit' => '0', 'credit' => '85.5', 'balance' => '-10.5'];
+    $row = (object) ['occurred_at' => '2026-10-10 09:00:00', 'type' => 'return', 'order_number' => '1024', 'return_number' => '2', 'debit' => '0', 'credit' => '85.5', 'balance' => '-10.5', 'method' => null, 'reference' => null];
 
     expect(rendered(new LedgerRowResource($row), dashboardRequest()))->toBe([
         'date' => '2026-10-10T09:00:00+00:00',
@@ -81,11 +82,20 @@ test('BR-C08 a ledger row renders its date, kind, references and money as string
         'debit' => '0.00',
         'credit' => '85.50',
         'balance' => '-10.50',
+        'method' => null,
+        'method_label' => null,
+        'reference' => null,
     ]);
 });
 
+test('BR-C10 a payment row says how it came in and its reference', function (): void {
+    $row = (object) ['occurred_at' => '2026-10-10 09:00:00', 'type' => 'payment', 'order_number' => '1024', 'return_number' => null, 'debit' => '0', 'credit' => '800', 'balance' => '200', 'method' => 'instapay', 'reference' => 'IP-55120'];
+
+    expect(rendered(new LedgerRowResource($row), dashboardRequest()))->toMatchArray(['method' => 'instapay', 'method_label' => 'إنستاباي', 'reference' => 'IP-55120']);
+});
+
 test('BR-C08 an info row without an order keeps null references', function (): void {
-    $row = (object) ['occurred_at' => '2026-10-10 09:00:00', 'type' => 'credit_created', 'order_number' => null, 'return_number' => null, 'debit' => '0', 'credit' => '0', 'balance' => '0'];
+    $row = (object) ['occurred_at' => '2026-10-10 09:00:00', 'type' => 'credit_created', 'order_number' => null, 'return_number' => null, 'debit' => '0', 'credit' => '0', 'balance' => '0', 'method' => null, 'reference' => null];
 
     expect(rendered(new LedgerRowResource($row), dashboardRequest()))->toMatchArray(['order_number' => null, 'return_number' => null, 'type_label' => 'رصيد للعميل']);
 });

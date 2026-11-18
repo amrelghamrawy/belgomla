@@ -570,7 +570,7 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | number        | int             | per order 1, 2, …; **unique (order_id, number)**         |
 | total         | numeric(12,2)   | Σ line_total, **check > 0**                              |
 | refund_amount | numeric(12,2)   | paid back (BR-R04), default 0, check ≥ 0                 |
-| refund_method | varchar(10)     | `cash` or `credit` (BR-C07), null when nothing went back |
+| refund_method | varchar(20)     | `cash`, `instapay`, `wallet`, `bank_transfer` (BR-C10) or `credit` (BR-C07), null when nothing went back |
 | reason        | varchar(300)    | required                                                 |
 | returned_at   | timestamptz     | defaults to now, never in the future                     |
 | recorded_by   | FK tenant_users | nullable (system)                                        |
@@ -596,7 +596,8 @@ No status: a return is live or voided. Model `Orders\Models\OrderReturn`.
 | kind         | enum            | `payment` (default), `refund` (V2, BR-R04) |
 | order_return_id | FK order_returns | set exactly for a refund (the return it pays back) |
 | amount       | numeric(12,2)   | **check > 0**     |
-| method       | enum            | `cash`, or `credit` (V2, BR-C07) |
+| method       | varchar(20)     | `cash`, `instapay`, `wallet`, `bank_transfer` (V2 Task 20, BR-C10), or `credit` (V2, BR-C07) |
+| reference    | varchar(60)     | nullable: the transfer or wallet transaction number (BR-C10); never on `credit` |
 | customer_credit_id | FK customer_credits | set exactly for method `credit`: the credit drawn from (payment) or created (refund) |
 | collected_at | timestamptz     |                   |
 | recorded_by  | FK tenant_users | nullable (system, e.g. a transition without a user) |
@@ -605,7 +606,7 @@ No status: a return is live or voided. Model `Orders\Models\OrderReturn`.
 | void_reason  | varchar(300)    | nullable          |
 | voided_by    | FK tenant_users | nullable          |
 
-Invariant (app, inside a transaction with the order row locked): `Σ live payments − Σ live refunds ≤ net total` (order_total − returned_total), except transiently between voiding a return's refund and voiding the return (BR-R06). After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method = 'cash'`, `kind in (payment, refund)`, `order_return_id` set iff `kind = refund`, `voided_at` and `void_reason` set together.
+Invariant (app, inside a transaction with the order row locked): `Σ live payments − Σ live refunds ≤ net total` (order_total − returned_total), except transiently between voiding a return's refund and voiding the return (BR-R06). After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method in (cash, instapay, wallet, bank_transfer, credit)` (`collections_method_known`), `method = credit` iff `customer_credit_id` is set, no `reference` on `credit` (`collections_credit_has_no_reference`), `kind in (payment, refund)`, `order_return_id` set iff `kind = refund`, `voided_at` and `void_reason` set together.
 
 ### `customer_credits` (V2 Task 02, BR-C07)
 

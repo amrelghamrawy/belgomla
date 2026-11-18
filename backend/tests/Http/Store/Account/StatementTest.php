@@ -31,6 +31,23 @@ test('BR-C08 a customer reads their own ledger with what they owe, their credit 
     expectDocumentedShape($response->json('meta'), 'LedgerMeta');
 });
 
+test('BR-C10 the customer sees how each payment came in and its reference', function (): void {
+    $order = ($this->delivered)('400.00');
+    $this->inTenant(fn () => App\Modules\Collections\Models\CashCollection::factory()->create([
+        'order_id' => $order->id, 'amount' => '150.00', 'method' => 'instapay', 'reference' => 'IP-55120', 'collected_at' => now()->subDay(),
+    ]));
+    $this->actingAsCustomer($this->customer);
+
+    $response = $this->tenantJson('GET', '/api/store/account/statement')
+        ->assertOk()
+        ->assertJsonPath('data.1.type', 'payment')
+        ->assertJsonPath('data.1.method', 'instapay')
+        ->assertJsonPath('data.1.method_label', 'إنستاباي')
+        ->assertJsonPath('data.1.reference', 'IP-55120');
+
+    expectDocumentedShape($response->json('data.1'), 'LedgerRow');
+});
+
 test('D60 the customer narrows their statement to a range of days', function (): void {
     ($this->delivered)('400.00');
     $this->actingAsCustomer($this->customer);

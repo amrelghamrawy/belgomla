@@ -19,8 +19,13 @@ test('BR-C08 a statement row is an order, a return, a payment, credit applied, a
     expect(array_keys(LedgerEntryType::toArray()))->toBe(['order', 'return', 'payment', 'credit_applied', 'refund', 'refund_to_credit', 'credit_created']);
 });
 
-test('BR-C02 BR-C07 money is cash, or drawn from customer credit', function (): void {
-    expect(CollectionMethod::toArray())->toBe(['cash' => 'نقدي', 'credit' => 'رصيد العميل']);
+test('BR-C02 BR-C07 BR-C10 money moves in cash, by InstaPay, to a wallet, by bank transfer, or from customer credit', function (): void {
+    expect(CollectionMethod::toArray())->toBe(['cash' => 'نقدي', 'instapay' => 'إنستاباي', 'wallet' => 'محفظة إلكترونية', 'bank_transfer' => 'تحويل بنكي', 'credit' => 'رصيد العميل']);
+});
+
+test('D103 a the merchant records every method but credit, which is the system\'s', function (): void {
+    expect(CollectionMethod::recordableValues())->toBe(['cash', 'instapay', 'wallet', 'bank_transfer'])
+        ->and(CollectionMethod::recordable())->not->toContain(CollectionMethod::Credit);
 });
 
 test('BR-R04 a collection is a payment or a refund', function (): void {

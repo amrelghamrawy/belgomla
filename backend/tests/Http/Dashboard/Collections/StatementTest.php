@@ -33,7 +33,9 @@ test('BR-C08 the statement is a dated ledger with a running balance, the custome
         ->assertJsonPath('data.0', [
             'date' => '2026-10-01T09:00:00+00:00', 'type' => 'order', 'type_label' => 'طلب مسلَّم', 'order_number' => $order->number,
             'return_number' => null, 'debit' => '500.00', 'credit' => '0.00', 'balance' => '500.00',
+            'method' => null, 'method_label' => null, 'reference' => null,
         ])
+        ->assertJsonPath('data.1.method', 'cash')
         ->assertJsonPath('data.1.type', 'payment')
         ->assertJsonPath('data.1.credit', '200.00')
         ->assertJsonPath('data.1.balance', '300.00')
@@ -49,6 +51,18 @@ test('BR-C08 the statement is a dated ledger with a running balance, the custome
     expectDocumentedShape($response->json('data.0'), 'LedgerRow');
     expectDocumentedShape($response->json('meta'), 'LedgerMeta');
     expectDocumentedShape($response->json('summary'), 'StatementSummary');
+});
+
+test('BR-C10 a statement payment row says how it came in and its reference', function (): void {
+    $order = ($this->order)('delivered', '500.00', ['delivered_at' => CarbonImmutable::parse('2026-10-01 09:00:00', 'UTC')]);
+    $this->inTenant(fn (): CashCollection => app(RecordCollection::class)->handle($order, new CollectionData('300.00', CarbonImmutable::parse('2026-10-05 09:00:00', 'UTC'), method: App\Modules\Collections\Enums\CollectionMethod::Wallet, reference: 'VC-0193'), $this->owner->id));
+
+    $this->tenantJson('GET', "/api/dashboard/customers/{$this->customer->id}/statement")
+        ->assertOk()
+        ->assertJsonPath('data.1.type', 'payment')
+        ->assertJsonPath('data.1.method', 'wallet')
+        ->assertJsonPath('data.1.method_label', 'محفظة إلكترونية')
+        ->assertJsonPath('data.1.reference', 'VC-0193');
 });
 
 test('D60 BR-C08 a date range starts from the opening balance of everything before it, in cairo days', function (): void {

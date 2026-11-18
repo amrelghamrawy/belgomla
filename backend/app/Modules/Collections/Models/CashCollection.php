@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $customer_credit_id the credit a `credit` collection draws from or creates (BR-C07)
  * @property string $amount
  * @property CollectionMethod $method
+ * @property string|null $reference the transfer or wallet transaction number (BR-C10); never on `credit`
  * @property CarbonImmutable $collected_at
  * @property int|null $recorded_by
  * @property string|null $note

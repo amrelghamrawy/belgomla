@@ -79,6 +79,22 @@ function CollectionsBody({ report }: { report: CollectionsReport }) {
       </div>
       <Card className="min-w-0">
         <CardHeader>
+          <CardTitle>{copy.byMethodTitle}</CardTitle>
+          <p className="text-muted-foreground text-xs">{copy.byMethodHint}</p>
+        </CardHeader>
+        <CardContent>
+          <ul className="flex flex-col gap-1 text-sm" data-testid="collections-by-method">
+            {report.by_method.map((row) => (
+              <li key={row.method} className="flex justify-between gap-2">
+                <span>{row.label}</span>
+                <bdi className="font-medium">{formatMoney(row.amount)}</bdi>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+      <Card className="min-w-0">
+        <CardHeader>
           <CardTitle>{copy.agingTitle}</CardTitle>
           <p className="text-muted-foreground text-xs">{copy.agingHint}</p>
         </CardHeader>

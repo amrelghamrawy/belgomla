@@ -25,7 +25,13 @@ export const ORDER_LIST_KEYS = [
   "kind",
   "sort",
 ] as const;
-export const COLLECTION_LIST_KEYS = ["from", "to", "customer_id", "order"] as const;
+export const COLLECTION_LIST_KEYS = ["from", "to", "customer_id", "order", "method"] as const;
+
+/** D103 a: the ways the merchant records money moving; `credit` is the system's. */
+export const PAYMENT_METHODS = ["cash", "instapay", "wallet", "bank_transfer"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export type CollectionInput = { amount: string; note: string | null; method: PaymentMethod; reference: string | null };
 
 export function useOrders(query: ListQuery) {
   return useQuery({
@@ -191,7 +197,7 @@ export function useRecordCollection(number: number) {
   const idempotency = useIdempotencyKey(`collection-${number}`);
 
   return useMutation({
-    mutationFn: (body: { amount: string; note: string | null }) =>
+    mutationFn: (body: CollectionInput) =>
       apiFetch<Collection>(`/api/dashboard/orders/${number}/collections`, {
         method: "POST",
         body,

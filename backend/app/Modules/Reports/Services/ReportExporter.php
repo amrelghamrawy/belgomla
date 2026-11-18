@@ -219,7 +219,7 @@ final readonly class ReportExporter
             ];
         }
 
-        return [['period_start' => 'الفترة', 'cash' => 'نقدي', 'credit' => 'من رصيد العميل', 'refunds' => 'مردود', 'net' => 'صافي التحصيل', 'delivered' => 'صافي المسلَّم'], $rows];
+        return [['period_start' => 'الفترة', 'cash' => 'نقدي وتحويلات', 'credit' => 'من رصيد العميل', 'refunds' => 'مردود', 'net' => 'صافي التحصيل', 'delivered' => 'صافي المسلَّم'], $rows];
     }
 
     private function yesNo(bool $value): string
