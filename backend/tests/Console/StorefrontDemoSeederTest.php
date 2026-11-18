@@ -158,3 +158,24 @@ test('BR-P14 the demo catalog has a highlighter in three colours, each its own s
         ->and($skus->pluck('name')->all())->toBe(['أصفر', 'أخضر', 'وردي'])
         ->and($skus->pluck('inventory.on_hand')->all())->toBe([600, 400, 200]);
 });
+
+test('D26 every demo product gets a drawn cover as its main image', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    [$products, $images] = $this->inTenant(fn (): array => [
+        Product::query()->count(),
+        App\Modules\Catalog\Models\ProductImage::query()->where('is_main', true)->pluck('path')->all(),
+    ]);
+
+    expect($images)->toHaveCount($products);
+    Illuminate\Support\Facades\Storage::disk('public')->assertExists($images);
+});
+
+test('BR-O14 the Coming Soon demo book takes pre-orders, expected in three weeks', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $book = $this->inTenant(fn (): Product => Product::query()->where('status', ProductStatus::ComingSoon)->sole());
+
+    expect($book->preorder_enabled)->toBeTrue()
+        ->and($book->expected_at?->toDateString())->toBe(now()->addDays(21)->toDateString());
+});

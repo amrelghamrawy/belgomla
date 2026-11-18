@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Modules\Catalog\Actions\AddProductImage;
 use App\Modules\Catalog\Actions\AddProductRelation;
 use App\Modules\Catalog\Actions\ApplyVerticalTemplate;
 use App\Modules\Catalog\Actions\CreateBundle;
@@ -16,6 +17,7 @@ use App\Modules\Catalog\Data\BundleComponentData;
 use App\Modules\Catalog\Data\BundleData;
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
+use App\Modules\Catalog\Data\PreorderData;
 use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\ProductOptionValueData;
@@ -42,7 +44,9 @@ use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use LogicException;
 use RuntimeException;
 
@@ -85,11 +89,12 @@ final class StorefrontDemoSeeder extends Seeder
         CreateProduct $products,
         AddProductRelation $relations,
         CreateBundle $bundles,
+        AddProductImage $images,
         string $subdomain = 'alnoor',
     ): void {
         $tenant = Tenant::query()->where('subdomain', $subdomain)->firstOrFail();
 
-        $context->runAs($tenant, fn () => DB::transaction(function () use ($tenant, $tree, $existingUnits, $fields, $settings, $templates, $fieldDefinitions, $fieldOptions, $units, $categories, $products, $relations, $bundles): void {
+        $context->runAs($tenant, fn () => DB::transaction(function () use ($tenant, $tree, $existingUnits, $fields, $settings, $templates, $fieldDefinitions, $fieldOptions, $units, $categories, $products, $relations, $bundles, $images): void {
             // The demo tree's books root marks a seeded catalog; a dev database may hold other test data.
             if ($tree->forDashboard()->contains('name', 'كتب خارجية')) {
                 return;
@@ -111,7 +116,63 @@ final class StorefrontDemoSeeder extends Seeder
             $this->books($categories, $products, $relations, $bundles, $copy, $carton);
             $this->supplies($categories, $products, $piece, $carton);
             $this->toys($categories, $products, $piece);
+            $this->covers($images);
         }));
+    }
+
+    /**
+     * D26, D61: a drawn cover for every product (a colour per subject or section, the SKU code on a band), so the
+     * store and the product gallery have pictures. Skipped without GD.
+     */
+    private function covers(AddProductImage $images): void
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            return;
+        }
+
+        $palette = [[0x1E, 0x6F, 0xB8], [0x2E, 0x8B, 0x57], [0xC0, 0x39, 0x2B], [0x8E, 0x44, 0xAD], [0xD3, 0x84, 0x1A], [0x16, 0xA0, 0x85], [0x34, 0x49, 0x5E]];
+
+        foreach (Product::query()->with('skus')->orderBy('id')->get() as $index => $product) {
+            $subject = array_find_key(self::SUBJECTS, fn (string $name): bool => str_contains($product->name, $name));
+            $code = $product->skus->first()->code ?? '';
+            $file = $this->cover($palette[($subject ?? $index) % count($palette)], $code);
+            $images->handle($product, new UploadedFile($file, "{$code}.png", 'image/png', null, true));
+            @unlink($file);
+        }
+    }
+
+    /**
+     * A 600×800 PNG: the colour, a lighter panel and circle, and a dark band with the code.
+     *
+     * @param  array{int, int, int}  $rgb
+     */
+    private function cover(array $rgb, string $code): string
+    {
+        $image = imagecreatetruecolor(600, 800) ?: throw new RuntimeException('GD could not create an image.');
+        [$r, $g, $b] = $rgb;
+        $tint = fn (float $mix): int => (int) imagecolorallocate($image, $this->channel($r + (255 - $r) * $mix), $this->channel($g + (255 - $g) * $mix), $this->channel($b + (255 - $b) * $mix));
+        $shade = (int) imagecolorallocate($image, $this->channel($r * 0.55), $this->channel($g * 0.55), $this->channel($b * 0.55));
+
+        imagefill($image, 0, 0, $tint(0.0));
+        imagefilledrectangle($image, 50, 60, 550, 330, $tint(0.85));
+        imagefilledellipse($image, 300, 500, 260, 260, $tint(0.35));
+        imagefilledellipse($image, 300, 500, 150, 150, $tint(0.7));
+        imagefilledrectangle($image, 0, 690, 600, 800, $shade);
+        imagestring($image, 5, 300 - (int) (mb_strlen($code) * imagefontwidth(5) / 2), 737, $code, (int) imagecolorallocate($image, 255, 255, 255));
+
+        $path = storage_path('framework/cache/cover-'.Str::random(16).'.png');
+
+        if (! imagepng($image, $path, 9)) {
+            throw new RuntimeException('Could not write a cover.');
+        }
+
+        return $path;
+    }
+
+    /** @return int<0, 255> */
+    private function channel(float $value): int
+    {
+        return max(0, min(255, (int) $value));
     }
 
     /**
@@ -402,6 +463,8 @@ final class StorefrontDemoSeeder extends Seeder
                 'term' => $this->option('term', 'الترم الأول'),
             ],
             status: $status,
+            // BR-O14 (D88): the Coming Soon book takes pre-orders until it arrives in three weeks.
+            preorder: $status === ProductStatus::ComingSoon ? new PreorderData(true, now()->addDays(21)->startOfDay()->toImmutable(), 500) : null,
         );
     }
 

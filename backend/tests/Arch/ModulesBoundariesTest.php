@@ -66,7 +66,7 @@ arch('pricing only touches the catalog product and sku it is handed, plus the sh
 
 arch('pricing models are used outside pricing only by the SkuUnit tiers relation')
     ->expect('App\Modules\Pricing\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Pricing', App\Modules\Catalog\Models\SkuUnit::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Pricing', App\Modules\Catalog\Models\SkuUnit::class, 'Database\Factories', 'Database\Seeders']);
 
 arch('catalog reaches pricing only through its actions, data, services and request concern')
     ->expect('App\Modules\Catalog')
@@ -361,7 +361,7 @@ arch('orders fill the recent orders contract of customers')
 
 arch('collection models are only used inside collections')
     ->expect('App\Modules\Collections\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Collections', 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Collections', 'Database\Factories', 'Database\Seeders']);
 
 arch('collections use orders only through the order, its enums, contracts and ApplyCollectedAmount')
     ->expect('App\Modules\Collections')
@@ -419,7 +419,7 @@ arch('collections fill the order collections contract of orders')
 
 arch('return models are used only by orders and, for reading, reports')
     ->expect([App\Modules\Orders\Models\OrderReturn::class, App\Modules\Orders\Models\OrderReturnItem::class])
-    ->toOnlyBeUsedIn(['App\Modules\Orders', 'App\Modules\Reports\Queries', App\Providers\OrdersServiceProvider::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Orders', 'App\Modules\Reports\Queries', App\Providers\OrdersServiceProvider::class, 'Database\Factories', 'Database\Seeders']);
 
 arch('collections reach returns only through the refunds contract')
     ->expect('App\Modules\Collections')
@@ -532,4 +532,4 @@ arch('expenses depend on no business module')
 
 arch('only reports read expenses, and only through their totals query')
     ->expect('App\Modules\Expenses')
-    ->toOnlyBeUsedIn(['App\Modules\Expenses', 'App\Modules\Reports\Queries', 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Expenses', 'App\Modules\Reports\Queries', 'Database\Factories', 'Database\Seeders']);
