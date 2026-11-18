@@ -7,7 +7,8 @@
 # It runs only the suites whose area changed since <base>:
 #   backend/     composer test (lint, phpstan, type coverage, pest incl. arch)
 #   openapi      api:openapi + api:types must reproduce the committed files exactly
-#   frontend/    typecheck, lint, vitest; next build when routing/config changed
+#   frontend/    typecheck, lint, vitest with the coverage floor; next build when routing/config changed
+#   audits       composer audit / npm audit (prod, high+) when a lockfile changed
 #   wa-gateway/  typecheck, vitest
 #
 # Usage:
@@ -92,7 +93,9 @@ skip() {
 openapi_in_sync() {
     local tmp
     tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"' RETURN
+    # The RETURN trap is global: clear it on first use, or it fires again when run() returns
+    # (tmp gone by then) and set -u kills the script.
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     (cd backend && php artisan api:openapi --output="$tmp/openapi.json" >/dev/null) || return 1
     (cd frontend && npx --no-install openapi-typescript "$tmp/openapi.json" -o "$tmp/schema.d.ts" >/dev/null 2>&1) || return 1
     local drift=0
@@ -109,6 +112,18 @@ else
     skip "backend: composer test" "backend/ unchanged"
 fi
 
+# --- dependency audits (known CVEs; needs the network) ----------------------
+if touched '^backend/composer\.(json|lock)$'; then
+    run "backend: composer audit" bash -c "cd backend && ${COMPOSER[*]} audit --locked --no-interaction"
+else
+    skip "backend: composer audit" "composer.lock unchanged"
+fi
+if touched '^frontend/package(-lock)?\.json$'; then
+    run "frontend: npm audit (prod, high+)" bash -c "cd frontend && npm audit --omit=dev --audit-level=high"
+else
+    skip "frontend: npm audit" "package-lock.json unchanged"
+fi
+
 # --- API contract ----------------------------------------------------------
 if touched '^(backend/openapi/|backend/openapi\.json|frontend/lib/api/schema\.d\.ts)'; then
     run "openapi: yaml → json → schema.d.ts in sync" openapi_in_sync
@@ -120,7 +135,7 @@ fi
 if touched '^frontend/'; then
     run "frontend: typecheck" bash -c "cd frontend && npm run --silent typecheck"
     run "frontend: lint" bash -c "cd frontend && npm run --silent lint"
-    run "frontend: vitest" bash -c "cd frontend && npm test --silent"
+    run "frontend: vitest + coverage floor" bash -c "cd frontend && npm run --silent test:coverage"
     # rules/03 §6: `npm run build` for anything touching routing/config.
     if touched '^frontend/(app/|proxy\.ts|next\.config\.|package(-lock)?\.json|tsconfig)'; then
         run "frontend: next build" bash -c "cd frontend && npm run --silent build"

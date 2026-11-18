@@ -74,7 +74,7 @@
         "test:types": "phpstan analyse --memory-limit=1G",
         "test:type-coverage": "php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100",
         "test:arch": "pest --filter=arch",
-        "test:unit": "pest --parallel",
+        "test:unit": "pest --parallel --coverage --min=99",
         "test": [
             "@test:lint",
             "@test:types",

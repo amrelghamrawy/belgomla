@@ -24,7 +24,12 @@ Known environment notes:
 - `pest --parallel` creates `belgomla_test_1..N`; the `belgomla` role has `CREATEDB` for that.
 - The Laravel arch preset is **not** used (it assumes `app/Http`, `app/Console`); its equivalents for the module layout live in `tests/Arch/*.php` and `tests/Unit/ModelConventionsTest.php`.
 
-Line coverage: pinkary enforces `--coverage --min=98.8`. PHP 8.5 on this machine has no PCOV/Xdebug yet. Until a driver is installed the rule is enforced by review: **every class under `app/` has a test file and every public method is exercised.** The moment a coverage driver exists, add `--coverage --min=95` to `test:unit` and raise it with every module.
+Line coverage is enforced, not reviewed. PHP 8.5 at `C:\php` has PCOV (`php_pcov.dll` 1.0.12, `extension=pcov` in `php.ini`); without it `test:unit` fails. Floors, measured when the gate was added (2026-11-18), may only go up:
+
+- Backend: `test:unit` runs `pest --parallel --coverage --min=99` (measured 99.4%; pinkary enforces 98.8). It costs about a minute on top of the plain run. `phpunit.xml` sets `memory_limit` to 2G because the coverage report does not fit in 512M.
+- Frontend: `npm run test:coverage` (what preflight runs) fails under lines 85, statements 85, branches 81 or functions 79 (`vitest.config.mts`, measured 85.8 / 85.5 / 81.5 / 79.1). `npm test` stays the fast run without coverage.
+
+A new class or component still ships with its own test; the floor only catches what review misses. Run the coverage suites on an idle machine: under load (another session's suite running in parallel) vitest's 5 s timeouts fail tests that pass alone.
 
 ---
 
