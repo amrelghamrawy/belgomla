@@ -171,7 +171,7 @@ export function OrdersPage() {
       {orders.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {orders.data !== undefined && orders.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.number}</TableHead>
@@ -187,11 +187,11 @@ export function OrdersPage() {
                 <TableRow
                   key={order.number}
                   data-testid={`order-${order.number}`}
-                  className={cn(order.is_stale && "bg-amber-50")}
+                  className={cn(order.is_stale && "bg-warn-soft/60")}
                 >
                   <TableCell className="font-medium">
                     <Link href={`/dashboard/orders/${order.number}`} className="hover:underline">
-                      <bdi>#{order.number}</bdi>
+                      <bdi className="text-primary font-bold tabular-nums">#{order.number}</bdi>
                     </Link>
                   </TableCell>
                   <TableCell>{order.customer?.name ?? order.delivery.name}</TableCell>

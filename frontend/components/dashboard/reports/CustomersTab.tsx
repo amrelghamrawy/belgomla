@@ -13,9 +13,9 @@ import { type ListQuery, pageOf } from "@/lib/dashboard/list-query";
 import { daysValue, reportParams } from "@/lib/dashboard/report-range";
 import { useCustomerReport } from "@/lib/dashboard/reports";
 import { formatDate } from "@/lib/format/date";
-import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 
+import { Money } from "../common/Money";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
 import { ReportToolbar, type SetQuery } from "./ReportToolbar";
@@ -115,19 +115,21 @@ export function CustomersTab({ query, setQuery }: { query: ListQuery; setQuery: 
                         </TableCell>
                         <TableCell>{row.customer_group?.name ?? "—"}</TableCell>
                         <TableCell>{row.orders}</TableCell>
-                        <TableCell className="font-semibold whitespace-nowrap">{formatMoney(row.revenue)}</TableCell>
+                        <TableCell className="font-semibold">
+                          <Money value={row.revenue} />
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">
-                          {row.average_order === null ? "—" : formatMoney(row.average_order)}
+                          {row.average_order === null ? "—" : <Money value={row.average_order} />}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(row.last_order_at)}</TableCell>
                         <TableCell>{row.days_since_last_order}</TableCell>
                         <TableCell>{row.average_interval_days ?? "—"}</TableCell>
                         <TableCell>{row.lifetime_orders}</TableCell>
                         <TableCell className="whitespace-nowrap">
-                          {row.outstanding === "0.00" ? "" : formatMoney(row.outstanding)}
+                          {row.outstanding === "0.00" ? "" : <Money value={row.outstanding} />}
                         </TableCell>
                         <TableCell className="text-destructive font-semibold whitespace-nowrap">
-                          {row.overdue === "0.00" ? "" : formatMoney(row.overdue)}
+                          {row.overdue === "0.00" ? "" : <Money value={row.overdue} />}
                         </TableCell>
                       </TableRow>
                     ))}

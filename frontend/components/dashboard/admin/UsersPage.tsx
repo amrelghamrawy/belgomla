@@ -48,7 +48,7 @@ export function UsersPage() {
       {users.data?.length === 0 && <EmptyBlock />}
       {users.data !== undefined && users.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.name}</TableHead>

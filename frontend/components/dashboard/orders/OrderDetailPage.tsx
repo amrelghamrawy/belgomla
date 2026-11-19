@@ -108,7 +108,7 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
                   href={`/dashboard/orders/${conversion.number}`}
                   className="text-primary underline"
                 >
-                  <bdi>#{conversion.number}</bdi>
+                  <bdi className="text-primary font-bold tabular-nums">#{conversion.number}</bdi>
                 </Link>
               ))}
             </>
@@ -129,7 +129,7 @@ export function OrderDetail({ order }: { order: DashboardOrderDetail }) {
               <CardTitle>{copy.items}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <Table>
+              <Table stack>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{copy.product}</TableHead>

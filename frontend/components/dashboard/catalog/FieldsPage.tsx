@@ -87,7 +87,7 @@ export function FieldsPage() {
       {fields.data?.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {fields.data !== undefined && fields.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.label}</TableHead>

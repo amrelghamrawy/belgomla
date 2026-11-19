@@ -94,7 +94,7 @@ export function ExpensesPage() {
       {expenses.data?.data.length === 0 && <EmptyBlock>{copy.none}</EmptyBlock>}
       {expenses.data !== undefined && expenses.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.spentOn}</TableHead>

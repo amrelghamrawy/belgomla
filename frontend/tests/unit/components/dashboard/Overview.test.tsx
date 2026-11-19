@@ -118,6 +118,8 @@ describe("Overview", () => {
             placed_at: "2026-10-01T08:00:00Z",
             customer: { id: 7, name: "مكتبة الأمل", phone: "+201012345678" },
             delivery: { name: "x" },
+            collection_status: "unpaid",
+            order_total: "100.00",
           },
         ]),
       ),
@@ -143,11 +145,46 @@ describe("Overview", () => {
 
     renderWithQuery(<Overview />);
 
-    expect(await screen.findByRole("link", { name: "#1001" })).toHaveAttribute("href", "/dashboard/orders/1001");
+    const stale = await screen.findByTestId("stale-orders");
+    expect(await within(stale).findByRole("link", { name: "#1001" })).toHaveAttribute("href", "/dashboard/orders/1001");
     expect(await screen.findByTestId("low-stock")).toHaveTextContent("40 / 100");
-    const query = callsTo(fetchMock, "GET /api/dashboard/orders")[0]?.url.searchParams;
+    const query = callsTo(fetchMock, "GET /api/dashboard/orders").find((call) => call.url.searchParams.has("stale"))
+      ?.url.searchParams;
     expect(query?.get("stale")).toBe("1");
     expect(query?.get("sort")).toBe("placed_at");
+  });
+
+  it("D104 leads with the five latest orders: serial, customer, collection copy and total", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/reports/overview": json(200, { data: overviewReport() }),
+      "GET /api/dashboard/orders": json(
+        200,
+        page([
+          {
+            number: 1002,
+            placed_at: "2026-10-01T08:00:00Z",
+            customer: { id: 7, name: "مكتبة الأمل", phone: "+201012345678" },
+            delivery: { name: "x" },
+            collection_status: "partially_collected",
+            order_total: "8450.00",
+          },
+        ]),
+      ),
+      "GET /api/dashboard/reports/low-stock": json(200, page([])),
+      "GET /api/dashboard/reports/sales": json(200, { data: emptySales }),
+      "GET /api/dashboard/reports/outstanding": json(200, page([])),
+    });
+
+    renderWithQuery(<Overview />);
+
+    const latest = await screen.findByTestId("latest-orders");
+    expect(await within(latest).findByRole("link", { name: "#1002" })).toHaveAttribute("href", "/dashboard/orders/1002");
+    expect(latest).toHaveTextContent("مكتبة الأمل");
+    expect(within(latest).getByTestId("collection-status")).toHaveTextContent("محصل جزئيًا");
+    expect(latest).toHaveTextContent("8,450.00 ج.م");
+    const query = callsTo(fetchMock, "GET /api/dashboard/orders").find((call) => !call.url.searchParams.has("stale"))
+      ?.url.searchParams;
+    expect(query?.get("per_page")).toBe("5");
   });
 
   it("BR-C06 flags what is overdue and for how many customers", async () => {
@@ -167,6 +204,9 @@ describe("Overview", () => {
     expect(tile).toHaveTextContent("750.00 ج.م");
     expect(tile).toHaveTextContent("2 عميل");
     expect(tile).toHaveAttribute("href", "/dashboard/reports?tab=collections");
+    // D104, WCAG 1.4.1: the warning is said in words, not only by colour.
+    expect(tile).toHaveTextContent("يحتاج متابعة");
+    expect(screen.getByRole("link", { name: /مبيعات اليوم/ })).not.toHaveTextContent("يحتاج متابعة");
   });
 
   it("shows the error with a retry", async () => {

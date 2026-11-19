@@ -24,20 +24,19 @@ export function KpiTile({ label, value, delta = null, upIsGood = true, hint, tes
   const Icon = delta !== null && delta < 0 ? TrendingDownIcon : TrendingUpIcon;
 
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-md border p-3">
+    <div className="bg-card shadow-panel flex min-w-0 flex-col gap-1 rounded-[20px] px-5 py-4">
       <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="text-lg font-semibold break-words" data-testid={testId}>
+      <p
+        className="font-heading text-foreground text-lg font-bold tabular-nums sm:text-[1.4rem] sm:whitespace-nowrap"
+        data-testid={testId}
+      >
         {value}
       </p>
       {delta !== null && (
         <p
           className={cn(
             "flex items-center gap-1 text-xs",
-            delta === 0
-              ? "text-muted-foreground"
-              : good
-                ? "text-emerald-700 dark:text-emerald-400"
-                : "text-destructive",
+            delta === 0 ? "text-muted-foreground" : good ? "text-ok" : "text-destructive",
           )}
           data-testid={testId === undefined ? undefined : `${testId}-delta`}
         >

@@ -1,6 +1,6 @@
 "use client";
 
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, FileTextIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -62,11 +62,16 @@ export function ReportToolbar({ report, query, setQuery, range, generatedAt, chi
       <FilterPanel
         active={activeFilters(query, keys)}
         leading={
-          <div className="flex flex-wrap items-center gap-1" role="group" aria-label={copy.period}>
+          // D104: the presets as one segmented control; the chosen period is solid brand.
+          <div
+            className="bg-card shadow-panel flex flex-wrap items-center gap-1 rounded-2xl p-1"
+            role="group"
+            aria-label={copy.period}
+          >
             {RANGE_PRESETS.map((preset) => (
               <Button
                 key={preset}
-                variant={pressed === preset ? "default" : "outline"}
+                variant={pressed === preset ? "default" : "ghost"}
                 size="sm"
                 aria-pressed={pressed === preset}
                 onClick={() => setQuery(presetRange(preset, today))}
@@ -75,6 +80,17 @@ export function ReportToolbar({ report, query, setQuery, range, generatedAt, chi
               </Button>
             ))}
           </div>
+        }
+        trailing={
+          <>
+            <div className="text-muted-foreground flex min-w-0 flex-col text-xs leading-relaxed">
+              {range !== undefined && <span>{copy.rangeLabel(formatDay(range.from), formatDay(range.to))}</span>}
+              {generatedAt !== undefined && (
+                <span data-testid="generated-at">{copy.generatedAt(formatDateTime(generatedAt))}</span>
+              )}
+            </div>
+            <ReportExportButtons report={report} params={reportParams(report, query)} />
+          </>
         }
       >
         <label className="flex flex-col gap-1 text-xs">
@@ -136,15 +152,6 @@ export function ReportToolbar({ report, query, setQuery, range, generatedAt, chi
         )}
         {children}
       </FilterPanel>
-      <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex min-w-0 flex-wrap gap-x-3">
-          {range !== undefined && <span>{copy.rangeLabel(formatDay(range.from), formatDay(range.to))}</span>}
-          {generatedAt !== undefined && (
-            <span data-testid="generated-at">{copy.generatedAt(formatDateTime(generatedAt))}</span>
-          )}
-        </div>
-        <ReportExportButtons report={report} params={reportParams(report, query)} />
-      </div>
     </div>
   );
 }
@@ -169,14 +176,15 @@ export function ReportExportButtons({ report, params }: { report: ReportName; pa
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="bg-card shadow-panel flex items-center gap-1 rounded-2xl p-1">
       <Hint text={copy.exportHint}>
-        <Button variant="outline" size="sm" disabled={exporter.isPending} onClick={() => run("xlsx")}>
+        <Button variant="ghost" size="sm" disabled={exporter.isPending} onClick={() => run("xlsx")}>
           <DownloadIcon />
           {exporter.isPending ? copy.exporting : copy.export}
         </Button>
       </Hint>
       <Button variant="ghost" size="sm" disabled={exporter.isPending} onClick={() => run("csv")}>
+        <FileTextIcon />
         {copy.exportCsv}
       </Button>
     </div>

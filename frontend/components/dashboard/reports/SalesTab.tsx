@@ -1,5 +1,7 @@
 "use client";
 
+import { TriangleAlertIcon } from "lucide-react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { SalesAnalyticsReport } from "@/lib/api/types";
@@ -10,7 +12,10 @@ import { useSalesAnalytics } from "@/lib/dashboard/reports";
 import { formatDay } from "@/lib/format/date";
 import { formatMoney, formatPercent } from "@/lib/format/money";
 
+import { DetailsBlock } from "../common/DetailsBlock";
+import { Money } from "../common/Money";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
+import { BarList } from "../overview/BarList";
 import { KpiTile } from "./KpiTile";
 import { ReportToolbar, type SetQuery } from "./ReportToolbar";
 import { SalesTrendChart } from "./SalesTrendChart";
@@ -36,10 +41,18 @@ function FigureCells({ row }: { row: Figures }) {
   return (
     <>
       <TableCell>{row.orders}</TableCell>
-      <TableCell className="whitespace-nowrap">{formatMoney(row.gross)}</TableCell>
-      <TableCell className="whitespace-nowrap">{formatMoney(row.discounts)}</TableCell>
-      <TableCell className="whitespace-nowrap">{formatMoney(row.returns)}</TableCell>
-      <TableCell className="font-semibold whitespace-nowrap">{formatMoney(row.net)}</TableCell>
+      <TableCell>
+        <Money value={row.gross} />
+      </TableCell>
+      <TableCell>
+        <Money value={row.discounts} />
+      </TableCell>
+      <TableCell>
+        <Money value={row.returns} />
+      </TableCell>
+      <TableCell className="font-semibold">
+        <Money value={row.net} />
+      </TableCell>
     </>
   );
 }
@@ -72,7 +85,6 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
 
   return (
     <>
-      <p className="text-muted-foreground text-xs">{copy.analyticsHint}</p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
         <KpiTile
           label={copy.totalSales}
@@ -113,6 +125,7 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
           testId="sales-average"
         />
       </div>
+      <p className="text-muted-foreground -mt-1 text-xs">{copy.analyticsHint}</p>
       <ProfitTiles report={report} />
       <Card className="min-w-0">
         <CardHeader>
@@ -123,33 +136,45 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
           {empty ? <EmptyBlock>{copy.noSales}</EmptyBlock> : <SalesTrendChart report={report} />}
         </CardContent>
       </Card>
+      {/* D104: the splits as ranked bars of net sales; the full figures fold under each. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="min-w-0">
           <CardHeader>
             <CardTitle>{copy.bySection}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-3">
             {report.by_section.length === 0 ? (
               <EmptyBlock>{copy.noSales}</EmptyBlock>
             ) : (
-              <div className="overflow-x-auto">
-                <Table data-testid="sales-by-section">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{copy.section}</TableHead>
-                      <FigureHeads />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {report.by_section.map((row) => (
-                      <TableRow key={row.kind}>
-                        <TableCell className="font-medium">{row.label}</TableCell>
-                        <FigureCells row={row} />
+              <>
+                <BarList
+                  label={copy.bySection}
+                  items={report.by_section.map((row) => ({
+                    key: row.kind,
+                    label: row.label,
+                    value: Math.max(Number(row.net), 0),
+                    display: formatMoney(row.net),
+                  }))}
+                />
+                <DetailsBlock summary={copy.detailsTable}>
+                  <Table data-testid="sales-by-section">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{copy.section}</TableHead>
+                        <FigureHeads />
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {report.by_section.map((row) => (
+                        <TableRow key={row.kind}>
+                          <TableCell className="font-medium">{row.label}</TableCell>
+                          <FigureCells row={row} />
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </DetailsBlock>
+              </>
             )}
           </CardContent>
         </Card>
@@ -157,28 +182,39 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
           <CardHeader>
             <CardTitle>{copy.byCustomerGroup}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-3">
             {report.by_customer_group.length === 0 ? (
               <EmptyBlock>{copy.noSales}</EmptyBlock>
             ) : (
-              <div className="overflow-x-auto">
-                <Table data-testid="sales-by-group">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{copy.groupColumn}</TableHead>
-                      <FigureHeads />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {report.by_customer_group.map((row) => (
-                      <TableRow key={row.customer_group_id ?? "none"}>
-                        <TableCell className="font-medium">{row.name ?? copy.noGroup}</TableCell>
-                        <FigureCells row={row} />
+              <>
+                <BarList
+                  label={copy.byCustomerGroup}
+                  items={report.by_customer_group.map((row) => ({
+                    key: String(row.customer_group_id ?? "none"),
+                    label: row.name ?? copy.noGroup,
+                    value: Math.max(Number(row.net), 0),
+                    display: formatMoney(row.net),
+                  }))}
+                />
+                <DetailsBlock summary={copy.detailsTable}>
+                  <Table data-testid="sales-by-group">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{copy.groupColumn}</TableHead>
+                        <FigureHeads />
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {report.by_customer_group.map((row) => (
+                        <TableRow key={row.customer_group_id ?? "none"}>
+                          <TableCell className="font-medium">{row.name ?? copy.noGroup}</TableCell>
+                          <FigureCells row={row} />
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </DetailsBlock>
+              </>
             )}
           </CardContent>
         </Card>
@@ -188,7 +224,7 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
           <CardTitle>{copy.bucketsTitle}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <DetailsBlock summary={copy.showTableRows(report.buckets.length)}>
             <Table data-testid="sales-buckets">
               <TableHeader>
                 <TableRow>
@@ -205,7 +241,7 @@ function SalesBody({ report }: { report: SalesAnalyticsReport }) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </DetailsBlock>
         </CardContent>
       </Card>
     </>
@@ -225,7 +261,7 @@ export function ProfitTiles({ report }: { report: SalesAnalyticsReport }) {
         <KpiTile label={copy.cost} value={formatMoney(profit.cost)} testId="sales-cost" />
         <KpiTile
           label={copy.profit}
-          value={profit.profit === null ? copy.profitUnknown : formatMoney(profit.profit)}
+          value={profit.profit === null ? <Unknown /> : formatMoney(profit.profit)}
           testId="sales-profit"
         />
         <KpiTile
@@ -235,10 +271,21 @@ export function ProfitTiles({ report }: { report: SalesAnalyticsReport }) {
         />
       </div>
       {profit.uncosted_lines > 0 && (
-        <p className="text-muted-foreground text-xs" data-testid="uncosted-hint">
+        <p className="text-warn flex items-center gap-1.5 text-xs font-medium" data-testid="uncosted-hint">
+          <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
           {copy.uncostedHint(profit.uncosted_lines)}
         </p>
       )}
     </div>
+  );
+}
+
+/** D98, D104: a figure that cannot be known yet, said as a small warning chip, not as a big value. */
+function Unknown() {
+  return (
+    <span className="bg-warn-soft text-warn inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-sm font-bold">
+      <TriangleAlertIcon aria-hidden className="size-3.5" />
+      {copy.profitUnknown}
+    </span>
   );
 }

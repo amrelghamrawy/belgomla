@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CollectionsReport, ReportAging } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
@@ -16,7 +17,11 @@ import { cn } from "@/lib/utils";
 
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
+import { DetailsBlock } from "../common/DetailsBlock";
+import { Money } from "../common/Money";
+import { BarList } from "../overview/BarList";
 import { KpiTile } from "./KpiTile";
+import { PeriodColumns } from "./PeriodColumns";
 import { ReportToolbar, type SetQuery } from "./ReportToolbar";
 
 const copy = ar.dashboard.reports;
@@ -77,31 +82,36 @@ function CollectionsBody({ report }: { report: CollectionsReport }) {
           testId="collection-rate"
         />
       </div>
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>{copy.byMethodTitle}</CardTitle>
-          <p className="text-muted-foreground text-xs">{copy.byMethodHint}</p>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col gap-1 text-sm" data-testid="collections-by-method">
-            {report.by_method.map((row) => (
-              <li key={row.method} className="flex justify-between gap-2">
-                <span>{row.label}</span>
-                <bdi className="font-medium">{formatMoney(row.amount)}</bdi>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>{copy.agingTitle}</CardTitle>
-          <p className="text-muted-foreground text-xs">{copy.agingHint}</p>
-        </CardHeader>
-        <CardContent>
-          <AgingBar aging={report.aging} />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>{copy.byMethodTitle}</CardTitle>
+            <p className="text-muted-foreground text-xs">{copy.byMethodHint}</p>
+          </CardHeader>
+          <CardContent>
+            {/* D104: the methods as ranked bars on one scale, the amount beside each. */}
+            <BarList
+              label={copy.byMethodTitle}
+              testId="collections-by-method"
+              items={report.by_method.map((row) => ({
+                key: row.method,
+                label: row.label,
+                value: Math.max(Number(row.amount), 0),
+                display: formatMoney(row.amount),
+              }))}
+            />
+          </CardContent>
+        </Card>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>{copy.agingTitle}</CardTitle>
+            <p className="text-muted-foreground text-xs">{copy.agingHint}</p>
+          </CardHeader>
+          <CardContent>
+            <AgingBar aging={report.aging} />
+          </CardContent>
+        </Card>
+      </div>
       <Card className="min-w-0">
         <CardHeader>
           <CardTitle>{copy.collectionsTitle}</CardTitle>
@@ -110,33 +120,47 @@ function CollectionsBody({ report }: { report: CollectionsReport }) {
           {totals.net === "0.00" && totals.delivered === "0.00" && totals.refunds === "0.00" ? (
             <EmptyBlock>{copy.noCollections}</EmptyBlock>
           ) : (
-            <div className="overflow-x-auto">
-              <Table data-testid="collections-buckets">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{copy.period}</TableHead>
-                    <TableHead>{copy.cash}</TableHead>
-                    <TableHead>{copy.credit}</TableHead>
-                    <TableHead>{copy.refunds}</TableHead>
-                    <TableHead>{copy.netCollected}</TableHead>
-                    <TableHead>{copy.delivered}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.buckets.map((bucket) => (
-                    <TableRow key={bucket.period_start}>
-                      <TableCell className="whitespace-nowrap">{formatDay(bucket.period_start)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatMoney(bucket.cash)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatMoney(bucket.credit)}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <bdi>{formatMoney(bucket.refunds)}</bdi>
-                      </TableCell>
-                      <TableCell className="font-semibold whitespace-nowrap">{formatMoney(bucket.net)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatMoney(bucket.delivered)}</TableCell>
+            <div className="flex flex-col gap-3">
+              <PeriodColumns
+                label={copy.collectionsTitle}
+                points={report.buckets.map((bucket) => ({ period_start: bucket.period_start, value: bucket.net }))}
+              />
+              <DetailsBlock summary={copy.showTableRows(report.buckets.length)}>
+                <Table data-testid="collections-buckets">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{copy.period}</TableHead>
+                      <TableHead>{copy.cash}</TableHead>
+                      <TableHead>{copy.credit}</TableHead>
+                      <TableHead>{copy.refunds}</TableHead>
+                      <TableHead>{copy.netCollected}</TableHead>
+                      <TableHead>{copy.delivered}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {report.buckets.map((bucket) => (
+                      <TableRow key={bucket.period_start}>
+                        <TableCell className="whitespace-nowrap">{formatDay(bucket.period_start)}</TableCell>
+                        <TableCell>
+                          <Money value={bucket.cash} />
+                        </TableCell>
+                        <TableCell>
+                          <Money value={bucket.credit} />
+                        </TableCell>
+                        <TableCell>
+                          <Money value={bucket.refunds} />
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          <Money value={bucket.net} />
+                        </TableCell>
+                        <TableCell>
+                          <Money value={bucket.delivered} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </DetailsBlock>
             </div>
           )}
         </CardContent>
@@ -187,9 +211,9 @@ export function AgingBar({ aging }: { aging: ReportAging }) {
         ))}
       </div>
       <figcaption>
-        <ul className="grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-5">
+        <ul className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           {AGING_BUCKETS.map((key) => (
-            <li key={key} className="flex items-center justify-between gap-2 sm:justify-start">
+            <li key={key} className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1">
                 <span aria-hidden className={cn("inline-block size-2.5 rounded-sm", AGING_FILL[key])} />
                 {copy.aging[key]}
@@ -215,6 +239,7 @@ export function OutstandingSection({ page, onPage }: { page: number; onPage: (pa
       {report.isError && <ErrorBlock error={report.error} onRetry={() => void report.refetch()} />}
       {report.isPending && <LoadingBlock />}
       {report.data?.data.length === 0 && <EmptyBlock>{copy.noOutstanding}</EmptyBlock>}
+      {report.data !== undefined && report.data.data.length > 0 && <AgingLegend />}
       {report.data !== undefined && report.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
           <Table data-testid="outstanding-report">
@@ -225,9 +250,7 @@ export function OutstandingSection({ page, onPage }: { page: number; onPage: (pa
                 <TableHead>{copy.total}</TableHead>
                 <TableHead>{copy.collected}</TableHead>
                 <TableHead>{copy.outstanding}</TableHead>
-                {AGING_BUCKETS.map((bucket) => (
-                  <TableHead key={bucket}>{copy.aging[bucket]}</TableHead>
-                ))}
+                <TableHead>{copy.agingColumn}</TableHead>
                 <TableHead>{copy.overdue}</TableHead>
               </TableRow>
             </TableHeader>
@@ -244,16 +267,20 @@ export function OutstandingSection({ page, onPage }: { page: number; onPage: (pa
                     <bdi className="text-muted-foreground text-xs">{formatPhone(row.customer.phone)}</bdi>
                   </TableCell>
                   <TableCell>{row.orders}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatMoney(row.total)}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatMoney(row.collected)}</TableCell>
-                  <TableCell className="font-semibold whitespace-nowrap">{formatMoney(row.outstanding)}</TableCell>
-                  {AGING_BUCKETS.map((bucket) => (
-                    <TableCell key={bucket} className="whitespace-nowrap">
-                      {row.aging[bucket] === "0.00" ? "" : formatMoney(row.aging[bucket])}
-                    </TableCell>
-                  ))}
-                  <TableCell className="text-destructive font-semibold whitespace-nowrap" data-testid="overdue">
-                    {row.overdue === "0.00" ? "" : formatMoney(row.overdue)}
+                  <TableCell>
+                    <Money value={row.total} />
+                  </TableCell>
+                  <TableCell>
+                    <Money value={row.collected} />
+                  </TableCell>
+                  <TableCell className="font-semibold">
+                    <Money value={row.outstanding} />
+                  </TableCell>
+                  <TableCell>
+                    <RowAging aging={row.aging} />
+                  </TableCell>
+                  <TableCell className="text-destructive font-semibold" data-testid="overdue">
+                    {row.overdue === "0.00" ? "" : <Money value={row.overdue} className="text-destructive" />}
                   </TableCell>
                 </TableRow>
               ))}
@@ -263,5 +290,75 @@ export function OutstandingSection({ page, onPage }: { page: number; onPage: (pa
       )}
       <Pager meta={report.data?.meta} onPage={onPage} />
     </div>
+  );
+}
+
+/** D104: one legend for the whole table: the age of each colour, oldest darkest. */
+function AgingLegend() {
+  return (
+    <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs" data-testid="aging-legend">
+      {AGING_BUCKETS.map((key) => (
+        <li key={key} className="flex items-center gap-1.5">
+          <span aria-hidden className={cn("inline-block size-2.5 rounded-full", AGING_FILL[key])} />
+          {copy.aging[key]}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * D104, BR-C06: a customer's debt split by age as one thin segmented bar (8px, widths by amount, a 2px gap between
+ * parts) with the oldest age in words beside it. The bar and its words are one button: a tap (phones) or a click
+ * opens the amount of every part, and its accessible name carries them too, so nothing rests on colour or hover.
+ */
+function RowAging({ aging }: { aging: Pick<ReportAging, AgingBucket> }) {
+  const segments = agingSegments(aging);
+  const oldest = segments.at(-1);
+
+  if (oldest === undefined) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  const description = segments.map((segment) => `${copy.aging[segment.key]} ${formatMoney(segment.amount)}`).join("، ");
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={description}
+          data-testid="row-aging"
+          className="hover:bg-muted focus-visible:ring-ring -mx-2 flex min-h-11 min-w-44 cursor-pointer items-center gap-2.5 rounded-xl px-2 outline-none focus-visible:ring-2"
+        >
+          <span aria-hidden className="flex h-2 w-28 shrink-0 gap-0.5 overflow-hidden rounded-full">
+            {segments.map((segment) => (
+              <span
+                key={segment.key}
+                className={cn("block h-full min-w-1 first:rounded-s-full last:rounded-e-full", AGING_FILL[segment.key])}
+                style={{ width: `${segment.percent}%` }}
+              />
+            ))}
+          </span>
+          <span className="text-muted-foreground text-xs font-normal whitespace-nowrap">
+            {copy.agingOldest(copy.aging[oldest.key] ?? oldest.key)}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-4">
+        <p className="mb-2 text-sm font-bold">{copy.agingColumn}</p>
+        <ul className="flex flex-col gap-1.5 text-sm" data-testid="row-aging-amounts">
+          {segments.map((segment) => (
+            <li key={segment.key} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className={cn("inline-block size-2.5 rounded-full", AGING_FILL[segment.key])} />
+                {copy.aging[segment.key]}
+              </span>
+              <Money value={segment.amount} className="font-semibold" />
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }

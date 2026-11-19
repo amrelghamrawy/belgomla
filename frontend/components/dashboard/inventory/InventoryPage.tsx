@@ -113,7 +113,7 @@ export function InventoryPage() {
           <BulkAdjustTable rows={rows} onDone={() => setBulk(false)} />
         ) : (
           <div className="overflow-x-auto rounded-md border">
-            <Table>
+            <Table stack>
               <TableHeader>
                 <TableRow>
                   <TableHead>{copy.code}</TableHead>
@@ -247,7 +247,7 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
       <p className="text-muted-foreground text-sm">{copy.bulkHint}</p>
       <div className="overflow-x-auto rounded-md border">
-        <Table>
+        <Table stack>
           <TableHeader>
             <TableRow>
               <TableHead>{copy.code}</TableHead>

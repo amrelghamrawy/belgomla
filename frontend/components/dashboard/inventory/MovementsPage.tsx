@@ -66,7 +66,7 @@ export function MovementsPage() {
       {movements.data?.data.length === 0 && <EmptyBlock>{copy.noMovements}</EmptyBlock>}
       {movements.data !== undefined && movements.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.when}</TableHead>
@@ -84,7 +84,7 @@ export function MovementsPage() {
                   <TableCell>{movement.type_label}</TableCell>
                   <TableCell
                     dir="ltr"
-                    className={cn("text-end", movement.quantity < 0 ? "text-destructive" : "text-emerald-700")}
+                    className={cn("text-end", movement.quantity < 0 ? "text-destructive" : "text-ok")}
                   >
                     {movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}
                   </TableCell>

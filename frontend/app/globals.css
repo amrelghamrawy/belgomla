@@ -12,7 +12,19 @@
   /* Tenant branding (01 §7), set by applyBranding() from GET /api/store/tenant. */
   --color-brand-secondary: var(--brand-secondary, var(--secondary));
   --color-brand-secondary-foreground: var(--brand-secondary-foreground, var(--secondary-foreground));
-  --font-heading: var(--font-sans);
+  /* The dashboard (D104) sets --heading-face; elsewhere headings stay in the body face. */
+  --font-heading: var(--heading-face, var(--font-sans));
+  /* Dashboard identity (D104): state tones (soft fill + readable ink) and the brand's soft tint. */
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-hover: var(--primary-hover);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-danger-soft: var(--danger-soft);
+  --shadow-panel: var(--panel-shadow);
   /* Storefront identity (D67): display face for headings, highlight from the secondary colour, brand-tinted fills. */
   --font-display: var(--font-cairo), var(--font-sans);
   --color-highlight: var(--highlight);
@@ -120,6 +132,457 @@
   --ring: color-mix(in oklch, var(--primary) 55%, oklch(1 0 0));
   --highlight-soft: color-mix(in oklch, var(--highlight) 20%, var(--card));
   --brand-soft: color-mix(in oklch, var(--primary) 8%, var(--card));
+}
+
+/*
+ * The dashboard's own identity (D104, revised 2026-11-19 to the product owner's Figma reference, Horizon UI): one
+ * BelGomla look for every merchant. Lavender-white ground, white panels with no borders, 20px corners and one soft
+ * shadow, a white sidebar whose active item carries a brand bar, violet-blue brand, DM Sans for Latin and figures
+ * with IBM Plex Sans Arabic for Arabic. Set on <html> while a dashboard page is mounted (DashboardTheme), so
+ * dialogs, sheets and toasts portalled to <body> wear it too; --primary is set here, so the tenant's colours
+ * (applyBranding) stay on the storefront. Muted ink and state inks are darkened from the reference to pass WCAG AA.
+ */
+.dash-theme {
+  /* "DM Sans" by name, not var(--font-dm): that variable also lists next/font's Arial-based fallback, whose Arabic glyphs would win over IBM Plex Sans Arabic. */
+  --heading-face: "DM Sans", var(--font-plex-arabic), system-ui, sans-serif;
+  --background: #f4f7fe;
+  --foreground: #1b2559;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+  --primary: #422afb;
+  --primary-hover: #3311db;
+  --primary-foreground: #ffffff;
+  --primary-soft: #f2efff;
+  --secondary: #f4f7fe;
+  --secondary-foreground: #1b2559;
+  --muted: #f4f7fe;
+  --muted-foreground: #5f6c94;
+  --accent: #f4f7fe;
+  --accent-foreground: #1b2559;
+  --destructive: #c81414;
+  --border: #e9edf7;
+  --input: #e0e5f2;
+  --ring: #422afb;
+  --chart-1: #422afb;
+  --chart-2: #6ad2ff;
+  --chart-3: #7551ff;
+  --chart-4: #e9edf7;
+  --chart-5: #ee5d50;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #5f6c94;
+  --sidebar-primary: #422afb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f7fe;
+  --sidebar-accent-foreground: #1b2559;
+  --sidebar-border: #e9edf7;
+  --sidebar-ring: #422afb;
+  --ok: #017a52;
+  --ok-soft: #e6faf5;
+  --warn: #9a5800;
+  --warn-soft: #fff6da;
+  --info: #2a50db;
+  --info-soft: #eff4fb;
+  --danger-soft: #feefee;
+  --panel-shadow: -14px 17px 40px 4px rgb(112 144 176 / 0.08);
+  --radius: 1rem;
+
+  font-family: var(--heading-face);
+
+  & ::selection {
+    background: var(--primary-soft);
+    color: var(--foreground);
+  }
+
+  & table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Panels: white, borderless, 20px corners, one soft shadow. */
+  & [data-slot="card"] {
+    border: 0;
+    border-radius: 20px;
+    box-shadow: var(--panel-shadow);
+  }
+
+  & [data-slot="card-header"].border-b {
+    border-bottom: 1px solid var(--border);
+  }
+
+  & [data-slot="card-title"] {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  /* A list outside a card is its own panel; the old bordered wrapper around it steps back. */
+  & div.border:has(> [data-slot="table-container"]) {
+    border: 0;
+    overflow: visible;
+  }
+
+  & [data-slot="table-container"] {
+    background: var(--card);
+    border-radius: 20px;
+    box-shadow: var(--panel-shadow);
+    padding: 0.5rem 0.75rem;
+  }
+
+  & [data-slot="card"] [data-slot="table-container"],
+  & [data-slot="dialog-content"] [data-slot="table-container"],
+  & [data-slot="sheet-content"] [data-slot="table-container"] {
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  & [data-slot="table-header"] tr {
+    border-bottom: 1px solid var(--border);
+  }
+
+  & [data-slot="table-head"] {
+    background: transparent;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+    height: 2.75rem;
+    padding-inline: 0.75rem;
+  }
+
+  & [data-slot="table-row"] {
+    border-bottom-color: color-mix(in srgb, var(--border) 60%, transparent);
+  }
+
+  & [data-slot="table-body"] [data-slot="table-row"]:hover {
+    background: #f8faff;
+  }
+
+  & [data-slot="table-cell"] {
+    padding: 0.85rem 0.75rem;
+    font-weight: 500;
+    color: var(--foreground);
+  }
+
+  & [data-slot="table-body"] [data-slot="table-cell"]:first-child {
+    font-weight: 700;
+  }
+
+  /* A wide list keeps its first column (the name) in place while the rest scrolls sideways under it. */
+  & [data-slot="table"] :is([data-slot="table-head"], [data-slot="table-cell"]):first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 1;
+    background: var(--card);
+  }
+
+  & [data-slot="table-body"] [data-slot="table-row"]:hover > [data-slot="table-cell"]:first-child {
+    background: #f8faff;
+  }
+
+  & [data-slot="badge"] {
+    border-radius: 10px;
+    font-weight: 700;
+    padding-inline: 0.65rem;
+    height: 1.4rem;
+  }
+
+  /* Controls at the reference's scale: 40px fields and buttons with 14px corners, the brand deepening on hover. */
+  & [data-slot="button"] {
+    font-weight: 600;
+  }
+
+  & [data-slot="button"][data-size="default"] {
+    height: 2.5rem;
+    padding-inline: 1.1rem;
+    border-radius: 14px;
+  }
+
+  & [data-slot="button"][data-size="sm"] {
+    height: 2.125rem;
+    padding-inline: 0.85rem;
+    border-radius: 12px;
+  }
+
+  & [data-slot="button"][data-size="lg"] {
+    height: 2.75rem;
+    padding-inline: 1.4rem;
+    border-radius: 16px;
+  }
+
+  & [data-slot="button"][data-variant="default"]:hover {
+    background: var(--primary-hover);
+  }
+
+  & [data-slot="button"][data-variant="outline"] {
+    background: var(--card);
+    border-color: var(--input);
+  }
+
+  & [data-slot="button"][data-variant="secondary"] {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  & [data-slot="input"],
+  & [data-slot="native-select"],
+  & [data-slot="select-trigger"] {
+    height: 2.5rem;
+    border-radius: 14px;
+    padding-inline: 0.9rem;
+  }
+
+  & [data-slot="native-select"] {
+    padding-inline-end: 2rem;
+  }
+
+  & [data-slot="input"],
+  & [data-slot="textarea"],
+  & [data-slot="native-select"],
+  & [data-slot="select-trigger"] {
+    background: var(--card);
+    border-color: var(--input);
+  }
+
+  & [data-slot="textarea"] {
+    border-radius: 14px;
+  }
+
+  & [data-slot="input"]:focus-visible,
+  & [data-slot="textarea"]:focus-visible,
+  & [data-slot="native-select"]:focus-visible {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+  }
+
+  /* Tabs: a white bar of 40px pills; the open one is solid brand, so where you are reads at a glance. */
+  & [data-slot="tabs-list"] {
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--panel-shadow);
+    padding: 0.35rem;
+    gap: 0.25rem;
+    height: auto;
+  }
+
+  & [data-slot="tabs-trigger"] {
+    height: 2.5rem;
+    padding-inline: 1rem;
+    border-radius: 12px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+
+  & [data-slot="tabs-trigger"]:hover:not([data-state="active"]) {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  & [data-slot="tabs-trigger"][data-state="active"] {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--primary) 70%, transparent);
+  }
+
+  & [data-slot="dialog-content"],
+  & [data-slot="alert-dialog-content"] {
+    border: 0;
+    border-radius: 20px;
+    box-shadow: 0 24px 60px -12px rgb(27 37 89 / 0.25);
+  }
+
+  & [data-slot="popover-content"],
+  & [data-slot="dropdown-menu-content"] {
+    border: 0;
+    border-radius: 16px;
+    box-shadow: -14px 17px 40px 4px rgb(112 144 176 / 0.18);
+  }
+
+  & [data-slot="alert"] {
+    border-radius: 16px;
+  }
+
+  & [data-slot="empty"] {
+    background: var(--card);
+    border: 0;
+    border-radius: 20px;
+    box-shadow: var(--panel-shadow);
+  }
+
+  /*
+   * D104: a row's actions, the same in every table whatever variant a page chose: small soft pills (32px, 10px
+   * corners, no border). Neutral actions sit on the ground tint and turn brand on hover; the primary one is brand
+   * soft; a destructive one (variant destructive or text-destructive) is red soft and turns solid red on hover.
+   */
+  & [data-slot="table-cell"] [data-slot="button"] {
+    height: 2rem;
+    padding-inline: 0.8rem;
+    gap: 0.35rem;
+    border: 0;
+    border-radius: 10px;
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: none;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  & [data-slot="table-cell"] [data-slot="button"]:is([data-size="icon"], [data-size="icon-sm"], [data-size="icon-xs"]) {
+    width: 2rem;
+    padding-inline: 0;
+  }
+
+  & [data-slot="table-cell"] [data-slot="button"]:hover:not(:disabled) {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  & [data-slot="table-cell"] [data-slot="button"][data-variant="default"] {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  & [data-slot="table-cell"] [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  & [data-slot="table-cell"] [data-slot="button"]:is([data-variant="destructive"], .text-destructive) {
+    background: var(--danger-soft);
+    color: var(--destructive);
+  }
+
+  & [data-slot="table-cell"] [data-slot="button"]:is([data-variant="destructive"], .text-destructive):hover:not(:disabled) {
+    background: var(--destructive);
+    color: #ffffff;
+  }
+
+  & [data-slot="table-cell"]:has([data-slot="button"]) > div:has(> [data-slot="button"]) {
+    gap: 0.4rem;
+  }
+
+  /* The white sidebar floats on the ground with the panel shadow instead of a rule. */
+  & [data-slot="sidebar-container"] {
+    border: 0;
+    box-shadow: var(--panel-shadow);
+  }
+
+  & ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  & ::-webkit-scrollbar-thumb {
+    background: var(--input);
+    border-radius: 999px;
+    border: 2px solid var(--background);
+  }
+
+  & ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/*
+ * D104: on phones a stacked dashboard list (<Table stack>) becomes a pile of white cards: the first cell heads the
+ * card across its width, the rest are label/value pairs two to a row. Labels come from the column headers.
+ */
+/* rules/03: 44px touch targets on phones, for fields, buttons and a row's actions alike. */
+@media (width < 48rem) {
+  .dash-theme
+    :is(
+      [data-slot="input"],
+      [data-slot="native-select"],
+      [data-slot="select-trigger"],
+      [data-slot="button"][data-size="default"],
+      [data-slot="button"][data-size="sm"],
+      [data-slot="table-cell"] [data-slot="button"]
+    ) {
+    min-height: 2.75rem;
+  }
+}
+
+@media (width < 48rem) {
+  .dash-theme [data-slot="table-container"]:has(> [data-stack]) {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .dash-theme [data-slot="table"][data-stack] {
+    background: transparent;
+
+    & thead {
+      display: none;
+    }
+
+    & tbody {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    & tbody tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem 1rem;
+      padding: 1rem 1.1rem;
+      background: var(--card);
+      border: 0;
+      border-radius: 20px;
+      box-shadow: var(--panel-shadow);
+    }
+
+    & tbody td {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.2rem;
+      padding: 0;
+      text-align: start;
+      min-width: 0;
+    }
+
+    & tbody td:first-child {
+      grid-column: 1 / -1;
+      font-size: 1rem;
+      position: static;
+      background: transparent;
+    }
+
+    & tbody td:not(:first-child)::before {
+      content: attr(data-label);
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--muted-foreground);
+    }
+
+    & tbody td[data-label=""]::before,
+    & tbody td:empty {
+      display: none;
+    }
+
+    /* A row's actions run across the card's foot, side by side, sharing the width. */
+    & tbody td:not(:first-child):has(button, [role="button"]) {
+      grid-column: 1 / -1;
+      flex-flow: row wrap;
+      align-items: center;
+      gap: 0.5rem;
+
+      &::before {
+        flex-basis: 100%;
+      }
+
+      & > :is(button, a) {
+        flex: 1 1 auto;
+      }
+    }
+  }
 }
 
 /*

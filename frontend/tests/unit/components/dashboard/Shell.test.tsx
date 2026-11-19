@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardShell } from "@/components/dashboard/shell/DashboardShell";
-import { isActive } from "@/components/dashboard/shell/DashboardNav";
+import { isActive, pageTitle } from "@/components/dashboard/shell/DashboardNav";
+import { OrderSearch } from "@/components/dashboard/shell/OrderSearch";
 import { NOTIFICATIONS_POLL_MS } from "@/lib/dashboard/notifications";
 
 import { dashboardMe, notification, shellRoutes, stubDashboard } from "../../dashboard-fixtures";
@@ -118,6 +119,28 @@ describe("isActive", () => {
     expect(isActive("/dashboard", "/dashboard/orders")).toBe(false);
     expect(isActive("/dashboard/orders", "/dashboard/orders/12")).toBe(true);
     expect(isActive("/dashboard/orders", "/dashboard/ordersx")).toBe(false);
+  });
+});
+
+describe("OrderSearch", () => {
+  it("D104 opens the orders list filtered by the number typed, and ignores an empty search", async () => {
+    const user = userEvent.setup();
+    render(<OrderSearch />);
+    const search = screen.getByRole("searchbox", { name: "ابحث برقم الطلب" });
+
+    await user.type(search, "   {Enter}");
+    expect(router.push).not.toHaveBeenCalled();
+
+    await user.type(search, " 1048 {Enter}");
+    expect(router.push).toHaveBeenCalledWith("/dashboard/orders?q=1048");
+  });
+});
+
+describe("pageTitle", () => {
+  it("D104 names the tab after the section and the store, on sub-pages too", () => {
+    expect(pageTitle("/dashboard/orders/12", "مكتبة النور")).toBe("الطلبات · مكتبة النور");
+    expect(pageTitle("/dashboard", "مكتبة النور")).toBe("الرئيسية · مكتبة النور");
+    expect(pageTitle("/dashboard/unknown", "مكتبة النور")).toBe("مكتبة النور");
   });
 });
 

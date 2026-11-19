@@ -75,7 +75,7 @@ export function ReturnsPage() {
       {returns.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {returns.data !== undefined && returns.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.when}</TableHead>
@@ -107,7 +107,7 @@ function ReturnRow({ orderReturn }: { orderReturn: OrderReturn }) {
       <TableCell>
         {orderReturn.order ? (
           <Link href={`/dashboard/orders/${orderReturn.order.number}`} className="font-medium hover:underline">
-            <bdi>#{orderReturn.order.number}</bdi> · {copy.returnNumber(orderReturn.number)}
+            <bdi className="text-primary font-bold tabular-nums">#{orderReturn.order.number}</bdi> · {copy.returnNumber(orderReturn.number)}
           </Link>
         ) : (
           copy.returnNumber(orderReturn.number)

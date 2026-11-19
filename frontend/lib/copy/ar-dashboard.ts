@@ -9,6 +9,12 @@ export const dashboard = {
 
   nav: {
     label: "القائمة الرئيسية",
+    // D104: the platform's name under the store's, in the sidebar head.
+    platform: "لوحة بالجملة",
+    home: "لوحة التحكم",
+    breadcrumb: "مسار الصفحة",
+    // D104: the top bar's search jumps to the orders list filtered by the number typed.
+    search: "ابحث برقم الطلب",
     toggle: "إظهار القائمة أو إخفاؤها",
     toggleHint: "إظهار القائمة أو إخفاؤها (Ctrl+B)",
     overview: "الرئيسية",
@@ -82,6 +88,10 @@ export const dashboard = {
     staleOrders: "طلبات قيد الانتظار متأخرة",
     lowStockList: "مخزون منخفض",
     viewAll: "عرض الكل",
+    // D104: a figure that needs action says so in words, not only in colour (WCAG 1.4.1).
+    needsAction: "يحتاج متابعة",
+    reviewPending: "راجع الطلبات المعلّقة",
+    latestOrders: "أحدث الطلبات",
     salesTrend: "المبيعات آخر 30 يومًا",
     salesTrendOrders: (n: number) => `${n} طلب مُسلَّم`,
     noSales: "لا توجد مبيعات مسلّمة في آخر 30 يومًا",
@@ -1093,9 +1103,24 @@ export const dashboard = {
       collections: "التحصيل",
       "profit-and-loss": "الأرباح والخسائر",
     },
+    // D104: a long table folded under its chart.
+    detailsTable: "عرض الأرقام التفصيلية",
+    showTableRows: (n: number) => `عرض الجدول التفصيلي (${n} صف)`,
+    // D104: one line under the tabs on what the open report answers.
+    tabHints: {
+      overview: "أرقام اليوم وما يحتاج متابعة الآن.",
+      sales: "صافي المبيعات والمرتجعات في الفترة، مقارنةً بالفترة السابقة.",
+      products: "الأكثر مبيعًا وأداء كل صنف، ومنها الباقات.",
+      customers: "مشتريات العملاء ومديونياتهم، ومن توقّف عن الطلب.",
+      inventory: "قيمة المخزون والأصناف الراكدة وما قارب على النفاد.",
+      collections: "ما تم تحصيله ونسبة التحصيل، ومن عليه مستحقات ومنذ متى.",
+      "profit-and-loss": "تكلفة المبيعات والمصروفات وصافي الربح في الفترة.",
+    },
     description: "الأرقام محسوبة من الطلبات المسلّمة بتوقيت القاهرة، وتُحدَّث كل 10 دقائق.",
     // V2 Task 19 (D100): the profit and loss statement.
     pl: {
+      item: "البند",
+      thisPeriod: "الفترة الحالية",
       hint: "الربح على أساس التسليم وليس النقد: يشمل ما لم يُحصَّل بعد من العملاء.",
       netSales: "صافي المبيعات",
       costOfGoods: "تكلفة البضاعة المباعة",
@@ -1197,12 +1222,19 @@ export const dashboard = {
     deadValue: (value: string) => `قيمتها ${value}`,
     unitsSold: "الوحدات المباعة (أساسية)",
     movementsTitle: "صافي الحركات حسب النوع (وحدة أساسية)",
-    movements: { opening: "رصيد افتتاحي", adjustment: "تسوية", sale: "بيع", return: "مرتجع", receive: "استلام بضاعة" } as Record<string, string>,
+    movements: {
+      opening: "رصيد افتتاحي",
+      adjustment: "تسوية",
+      sale: "بيع",
+      return: "مرتجع",
+      receive: "استلام بضاعة",
+    } as Record<string, string>,
     inventoryTitle: "تحليل المخزون",
     inventoryHint: "الأعلى قيمة أولًا. «يكفي لمدة» = المتاح ÷ متوسط البيع اليومي في الفترة.",
     onHand: "الرصيد",
     daysOfCover: "يكفي لمدة (يوم)",
     infinity: "∞",
+    daysCount: (n: number) => `${n} يوم`,
     noSalesCover: "لم يُبَع في الفترة",
     deadBadge: "راكد",
     deadOnly: "الراكد فقط",
@@ -1220,6 +1252,8 @@ export const dashboard = {
     collectionsTitle: "التحصيل حسب الفترة",
     agingTitle: "أعمار المديونيات الآن",
     agingLabel: "توزيع المستحقات حسب أيام التأخير عن الاستحقاق",
+    agingColumn: "أعمار الدين",
+    agingOldest: (age: string) => `أقدمه: ${age}`,
     agingTotal: (value: string) => `إجمالي المستحق ${value}`,
     noAging: "لا توجد مستحقات الآن",
     noCollections: "لا يوجد تحصيل ولا مبيعات في هذه الفترة",

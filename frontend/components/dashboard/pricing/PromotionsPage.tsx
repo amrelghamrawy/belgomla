@@ -86,7 +86,7 @@ export function PromotionsPage() {
       {promotions.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {promotions.data !== undefined && promotions.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.name}</TableHead>

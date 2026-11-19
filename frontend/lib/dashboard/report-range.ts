@@ -157,7 +157,9 @@ export const AGING_BUCKETS = ["current", "0_30", "31_60", "61_90", "over_90"] as
 export type AgingBucket = (typeof AGING_BUCKETS)[number];
 
 /** The aging as segments of one bar: each bucket's share of their sum in %, the empty ones left out. */
-export function agingSegments(aging: ReportAging): { key: AgingBucket; amount: string; percent: number }[] {
+export function agingSegments(
+  aging: Pick<ReportAging, AgingBucket>,
+): { key: AgingBucket; amount: string; percent: number }[] {
   const total = AGING_BUCKETS.reduce((sum, key) => sum + Number(aging[key]), 0);
 
   if (total <= 0) {

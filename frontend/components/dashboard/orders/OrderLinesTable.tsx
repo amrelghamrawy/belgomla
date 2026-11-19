@@ -50,7 +50,7 @@ export function OrderLinesTable({
 
   return (
     <div className="overflow-x-auto rounded-md border">
-      <Table>
+      <Table stack>
         <TableHeader>
           <TableRow>
             <TableHead>{orders.product}</TableHead>

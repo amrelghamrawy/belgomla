@@ -3,14 +3,56 @@
 import * as React from "react"
 import { cn } from "cn"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/**
+ * `stack` (D104, dashboard lists): below the md breakpoint each row becomes a card of label/value pairs instead of
+ * a table that scrolls sideways. Each cell takes its column's header text as `data-label` (kept in sync as rows
+ * change), which globals.css shows above the value.
+ */
+function Table({
+  className,
+  stack = false,
+  ...props
+}: React.ComponentProps<"table"> & { stack?: boolean }) {
+  const ref = React.useRef<HTMLTableElement>(null)
+
+  React.useEffect(() => {
+    const table = ref.current
+
+    if (!stack || table === null) {
+      return
+    }
+
+    const label = () => {
+      const heads = [...table.querySelectorAll("thead th")].map((th) => th.textContent?.trim() ?? "")
+
+      table.querySelectorAll("tbody tr").forEach((row) => {
+        ;[...row.children].forEach((cell, index) => {
+          const text = heads[index] ?? ""
+
+          if (cell.getAttribute("data-label") !== text) {
+            cell.setAttribute("data-label", text)
+          }
+        })
+      })
+    }
+
+    label()
+    // Attribute writes are not childList mutations, so labelling never re-triggers itself.
+    const observer = new MutationObserver(label)
+    observer.observe(table, { childList: true, subtree: true, characterData: true })
+
+    return () => observer.disconnect()
+  }, [stack])
+
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
       <table
+        ref={ref}
         data-slot="table"
+        data-stack={stack ? "" : undefined}
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />

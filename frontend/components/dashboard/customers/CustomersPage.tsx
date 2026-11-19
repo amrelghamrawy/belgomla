@@ -137,7 +137,7 @@ export function CustomersPage() {
       {customers.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {customers.data !== undefined && customers.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 {groupsAllowed && (

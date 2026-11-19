@@ -16,7 +16,7 @@ Product constraints it serves: **Arabic only, RTL-first, mobile-first** (01 §6,
 | Server state   | TanStack Query. No other global store                                                           |
 | Forms          | react-hook-form + zod (`@hookform/resolvers`), shadcn `Field` components for layout and errors  |
 | API types      | `openapi-typescript` from `backend/openapi.json` → `lib/api/schema.d.ts` (generated, never edited) |
-| Font           | IBM Plex Sans Arabic via `next/font/google` (D40); storefront headings Cairo, `font-display` (D67) |
+| Font           | IBM Plex Sans Arabic via `next/font/google` (D40); storefront headings Cairo, `font-display` (D67); dashboard Latin and figures DM Sans before Plex (D104) |
 | Storefront look | Brand-tinted neutrals (`.store-theme`), `highlight`/`brand-soft` tokens, `shadow-card`, `ledger` and `store-wallpaper` utilities (D67) |
 | Unit tests     | Vitest + Testing Library + jsdom; `fetch` stubbed per test (`stubFetch` in `tests/unit/http.ts`) |
 | E2E            | Playwright, `mobile` (390×844) and `desktop` projects                                            |
@@ -136,7 +136,7 @@ Which file to write:
 - Hooks: `useX`, one concern each. Server components by default; `'use client'` only for interactivity, as low in the tree as possible.
 - No `any`; no non-null `!` except on values the type system cannot see (comment why). Types for API data come from `lib/api/types.ts` aliases of the generated schema.
 - No inline Arabic strings in components; no `console.log`.
-- Class names: `cn()` from `@/lib/utils` for conditionals; brand colours only through theme tokens (`bg-primary`, `text-primary-foreground`), which `applyBranding()` drives from tenant settings.
+- Class names: `cn()` from `@/lib/utils` for conditionals; brand colours only through theme tokens (`bg-primary`, `text-primary-foreground`). On the storefront `applyBranding()` drives them from tenant settings; the dashboard wears the fixed BelGomla theme (`.dash-theme` in `globals.css`, D104, `DESIGN.md`): style shared primitives there, not page by page.
 
 ---
 

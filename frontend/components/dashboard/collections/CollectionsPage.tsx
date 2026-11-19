@@ -94,7 +94,7 @@ export function CollectionsPage() {
       {collections.data?.data.length === 0 && <EmptyBlock>{copy.none}</EmptyBlock>}
       {collections.data !== undefined && collections.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.when}</TableHead>
@@ -126,7 +126,7 @@ function CollectionRow({ collection }: { collection: Collection }) {
       <TableCell className="whitespace-nowrap">{formatDateTime(collection.collected_at)}</TableCell>
       <TableCell>
         <Link href={`/dashboard/orders/${collection.order.number}`} className="font-medium hover:underline">
-          <bdi>#{collection.order.number}</bdi>
+          <bdi className="text-primary font-bold tabular-nums">#{collection.order.number}</bdi>
         </Link>
       </TableCell>
       <TableCell>

@@ -14,9 +14,11 @@ import { daysValue, reportParams } from "@/lib/dashboard/report-range";
 import { useInventoryReport, useLowStockReport } from "@/lib/dashboard/reports";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
+import { cn } from "@/lib/utils";
 
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
+import { Money } from "../common/Money";
 import { KpiTile } from "./KpiTile";
 import { ReportToolbar, type SetQuery } from "./ReportToolbar";
 
@@ -65,7 +67,7 @@ export function InventoryTab({ query, setQuery }: { query: ListQuery; setQuery: 
       {report.isPending && <LoadingBlock rows={4} />}
       {report.data !== undefined && summary !== undefined && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             <KpiTile
               label={copy.stockValue}
               value={formatMoney(summary.stock_value)}
@@ -79,20 +81,35 @@ export function InventoryTab({ query, setQuery }: { query: ListQuery; setQuery: 
               testId="dead-count"
             />
             <KpiTile label={copy.unitsSold} value={summary.sold_base} testId="units-sold" />
-            <div className="col-span-2 flex min-w-0 flex-col gap-1 rounded-md border p-3 lg:col-span-1">
-              <p className="text-muted-foreground text-xs">{copy.movementsTitle}</p>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-sm" data-testid="movements">
-                {MOVEMENTS.map((type) => (
-                  <div key={type} className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">{copy.movements[type]}</dt>
-                    <dd className="font-semibold">
-                      <bdi>{summary.movements[type]}</bdi>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
           </div>
+          {/* D104: the period's movements as their own panel, each type with its signed quantity, in out and back. */}
+          <Card className="min-w-0">
+            <CardHeader>
+              <CardTitle>{copy.movementsTitle}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="movements">
+                {MOVEMENTS.map((type) => {
+                  const value = summary.movements[type];
+
+                  return (
+                    <div key={type} className="bg-muted flex flex-col gap-1 rounded-2xl px-4 py-3">
+                      <dt className="text-muted-foreground text-xs">{copy.movements[type]}</dt>
+                      <dd
+                        className={cn(
+                          "text-lg font-bold tabular-nums",
+                          value > 0 && "text-ok",
+                          value < 0 && "text-destructive",
+                        )}
+                      >
+                        <bdi>{value > 0 ? `+${value}` : value}</bdi>
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </CardContent>
+          </Card>
           <p className="text-muted-foreground text-xs">{copy.stockValueHint}</p>
           <Card className="min-w-0">
             <CardHeader>
@@ -138,15 +155,18 @@ export function InventoryTab({ query, setQuery }: { query: ListQuery; setQuery: 
                           </TableCell>
                           <TableCell>{row.on_hand}</TableCell>
                           <TableCell>{row.available}</TableCell>
-                          <TableCell className="font-semibold whitespace-nowrap">
-                            {formatMoney(row.stock_value)}
+                          <TableCell className="font-semibold">
+                            <Money value={row.stock_value} />
                           </TableCell>
                           <TableCell>{row.sold_base}</TableCell>
                           <TableCell data-testid="cover">
                             {row.days_of_cover === null ? (
                               <span aria-label={copy.noSalesCover}>{copy.infinity}</span>
                             ) : (
-                              row.days_of_cover
+                              // D104: cover in days, with the unit; under two weeks is flagged.
+                              <span className={cn(row.days_of_cover < 14 && "text-warn font-bold")}>
+                                {copy.daysCount(row.days_of_cover)}
+                              </span>
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">

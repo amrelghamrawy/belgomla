@@ -62,7 +62,7 @@ export function CustomerPricesTab({ customerId }: { customerId: number }) {
       {prices.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {prices.data !== undefined && prices.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.product}</TableHead>

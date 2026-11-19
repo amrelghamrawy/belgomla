@@ -129,6 +129,8 @@ describe("ReportsPage (V2 Task 16)", () => {
     renderWithQuery(<ReportsPage />);
 
     expect(screen.getByRole("tab", { name: "التحصيل" })).toHaveAttribute("aria-selected", "true");
+    // D104: the line under the tabs says what the open report answers.
+    expect(screen.getByTestId("report-hint")).toHaveTextContent("ما تم تحصيله ونسبة التحصيل");
     expect(await screen.findByTestId("collected-net")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "المبيعات" }));
     expect(router.replace).toHaveBeenCalledWith("/dashboard/reports?tab=sales", { scroll: false });
@@ -177,7 +179,8 @@ describe("SalesTab", () => {
       Object.fromEntries(callsTo(fetchMock, "GET /api/dashboard/reports/sales-analytics")[0]?.url.searchParams ?? []),
     ).toEqual({ from: "2026-09-01", to: "2026-09-30", group: "week" });
 
-    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
+    // D104: filters already in the URL open the panel on arrival.
+    expect(screen.getByRole("button", { name: /^تصفية/ })).toHaveAttribute("aria-expanded", "true");
     await user.selectOptions(screen.getByLabelText("التجميع"), "month");
     expect(setQuery).toHaveBeenCalledWith({ group: "month" });
     await user.selectOptions(await screen.findByLabelText("القسم"), "9");
@@ -288,7 +291,9 @@ describe("SalesTab", () => {
   it("D96 f D98 says the profit is incomplete and how many lines lack a cost, never a partial figure", () => {
     renderBare(
       <ProfitTiles
-        report={{ ...salesAnalytics, profit: { cost: "500.00", profit: null, margin: null, uncosted_lines: 4 } } as never}
+        report={
+          { ...salesAnalytics, profit: { cost: "500.00", profit: null, margin: null, uncosted_lines: 4 } } as never
+        }
       />,
     );
 
@@ -403,7 +408,8 @@ describe("ProductsTab", () => {
     expect(calls).toContainEqual({ per_page: "20", sort: "quantity" });
     expect(calls).toContainEqual({ per_page: "20", sort: "quantity", page: "2" });
 
-    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
+    // D104: filters already in the URL open the panel on arrival.
+    expect(screen.getByRole("button", { name: /^تصفية/ })).toHaveAttribute("aria-expanded", "true");
     await user.selectOptions(screen.getByLabelText("الترتيب"), "return_rate");
     expect(setQuery).toHaveBeenCalledWith({ sort: "return_rate" });
     await user.click(screen.getByRole("button", { name: /السابق/ }));
@@ -458,7 +464,8 @@ describe("CustomersTab", () => {
 
     await user.click(screen.getByRole("button", { name: "أفضل العملاء" }));
     expect(setQuery).toHaveBeenCalledWith({ view: null });
-    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
+    // D104: filters already in the URL open the panel on arrival.
+    expect(screen.getByRole("button", { name: /^تصفية/ })).toHaveAttribute("aria-expanded", "true");
     fireEvent.change(screen.getByLabelText("خامل بعد (يوم)"), { target: { value: "60" } });
     expect(setQuery).toHaveBeenCalledWith({ dormant_days: "60" });
     fireEvent.change(screen.getByLabelText("خامل بعد (يوم)"), { target: { value: "" } });
@@ -582,7 +589,8 @@ describe("InventoryTab", () => {
     expect(
       Object.fromEntries(callsTo(fetchMock, "GET /api/dashboard/reports/inventory")[0]?.url.searchParams ?? []),
     ).toEqual({ per_page: "20", dead_days: "90" });
-    await user.click(screen.getByRole("button", { name: /^تصفية/ }));
+    // D104: filters already in the URL open the panel on arrival.
+    expect(screen.getByRole("button", { name: /^تصفية/ })).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("checkbox", { name: "الراكد فقط" }));
     expect(setQuery).toHaveBeenCalledWith({ dead_only: "1" });
     expect(screen.queryByLabelText("مجموعة العملاء")).not.toBeInTheDocument();
@@ -750,8 +758,14 @@ describe("OutstandingSection", () => {
     renderWithQuery(<OutstandingSection page={1} onPage={vi.fn()} />);
 
     const row = (await screen.findByRole("link", { name: "مكتبة الأمل" })).closest("tr") as HTMLElement;
-    expect(row).toHaveTextContent("300.00 ج.م");
     expect(within(row).getByTestId("overdue")).toHaveTextContent("500.00 ج.م");
-    expect(screen.getByRole("columnheader", { name: "31–60" })).toBeInTheDocument();
+    // D104: the ages ride one bar per row, named with every amount, the oldest age in words beside it.
+    const ages = within(row).getByRole("button", { name: "لم يستحق 300.00 ج.م، 31–60 500.00 ج.م" });
+    // A tap opens every part's amount, for phones where there is no hover.
+    await userEvent.setup().click(ages);
+    expect(await screen.findByTestId("row-aging-amounts")).toHaveTextContent("31–60500.00 ج.م");
+    expect(row).toHaveTextContent("أقدمه: 31–60");
+    expect(screen.getByRole("columnheader", { name: "أعمار الدين" })).toBeInTheDocument();
+    expect(screen.getByTestId("aging-legend")).toHaveTextContent("31–60");
   });
 });

@@ -6,24 +6,29 @@ import { cn } from "@/lib/utils";
 
 import { Hint } from "../common/Hint";
 
+/**
+ * D104: each status is a soft tint with a readable ink of the same hue: waiting amber, confirmed blue, in hand
+ * brand, on the road solid brand, done green, cancelled red. The label always carries the state, never the colour alone.
+ */
 const ORDER_TONES: Record<OrderStatus, string> = {
-  pending: "bg-amber-100 text-amber-900",
-  confirmed: "bg-sky-100 text-sky-900",
-  preparing: "bg-indigo-100 text-indigo-900",
-  out_for_delivery: "bg-violet-100 text-violet-900",
-  delivered: "bg-emerald-100 text-emerald-900",
-  cancelled: "bg-muted text-muted-foreground",
+  pending: "bg-warn-soft text-warn",
+  confirmed: "bg-info-soft text-info",
+  preparing: "bg-primary-soft text-primary",
+  out_for_delivery: "bg-primary text-primary-foreground",
+  delivered: "bg-ok-soft text-ok",
+  cancelled: "bg-danger-soft text-destructive",
 };
 
+/** D104: collection state in the same tints: red unpaid, amber partly collected, green collected. */
 const COLLECTION_TONES: Record<CollectionStatus, string> = {
-  unpaid: "border-destructive/40 text-destructive",
-  partially_collected: "border-amber-500 text-amber-900",
-  collected: "border-emerald-600 text-emerald-800",
+  unpaid: "bg-danger-soft text-destructive",
+  partially_collected: "bg-warn-soft text-warn",
+  collected: "bg-ok-soft text-ok",
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   return (
-    <Badge variant="secondary" className={cn("border-transparent", ORDER_TONES[status])} data-testid="order-status">
+    <Badge variant="outline" className={cn("border-transparent", ORDER_TONES[status])} data-testid="order-status">
       {ar.orders.statuses[status]}
     </Badge>
   );
@@ -32,7 +37,7 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
 /** BR-C04: collection status is separate from order status. */
 export function CollectionStatusBadge({ status }: { status: CollectionStatus }) {
   return (
-    <Badge variant="outline" className={COLLECTION_TONES[status]} data-testid="collection-status">
+    <Badge variant="outline" className={cn("border-transparent", COLLECTION_TONES[status])} data-testid="collection-status">
       {ar.dashboard.collectionStatuses[status]}
     </Badge>
   );
@@ -65,7 +70,7 @@ export function PlacedByMerchantBadge() {
 export function StaleBadge() {
   return (
     <Hint text={ar.dashboard.orders.staleHint}>
-      <Badge variant="outline" className="border-amber-500 text-amber-900" tabIndex={0}>
+      <Badge variant="outline" className="bg-warn-soft text-warn border-transparent" tabIndex={0}>
         {ar.dashboard.orders.stale}
       </Badge>
     </Hint>

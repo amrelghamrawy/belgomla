@@ -155,7 +155,7 @@ function PreviewStep({
         ]}
       />
       {preview.errors.length === 0 ? (
-        <p className="text-sm text-emerald-700 dark:text-emerald-400">{copy.noErrors}</p>
+        <p className="text-sm text-ok">{copy.noErrors}</p>
       ) : (
         <>
           <p className="text-muted-foreground text-sm">{copy.skipNote}</p>

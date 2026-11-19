@@ -422,7 +422,7 @@ function RecentOrders({ customer }: { customer: DashboardCustomer }) {
             {orders.map((order) => (
               <li key={order.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                 <Link href={`/dashboard/orders/${order.number}`} className="font-medium hover:underline">
-                  <bdi>#{order.number}</bdi>
+                  <bdi className="text-primary font-bold tabular-nums">#{order.number}</bdi>
                 </Link>
                 <span>{ar.orders.statuses[order.status]}</span>
                 <span className="text-muted-foreground">{formatDateTime(order.placed_at)}</span>

@@ -27,12 +27,12 @@ export function NotificationsBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative size-11" aria-label={copy.open(unread)}>
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground relative size-10 rounded-full" aria-label={copy.open(unread)}>
           <BellIcon />
           {unread > 0 && (
             <span
               data-testid="unread-count"
-              className="bg-destructive absolute end-1 top-1 grid min-w-5 place-items-center rounded-full px-1 text-xs leading-5 text-white"
+              className="bg-destructive ring-card absolute end-0 top-0 grid ring-2 min-w-5 place-items-center rounded-full px-1 text-xs leading-5 text-white"
             >
               {unread}
             </span>

@@ -14,6 +14,7 @@ import { useBundleReport, useProductReport } from "@/lib/dashboard/reports";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney, formatPercent } from "@/lib/format/money";
 
+import { Money } from "../common/Money";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../common/States";
 import { BarList } from "../overview/BarList";
@@ -151,12 +152,18 @@ export function ProductsTab({ query, setQuery }: { query: ListQuery; setQuery: S
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="font-semibold whitespace-nowrap">{formatMoney(row.revenue)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{formatMoney(row.returns)}</TableCell>
+                          <TableCell className="font-semibold">
+                            <Money value={row.revenue} />
+                          </TableCell>
+                          <TableCell>
+                            <Money value={row.returns} />
+                          </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {row.return_rate === null ? "—" : `${formatPercent(row.return_rate)}%`}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{formatMoney(row.cost)}</TableCell>
+                          <TableCell>
+                            <Money value={row.cost} />
+                          </TableCell>
                           <TableCell className="whitespace-nowrap" data-testid={`profit-${row.sku_id}`}>
                             {row.profit === null ? copy.profitUnknown : formatMoney(row.profit)}
                           </TableCell>
@@ -228,7 +235,9 @@ export function BundlesCards({ from, to }: { from?: string; to?: string }) {
                         <bdi className="text-muted-foreground text-xs">{row.sku_code}</bdi>
                       </TableCell>
                       <TableCell>{row.quantity}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatMoney(row.total)}</TableCell>
+                      <TableCell>
+                        <Money value={row.total} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
