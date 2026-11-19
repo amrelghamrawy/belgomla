@@ -398,6 +398,29 @@
     box-shadow: -14px 17px 40px 4px rgb(112 144 176 / 0.18);
   }
 
+  & [data-slot="dropdown-menu-content"] {
+    padding: 0.4rem;
+  }
+
+  /* A menu item matches a row action: 40px, 10px corners, a brand icon, a brand-soft wash when focused. */
+  & [data-slot="dropdown-menu-item"] {
+    min-height: 2.5rem;
+    gap: 0.6rem;
+    border-radius: 10px;
+    padding-inline: 0.75rem;
+    font-weight: 600;
+  }
+
+  & [data-slot="dropdown-menu-item"] svg {
+    color: var(--primary);
+  }
+
+  & [data-slot="dropdown-menu-item"]:focus,
+  & [data-slot="dropdown-menu-item"][data-highlighted] {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
   & [data-slot="alert"] {
     border-radius: 16px;
   }
@@ -410,11 +433,11 @@
   }
 
   /*
-   * D104: a row's actions, the same in every table whatever variant a page chose: small soft pills (32px, 10px
+   * D104: a row's actions, the same in every table (and any row list marked `data-row-actions`) whatever variant a page chose: small soft pills (32px, 10px
    * corners, no border). Neutral actions sit on the ground tint and turn brand on hover; the primary one is brand
    * soft; a destructive one (variant destructive or text-destructive) is red soft and turns solid red on hover.
    */
-  & [data-slot="table-cell"] [data-slot="button"] {
+  & :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"] {
     height: 2rem;
     padding-inline: 0.8rem;
     gap: 0.35rem;
@@ -431,38 +454,82 @@
       color 0.15s ease;
   }
 
-  & [data-slot="table-cell"] [data-slot="button"]:is([data-size="icon"], [data-size="icon-sm"], [data-size="icon-xs"]) {
+  &
+    :is([data-slot="table-cell"], [data-row-actions])
+    [data-slot="button"]:is([data-size="icon"], [data-size="icon-sm"], [data-size="icon-xs"]) {
     width: 2rem;
     padding-inline: 0;
   }
 
-  & [data-slot="table-cell"] [data-slot="button"]:hover:not(:disabled) {
+  & :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"]:hover:not(:disabled) {
     background: var(--primary-soft);
     color: var(--primary);
   }
 
-  & [data-slot="table-cell"] [data-slot="button"][data-variant="default"] {
+  & :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"][data-variant="default"] {
     background: var(--primary-soft);
     color: var(--primary);
   }
 
-  & [data-slot="table-cell"] [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  &
+    :is([data-slot="table-cell"], [data-row-actions])
+    [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
     background: var(--primary);
     color: var(--primary-foreground);
   }
 
-  & [data-slot="table-cell"] [data-slot="button"]:is([data-variant="destructive"], .text-destructive) {
+  &
+    :is([data-slot="table-cell"], [data-row-actions])
+    [data-slot="button"]:is([data-variant="destructive"], .text-destructive) {
     background: var(--danger-soft);
     color: var(--destructive);
   }
 
-  & [data-slot="table-cell"] [data-slot="button"]:is([data-variant="destructive"], .text-destructive):hover:not(:disabled) {
+  &
+    [data-slot="table-cell"]
+    [data-slot="button"]:is([data-variant="destructive"], .text-destructive):hover:not(:disabled) {
     background: var(--destructive);
     color: #ffffff;
   }
 
+  & [data-row-actions],
   & [data-slot="table-cell"]:has([data-slot="button"]) > div:has(> [data-slot="button"]) {
     gap: 0.4rem;
+  }
+
+  /* Each action leads with its icon: brand on a neutral pill, red on a destructive one, white once a pill is solid. */
+  & :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"] svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    color: var(--primary);
+    transition: color 0.15s ease;
+  }
+
+  &
+    :is([data-slot="table-cell"], [data-row-actions])
+    [data-slot="button"]:is([data-variant="destructive"], .text-destructive)
+    svg {
+    color: var(--destructive);
+  }
+
+  &
+    [data-slot="table-cell"]
+    [data-slot="button"]:is([data-variant="destructive"], .text-destructive):hover:not(:disabled)
+    svg,
+  &
+    :is([data-slot="table-cell"], [data-row-actions])
+    [data-slot="button"][data-variant="default"]:hover:not(:disabled)
+    svg {
+    color: currentColor;
+  }
+
+  & :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"]:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  & :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 
   /* The white sidebar floats on the ground with the panel shadow instead of a rule. */
@@ -491,6 +558,19 @@
  * D104: on phones a stacked dashboard list (<Table stack>) becomes a pile of white cards: the first cell heads the
  * card across its width, the rest are label/value pairs two to a row. Labels come from the column headers.
  */
+/*
+ * D104: in a row list (not a table, which stacks into cards) phones keep the row's name readable: the actions shrink
+ * to 44px icon squares. The words stay in the button (font-size 0), so its accessible name is unchanged.
+ */
+@media (width < 48rem) {
+  .dash-theme [data-row-actions] [data-slot="button"] {
+    width: 2.75rem;
+    padding-inline: 0;
+    gap: 0;
+    font-size: 0;
+  }
+}
+
 /* rules/03: 44px touch targets on phones, for fields, buttons and a row's actions alike. */
 @media (width < 48rem) {
   .dash-theme
@@ -500,7 +580,7 @@
       [data-slot="select-trigger"],
       [data-slot="button"][data-size="default"],
       [data-slot="button"][data-size="sm"],
-      [data-slot="table-cell"] [data-slot="button"]
+      :is([data-slot="table-cell"], [data-row-actions]) [data-slot="button"]
     ) {
     min-height: 2.75rem;
   }

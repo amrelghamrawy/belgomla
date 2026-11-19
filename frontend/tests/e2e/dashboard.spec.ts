@@ -93,10 +93,15 @@ test("BR-INV08 a reserved quantity blocks the adjustment, then the order is conf
 
   // Setting the stock to zero would eat the order's reservation: refused, with the order linked.
   await page.goto(`/dashboard/inventory?q=${encodeURIComponent(order.sku.code)}`);
-  await page.getByTestId(`stock-${order.sku.id}`).getByRole("button", { name: "تعديل الرصيد" }).click();
+  // D104: adjusting sits in the row's «⋯» menu, beside the visible «استلام بضاعة».
+  await page
+    .getByTestId(`stock-${order.sku.id}`)
+    .getByRole("button", { name: /إجراءات أخرى/ })
+    .click();
+  await page.getByRole("menuitem", { name: "تعديل الرصيد" }).click();
   await expect(page.getByTestId("min-allowed")).toContainText("أقل كمية ممكنة:");
   await page.getByLabel("الرصيد الجديد (بالوحدة الأساسية)").fill("0");
-  await page.getByLabel("سبب التعديل").fill("جرد");
+  await page.getByLabel("سبب التعديل").selectOption({ label: "جرد" });
   await page.getByRole("button", { name: "حفظ" }).click();
   const refusal = page.getByTestId("below-reserved");
   await expect(refusal).toContainText("لا يمكن تقليل المخزون إلى 0");

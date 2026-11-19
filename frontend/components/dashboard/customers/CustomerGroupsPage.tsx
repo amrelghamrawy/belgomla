@@ -1,5 +1,6 @@
 "use client";
 
+import { ArchiveIcon, ArchiveRestoreIcon, PencilIcon } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
@@ -104,11 +105,13 @@ function GroupRow({ group, onEdit }: { group: CustomerGroup; onEdit: () => void 
               )
             }
           >
+            <ArchiveRestoreIcon aria-hidden />
             {copy.restore}
           </Button>
         ) : (
           <>
             <Button variant="outline" size="sm" onClick={onEdit}>
+              <PencilIcon aria-hidden />
               {ar.dashboard.edit}
             </Button>
             <Button
@@ -122,6 +125,7 @@ function GroupRow({ group, onEdit }: { group: CustomerGroup; onEdit: () => void 
                 })
               }
             >
+              <ArchiveIcon aria-hidden />
               {copy.archive}
             </Button>
           </>

@@ -1,5 +1,6 @@
 "use client";
 
+import { BanIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -49,7 +50,9 @@ export function ExpensesPage() {
       <FilterPanel
         active={activeFilters(query, ["from", "to", "category", "voided"])}
         onClear={
-          hasFilters(query) ? () => setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null]))) : undefined
+          hasFilters(query)
+            ? () => setQuery(Object.fromEntries(Object.keys(query).map((key) => [key, null])))
+            : undefined
         }
       >
         <label className="flex flex-col gap-1 text-xs">
@@ -144,6 +147,7 @@ function ExpenseRow({ expense }: { expense: Expense }) {
           <ReasonDialog
             trigger={(open) => (
               <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                <BanIcon aria-hidden />
                 {copy.void}
               </Button>
             )}

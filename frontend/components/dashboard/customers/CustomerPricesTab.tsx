@@ -1,6 +1,6 @@
 "use client";
 
-import { TrashIcon } from "lucide-react";
+import { CheckIcon, TrashIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -248,6 +248,7 @@ function PriceRow({ customerId, price }: { customerId: number; price: CustomerSk
           />
           {value !== price.unit_price && (
             <Button size="sm" variant="outline" disabled={set.isPending} onClick={save}>
+              <CheckIcon aria-hidden />
               {ar.save}
             </Button>
           )}

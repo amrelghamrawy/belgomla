@@ -1,5 +1,6 @@
 "use client";
 
+import { BanIcon } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -107,7 +108,8 @@ function ReturnRow({ orderReturn }: { orderReturn: OrderReturn }) {
       <TableCell>
         {orderReturn.order ? (
           <Link href={`/dashboard/orders/${orderReturn.order.number}`} className="font-medium hover:underline">
-            <bdi className="text-primary font-bold tabular-nums">#{orderReturn.order.number}</bdi> · {copy.returnNumber(orderReturn.number)}
+            <bdi className="text-primary font-bold tabular-nums">#{orderReturn.order.number}</bdi> ·{" "}
+            {copy.returnNumber(orderReturn.number)}
           </Link>
         ) : (
           copy.returnNumber(orderReturn.number)
@@ -140,6 +142,7 @@ function ReturnRow({ orderReturn }: { orderReturn: OrderReturn }) {
           <ReasonDialog
             trigger={(open) => (
               <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                <BanIcon aria-hidden />
                 {copy.void}
               </Button>
             )}

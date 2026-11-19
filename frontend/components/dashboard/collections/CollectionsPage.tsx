@@ -1,5 +1,6 @@
 "use client";
 
+import { BanIcon } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -171,6 +172,7 @@ function CollectionRow({ collection }: { collection: Collection }) {
           <ReasonDialog
             trigger={(open) => (
               <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                <BanIcon aria-hidden />
                 {copy.void}
               </Button>
             )}

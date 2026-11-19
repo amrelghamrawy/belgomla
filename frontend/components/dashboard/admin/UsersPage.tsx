@@ -1,5 +1,6 @@
 "use client";
 
+import { KeyRoundIcon, UserCheckIcon, UserXIcon } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -127,9 +128,11 @@ function UserRow({ user, isMe, onPassword }: { user: TenantUser; isMe: boolean; 
             )
           }
         >
+          {active ? <UserXIcon aria-hidden /> : <UserCheckIcon aria-hidden />}
           {active ? copy.disable : copy.enable}
         </Button>
         <Button variant="ghost" size="sm" onClick={onPassword}>
+          <KeyRoundIcon aria-hidden />
           {copy.changePassword}
         </Button>
       </TableCell>

@@ -1,5 +1,6 @@
 "use client";
 
+import { CoinsIcon, EllipsisIcon, HistoryIcon, PackagePlusIcon, SlidersHorizontalIcon } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -7,6 +8,12 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,23 +159,48 @@ export function InventoryPage() {
                         {row.avg_cost ? formatUnitCost(row.avg_cost) : copy.noCost}
                       </TableCell>
                     )}
-                    <TableCell className="flex flex-wrap gap-1">
-                      <Button variant="outline" size="sm" onClick={() => setAdjusting(row)}>
-                        {copy.adjust}
-                      </Button>
-                      {canReceive && (
-                        <>
+                    {/* D104: one visible action (the day's job: receiving, else adjusting) and the rest behind «⋯». */}
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {canReceive ? (
                           <Button variant="outline" size="sm" onClick={() => setCosting({ row, mode: "receive" })}>
+                            <PackagePlusIcon aria-hidden />
                             {copy.receive}
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setCosting({ row, mode: "cost" })}>
-                            {copy.setCost}
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => setAdjusting(row)}>
+                            <SlidersHorizontalIcon aria-hidden />
+                            {copy.adjust}
                           </Button>
-                        </>
-                      )}
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/dashboard/inventory/${row.sku_id}`}>{copy.movements}</Link>
-                      </Button>
+                        )}
+                        <DropdownMenu dir="rtl">
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" aria-label={copy.moreActions(row.code)}>
+                              <EllipsisIcon aria-hidden />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            {canReceive && (
+                              <DropdownMenuItem onSelect={() => setAdjusting(row)}>
+                                <SlidersHorizontalIcon aria-hidden />
+                                {copy.adjust}
+                              </DropdownMenuItem>
+                            )}
+                            {canReceive && (
+                              <DropdownMenuItem onSelect={() => setCosting({ row, mode: "cost" })}>
+                                <CoinsIcon aria-hidden />
+                                {copy.setCost}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/inventory/${row.sku_id}`}>
+                                <HistoryIcon aria-hidden />
+                                {copy.movements}
+                              </Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -178,9 +210,7 @@ export function InventoryPage() {
         ))}
       <Pager meta={inventory.data?.meta} onPage={(page) => setQuery({ page })} />
       {adjusting !== null && <AdjustStockSheet row={adjusting} onClose={() => setAdjusting(null)} />}
-      {costing !== null && (
-        <ReceiveStockSheet row={costing.row} mode={costing.mode} onClose={() => setCosting(null)} />
-      )}
+      {costing !== null && <ReceiveStockSheet row={costing.row} mode={costing.mode} onClose={() => setCosting(null)} />}
     </>
   );
 }
@@ -230,17 +260,20 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
 
     const note = reason.note.trim() || null;
     setProblem(null);
-    bulk.mutate(items.map((item) => ({ ...item, reason: reason.reason as MerchantAdjustmentReason, note })), {
-      onSuccess: (outcome) => {
-        setResult(outcome);
-        toast.success(copy.bulkApplied(outcome.applied));
+    bulk.mutate(
+      items.map((item) => ({ ...item, reason: reason.reason as MerchantAdjustmentReason, note })),
+      {
+        onSuccess: (outcome) => {
+          setResult(outcome);
+          toast.success(copy.bulkApplied(outcome.applied));
 
-        if (outcome.skipped.length === 0) {
-          onDone();
-        }
+          if (outcome.skipped.length === 0) {
+            onDone();
+          }
+        },
+        onError: (failure) => setProblem(messageFor(failure)),
       },
-      onError: (failure) => setProblem(messageFor(failure)),
-    });
+    );
   };
 
   return (

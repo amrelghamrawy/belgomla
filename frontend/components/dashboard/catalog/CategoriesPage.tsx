@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient } from "@tanstack/react-query";
-import { GripVerticalIcon } from "lucide-react";
+import { ArchiveIcon, ArchiveRestoreIcon, GripVerticalIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -75,7 +75,12 @@ export function CategoriesPage() {
       <PageHeader
         title={copy.title}
         description={copy.description}
-        actions={<Button onClick={() => setEditing({ mode: "create", parentId: null })}>{copy.add}</Button>}
+        actions={
+          <Button onClick={() => setEditing({ mode: "create", parentId: null })}>
+            <PlusIcon aria-hidden />
+            {copy.add}
+          </Button>
+        }
       />
       <FilterPanel active={showArchived ? 1 : 0}>
         <div className="flex h-10 items-center gap-2">
@@ -192,12 +197,17 @@ function CategoryRow({
         </span>
         {depth === 0 && <Badge variant="outline">{ar.catalog.kinds[node.kind]}</Badge>}
         {archived && <Badge variant="secondary">{copy.archivedNote}</Badge>}
-        <Button variant="ghost" size="sm" onClick={() => onEdit(node)}>
-          {ar.dashboard.edit}
-        </Button>
-        <Button variant="ghost" size="sm" disabled={status.isPending} onClick={toggle}>
-          {archived ? ar.dashboard.restore : ar.dashboard.archive}
-        </Button>
+        {/* D104: the same row actions as every table: icon pills. */}
+        <div data-row-actions className="flex shrink-0 items-center">
+          <Button variant="ghost" size="sm" onClick={() => onEdit(node)}>
+            <PencilIcon aria-hidden />
+            {ar.dashboard.edit}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={status.isPending} onClick={toggle}>
+            {archived ? <ArchiveRestoreIcon aria-hidden /> : <ArchiveIcon aria-hidden />}
+            {archived ? ar.dashboard.restore : ar.dashboard.archive}
+          </Button>
+        </div>
       </div>
       {node.children.length > 0 && <SiblingList nodes={node.children} depth={depth + 1} onEdit={onEdit} />}
     </li>

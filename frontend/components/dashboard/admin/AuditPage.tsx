@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, FilterIcon } from "lucide-react";
 import { type FormEvent, Fragment, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -139,6 +139,7 @@ export function AuditPage() {
                             setQuery({ batch_id: entry.batch_id });
                           }}
                         >
+                          <FilterIcon aria-hidden />
                           {copy.batchFilter}
                         </Button>
                       )}

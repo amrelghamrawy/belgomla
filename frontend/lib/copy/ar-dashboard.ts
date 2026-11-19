@@ -579,6 +579,7 @@ export const dashboard = {
       "-available": "المتاح الأكثر",
     } as Record<string, string>,
     adjust: "تعديل الرصيد",
+    moreActions: (code: string) => `إجراءات أخرى للصنف ${code}`,
     adjustTitle: (code: string) => `تعديل رصيد ${code}`,
     // BR-INV08: the exact line the adjustment form shows.
     minAllowedLine: (reserved: number) => `أقل كمية ممكنة: ${reserved} (محجوزة لطلبات قائمة)`,

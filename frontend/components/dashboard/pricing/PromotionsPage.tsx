@@ -1,5 +1,6 @@
 "use client";
 
+import { BanIcon, CalendarClockIcon, PencilIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -135,6 +136,7 @@ function PromotionRow({ promotion, onEdit }: { promotion: Promotion; onEdit: () 
       <TableCell className="flex flex-wrap gap-1">
         {isEditable(promotion.status) && (
           <Button variant="outline" size="sm" onClick={onEdit}>
+            <PencilIcon aria-hidden />
             {ar.dashboard.edit}
           </Button>
         )}
@@ -150,11 +152,13 @@ function PromotionRow({ promotion, onEdit }: { promotion: Promotion; onEdit: () 
               )
             }
           >
+            <CalendarClockIcon aria-hidden />
             {copy.schedule}
           </Button>
         )}
         {isCancellable(promotion.status) && (
           <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setCancelling(true)}>
+            <BanIcon aria-hidden />
             {copy.cancel}
           </Button>
         )}
@@ -193,6 +197,7 @@ function CancelDialog({ promotion, onClose }: { promotion: Promotion; onClose: (
               })
             }
           >
+            <BanIcon aria-hidden />
             {copy.cancel}
           </Button>
         </DialogFooter>
