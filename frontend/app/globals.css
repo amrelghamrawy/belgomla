@@ -363,6 +363,15 @@
     padding: 0.35rem;
     gap: 0.25rem;
     height: auto;
+    /* Never wider than its column: a bar with more tabs than fit scrolls sideways itself (rules/03 §3). */
+    max-width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+
+  & [data-slot="tabs-list"] > [data-slot="tabs-trigger"] {
+    flex: none;
   }
 
   & [data-slot="tabs-trigger"] {

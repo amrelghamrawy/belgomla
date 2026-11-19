@@ -277,6 +277,12 @@ test("no dashboard screen scrolls sideways, on a phone or a desktop (rules/03 §
     .click();
   await expect(page.getByRole("heading", { level: 1, name: /^طلب #\d+$/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+
+  // D104: a detail page with a bar of tabs wider than a phone; the bar scrolls, the page does not.
+  await page.goto("/dashboard/customers");
+  await page.getByTestId(/^customer-\d+$/).first().getByRole("link").first().click();
+  await expect(page.getByRole("tab").first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
 test("BR-C05 a credit limit blocks the next checkout until the merchant collects", async ({ page, browser }) => {

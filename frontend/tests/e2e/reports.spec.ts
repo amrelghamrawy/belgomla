@@ -36,6 +36,8 @@ test("the owner opens every report tab on the demo store and exports each report
   await expect(page).toHaveURL(/tab=sales/);
   await expect(page).toHaveURL(/from=\d{4}-08-01/);
   await expect(page.getByRole("button", { name: "هذا الموسم" })).toHaveAttribute("aria-pressed", "true");
+  // D104: the period rows fold under the chart; open them.
+  await page.getByText(/عرض الجدول التفصيلي/).click();
   await expect(page.getByTestId("sales-buckets")).toBeVisible();
   await expect(page.getByTestId("sales-net")).toBeVisible();
   await expect(page.getByRole("figure", { name: /رسم بياني لصافي المبيعات/ })).toBeVisible();
@@ -74,6 +76,8 @@ test("the owner opens every report tab on the demo store and exports each report
   // التحصيل: the tiles, the aging now, the buckets and who owes.
   await page.getByRole("tab", { name: "التحصيل" }).click();
   await expect(page.getByTestId("collected-net")).toBeVisible();
+  await expect(page.getByRole("figure", { name: "التحصيل حسب الفترة" })).toBeVisible();
+  await page.getByText(/عرض الجدول التفصيلي/).click();
   await expect(page.getByTestId("collections-buckets")).toBeVisible();
   await expect(page.getByText("أعمار المديونيات الآن")).toBeVisible();
   await expect(page.getByText("المستحق لكل عميل")).toBeVisible();
