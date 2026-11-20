@@ -16,7 +16,7 @@ final class UpdateProductRequest extends FormRequest
     use ProductPayloadRules;
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<mixed>>
      */
     public function rules(): array
     {

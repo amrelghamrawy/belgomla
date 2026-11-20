@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Messaging\Contracts\ConnectionAlerts;
+use App\Modules\Messaging\Services\NullConnectionAlerts;
 use App\Modules\Platform\Services\HealthProbe;
+use App\Modules\Tenancy\Enums\Permission;
+use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\Services\TenantCreatedHooks;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -13,6 +17,7 @@ use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 final class AppServiceProvider extends ServiceProvider
@@ -21,6 +26,8 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(TenantContext::class);
         $this->app->singleton(TenantCreatedHooks::class);
+        // D70: nobody is told about a dropped store number until Orders binds its dashboard notice.
+        $this->app->bind(ConnectionAlerts::class, NullConnectionAlerts::class);
     }
 
     public function boot(): void
@@ -29,6 +36,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureDates();
         $this->configureCommands();
         $this->configureHealth();
+        $this->configurePermissions();
     }
 
     /** Input safety comes from Requests + Data classes (rules/02-architecture.md §3), not from $fillable. */
@@ -46,6 +54,14 @@ final class AppServiceProvider extends ServiceProvider
     private function configureCommands(): void
     {
         DB::prohibitDestructiveCommands($this->app->isProduction());
+    }
+
+    /** BR-T06, D82: one gate per permission, so policies can ask `Gate::allows('orders.manage')`. */
+    private function configurePermissions(): void
+    {
+        foreach (Permission::cases() as $permission) {
+            Gate::define($permission->value, fn (mixed $user): bool => $user instanceof TenantUser && $user->role->can($permission));
+        }
     }
 
     /** `/up` checks the database and Redis, not only that PHP answers (tasks/11). */

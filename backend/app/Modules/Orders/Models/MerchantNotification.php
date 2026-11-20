@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Models;
 
 use App\Modules\Orders\Enums\NotificationType;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
+use App\Modules\Tenancy\Enums\Permission;
 use Carbon\CarbonImmutable;
 use Database\Factories\MerchantNotificationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $tenant_user_id
  * @property NotificationType $type
  * @property array<string, mixed> $data
+ * @property Permission $permission who may see it (D82)
  * @property CarbonImmutable|null $read_at
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -47,6 +49,7 @@ final class MerchantNotification extends Model
         return [
             'tenant_user_id' => 'integer',
             'type' => NotificationType::class,
+            'permission' => Permission::class,
             'data' => 'array',
             'read_at' => 'datetime',
         ];

@@ -21,6 +21,6 @@ final readonly class LowStockReportQuery
      */
     public function paginate(int $perPage): LengthAwarePaginator
     {
-        return $this->lowStock->builder()->with(['product', 'inventory'])->orderBy('skus.code')->orderBy('skus.id')->paginate($perPage);
+        return $this->lowStock->builder()->with(['product', 'inventory', 'smallestUnit'])->orderBy('skus.code')->orderBy('skus.id')->paginate($perPage);
     }
 }

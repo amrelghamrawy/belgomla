@@ -10,5 +10,5 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
-    Route::get('audit', [AuditLogController::class, 'index'])->name('audit.index');
+    Route::get('audit', [AuditLogController::class, 'index'])->middleware('permission:audit.view')->name('audit.index');
 });

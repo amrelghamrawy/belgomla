@@ -45,9 +45,9 @@ export function DashboardLoginForm() {
 
   return (
     <Card className="w-full max-w-sm">
-      <CardHeader>
+      <CardHeader className="border-b">
         <CardTitle>
-          <h1 className="text-xl">{ar.auth.dashboardLoginTitle}</h1>
+          <h1 className="text-xl font-extrabold">{ar.auth.dashboardLoginTitle}</h1>
         </CardTitle>
       </CardHeader>
       <CardContent>

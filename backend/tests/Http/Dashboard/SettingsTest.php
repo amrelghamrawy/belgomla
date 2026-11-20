@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
 use App\Support\InvitationMessage;
+use App\Support\OrderStatusMessage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -77,7 +78,96 @@ test('settings validation', function (array $body, string $field): void {
     'invitation text too long' => [['invitation_message' => str_repeat('ا', 501)], 'invitation_message'],
     'invitation text unknown placeholder' => [['invitation_message' => 'أهلًا {name}'], 'invitation_message'],
     'invitation text not a string' => [['invitation_message' => ['x']], 'invitation_message'],
+    'default terms negative' => [['default_payment_terms_days' => -1], 'default_payment_terms_days'],
+    'default terms over a year' => [['default_payment_terms_days' => 366], 'default_payment_terms_days'],
+    'default limit negative' => [['default_credit_limit' => '-1'], 'default_credit_limit'],
+    'default limit three decimals' => [['default_credit_limit' => '1.001'], 'default_credit_limit'],
+    'unknown notify status' => [['order_notify_statuses' => ['pending']], 'order_notify_statuses.0'],
+    'notify statuses not a list' => [['order_notify_statuses' => 'confirmed'], 'order_notify_statuses'],
+    'duplicate notify status' => [['order_notify_statuses' => ['confirmed', 'confirmed']], 'order_notify_statuses.0'],
+    'placed is no notify status (BR-O11)' => [['order_notify_statuses' => ['placed']], 'order_notify_statuses.0'],
+    'reason in the placed message' => [['order_status_messages' => ['placed' => '{سبب_الإلغاء}']], 'order_status_messages.placed'],
+    'message for an unknown status' => [['order_status_messages' => ['pending' => 'x']], 'order_status_messages'],
+    'message too long' => [['order_status_messages' => ['confirmed' => str_repeat('ا', 501)]], 'order_status_messages.confirmed'],
+    'message unknown placeholder' => [['order_status_messages' => ['confirmed' => 'أهلًا {name}']], 'order_status_messages.confirmed'],
+    'reason outside cancelled' => [['order_status_messages' => ['delivered' => '{سبب_الإلغاء}']], 'order_status_messages.delivered'],
+    'expiry zero' => [['pending_expiry_hours' => 0], 'pending_expiry_hours'],
+    'expiry over a month' => [['pending_expiry_hours' => 721], 'pending_expiry_hours'],
+    'expiry not a number' => [['pending_expiry_hours' => 'soon'], 'pending_expiry_hours'],
+    'expiry below the stale hours sent with it' => [['stale_pending_hours' => 48, 'pending_expiry_hours' => 24], 'pending_expiry_hours'],
+    'expiry below the stored stale hours' => [['pending_expiry_hours' => 23], 'pending_expiry_hours'],
+    'sales discount cap zero' => [['max_discount_percent_sales' => 0], 'max_discount_percent_sales'],
+    'sales discount cap of 100' => [['max_discount_percent_sales' => 100], 'max_discount_percent_sales'],
+    'sales discount cap three decimals' => [['max_discount_percent_sales' => '5.125'], 'max_discount_percent_sales'],
+    'sales discount cap not a number' => [['max_discount_percent_sales' => 'some'], 'max_discount_percent_sales'],
+    'unknown notify event' => [['order_notify_statuses' => ['discounted']], 'order_notify_statuses.0'],
+    'reason in the discount message' => [['order_status_messages' => ['discount' => '{سبب_الإلغاء}']], 'order_status_messages.discount'],
 ]);
+
+test('D85 an owner sets and clears the sales discount cap; it starts unset', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/settings')->assertOk()->assertJsonPath('data.max_discount_percent_sales', null);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['max_discount_percent_sales' => 12.5])->assertOk()->assertJsonPath('data.max_discount_percent_sales', '12.50');
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['max_discount_percent_sales' => null])->assertOk()->assertJsonPath('data.max_discount_percent_sales', null);
+});
+
+test('D85 BR-N03 a store may tell customers about discounts and word the message', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['order_notify_statuses' => ['discount', 'confirmed'], 'order_status_messages' => ['discount' => 'خصم على {رقم_الطلب}']])
+        ->assertOk()
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'discount'])
+        ->assertJsonPath('data.order_status_messages.discount', 'خصم على {رقم_الطلب}');
+});
+
+test('BR-INV07 D81 an owner turns the automatic expiry on and off; it starts off', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/settings')->assertOk()->assertJsonPath('data.pending_expiry_hours', null);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['pending_expiry_hours' => 24])->assertOk()->assertJsonPath('data.pending_expiry_hours', 24);
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['pending_expiry_hours' => null])->assertOk()->assertJsonPath('data.pending_expiry_hours', null);
+});
+
+test('BR-INV07 the stale hours cannot be raised past the expiry already set', function (): void {
+    $this->tenant->settings->update(['pending_expiry_hours' => 24]);
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['stale_pending_hours' => 30])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.pending_expiry_hours.0', 'يجب ألا تقل مهلة الإلغاء التلقائي عن مدة تمييز الطلب كمتأخر (30 ساعة)');
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['stale_pending_hours' => 30, 'pending_expiry_hours' => 30])->assertOk();
+});
+
+test('the automatic expiry is not shown on the storefront', function (): void {
+    $this->tenantJson('GET', '/api/store/tenant')->assertOk()->assertJsonMissingPath('data.pending_expiry_hours');
+});
+
+test('BR-N03 an owner picks the statuses customers hear about and words a status, the default text sent back is dropped', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', [
+        'order_notify_statuses' => ['delivered', 'confirmed'],
+        'order_status_messages' => ['confirmed' => 'تأكد طلبك {رقم_الطلب}', 'delivered' => OrderStatusMessage::DEFAULTS['delivered'], 'cancelled' => null],
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'delivered'])
+        ->assertJsonPath('data.order_status_messages', ['confirmed' => 'تأكد طلبك {رقم_الطلب}'])
+        ->assertJsonPath('data.order_status_message_defaults.cancelled', OrderStatusMessage::DEFAULTS['cancelled']);
+});
+
+test('BR-N03 D87 by default the four main statuses and line edits notify in the platform words', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/settings')
+        ->assertOk()
+        ->assertJsonPath('data.order_notify_statuses', ['confirmed', 'out_for_delivery', 'delivered', 'cancelled', 'edited'])
+        ->assertJsonPath('data.order_status_messages', []);
+});
+
+test('BR-C05 BR-C06 an owner sets the credit terms new customers start with, and clears them with null', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['default_payment_terms_days' => 30, 'default_credit_limit' => '2500'])
+        ->assertOk()
+        ->assertJsonPath('data.default_payment_terms_days', 30)
+        ->assertJsonPath('data.default_credit_limit', '2500.00');
+
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['default_payment_terms_days' => null, 'default_credit_limit' => null])
+        ->assertOk()
+        ->assertJsonPath('data.default_payment_terms_days', null)
+        ->assertJsonPath('data.default_credit_limit', null);
+});
 
 test('the Arabic message for a missing minimum order amount is explicit', function (): void {
     $this->tenantJson('PUT', '/api/dashboard/settings', ['mov_enabled' => true, 'mov_amount' => null])
@@ -155,4 +245,11 @@ test('branding uploads reject non-images and unknown kinds', function (): void {
 
     $this->tenantJson('POST', '/api/dashboard/settings/banner', ['file' => UploadedFile::fake()->image('x.png')])
         ->assertNotFound();
+});
+
+test('BR-O11 the store words the placed message of merchant orders like the status messages', function (): void {
+    $this->tenantJson('PUT', '/api/dashboard/settings', ['order_status_messages' => ['placed' => 'سجلنا طلبك {رقم_الطلب}']])
+        ->assertOk()
+        ->assertJsonPath('data.order_status_messages', ['placed' => 'سجلنا طلبك {رقم_الطلب}'])
+        ->assertJsonPath('data.order_status_message_defaults.placed', OrderStatusMessage::DEFAULTS['placed']);
 });

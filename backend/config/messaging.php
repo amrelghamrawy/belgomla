@@ -46,6 +46,7 @@ return [
 
     'limits' => [
         'per_phone_per_hour' => 5,   // BR-CU07
+        'order_status_per_phone_per_hour' => 10, // D79: order updates have their own bucket
         'provider_per_minute' => 10, // Hypersender plan limit and D46 ban-risk mitigation
     ],
 

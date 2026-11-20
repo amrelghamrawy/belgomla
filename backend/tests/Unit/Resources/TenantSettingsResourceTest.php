@@ -21,6 +21,10 @@ test('the settings resource has the documented key set and hides operational fie
         ->and($dashboard)->toHaveKey('stale_pending_hours', 24)
         ->and($dashboard)->toHaveKey('invitation_message', null)
         ->and($dashboard)->toHaveKey('invitation_message_default', InvitationMessage::DEFAULT)
+        ->and($dashboard)->toHaveKey('default_payment_terms_days', null)
+        ->and($dashboard)->toHaveKey('default_credit_limit', null)
+        ->and($dashboard)->toHaveKey('max_discount_percent_sales', null)
+        ->and($store)->not->toHaveKeys(['default_payment_terms_days', 'default_credit_limit', 'max_discount_percent_sales'])
         ->and($store['mov'])->toBe(['enabled' => false, 'amount' => null]);
 });
 
@@ -29,7 +33,7 @@ test('the user resource never exposes the password or token', function (): void 
 
     $data = new TenantUserResource($user)->resolve(Request::create('/'));
 
-    expect(array_keys($data))->toBe(['id', 'name', 'email', 'role', 'status', 'last_login_at'])
+    expect(array_keys($data))->toBe(['id', 'name', 'email', 'role', 'role_label', 'status', 'last_login_at'])
         ->and($data['role'])->toBe('owner')
         ->and($data['last_login_at'])->toBe('2026-10-09T10:00:00+00:00');
 });

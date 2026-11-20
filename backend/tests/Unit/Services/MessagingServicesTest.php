@@ -182,3 +182,29 @@ test('the message context skips a message that no longer exists', function (): v
 
     expect($called)->toBeFalse();
 });
+
+test('D80 an order status message never falls back to sms', function (Provider $provider, DriverResult $result, ?array $next): void {
+    useHypersender();
+    $message = new OutboundMessage(['channel' => Channel::WhatsApp, 'provider' => $provider, 'purpose' => MessagePurpose::OrderStatus]);
+
+    $route = app(Fallback::class)->next($message, $result);
+
+    expect($route === null ? null : [$route->channel, $route->provider])->toBe($next);
+})->with([
+    'store number failed, platform next' => [Provider::WaGateway, DriverResult::failed('session_not_open'), [Channel::WhatsApp, Provider::Hypersender]],
+    'store number, not on whatsapp' => [Provider::WaGateway, DriverResult::failed('not_on_whatsapp', true), null],
+    'platform failed' => [Provider::Hypersender, DriverResult::failed('provider_error'), null],
+]);
+
+test('BR-N03 D70 an order status message goes from the store number when it is connected', function (): void {
+    useWaGateway();
+    $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    expect($this->inTenant(fn () => app(MessageDrivers::class)->choose(Channel::WhatsApp, MessagePurpose::OrderStatus)))->toBeInstanceOf(WaGatewayDriver::class);
+});
+
+test('BR-N03 a message about an order keeps the order in its payload', function (): void {
+    $message = new OutboundMessage(['to_phone' => '+201012345678', 'purpose' => MessagePurpose::OrderStatus, 'body' => 'x', 'channel' => Channel::WhatsApp, 'order_id' => 7]);
+
+    expect(MessagePayload::fromMessage($message)->orderId)->toBe(7);
+});

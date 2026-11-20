@@ -1,8 +1,9 @@
 "use client";
 
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 
-import { apiFetch, apiFetchPage, withQuery, type Page } from "@/lib/api/client";
+import { apiDownload, apiFetch, apiFetchPage, withQuery, type Page } from "@/lib/api/client";
+import { saveDownload } from "@/lib/api/download";
 import { queryKeys } from "@/lib/api/keys";
 import type { Category, Facet, PriceListMeta, PriceListRow, StoreProduct, StoreProductDetail } from "@/lib/api/types";
 
@@ -108,6 +109,16 @@ export function useFeaturedProducts() {
   });
 }
 
+/** BR-PR15 (V2 Task 12): the products on a live promotion, for the home page's «عروض» row. */
+export function useOfferProducts() {
+  const params = { on_offer: 1, sort: "-created_at", per_page: 8 } as const;
+
+  return useQuery({
+    queryKey: queryKeys.products(params),
+    queryFn: () => apiFetchPage<StoreProduct>(withQuery("/api/store/products", params)),
+  });
+}
+
 /** A category's newest products, for its row on the home page (D67). */
 export function useCategoryProducts(slug: string) {
   const params = { category: slug, sort: "-created_at", per_page: 8 } as const;
@@ -132,5 +143,20 @@ export function usePriceList(listing: Listing) {
   return useQuery({
     queryKey: queryKeys.priceList(params),
     queryFn: () => apiFetchPage<PriceListRow, PriceListMeta>(withQuery("/api/store/price-list", params)),
+  });
+}
+
+/** BR-P13, D83: the price list of the selection as an Excel file (the page's print stays the PDF). */
+export function useDownloadPriceList() {
+  return useMutation({
+    mutationFn: async (listing: Listing) => {
+      const result = await apiDownload(
+        withQuery("/api/store/price-list/export", apiParams({ ...listing, sort: undefined })),
+      );
+
+      if ("file" in result) {
+        saveDownload(result.file);
+      }
+    },
   });
 }

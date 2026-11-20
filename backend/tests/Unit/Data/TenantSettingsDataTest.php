@@ -14,6 +14,28 @@ function settingsRequest(array $payload): UpdateSettingsRequest
     return $request;
 }
 
+test('BR-C05 BR-C06 the default credit terms are an integer and a 2-decimal string, null when cleared', function (): void {
+    expect(TenantSettingsData::fromRequest(settingsRequest(['default_payment_terms_days' => '45', 'default_credit_limit' => '1500.5']))->settingColumns())
+        ->toBe(['default_payment_terms_days' => 45, 'default_credit_limit' => '1500.50'])
+        ->and(TenantSettingsData::fromRequest(settingsRequest(['default_payment_terms_days' => null, 'default_credit_limit' => null]))->settingColumns())
+        ->toBe(['default_payment_terms_days' => null, 'default_credit_limit' => null]);
+});
+
+test('BR-N03 the notified statuses keep the platform order and the default text is not stored', function (): void {
+    expect(TenantSettingsData::fromRequest(settingsRequest([
+        'order_notify_statuses' => ['cancelled', 'confirmed'],
+        'order_status_messages' => ['confirmed' => '  نص  ', 'delivered' => App\Support\OrderStatusMessage::DEFAULTS['delivered'], 'cancelled' => ''],
+    ]))->settingColumns())->toBe([
+        'order_notify_statuses' => ['confirmed', 'cancelled'],
+        'order_status_messages' => ['confirmed' => 'نص'],
+    ]);
+});
+
+test('BR-N03 messages that are all defaults are stored as null', function (): void {
+    expect(TenantSettingsData::fromRequest(settingsRequest(['order_status_messages' => ['confirmed' => null]]))->settingColumns())
+        ->toBe(['order_status_messages' => null]);
+});
+
 test('only sent fields are carried, nullable fields can be cleared, money is a 2-decimal string', function (): void {
     $data = TenantSettingsData::fromRequest(settingsRequest([
         'name' => 'x', 'phone' => null, 'mov_enabled' => true, 'mov_amount' => 1000, 'primary_color' => '#aabbcc',
@@ -41,4 +63,9 @@ test('working hours are normalised to typed rows', function (): void {
     ]));
 
     expect($data->workingHours)->toBe([['day' => 6, 'from' => '09:00', 'to' => '21:00']]);
+});
+
+test('D85 the sales discount cap is a 2-decimal string, null when cleared', function (): void {
+    expect(TenantSettingsData::fromRequest(settingsRequest(['max_discount_percent_sales' => '7.5']))->settingColumns())->toBe(['max_discount_percent_sales' => '7.50'])
+        ->and(TenantSettingsData::fromRequest(settingsRequest(['max_discount_percent_sales' => null]))->settingColumns())->toBe(['max_discount_percent_sales' => null]);
 });

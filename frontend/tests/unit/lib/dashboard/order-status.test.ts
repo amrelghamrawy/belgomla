@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { OrderStatus } from "@/lib/api/types";
-import { allowsAddressEdit, canCancel, canCollect, canTransition, nextSteps } from "@/lib/dashboard/order-status";
+import {
+  allowsAddressEdit,
+  allowsPriceChange,
+  canCancel,
+  canCollect,
+  canTransition,
+  nextSteps,
+} from "@/lib/dashboard/order-status";
 import { balanceOf } from "@/lib/dashboard/orders";
 
 const ALL: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
@@ -41,8 +48,19 @@ describe("nextSteps and the other guards", () => {
     expect(ALL.filter(canCollect)).toEqual(["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]);
   });
 
-  it("works out the balance in piasters and never below zero", () => {
-    expect(balanceOf({ order_total: "450.10", collected_amount: "100.05" })).toBe("350.05");
-    expect(balanceOf({ order_total: "100.00", collected_amount: "100.00" })).toBe("0.00");
+  it("BR-O08 works out the balance on the net total in piasters and never below zero", () => {
+    expect(balanceOf({ net_total: "450.10", collected_amount: "100.05" })).toBe("350.05");
+    expect(balanceOf({ net_total: "100.00", collected_amount: "100.00" })).toBe("0.00");
+    expect(balanceOf({ net_total: "60.00", collected_amount: "100.00" })).toBe("0.00");
+  });
+});
+
+describe("allowsPriceChange", () => {
+  it("BR-PR08 D85 allows discounts while pending or confirmed only", () => {
+    expect(
+      (["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"] as const).filter(
+        allowsPriceChange,
+      ),
+    ).toEqual(["pending", "confirmed"]);
   });
 });

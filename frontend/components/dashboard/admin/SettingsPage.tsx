@@ -29,14 +29,23 @@ import {
   renderInvitation,
   unknownPlaceholders,
 } from "@/lib/dashboard/invitation-message";
-import { toPiasters } from "@/lib/dashboard/price-math";
+import {
+  NOTIFIABLE_STATUSES,
+  type NotifiableStatus,
+  ORDER_MESSAGE_MAX_LENGTH,
+  orderMessagesBody,
+  unknownOrderPlaceholders,
+} from "@/lib/dashboard/order-status-message";
+import { toBasisPoints, toPiasters } from "@/lib/dashboard/price-math";
 import { applyServerErrors } from "@/lib/forms/server-errors";
 
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { OrderMessagesCard } from "./OrderMessagesCard";
 import { StoreWhatsAppCard } from "./StoreWhatsAppCard";
 
 const copy = ar.dashboard.settings;
 const COLOR = /^#[0-9A-Fa-f]{6}$/;
+const orderMessage = z.string().max(ORDER_MESSAGE_MAX_LENGTH, copy.invitation.tooLong(ORDER_MESSAGE_MAX_LENGTH));
 
 // Mirrors UpdateSettingsRequest.
 const schema = z
@@ -57,7 +66,41 @@ const schema = z
       .string()
       .regex(/^\d{1,3}$/, ar.dashboard.productForm.invalidInteger)
       .refine((value) => Number(value) >= 1 && Number(value) <= 720, ar.dashboard.productForm.invalidInteger),
+    pending_expiry_hours: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (/^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 720),
+        copy.expiryRange,
+      ),
     invitation_message: z.string().max(INVITATION_MAX_LENGTH, copy.invitation.tooLong(INVITATION_MAX_LENGTH)),
+    default_payment_terms_days: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || (/^\d{1,3}$/.test(value) && Number(value) <= 365),
+        ar.dashboard.productForm.invalidInteger,
+      ),
+    default_credit_limit: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || toPiasters(value) !== null, ar.dashboard.productForm.invalidMoney),
+    max_discount_percent_sales: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || toBasisPoints(value) !== null, copy.salesDiscountRange),
+    order_notify_statuses: z.array(
+      z.enum(["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled", "discount", "edited"]),
+    ),
+    order_status_messages: z.object({
+      confirmed: orderMessage,
+      preparing: orderMessage,
+      out_for_delivery: orderMessage,
+      delivered: orderMessage,
+      cancelled: orderMessage,
+      discount: orderMessage,
+      edited: orderMessage,
+    }),
   })
   .superRefine((values, context) => {
     const unknown = unknownPlaceholders(values.invitation_message);
@@ -67,6 +110,30 @@ const schema = z
         code: "custom",
         path: ["invitation_message"],
         message: copy.invitation.unknown(unknown.join("، ")),
+      });
+    }
+
+    for (const status of NOTIFIABLE_STATUSES) {
+      const unknownTokens = unknownOrderPlaceholders(values.order_status_messages[status], status);
+
+      if (unknownTokens.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["order_status_messages", status],
+          message: copy.orderMessages.unknown(unknownTokens.join("، ")),
+        });
+      }
+    }
+
+    if (
+      values.pending_expiry_hours !== "" &&
+      /^\d{1,3}$/.test(values.stale_pending_hours) &&
+      Number(values.pending_expiry_hours) < Number(values.stale_pending_hours)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["pending_expiry_hours"],
+        message: copy.expiryBelowStale(Number(values.stale_pending_hours)),
       });
     }
 
@@ -87,8 +154,41 @@ const SERVER_FIELDS = [
   "description",
   "mov_amount",
   "stale_pending_hours",
+  "pending_expiry_hours",
   "invitation_message",
+  "default_payment_terms_days",
+  "default_credit_limit",
+  "max_discount_percent_sales",
+  "order_notify_statuses",
+  "order_status_messages.confirmed",
+  "order_status_messages.preparing",
+  "order_status_messages.out_for_delivery",
+  "order_status_messages.delivered",
+  "order_status_messages.cancelled",
+  "order_status_messages.discount",
+  "order_status_messages.edited",
 ] as const;
+
+function messageDefaults(settings: DashboardSettings): Record<NotifiableStatus, string> {
+  const texts = {} as Record<NotifiableStatus, string>;
+
+  for (const status of NOTIFIABLE_STATUSES) {
+    texts[status] = settings.order_status_message_defaults[status] ?? "";
+  }
+
+  return texts;
+}
+
+function messageTexts(settings: DashboardSettings): Record<NotifiableStatus, string> {
+  const fallback = messageDefaults(settings);
+  const texts = {} as Record<NotifiableStatus, string>;
+
+  for (const status of NOTIFIABLE_STATUSES) {
+    texts[status] = settings.order_status_messages[status] ?? fallback[status];
+  }
+
+  return texts;
+}
 
 function defaults(settings: DashboardSettings): Values {
   return {
@@ -105,7 +205,14 @@ function defaults(settings: DashboardSettings): Values {
     require_login_for_prices: settings.require_login_for_prices,
     require_customer_approval: settings.require_customer_approval,
     stale_pending_hours: String(settings.stale_pending_hours),
+    pending_expiry_hours: settings.pending_expiry_hours === null ? "" : String(settings.pending_expiry_hours),
     invitation_message: settings.invitation_message ?? settings.invitation_message_default,
+    default_payment_terms_days:
+      settings.default_payment_terms_days === null ? "" : String(settings.default_payment_terms_days),
+    default_credit_limit: settings.default_credit_limit ?? "",
+    max_discount_percent_sales: settings.max_discount_percent_sales ?? "",
+    order_notify_statuses: settings.order_notify_statuses,
+    order_status_messages: messageTexts(settings),
   };
 }
 
@@ -135,10 +242,19 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
   const [error, setError] = useState<string | null>(null);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults(settings) });
   const errors = form.formState.errors;
-  const [primary, secondary, movEnabled, hours, invitation] = useWatch({
+  const [primary, secondary, movEnabled, hours, invitation, notifyStatuses, statusMessages] = useWatch({
     control: form.control,
-    name: ["primary_color", "secondary_color", "mov_enabled", "hours", "invitation_message"],
+    name: [
+      "primary_color",
+      "secondary_color",
+      "mov_enabled",
+      "hours",
+      "invitation_message",
+      "order_notify_statuses",
+      "order_status_messages",
+    ],
   });
+  const statusDefaults = messageDefaults(settings);
 
   const submit = form.handleSubmit((values) => {
     setError(null);
@@ -158,7 +274,18 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         require_login_for_prices: values.require_login_for_prices,
         require_customer_approval: values.require_customer_approval,
         stale_pending_hours: Number(values.stale_pending_hours),
+        pending_expiry_hours: values.pending_expiry_hours === "" ? null : Number(values.pending_expiry_hours),
         invitation_message: invitationBody(values.invitation_message, settings.invitation_message_default),
+        default_payment_terms_days:
+          values.default_payment_terms_days === "" ? null : Number(values.default_payment_terms_days),
+        default_credit_limit: empty(values.default_credit_limit),
+        max_discount_percent_sales: empty(values.max_discount_percent_sales),
+        order_notify_statuses: values.order_notify_statuses,
+        // BR-O11: the `placed` wording (merchant orders) has no editor here yet; send it back so a save keeps it.
+        order_status_messages: {
+          placed: settings.order_status_messages.placed ?? null,
+          ...orderMessagesBody(values.order_status_messages, statusDefaults),
+        },
       },
       {
         onSuccess: () => toast.success(copy.saved),
@@ -358,6 +485,51 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
             registration={form.register("stale_pending_hours")}
             error={errors.stale_pending_hours}
           />
+          <div className="flex flex-col gap-1">
+            <TextField
+              id="settings-expiry"
+              label={copy.expiryHours}
+              dir="ltr"
+              inputMode="numeric"
+              className="max-w-24"
+              registration={form.register("pending_expiry_hours")}
+              error={errors.pending_expiry_hours}
+            />
+            <p className="text-muted-foreground text-xs">{copy.expiryHint}</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField
+              id="settings-default-terms"
+              label={copy.defaultTerms}
+              dir="ltr"
+              inputMode="numeric"
+              className="max-w-24"
+              registration={form.register("default_payment_terms_days")}
+              error={errors.default_payment_terms_days}
+            />
+            <TextField
+              id="settings-default-limit"
+              label={copy.defaultLimit}
+              dir="ltr"
+              inputMode="decimal"
+              className="max-w-40"
+              registration={form.register("default_credit_limit")}
+              error={errors.default_credit_limit}
+            />
+          </div>
+          <p className="text-muted-foreground text-xs">{copy.defaultCreditHint}</p>
+          <div className="flex flex-col gap-1">
+            <TextField
+              id="settings-sales-discount"
+              label={copy.salesDiscount}
+              dir="ltr"
+              inputMode="decimal"
+              className="max-w-24"
+              registration={form.register("max_discount_percent_sales")}
+              error={errors.max_discount_percent_sales}
+            />
+            <p className="text-muted-foreground text-xs">{copy.salesDiscountHint}</p>
+          </div>
         </CardContent>
       </Card>
       <InvitationCard
@@ -367,6 +539,25 @@ export function SettingsForm({ settings }: { settings: DashboardSettings }) {
         value={invitation}
         error={errors.invitation_message?.message}
         onChange={(text) => form.setValue("invitation_message", text, { shouldDirty: true, shouldValidate: true })}
+      />
+      <OrderMessagesCard
+        storeName={settings.name}
+        statuses={notifyStatuses}
+        texts={statusMessages}
+        defaults={statusDefaults}
+        errors={{
+          confirmed: errors.order_status_messages?.confirmed?.message,
+          preparing: errors.order_status_messages?.preparing?.message,
+          out_for_delivery: errors.order_status_messages?.out_for_delivery?.message,
+          delivered: errors.order_status_messages?.delivered?.message,
+          cancelled: errors.order_status_messages?.cancelled?.message,
+          discount: errors.order_status_messages?.discount?.message,
+          edited: errors.order_status_messages?.edited?.message,
+        }}
+        onStatuses={(next) => form.setValue("order_notify_statuses", next, { shouldDirty: true })}
+        onText={(status, text) =>
+          form.setValue(`order_status_messages.${status}`, text, { shouldDirty: true, shouldValidate: true })
+        }
       />
       <div className="bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t p-3 backdrop-blur md:hidden">
         <Button type="submit" className="h-11 w-full" disabled={save.isPending}>

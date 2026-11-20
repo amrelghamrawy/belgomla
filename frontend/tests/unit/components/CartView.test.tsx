@@ -49,6 +49,61 @@ describe("CartView", () => {
     });
   }
 
+  it("D91 shows the same product in two units as two lines, each with its unit", async () => {
+    stubCart(
+      cart({
+        items: [
+          cartItem({
+            sku_unit_id: 601,
+            unit: "قطعة",
+            conversion_factor: 1,
+            quantity: 5,
+            unit_price: "10.00",
+            line_total: "50.00",
+          }),
+          cartItem({
+            sku_unit_id: 602,
+            unit: "كرتونة",
+            conversion_factor: 12,
+            quantity: 2,
+            unit_price: "110.00",
+            line_total: "220.00",
+          }),
+        ],
+        items_total: "270.00",
+      }),
+    );
+    renderWithQuery(<CartView />);
+
+    expect(await screen.findByTestId("cart-unit-601")).toHaveTextContent("الوحدة: قطعة");
+    expect(screen.getByTestId("cart-unit-602")).toHaveTextContent("الوحدة: كرتونة (12)");
+    expect(screen.getAllByRole("link", { name: "الأضواء علوم أولى إعدادي" })).toHaveLength(2);
+  });
+
+  it("BR-P14 shows two colours of one pen as two lines, each naming its variant", async () => {
+    stubCart(
+      cart({
+        items: [
+          cartItem({ sku_id: 11, sku_unit_id: 611, product_name: "قلم جاف", variant: "أزرق" }),
+          cartItem({ sku_id: 12, sku_unit_id: 612, product_name: "قلم جاف", variant: "أسود" }),
+        ],
+      }),
+    );
+    renderWithQuery(<CartView />);
+
+    expect(await screen.findByTestId("cart-variant-611")).toHaveTextContent("أزرق");
+    expect(screen.getByTestId("cart-variant-612")).toHaveTextContent("أسود");
+  });
+
+  it("shows no variant line for a product without options", async () => {
+    stubCart(cart());
+    renderWithQuery(<CartView />);
+
+    await screen.findByTestId("cart-unit-601");
+
+    expect(screen.queryByTestId("cart-variant-601")).not.toBeInTheDocument();
+  });
+
   it("BR-PR04 shows each line priced by the server and the total", async () => {
     stubCart(
       cart({
@@ -89,7 +144,7 @@ describe("CartView", () => {
 
   it("removes a line", async () => {
     const fetchMock = stubCart(cart(), {
-      "DELETE /api/store/cart/items/501": json(200, { data: cart({ items: [] }) }),
+      "DELETE /api/store/cart/items/601": json(200, { data: cart({ items: [] }) }),
     });
     const user = userEvent.setup();
     renderWithQuery(<CartView />);
@@ -97,7 +152,7 @@ describe("CartView", () => {
     await user.click(await screen.findByRole("button", { name: "حذف من السلة: الأضواء علوم أولى إعدادي" }));
 
     expect(await screen.findByText("سلتك فارغة")).toBeInTheDocument();
-    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/501")).toHaveLength(1);
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/601")).toHaveLength(1);
   });
 
   it("D51 a customer who is not active sees why there is no cart", async () => {
@@ -126,7 +181,7 @@ describe("CartView", () => {
 
     it("waits for the taps to stop, then sends one update", async () => {
       const fetchMock = stubCart(cart(), {
-        "PATCH /api/store/cart/items/501": json(200, {
+        "PATCH /api/store/cart/items/601": json(200, {
           data: cart({ items: [cartItem({ quantity: 8, line_total: "720.00" })] }),
         }),
       });
@@ -136,16 +191,16 @@ describe("CartView", () => {
       fireEvent.click(increase);
       fireEvent.click(increase);
       expect(screen.getByRole("spinbutton", { name: "الكمية" })).toHaveValue(8);
-      expect(callsTo(fetchMock, "PATCH /api/store/cart/items/501")).toHaveLength(0);
+      expect(callsTo(fetchMock, "PATCH /api/store/cart/items/601")).toHaveLength(0);
       act(() => vi.advanceTimersByTime(CART_DEBOUNCE_MS));
 
       await waitFor(() => expect(screen.getByText("720.00 ج.م")).toBeInTheDocument());
-      expect(callsTo(fetchMock, "PATCH /api/store/cart/items/501").map((call) => call.body)).toEqual([{ quantity: 8 }]);
+      expect(callsTo(fetchMock, "PATCH /api/store/cart/items/601").map((call) => call.body)).toEqual([{ quantity: 8 }]);
     });
 
     it("goes back to the server's quantity when the update is refused", async () => {
       stubCart(cart(), {
-        "PATCH /api/store/cart/items/501": envelopeError(422, "cart_line_invalid", "الكمية غير متوفرة"),
+        "PATCH /api/store/cart/items/601": envelopeError(422, "cart_line_invalid", "الكمية غير متوفرة"),
       });
       renderWithQuery(<CartView />);
       fireEvent.click(await screen.findByRole("button", { name: "زيادة الكمية" }));
@@ -154,5 +209,129 @@ describe("CartView", () => {
 
       await waitFor(() => expect(screen.getByRole("spinbutton", { name: "الكمية" })).toHaveValue(6));
     });
+  });
+});
+
+describe("CartView pre-orders (BR-O14)", () => {
+  const preorderLine = {
+    ...cartItem({
+      sku_id: 777,
+      sku_unit_id: 777,
+      product_name: "سلاح التلميذ ٢٠٢٧",
+      product_slug: "selah",
+      quantity: 5,
+      available: 0,
+      line_total: "450.00",
+    }),
+    expected_at: "2026-12-01",
+  };
+
+  function stubPreorders(
+    answer = cart({ preorders: { items: [preorderLine], items_total: "450.00" } }),
+    routes: Parameters<typeof stubApi>[0] = {},
+  ) {
+    return stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/cart": json(200, { data: answer }),
+      ...routes,
+    });
+  }
+
+  it("lists the pre-order lines apart with the expected day, their indicative total and their own confirmation", async () => {
+    stubPreorders();
+    renderWithQuery(<CartView />);
+
+    const section = await screen.findByTestId("preorders");
+    expect(section).toHaveTextContent("الحجز المسبق");
+    expect(section).toHaveTextContent("سلاح التلميذ ٢٠٢٧");
+    expect(section).toHaveTextContent("متوقع 1 ديسمبر 2026");
+    expect(screen.getByTestId("preorders-total")).toHaveTextContent("450.00 ج.م");
+    expect(screen.getByRole("link", { name: "تأكيد الحجز" })).toHaveAttribute("href", "/checkout/preorder");
+    expect(screen.getByRole("link", { name: "إتمام الطلب" })).toHaveAttribute("href", "/checkout");
+  });
+
+  it("a cart with only pre-orders is not empty and offers no checkout", async () => {
+    stubPreorders(
+      cart({ items: [], items_total: "0.00", preorders: { items: [preorderLine], items_total: "450.00" } }),
+    );
+    renderWithQuery(<CartView />);
+
+    expect(await screen.findByTestId("preorders")).toBeInTheDocument();
+    expect(screen.queryByText("سلتك فارغة")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "إتمام الطلب" })).not.toBeInTheDocument();
+  });
+
+  it("removes a pre-order line by its kind", async () => {
+    const fetchMock = stubPreorders(undefined, {
+      "DELETE /api/store/cart/items/777": json(200, { data: cart() }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<CartView />);
+
+    await user.click(await screen.findByRole("button", { name: "حذف من السلة: سلاح التلميذ ٢٠٢٧" }));
+
+    await waitFor(() => expect(screen.queryByTestId("preorders")).not.toBeInTheDocument());
+    expect(callsTo(fetchMock, "DELETE /api/store/cart/items/777")[0]?.url.searchParams.get("kind")).toBe("preorder");
+  });
+});
+
+describe("CartView customer prices (BR-PR14)", () => {
+  it("marks a line priced at the customer's negotiated price, not a tier line", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/cart": json(200, {
+        data: cart({
+          items: [
+            cartItem({
+              sku_id: 1,
+              sku_unit_id: 1,
+              product_name: "سعر خاص",
+              unit_price: "70.00",
+              price_source: "customer",
+            }),
+            cartItem({
+              sku_id: 2,
+              sku_unit_id: 2,
+              product_name: "سعر كمية",
+              unit_price: "85.00",
+              tier_min_quantity: 10,
+              price_source: "tier",
+            }),
+          ],
+        }),
+      }),
+    });
+    renderWithQuery(<CartView />);
+
+    await screen.findByRole("link", { name: "سعر خاص" });
+    expect(screen.getAllByTestId("your-price")).toHaveLength(1);
+  });
+});
+
+describe("CartView offers (BR-PR15)", () => {
+  it("shows the offer badge on a line a promotion priced", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/cart": json(200, {
+        data: cart({
+          items: [
+            cartItem({
+              sku_id: 1,
+              sku_unit_id: 1,
+              product_name: "كتاب العرض",
+              unit_price: "76.50",
+              price_source: "promotion",
+              promotion: { id: 4, name: "عرض", discount_percent: "15.00", ends_at: "2030-01-01T00:00:00Z" },
+            }),
+            cartItem({ sku_id: 2, sku_unit_id: 2, product_name: "كتاب عادي" }),
+          ],
+        }),
+      }),
+    });
+    renderWithQuery(<CartView />);
+
+    await screen.findByRole("link", { name: "كتاب العرض" });
+    expect(screen.getAllByTestId("offer-badge")).toHaveLength(1);
+    expect(screen.getByTestId("offer-badge")).toHaveTextContent("عرض 15%");
   });
 });

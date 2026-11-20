@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, withQuery } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/keys";
-import type { Cart } from "@/lib/api/types";
+import type { Cart, CartLineKind } from "@/lib/api/types";
 
 // The server-side cart (BR-CU06). Every write answers with the whole cart priced now (BR-PR04), which
-// replaces the cached one: prices are never computed here (rules/03 §4).
+// replaces the cached one: prices are never computed here (rules/03 §4). A line is an order line or, for a Coming Soon
+// product that takes pre-orders, a pre-order line (BR-O14); `kind` left out means an order line.
 
 /** Only for a logged-in active customer: guests have no cart (pass `enabled: false`). */
 export function useCart(enabled = true) {
@@ -27,19 +28,30 @@ function useCartWrite<T>(write: (input: T) => Promise<Cart>) {
   });
 }
 
+/** A line by its SKU unit (V2 Task 13, D91): one SKU may be in the cart in two units. */
+export type CartLineInput = { sku_unit_id: number; quantity: number; kind?: CartLineKind };
+
 /** Adds to the line's quantity. A guest gets 401 (redirected to login) or 403 `prices_hidden` (D53). */
 export function useAddToCart() {
-  return useCartWrite((line: { sku_id: number; quantity: number }) =>
-    apiFetch<Cart>("/api/store/cart/items", { method: "POST", body: line }),
-  );
+  return useCartWrite((line: CartLineInput) => apiFetch<Cart>("/api/store/cart/items", { method: "POST", body: line }));
 }
 
 export function useUpdateCartItem() {
-  return useCartWrite(({ sku_id, quantity }: { sku_id: number; quantity: number }) =>
-    apiFetch<Cart>(`/api/store/cart/items/${sku_id}`, { method: "PATCH", body: { quantity } }),
+  return useCartWrite(({ sku_unit_id, quantity, kind }: CartLineInput) =>
+    apiFetch<Cart>(`/api/store/cart/items/${sku_unit_id}`, {
+      method: "PATCH",
+      body: kind === undefined ? { quantity } : { quantity, kind },
+    }),
   );
 }
 
+/** Takes an order line out by its SKU unit id, or a pre-order line with `{ sku_unit_id, kind: "preorder" }`. */
 export function useRemoveCartItem() {
-  return useCartWrite((skuId: number) => apiFetch<Cart>(`/api/store/cart/items/${skuId}`, { method: "DELETE" }));
+  return useCartWrite((line: number | { sku_unit_id: number; kind: CartLineKind }) =>
+    typeof line === "number"
+      ? apiFetch<Cart>(`/api/store/cart/items/${line}`, { method: "DELETE" })
+      : apiFetch<Cart>(withQuery(`/api/store/cart/items/${line.sku_unit_id}`, { kind: line.kind }), {
+          method: "DELETE",
+        }),
+  );
 }

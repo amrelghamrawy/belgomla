@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Data;
 
+use App\Modules\Tenancy\Enums\TenantUserRole;
 use App\Modules\Tenancy\Enums\TenantUserStatus;
 use App\Modules\Tenancy\Http\Requests\UpdateTenantUserRequest;
 
@@ -14,6 +15,7 @@ final readonly class TenantUserChanges
         public ?string $name,
         public ?TenantUserStatus $status,
         public ?string $password,
+        public ?TenantUserRole $role = null,
     ) {}
 
     public static function fromRequest(UpdateTenantUserRequest $request): self
@@ -22,6 +24,7 @@ final readonly class TenantUserChanges
             name: $request->name(),
             status: $request->status(),
             password: $request->password(),
+            role: $request->role(),
         );
     }
 

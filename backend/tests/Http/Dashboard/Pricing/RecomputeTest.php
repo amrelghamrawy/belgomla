@@ -7,6 +7,7 @@ use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Pricing\Models\SkuPriceTier;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -15,20 +16,32 @@ beforeEach(function (): void {
 test('BR-PR10 recompute applies the stored percentages to the new cover price, audited', function (): void {
     $product = $this->inTenant(function (): Product {
         $product = Product::factory()->withSku(['cover_price' => '140.00', 'base_price' => '90.00', 'base_price_percent' => '25.00'])->create();
-        SkuPriceTier::factory()->for($product->sku)->percent('30.00')->create(['min_quantity' => 10, 'unit_price' => '84.00']);
+        SkuPriceTier::factory()->percent('30.00')->create(['sku_id' => $product->skus()->sole()->id, 'min_quantity' => 10, 'unit_price' => '84.00']);
 
         return $product;
     });
 
     $this->tenantJson('POST', "/api/dashboard/products/{$product->id}/pricing/recompute")
         ->assertOk()
-        ->assertJsonPath('data.base_price', '105.00')
-        ->assertJsonPath('data.tiers', [['min_quantity' => 10, 'unit_price' => '98.00', 'discount_percent' => '30.00']]);
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.base_price', '105.00')
+        ->assertJsonPath('data.0.tiers', [['min_quantity' => 10, 'unit_price' => '98.00', 'discount_percent' => '30.00']]);
 
     $logs = $this->inTenant(fn () => AuditLog::query()->get());
 
     expect($logs->pluck('action')->sort()->values()->all())->toBe(['sku.price_changed', 'sku.tiers_changed'])
         ->and($logs->pluck('actor_id')->unique()->all())->toBe([$this->me->id]);
+});
+
+test('D91 recompute answers every unit of the product, each off its own cover price', function (): void {
+    $product = $this->inTenant(fn (): Product => Product::factory()->withSku(['cover_price' => '140.00', 'base_price' => '90.00', 'base_price_percent' => '25.00'])->create());
+    $carton = $this->addUnit($this->inTenant(fn () => $product->skus()->sole()), ['cover_price' => '1680.00', 'base_price' => '1000.00', 'base_price_percent' => '20.00']);
+
+    $this->tenantJson('POST', "/api/dashboard/products/{$product->id}/pricing/recompute")
+        ->assertOk()
+        ->assertJsonPath('data.0.base_price', '105.00')
+        ->assertJsonPath('data.1.sku_unit_id', $carton->id)
+        ->assertJsonPath('data.1.base_price', '1344.00');
 });
 
 test('BR-PR10 recompute without a reference price is refused with cover_price_required, named after the section', function (CategoryKind $kind, string $message): void {
@@ -55,5 +68,5 @@ test('BR-T04 recomputing another tenant product is 404 and changes nothing', fun
         ->assertNotFound()
         ->assertJsonPath('error.code', 'not_found');
 
-    $this->assertDatabaseHas('skus', ['product_id' => $foreign->id, 'base_price' => '90.00']);
+    $this->assertDatabaseHas('sku_units', ['sku_id' => DB::table('skus')->where('product_id', $foreign->id)->value('id'), 'base_price' => '90.00']);
 });

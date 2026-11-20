@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Customers\Models;
 
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Carbon\CarbonImmutable;
 use Database\Factories\CartItemFactory;
@@ -13,17 +15,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One SKU in a cart, in selling units (BR-U04), unique per cart. No price is stored (BR-PR06).
+ * One SKU in a cart, in selling units (BR-U04), unique per cart and kind: to order now, or to pre-order (BR-O14).
+ * No price is stored (BR-PR06).
  *
  * @property int $id
  * @property int $tenant_id
  * @property int $cart_id
  * @property int $sku_id
+ * @property int $sku_unit_id
  * @property int $quantity
+ * @property CartLineKind $kind
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Cart $cart
  * @property-read Sku $sku
+ * @property-read SkuUnit $skuUnit
  */
 final class CartItem extends Model
 {
@@ -31,6 +37,10 @@ final class CartItem extends Model
 
     /** @use HasFactory<CartItemFactory> */
     use HasFactory;
+
+    protected $attributes = [
+        'kind' => 'order',
+    ];
 
     protected static function newFactory(): CartItemFactory
     {
@@ -57,12 +67,23 @@ final class CartItem extends Model
     }
 
     /**
+     * The unit of the SKU this line is in (D91).
+     *
+     * @return BelongsTo<SkuUnit, $this>
+     */
+    public function skuUnit(): BelongsTo
+    {
+        return $this->belongsTo(SkuUnit::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
             'quantity' => 'integer',
+            'kind' => CartLineKind::class,
         ];
     }
 }

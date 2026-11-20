@@ -7,7 +7,13 @@ import { cartItem } from "../../fixtures";
 
 const lines = [
   cartItem(),
-  cartItem({ sku_id: 502, product_name: "المعلم رياضيات", product_slug: "المعلم-رياضيات", unit: "نسخة" }),
+  cartItem({
+    sku_id: 502,
+    sku_unit_id: 602,
+    product_name: "المعلم رياضيات",
+    product_slug: "المعلم-رياضيات",
+    unit: "نسخة",
+  }),
 ];
 
 function failed(items: Record<string, unknown>[], details: Record<string, unknown> | null = null) {
@@ -15,11 +21,27 @@ function failed(items: Record<string, unknown>[], details: Record<string, unknow
 }
 
 describe("checkoutFailure", () => {
+  it("D91 matches a problem to the line of its unit when the SKU is in the cart in two units", () => {
+    const twoUnits = [
+      cartItem({ sku_unit_id: 601, unit: "قطعة", conversion_factor: 1 }),
+      cartItem({ sku_unit_id: 603, unit: "كرتونة", conversion_factor: 12 }),
+    ];
+
+    const failure = checkoutFailure(
+      failed([{ sku_id: 501, sku_unit_id: 603, reason: "insufficient_stock", requested: 3, available: 1 }]),
+      twoUnits,
+    );
+
+    expect(failure?.problems).toEqual([
+      expect.objectContaining({ skuId: 501, skuUnitId: 603, message: "المتاح 1 كرتونة فقط" }),
+    ]);
+  });
+
   it("BR-PR06 names each SKU with its reason and links back to its product", () => {
     const failure = checkoutFailure(
       failed([
-        { sku_id: 501, reason: "insufficient_stock", requested: 6, available: 3 },
-        { sku_id: 502, reason: "below_moq", moq: 10 },
+        { sku_id: 501, sku_unit_id: 601, reason: "insufficient_stock", requested: 6, available: 3 },
+        { sku_id: 502, sku_unit_id: 602, reason: "below_moq", moq: 10 },
       ]),
       lines,
     );
@@ -28,19 +50,31 @@ describe("checkoutFailure", () => {
       problems: [
         {
           skuId: 501,
+          skuUnitId: 601,
           productName: "الأضواء علوم أولى إعدادي",
           productSlug: "الأضواء-علوم-أولى-إعدادي",
           message: "المتاح 3 كرتونة فقط",
         },
         {
           skuId: 502,
+          skuUnitId: 602,
           productName: "المعلم رياضيات",
           productSlug: "المعلم-رياضيات",
           message: "الحد الأدنى للطلب 10 نسخة",
         },
       ],
       mov: null,
+      credit: null,
     });
+  });
+
+  it("BR-C05 D78 explains the credit limit with the limit, the balance and the order", () => {
+    expect(
+      checkoutFailure(failed([], { credit: { limit: "1500.00", exposure: "500.00", order_total: "1020.00" } }), lines)
+        ?.credit,
+    ).toBe(
+      "الطلب يتجاوز حد الائتمان: الحد 1,500.00 ج.م، والمستحق عليك حاليًا 500.00 ج.م، وقيمة هذا الطلب 1,020.00 ج.م. تواصل مع المتجر لترتيب السداد.",
+    );
   });
 
   it("BR-P04 explains a product that is no longer active", () => {
@@ -60,6 +94,21 @@ describe("checkoutFailure", () => {
       productName: null,
       productSlug: null,
     });
+  });
+
+  it("BR-O14 explains a pre-order past the cap with what remains, and one that no longer takes pre-orders", () => {
+    const failure = checkoutFailure(
+      failed([
+        { sku_id: 501, reason: "preorder_limit", requested: 6, remaining: 2 },
+        { sku_id: 502, reason: "preorder_unavailable" },
+      ]),
+      lines,
+    );
+
+    expect(failure?.problems.map((problem) => problem.message)).toEqual([
+      "المتبقي للحجز 2 كرتونة فقط",
+      "لم يعد متاحًا للحجز",
+    ]);
   });
 
   it("reads cart_line_invalid the same way", () => {

@@ -14,6 +14,6 @@ final readonly class InventoryRowQuery
 {
     public function get(Sku $sku): Sku
     {
-        return $sku->load(['product', 'inventory']);
+        return $sku->load(['product', 'inventory', 'smallestUnit']);
     }
 }

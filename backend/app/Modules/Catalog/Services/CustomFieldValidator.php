@@ -31,9 +31,10 @@ final readonly class CustomFieldValidator
      * @param  array<array-key, mixed>  $input
      * @param  CategoryKind  $kind  the kind of the product's category
      * @param  array<string, FieldValue>  $current  the product's stored map (empty on create)
+     * @param  bool  $required  whether required fields must be there: not for a bundle (BR-P15, D93), whose fields only help find it
      * @return array<string, FieldValue>
      */
-    public function validate(array $input, CategoryKind $kind, array $current = []): array
+    public function validate(array $input, CategoryKind $kind, array $current = [], bool $required = true): array
     {
         $definitions = $this->definitions();
         $values = [];
@@ -69,7 +70,7 @@ final readonly class CustomFieldValidator
         foreach ($definitions as $key => $definition) {
             $applies = $definition->status === ArchiveStatus::Active && $definition->appliesTo($kind);
 
-            if ($applies && $definition->is_required && ! array_key_exists($key, $values) && ! isset($errors[$key])) {
+            if ($required && $applies && $definition->is_required && ! array_key_exists($key, $values) && ! isset($errors[$key])) {
                 $errors[$key] = 'هذا الحقل مطلوب';
             }
 

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Exceptions\CannotCancel;
 use App\Modules\Orders\Exceptions\InvalidOrderTransition;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderStateMachine;
@@ -57,3 +59,24 @@ test('BR-O01 an invalid move is refused with 409 invalid_transition naming both 
     'out of delivered' => [OrderStatus::Delivered, OrderStatus::Cancelled],
     'out of cancelled' => [OrderStatus::Cancelled, OrderStatus::Confirmed],
 ]);
+
+test('BR-O14 a pre-order is never confirmed or moved on', function (OrderStatus $to): void {
+    expect(fn (): mixed => new OrderStateMachine()->plan(new Order(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending, 'converted_at' => null]), $to))
+        ->toThrow(function (InvalidOrderTransition $e) use ($to): void {
+            expect($e->errorCode)->toBe('invalid_transition')
+                ->and($e->details)->toBe(['from' => 'pending', 'to' => $to->value]);
+        });
+})->with(['confirmed' => [OrderStatus::Confirmed], 'preparing' => [OrderStatus::Preparing], 'out for delivery' => [OrderStatus::OutForDelivery], 'delivered' => [OrderStatus::Delivered]]);
+
+test('BR-O14 an open pre-order can be cancelled, which releases (nothing it holds)', function (): void {
+    $plan = new OrderStateMachine()->plan(new Order(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending, 'converted_at' => null]), OrderStatus::Cancelled);
+
+    expect($plan->timestamps)->toBe(['cancelled_at'])
+        ->and($plan->releasesStock)->toBeTrue()
+        ->and($plan->deductsStock)->toBeFalse();
+});
+
+test('D88 a pre-order converted in full cannot be cancelled', function (): void {
+    expect(fn (): mixed => new OrderStateMachine()->plan(new Order(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending, 'converted_at' => now()]), OrderStatus::Cancelled))
+        ->toThrow(CannotCancel::class, 'تم تحويل هذا الحجز بالكامل إلى طلبات');
+});

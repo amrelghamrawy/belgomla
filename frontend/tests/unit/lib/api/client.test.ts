@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  apiDownload,
   apiFetch,
   apiFetchPage,
+  apiFetchWith,
+  fileNameOf,
   refreshCsrfCookie,
   setUnauthenticatedHandler,
   surfaceOf,
@@ -289,5 +292,71 @@ describe("withQuery", () => {
 
   it("repeats a key for an array", () => {
     expect(withQuery("/x", { id: ["1", "2"] })).toBe("/x?id=1&id=2");
+  });
+});
+
+describe("apiFetchWith", () => {
+  it("keeps the keys next to data when the body is not a page", async () => {
+    stubFetch(json(200, { data: [{ id: 1 }], returnable: [{ order_item_id: 7 }] }));
+
+    await expect(
+      apiFetchWith<{ id: number }[], { returnable: { order_item_id: number }[] }>("/api/dashboard/orders/1/returns"),
+    ).resolves.toEqual({ data: [{ id: 1 }], returnable: [{ order_item_id: 7 }] });
+  });
+
+  it("treats a body without data as server_error", async () => {
+    stubFetch(json(200, { returnable: [] }));
+
+    await expect(apiFetchWith("/api/dashboard/orders/1/returns")).rejects.toMatchObject({ code: "server_error" });
+  });
+});
+
+describe("apiDownload", () => {
+  it("resolves to the attachment with its file name", async () => {
+    const fetchMock = stubFetch(
+      new Response("xlsx-bytes", {
+        status: 200,
+        headers: { "Content-Disposition": "attachment; filename=products-2026-10-20.xlsx" },
+      }),
+    );
+
+    const result = await apiDownload("/api/dashboard/products/export?format=xlsx");
+
+    expect("file" in result && result.file.fileName).toBe("products-2026-10-20.xlsx");
+    expect("file" in result && (await result.file.blob.text())).toBe("xlsx-bytes");
+    expect(requestOf(fetchMock, 0).init.credentials).toBe("include");
+  });
+
+  it("V2 Task 06 resolves to the queued export on 202", async () => {
+    stubFetch(json(202, { data: { id: "e1", download_url: "/api/dashboard/products/export/e1?signature=x" } }));
+
+    await expect(apiDownload("/api/dashboard/products/export")).resolves.toEqual({
+      queued: { id: "e1", download_url: "/api/dashboard/products/export/e1?signature=x" },
+    });
+  });
+
+  it("throws the envelope error and calls the unauthenticated handler on 401", async () => {
+    stubFetch(envelopeError(403, "prices_hidden", "سجّل الدخول لعرض الأسعار"));
+
+    await expect(apiDownload("/api/store/price-list/export")).rejects.toMatchObject({
+      status: 403,
+      code: "prices_hidden",
+    });
+
+    stubFetch(envelopeError(401, "unauthenticated", "يجب تسجيل الدخول"));
+
+    await expect(apiDownload("/api/dashboard/products/export")).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthenticated).toHaveBeenCalledWith("dashboard");
+  });
+});
+
+describe("fileNameOf", () => {
+  it("reads a plain, a quoted and an encoded file name, or falls back", () => {
+    expect(fileNameOf("attachment; filename=a.csv", "x")).toBe("a.csv");
+    expect(fileNameOf('attachment; filename="b.xlsx"', "x")).toBe("b.xlsx");
+    expect(fileNameOf("attachment; filename=c.xlsx; filename*=UTF-8''%D9%82%D8%A7%D8%A6%D9%85%D8%A9.xlsx", "x")).toBe(
+      "قائمة.xlsx",
+    );
+    expect(fileNameOf(null, "download")).toBe("download");
   });
 });

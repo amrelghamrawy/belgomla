@@ -80,5 +80,9 @@ export function applyBranding(settings: TenantSettings, doc: Document = document
     icon.href = settings.favicon_url;
   }
 
-  doc.title = settings.name;
+  // D104: inside the dashboard the shell names each tab after its page (DashboardTitle), so the store name alone
+  // would overwrite it; the storefront keeps the store name.
+  if (!doc.documentElement.classList.contains("dash-theme")) {
+    doc.title = settings.name;
+  }
 }

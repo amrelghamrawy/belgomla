@@ -31,7 +31,7 @@ test('the demo catalog seeds books, supplies, toys, categories, stock and the st
     ]);
     $settings = TenantSetting::query()->whereKey($this->tenant->id)->sole();
 
-    expect($products)->toBe(44)
+    expect($products)->toBe(46)
         ->and($comingSoon)->toBe(1)
         ->and($categories)->toBe(11)
         ->and($stocked)->toBe(43)
@@ -88,7 +88,7 @@ test('the store lists the seeded books with the grade facet', function (): void 
     $response = $this->tenantJson('GET', '/api/store/filters')->assertOk();
 
     expect($response->json('data.0.key'))->toBe('grade')
-        ->and($this->tenantJson('GET', '/api/store/products?per_page=24')->json('meta.total'))->toBe(44);
+        ->and($this->tenantJson('GET', '/api/store/products?per_page=24')->json('meta.total'))->toBe(46);
 });
 
 test('a database with other test data still gets the demo catalog, reusing its units', function (): void {
@@ -96,7 +96,7 @@ test('a database with other test data still gets the demo catalog, reusing its u
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): array => [Product::query()->count(), Unit::query()->count()]))->toBe([44, 3]);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Unit::query()->count()]))->toBe([46, 3]);
 });
 
 test('seeding twice changes nothing', function (): void {
@@ -104,7 +104,7 @@ test('seeding twice changes nothing', function (): void {
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([44, 11, 11]);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([46, 11, 11]);
 });
 
 test('the books read like the publisher describes them, the revision edition as an exam review', function (): void {
@@ -117,4 +117,65 @@ test('the books read like the publisher describes them, the revision edition as 
 
     expect($book)->toBe('كتاب الأضواء في مادة عربي لطلاب أولى إعدادي، الترم الأول، طبعة 2026/2027 مطابقة للمنهج الجديد. يغطي النحو والقراءة والنصوص والقصة والتعبير، مع شرح مبسّط لكل درس، وتدريبات متدرجة من السهل للصعب، ونماذج امتحانات بالإجابات.')
         ->and($revision)->toStartWith('مراجعة ليلة الامتحان في مادة عربي لطلاب أولى إعدادي');
+});
+
+test('D91 the A4 notebook sells by the piece and by the carton of 24, the piece by default', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $units = $this->inTenant(fn (): array => App\Modules\Catalog\Models\SkuUnit::query()
+        ->with('unit')
+        ->whereHas('sku', fn (Illuminate\Database\Eloquent\Builder $sku): Illuminate\Database\Eloquent\Builder => $sku->where('code', 'ST-006'))
+        ->orderBy('sort_order')
+        ->get()
+        ->map(fn (App\Modules\Catalog\Models\SkuUnit $unit): array => [$unit->unit->name, $unit->conversion_factor, $unit->base_price, $unit->cover_price, $unit->moq, $unit->is_default])
+        ->all());
+
+    expect($units)->toBe([
+        ['قطعة', 1, '45.00', '60.00', 6, true],
+        ['كرتونة', 24, '972.00', '1440.00', 1, false],
+    ]);
+});
+
+test('D93 the demo catalog has a grade set of four الأضواء books of أولى إعدادي at 10% off their sum', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $set = $this->inTenant(fn (): App\Modules\Catalog\Models\Sku => App\Modules\Catalog\Models\Sku::query()->with(['product', 'defaultUnit', 'bundleItems.componentUnit.sku', 'inventory'])->where('code', 'SET-DEMO-1')->sole());
+
+    expect($set->product->type)->toBe(App\Modules\Catalog\Enums\ProductType::Bundle)
+        ->and($set->product->name)->toBe('باقة الأضواء أولى إعدادي')
+        ->and($set->product->status)->toBe(ProductStatus::Active)
+        ->and($set->bundleItems->map(fn (App\Modules\Catalog\Models\BundleItem $item): array => [$item->componentUnit->sku->code, $item->quantity])->all())->toBe([['BK-001', 1], ['BK-007', 1], ['BK-010', 1], ['BK-013', 1]])
+        ->and($set->defaultUnit?->base_price)->toBe('367.20')
+        ->and($set->inventory)->toBeNull();
+});
+
+test('BR-P14 the demo catalog has a highlighter in three colours, each its own sku with its own stock', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $skus = $this->inTenant(fn () => Product::query()->where('name', 'قلم هايلايتر فابر كاستل')->sole()->skus()->with('inventory')->get());
+
+    expect($skus->pluck('code')->all())->toBe(['ST-007-1', 'ST-007-2', 'ST-007-3'])
+        ->and($skus->pluck('name')->all())->toBe(['أصفر', 'أخضر', 'وردي'])
+        ->and($skus->pluck('inventory.on_hand')->all())->toBe([600, 400, 200]);
+});
+
+test('D26 every demo product gets a drawn cover as its main image', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    [$products, $images] = $this->inTenant(fn (): array => [
+        Product::query()->count(),
+        App\Modules\Catalog\Models\ProductImage::query()->where('is_main', true)->pluck('path')->all(),
+    ]);
+
+    expect($images)->toHaveCount($products);
+    Illuminate\Support\Facades\Storage::disk('public')->assertExists($images);
+});
+
+test('BR-O14 the Coming Soon demo book takes pre-orders, expected in three weeks', function (): void {
+    $this->seed(StorefrontDemoSeeder::class);
+
+    $book = $this->inTenant(fn (): Product => Product::query()->where('status', ProductStatus::ComingSoon)->sole());
+
+    expect($book->preorder_enabled)->toBeTrue()
+        ->and($book->expected_at?->toDateString())->toBe(now()->addDays(21)->toDateString());
 });

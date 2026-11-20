@@ -10,14 +10,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * The sales report (08-api-contract.md §11, D5 a): the range and grouping it covers, one bucket per day, week
- * (from Saturday, D58) or month with delivered orders and their total, and the totals of the range.
+ * (from Saturday, D58) or month with delivered orders, their gross total, the returns and the net (BR-R05), and the
+ * totals of the range.
  *
- * @property-read array{buckets: list<array{period_start: string, orders: int, total: string}>, orders: int, total: string} $resource
+ * @property-read array{buckets: list<array{period_start: string, orders: int, gross: string, returns: string, net: string}>, orders: int, gross: string, returns: string, net: string} $resource
  */
 final class SalesReportResource extends JsonResource
 {
     /**
-     * @param  array{buckets: list<array{period_start: string, orders: int, total: string}>, orders: int, total: string}  $resource
+     * @param  array{buckets: list<array{period_start: string, orders: int, gross: string, returns: string, net: string}>, orders: int, gross: string, returns: string, net: string}  $resource
      */
     public function __construct(array $resource, private readonly SalesReportData $report)
     {
@@ -36,7 +37,9 @@ final class SalesReportResource extends JsonResource
             'buckets' => $this->resource['buckets'],
             'totals' => [
                 'orders' => $this->resource['orders'],
-                'total' => $this->resource['total'],
+                'gross' => $this->resource['gross'],
+                'returns' => $this->resource['returns'],
+                'net' => $this->resource['net'],
             ],
         ];
     }

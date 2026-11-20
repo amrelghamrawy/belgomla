@@ -4,23 +4,38 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Http\Resources;
 
+use App\Modules\Catalog\Models\BundleItem;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductImage;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
+use App\Modules\Catalog\Services\BundleAvailability;
 use App\Modules\Pricing\Data\TierData;
+use App\Modules\Pricing\Services\BundlePricer;
 use App\Modules\Pricing\Services\PriceResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Dashboard view of a product with its SKU (08-api-contract.md §6). The detail endpoint also loads
+ * Dashboard view of a product with its SKUs (08-api-contract.md §6). `skus` lists every SKU, active and inactive, in the
+ * merchant's order, each with its variant `label`, `status`, `sort_order` and `option_values` (texts in option order, as
+ * the form sends them; BR-P14, V2 Task 14); `options` the variant options with their values and swatches; `sku` is the
+ * first active SKU (else the first), standing for the product in lists. The detail endpoint also loads
  * `images` and `relations`; the list leaves them out. `custom_fields` is the raw stored map
- * (select values are option ids) because the dashboard form edits it. `sku.tiers` (with the % each was
- * entered as) is present when the tiers are loaded, i.e. on the detail, and so is `sku.inventory`
- * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros).
+ * (select values are option ids) because the dashboard form edits it. `sku.units` lists the active units the SKU is
+ * sold in, the default first (V2 Task 13, D91), each with its tiers (with the % each was entered as) when they are
+ * loaded, i.e. on the detail; `selling_unit`, `conversion_factor`, the prices and `moq` next to them are the default
+ * unit's, for the lists. `sku.inventory`
+ * (`on_hand, reserved, available` in base units, BR-INV02; no stock row = zeros). `preorder` holds the pre-order
+ * settings (`enabled`, `expected_at` as Y-m-d, `limit`, D88). `type` is `simple` or `bundle` (BR-P15, V2 Task 15, D93); a
+ * bundle's detail adds `bundle { pricing { mode, value }, components[], components_total, availability }`: each component
+ * with its product, SKU, unit, quantity, base price, stock (`available`, base units) and whether it can be ordered, the
+ * components' sum at their base prices and the bundles that can be made now.
  *
  * @property-read Product $resource
  */
@@ -39,9 +54,14 @@ final class DashboardProductResource extends JsonResource
             'slug' => $product->slug,
             'description' => $product->description,
             'status' => $product->status->value,
+            'type' => $product->type->value,
             'category' => $this->category(),
             'custom_fields' => (object) $product->custom_fields,
-            'sku' => $this->sku(),
+            'preorder' => ['enabled' => $product->preorder_enabled, 'expected_at' => $product->expected_at?->toDateString(), 'limit' => $product->preorder_limit],
+            'sku' => $this->primary(),
+            'skus' => $this->whenLoaded('skus', fn (): array => $product->skus->map(fn (Sku $sku): array => $this->sku($sku))->values()->all(), []),
+            'options' => $this->whenLoaded('options', fn (): array => $product->options->map($this->option(...))->values()->all(), []),
+            'bundle' => $this->when($product->isBundle() && $this->bundleSku() instanceof Sku, fn (): ?array => $this->bundle()),
             'main_image_url' => $this->mainImage()?->url(),
             'images' => $this->whenLoaded('images', fn () => ProductImageResource::collection($product->images)),
             'relations' => $this->when(
@@ -50,6 +70,53 @@ final class DashboardProductResource extends JsonResource
             ),
             'created_at' => $product->created_at->toIso8601String(),
             'updated_at' => $product->updated_at->toIso8601String(),
+        ];
+    }
+
+    /** The bundle's SKU with its components loaded (the detail). */
+    private function bundleSku(): ?Sku
+    {
+        $sku = $this->resource->relationLoaded('skus') ? $this->resource->skus->first() : null;
+
+        return $sku instanceof Sku && $sku->relationLoaded('bundleItems') ? $sku : null;
+    }
+
+    /**
+     * BR-P15, D93: how the bundle is priced, its components and what can be made now.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function bundle(): ?array
+    {
+        $sku = $this->bundleSku();
+
+        if (! $sku instanceof Sku) {
+            return null;
+        }
+
+        $availability = app(BundleAvailability::class);
+        $pricer = app(BundlePricer::class);
+        $pricing = $pricer->pricingOf($sku);
+
+        return [
+            'pricing' => $pricing === null ? null : ['mode' => $pricing->mode->value, 'value' => $pricing->value],
+            'components' => $sku->bundleItems->map(fn (BundleItem $item): array => [
+                'id' => $item->id,
+                'sku_unit_id' => $item->component_sku_unit_id,
+                'sku_id' => $item->componentUnit->sku_id,
+                'product_id' => $item->componentUnit->sku->product_id,
+                'product_name' => $item->componentUnit->sku->product->name,
+                'sku_code' => $item->componentUnit->sku->code,
+                'label' => $item->componentUnit->sku->name,
+                'unit' => $item->componentUnit->unit->name,
+                'conversion_factor' => $item->componentUnit->conversion_factor,
+                'quantity' => $item->quantity,
+                'base_price' => $item->componentUnit->base_price,
+                'available' => $item->componentUnit->sku->inventory->available ?? 0,
+                'orderable' => $availability->orderable($item),
+            ])->values()->all(),
+            'components_total' => $pricer->sum($sku->bundleItems),
+            'availability' => $availability->available($sku),
         ];
     }
 
@@ -71,44 +138,116 @@ final class DashboardProductResource extends JsonResource
     /**
      * @return array<string, mixed>|null
      */
-    private function sku(): ?array
+    private function primary(): ?array
     {
-        $sku = $this->resource->relationLoaded('sku') ? $this->resource->sku : null;
+        $skus = $this->resource->relationLoaded('skus') ? $this->resource->skus : null;
+        $sku = $skus?->first(fn (Sku $sku): bool => $sku->isActive()) ?? $skus?->first();
 
-        if (! $sku instanceof Sku) {
-            return null;
+        return $sku instanceof Sku ? $this->sku($sku) : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function option(ProductOption $option): array
+    {
+        return [
+            'id' => $option->id,
+            'name' => $option->name,
+            'sort_order' => $option->sort_order,
+            'values' => $option->values->map(fn (ProductOptionValue $value): array => [
+                'id' => $value->id,
+                'value' => $value->value,
+                'sort_order' => $value->sort_order,
+                'image_id' => $value->image_id,
+                'image_url' => $value->relationLoaded('image') ? $value->image?->url() : null,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * The SKU's option values in the product's option order (BR-P14).
+     *
+     * @return list<string>
+     */
+    private function optionValues(Sku $sku): array
+    {
+        if (! $sku->relationLoaded('optionValues') || ! $this->resource->relationLoaded('options')) {
+            return [];
         }
+
+        $values = [];
+
+        foreach ($this->resource->options as $option) {
+            $value = $sku->optionValues->firstWhere('product_option_id', $option->id);
+
+            if ($value instanceof ProductOptionValue) {
+                $values[] = $value->value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sku(Sku $sku): array
+    {
+
+        $units = $sku->relationLoaded('activeUnits') ? $sku->activeUnits : null;
+        $default = $units?->firstWhere('is_default', true);
 
         return [
             'id' => $sku->id,
             'code' => $sku->code,
-            'selling_unit' => $this->unit($sku, 'sellingUnit'),
-            'base_unit' => $this->unit($sku, 'baseUnit'),
-            'conversion_factor' => $sku->conversion_factor,
-            'cover_price' => $sku->cover_price,
-            'base_price' => $sku->base_price,
-            'base_price_percent' => $sku->base_price_percent,
-            'moq' => $sku->moq,
-            'tiers' => $this->when($sku->relationLoaded('tiers'), fn (): array => array_map(fn (TierData $tier): array => [
-                'min_quantity' => $tier->minQuantity,
-                'unit_price' => $tier->unitPrice,
-                'discount_percent' => $tier->discountPercent,
-            ], app(PriceResolver::class)->tiers($sku))),
+            'base_unit' => $this->unit($sku->relationLoaded('baseUnit') ? $sku->baseUnit : null),
+            'selling_unit' => $this->unit($default?->relationLoaded('unit') === true ? $default->unit : null),
+            'conversion_factor' => $default?->conversion_factor,
+            'cover_price' => $default?->cover_price,
+            'base_price' => $default?->base_price,
+            'base_price_percent' => $default?->base_price_percent,
+            'moq' => $default?->moq,
+            'units' => $this->when($units !== null, fn (): array => $units?->map($this->skuUnit(...))->values()->all() ?? []),
             'inventory' => $this->when($sku->relationLoaded('inventory'), fn (): array => [
                 'on_hand' => $sku->inventory->on_hand ?? 0,
                 'reserved' => $sku->inventory->reserved ?? 0,
                 'available' => $sku->inventory->available ?? 0,
             ]),
+            'label' => $sku->name,
+            'status' => $sku->status->value,
+            'sort_order' => $sku->sort_order,
+            'option_values' => $this->optionValues($sku),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function skuUnit(SkuUnit $unit): array
+    {
+        return [
+            'id' => $unit->id,
+            'unit' => $this->unit($unit->relationLoaded('unit') ? $unit->unit : null),
+            'conversion_factor' => $unit->conversion_factor,
+            'cover_price' => $unit->cover_price,
+            'base_price' => $unit->base_price,
+            'base_price_percent' => $unit->base_price_percent,
+            'moq' => $unit->moq,
+            'is_default' => $unit->is_default,
+            'tiers' => $this->when($unit->relationLoaded('tiers'), fn (): array => array_map(fn (TierData $tier): array => [
+                'min_quantity' => $tier->minQuantity,
+                'unit_price' => $tier->unitPrice,
+                'discount_percent' => $tier->discountPercent,
+            ], app(PriceResolver::class)->tiers($unit))),
         ];
     }
 
     /**
      * @return array{id: int, name: string}|null
      */
-    private function unit(Sku $sku, string $relation): ?array
+    private function unit(?Unit $unit): ?array
     {
-        $unit = $sku->relationLoaded($relation) ? $sku->getRelation($relation) : null;
-
         return $unit instanceof Unit ? ['id' => $unit->id, 'name' => $unit->name] : null;
     }
 }

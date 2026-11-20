@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace App\Modules\Platform\Services;
 
 use App\Modules\Messaging\Queries\LastPhoneHeartbeatQuery;
+use App\Modules\Messaging\Services\StoreNumberHealth;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 /**
  * The in-app checks behind `platform:monitor` (tasks/11): messaging queue backlog, recently failed jobs,
- * free disk and the SMS phone heartbeat (D49). The per-host `/up` checks run outside PHP, in monitor.sh.
+ * free disk, the SMS phone heartbeat (D49) and wa-gateway (D70). The per-host `/up` checks run outside PHP,
+ * in monitor.sh.
  */
 final readonly class HealthChecks
 {
-    public function __construct(private LastPhoneHeartbeatQuery $heartbeat) {}
+    public function __construct(private LastPhoneHeartbeatQuery $heartbeat, private StoreNumberHealth $storeNumbers) {}
 
     /**
      * @return array<string, string> problem key => Arabic description for the operator
@@ -27,6 +29,7 @@ final readonly class HealthChecks
             'failed_jobs' => $this->failedJobs(),
             'disk' => $this->disk(),
             'sms_heartbeat' => $this->smsHeartbeat(),
+            'wa_gateway' => $this->waGateway(),
         ], fn (?string $problem): bool => $problem !== null);
     }
 
@@ -73,6 +76,19 @@ final readonly class HealthChecks
         return match (true) {
             ! $last instanceof CarbonImmutable => 'هاتف الرسائل النصية لم يرسل أي نبضة بعد',
             $last->lt(now()->subMinutes($max)) => 'هاتف الرسائل النصية بلا نبضة منذ '.$last->toDateTimeString().' UTC',
+            default => null,
+        };
+    }
+
+    /** D70: the gateway is down, or runs fewer open sessions than the store numbers Laravel holds as connected. */
+    private function waGateway(): ?string
+    {
+        $health = $this->storeNumbers->get();
+
+        return match (true) {
+            $health === null => null,
+            ! $health['reachable'] => 'خدمة أرقام واتساب المتاجر (wa-gateway) لا تستجيب: journalctl -u belgomla-wa-gateway',
+            $health['open'] < $health['connected'] => "wa-gateway: {$health['open']} جلسة مفتوحة من {$health['connected']} رقم متجر مربوط",
             default => null,
         };
     }

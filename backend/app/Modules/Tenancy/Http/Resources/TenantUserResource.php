@@ -23,6 +23,7 @@ final class TenantUserResource extends JsonResource
             'name' => $this->resource->name,
             'email' => $this->resource->email,
             'role' => $this->resource->role->value,
+            'role_label' => $this->resource->role->label(),
             'status' => $this->resource->status->value,
             'last_login_at' => $this->resource->last_login_at?->toIso8601String(),
         ];

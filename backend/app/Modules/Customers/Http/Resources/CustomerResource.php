@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Customers\Http\Resources;
 
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerGroup;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -13,7 +14,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * A customer. On the storefront (`GET /me`) the customer sees their own profile and status (BR-CU05). The
  * dashboard (08-api-contract.md §8) adds `outstanding_amount` (OutstandingBalances), who created and approved
- * them, the block details, and on the detail page the addresses and `recent_orders` (RecentOrders).
+ * them, the block details, the credit terms (BR-C05/C06), the customer's group (`group`, null for none; BR-PR12, V2 Task 11)
+ * and on the detail page the addresses and `recent_orders` (RecentOrders).
  *
  * @property-read Customer $resource
  */
@@ -66,13 +68,29 @@ final class CustomerResource extends JsonResource
             'status_label' => $customer->status->label(),
             'phone_verified_at' => $customer->phone_verified_at?->toIso8601String(),
             'created_at' => $customer->created_at->toIso8601String(),
+            'order_notifications' => ! $customer->order_notifications_opt_out,
             'outstanding_amount' => $this->when($dashboard, $this->outstandingAmount),
             'created_by' => $this->when($dashboard, $customer->created_by),
             'approved_by' => $this->when($dashboard, $customer->approved_by),
             'blocked_at' => $this->when($dashboard, $customer->blocked_at?->toIso8601String()),
             'blocked_reason' => $this->when($dashboard, $customer->blocked_reason),
+            'credit_limit' => $this->when($dashboard, $customer->credit_limit),
+            'payment_terms_days' => $this->when($dashboard, $customer->payment_terms_days),
+            'group' => $this->when($dashboard, fn (): ?array => $this->group()),
             'addresses' => $this->when($customer->relationLoaded('addresses'), fn (): AnonymousResourceCollection => AddressResource::collection($customer->addresses)),
             'recent_orders' => $this->when($this->recentOrders !== null, $this->recentOrders),
         ];
+    }
+
+    /**
+     * @return array{id: int, name: string, discount_percent: string, status: string}|null
+     */
+    private function group(): ?array
+    {
+        $group = $this->resource->relationLoaded('group') ? $this->resource->group : null;
+
+        return $group instanceof CustomerGroup
+            ? ['id' => $group->id, 'name' => $group->name, 'discount_percent' => $group->discount_percent, 'status' => $group->status->value]
+            : null;
     }
 }

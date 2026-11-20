@@ -101,3 +101,26 @@ test('late events for an unlinked or refused number change nothing', function (s
     expect($recorded->status)->toBe($connection->status)
         ->and($recorded->updated_at->equalTo($connection->updated_at))->toBeTrue();
 })->with(['disconnected', 'error']);
+
+test('D70 BR-N02 a number that logs out tells the merchants once in the dashboard', function (): void {
+    $connection = $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    recordEvent($connection, closed($connection, 'logged_out', true));
+    recordEvent($connection, closed($connection, 'logged_out', true));
+
+    expect($this->inTenant(fn () => App\Modules\Orders\Models\MerchantNotification::query()->get()->map->only(['type', 'data'])->all()))->toEqual([
+        ['type' => App\Modules\Orders\Enums\NotificationType::WhatsappDropped, 'data' => ['phone' => '+201001234567', 'reason' => 'logged_out']],
+    ]);
+});
+
+test('D70 a close that is not fatal tells nobody', function (): void {
+    $connection = $this->inTenant(fn () => WhatsAppConnection::factory()->connected()->create());
+
+    recordEvent($connection, closed($connection, 'connection_lost', false));
+
+    expect($this->inTenant(fn (): int => App\Modules\Orders\Models\MerchantNotification::query()->count()))->toBe(0);
+});
+
+test('without orders nobody is told about a dropped number', function (): void {
+    expect(fn () => new App\Modules\Messaging\Services\NullConnectionAlerts()->dropped('+201001234567', 'logged_out'))->not->toThrow(Throwable::class);
+});

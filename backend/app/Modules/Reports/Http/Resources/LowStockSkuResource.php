@@ -10,7 +10,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * One SKU of the low-stock report (08-api-contract.md §11, D5 c). Quantities are base units (BR-U03); `threshold`
- * is MOQ × conversion factor (D36) and a SKU without a stock row has 0 available.
+ * is MOQ × conversion factor of the SKU's smallest active unit (D36, V2 Task 13) and a SKU without a stock row has 0
+ * available. Expects `product`, `inventory` and `smallestUnit` loaded.
  *
  * @property-read Sku $resource
  */
@@ -22,6 +23,7 @@ final class LowStockSkuResource extends JsonResource
     public function toArray(Request $request): array
     {
         $sku = $this->resource;
+        $unit = $sku->smallestUnit;
 
         return [
             'sku_id' => $sku->id,
@@ -30,9 +32,9 @@ final class LowStockSkuResource extends JsonResource
             'code' => $sku->code,
             'name' => $sku->name,
             'available' => $sku->inventory->available ?? 0,
-            'moq' => $sku->moq,
-            'conversion_factor' => $sku->conversion_factor,
-            'threshold' => $sku->moq * $sku->conversion_factor,
+            'moq' => $unit?->moq,
+            'conversion_factor' => $unit?->conversion_factor,
+            'threshold' => $unit === null ? 0 : $unit->moq * $unit->conversion_factor,
         ];
     }
 }

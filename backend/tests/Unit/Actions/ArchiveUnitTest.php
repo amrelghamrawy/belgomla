@@ -7,6 +7,7 @@ use App\Modules\Catalog\Actions\ArchiveUnit;
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Exceptions\UnitInUse;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Tenancy\TenantContext;
 
@@ -24,9 +25,11 @@ test('ArchiveUnit archives an unused unit once', function (): void {
         ->and(AuditLog::query()->where('action', 'unit.archived')->count())->toBe(1);
 });
 
-test('ArchiveUnit refuses a unit used by skus and reports how many', function (): void {
+test('D91 ArchiveUnit refuses a unit skus sell in or stock in and reports how many', function (): void {
     $unit = Unit::factory()->create();
-    Sku::factory()->count(2)->create(['selling_unit_id' => $unit->id]);
+    Sku::factory()->create(['selling_unit_id' => $unit->id]);
+    $this->addUnit(Sku::factory()->create(), ['unit_id' => $unit->id]);
+    Sku::factory()->create(['base_unit_id' => $unit->id]);
 
     try {
         app(ArchiveUnit::class)->handle($unit);
@@ -34,10 +37,17 @@ test('ArchiveUnit refuses a unit used by skus and reports how many', function ()
     } catch (UnitInUse $e) {
         expect($e->status)->toBe(409)
             ->and($e->errorCode)->toBe('in_use')
-            ->and($e->details)->toBe(['skus' => 2]);
+            ->and($e->details)->toBe(['skus' => 3]);
     }
 
     expect($unit->refresh()->status)->toBe(ArchiveStatus::Active);
+});
+
+test('D91 ArchiveUnit ignores sku units that are archived', function (): void {
+    $unit = Unit::factory()->create();
+    SkuUnit::factory()->archived()->create(['unit_id' => $unit->id]);
+
+    expect(app(ArchiveUnit::class)->handle($unit)->status)->toBe(ArchiveStatus::Archived);
 });
 
 test('ArchiveUnit ignores skus of another tenant', function (): void {

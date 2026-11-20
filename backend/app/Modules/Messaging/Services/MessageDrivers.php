@@ -24,7 +24,7 @@ use RuntimeException;
  */
 final readonly class MessageDrivers
 {
-    private const array STORE_NUMBER_PURPOSES = [MessagePurpose::Otp, MessagePurpose::Invitation];
+    private const array STORE_NUMBER_PURPOSES = [MessagePurpose::Otp, MessagePurpose::Invitation, MessagePurpose::OrderStatus];
 
     public function __construct(private Container $container, private ConnectedStoreNumberQuery $storeNumber) {}
 

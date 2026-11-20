@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isApiError } from "@/lib/api/errors";
 import { ar, messageFor } from "@/lib/copy/ar";
 
 /** Placeholder rows while a list or card loads. */
@@ -22,6 +23,15 @@ export function LoadingBlock({ rows = 5 }: { rows?: number }) {
 
 /** A failed read, with its Arabic message and a retry. */
 export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  // D82: the role may not open this page; retrying would not help.
+  if (isApiError(error, "forbidden")) {
+    return (
+      <Alert data-testid="forbidden">
+        <AlertDescription>{ar.dashboard.forbidden}</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <Alert variant="destructive">
       <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
@@ -39,7 +49,7 @@ export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () =>
 /** Nothing to show: an icon and the reason. */
 export function EmptyBlock({ children }: { children?: ReactNode }) {
   return (
-    <Empty className="border">
+    <Empty>
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <InboxIcon />
@@ -61,9 +71,11 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="text-xl font-bold md:text-2xl">{title}</h1>
+        <h1 className="font-heading text-foreground text-[1.75rem] leading-tight font-bold md:text-[2.125rem]">
+          {title}
+        </h1>
         {description !== undefined && <div className="text-muted-foreground text-sm">{description}</div>}
       </div>
       {actions !== undefined && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

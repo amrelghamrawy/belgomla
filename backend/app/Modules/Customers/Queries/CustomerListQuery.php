@@ -10,17 +10,27 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
- * Dashboard customer list (08-api-contract.md §8): `q` matches the name or the phone digits, `status` filters,
- * newest first. The outstanding amounts are added by the controller through OutstandingBalances.
+ * Dashboard customer list (08-api-contract.md §8): `q` matches the name or the phone digits, `status` filters, `group`
+ * keeps one customer group's members (V2 Task 11), newest first, each with their group. The outstanding amounts are added
+ * by the controller through OutstandingBalances. AssignCustomersToGroup selects "every customer of this filter" through
+ * builder().
  */
 final readonly class CustomerListQuery
 {
     /**
      * @return LengthAwarePaginator<int, Customer>
      */
-    public function paginate(?string $search, ?CustomerStatus $status, int $perPage): LengthAwarePaginator
+    public function paginate(?string $search, ?CustomerStatus $status, int $perPage, ?int $groupId = null): LengthAwarePaginator
     {
-        $query = Customer::query()->orderByDesc('id');
+        return $this->builder($search, $status, $groupId)->with('group')->orderByDesc('id')->paginate($perPage);
+    }
+
+    /**
+     * @return Builder<Customer>
+     */
+    public function builder(?string $search, ?CustomerStatus $status, ?int $groupId = null): Builder
+    {
+        $query = Customer::query();
 
         if ($search !== null) {
             $this->search($query, $search);
@@ -30,7 +40,11 @@ final readonly class CustomerListQuery
             $query->where('status', $status);
         }
 
-        return $query->paginate($perPage);
+        if ($groupId !== null) {
+            $query->where('customer_group_id', $groupId);
+        }
+
+        return $query;
     }
 
     /**

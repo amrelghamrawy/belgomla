@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
-    Route::get('settings/whatsapp', [StoreWhatsAppController::class, 'show'])->name('settings.whatsapp.show');
-    Route::post('settings/whatsapp', [StoreWhatsAppController::class, 'store'])->name('settings.whatsapp.store');
-    Route::delete('settings/whatsapp', [StoreWhatsAppController::class, 'destroy'])->name('settings.whatsapp.destroy');
+    Route::get('settings/whatsapp', [StoreWhatsAppController::class, 'show'])->middleware('permission:settings.manage')->name('settings.whatsapp.show');
+    Route::post('settings/whatsapp', [StoreWhatsAppController::class, 'store'])->middleware('permission:settings.manage')->name('settings.whatsapp.store');
+    Route::delete('settings/whatsapp', [StoreWhatsAppController::class, 'destroy'])->middleware('permission:settings.manage')->name('settings.whatsapp.destroy');
 });

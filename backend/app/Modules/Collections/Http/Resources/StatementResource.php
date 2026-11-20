@@ -17,7 +17,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 final class StatementResource extends JsonResource
 {
     /**
-     * @param  array{orders_count: int, total: string, collected: string, outstanding: string}  $summary
+     * @param  array{orders_count: int, total: string, collected: string, outstanding: string, credit_limit: string|null, payment_terms_days: int|null, available_credit: string|null, credit_balance: string, overdue: string}  $summary
      */
     public function __construct(Customer $resource, private readonly array $summary)
     {

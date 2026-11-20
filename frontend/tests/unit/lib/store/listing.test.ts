@@ -80,3 +80,14 @@ describe("apiParams", () => {
     });
   });
 });
+
+describe("variant option facets (V2 Task 14)", () => {
+  it("reads and writes an option facet whose key holds a colon and Arabic", () => {
+    const search = listingSearch({ f: { "o:اللون": "ازرق", grade: "7" } });
+    const listing = parseListing(new URLSearchParams(search.slice(1)));
+
+    expect(listing.f).toEqual({ "o:اللون": "ازرق", grade: "7" });
+    expect(apiParams(listing).f).toEqual({ "o:اللون": ["ازرق"], grade: ["7"] });
+    expect(toggleFacet(listing.f, "o:اللون", "ازرق")).toEqual({ grade: "7" });
+  });
+});

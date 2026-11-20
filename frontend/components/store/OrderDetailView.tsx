@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { BundleComponentsList } from "@/components/shared/BundleComponentsList";
 import { StatusPage } from "@/components/shared/StatusPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
+import { changedLineIds, groupOrderLines, liveItems, variantOf } from "@/lib/store/order-lines";
 import { useCancelOrder, useOrder } from "@/lib/store/orders";
 import { useRouteParam } from "@/lib/store/route";
 
@@ -33,7 +35,11 @@ import { AddressText } from "./AddressList";
 
 const REASON_MAX = 300;
 
-/** `/account/orders/[number]`: status history, items, payment status, delivery; cancel while pending (BR-O02). */
+/**
+ * `/account/orders/[number]`: status history, items, returns (BR-R05), payment status, delivery; cancel while pending
+ * (BR-O02). A pre-order (BR-O14) shows where it stands, how much of each line became an order and links to those
+ * orders; an order converted from a pre-order links back to it.
+ */
 export function OrderDetailView() {
   const number = Number(useRouteParam("number"));
   const session = useRequiredCustomer();
@@ -72,19 +78,55 @@ export function OrderDetailView() {
 }
 
 function OrderDetailBody({ order }: { order: OrderDetail }) {
+  const changed = changedLineIds(order);
+  const preorder = order.kind === "preorder";
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-bold">{ar.orders.number(order.number)}</h1>
+          <h1 className="text-xl font-bold">
+            {preorder ? ar.orders.preorderNumber(order.number) : ar.orders.number(order.number)}
+          </h1>
           <p className="text-muted-foreground text-sm">
             {ar.orders.placedAt}: {formatDateTime(order.placed_at)}
           </p>
         </div>
         <Badge variant={order.status === "cancelled" ? "destructive" : "default"} data-testid="order-status">
-          {order.status_label}
+          {order.preorder_state === null ? order.status_label : ar.orders.preorderStates[order.preorder_state]}
         </Badge>
       </div>
+
+      {preorder && order.preorder_state === "open" && (
+        <Alert>
+          <AlertDescription>{ar.orders.preorderPriceNote}</AlertDescription>
+        </Alert>
+      )}
+
+      {order.conversions.length > 0 && (
+        <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="conversions">
+          <span className="font-medium">{ar.orders.convertedTo}:</span>
+          {order.conversions.map((conversion) => (
+            <Link
+              key={conversion.number}
+              href={`/account/orders/${conversion.number}`}
+              className="text-primary underline"
+            >
+              {ar.orders.number(conversion.number)}
+            </Link>
+          ))}
+        </p>
+      )}
+
+      {order.converted_from !== null && (
+        <Link
+          href={`/account/orders/${order.converted_from}`}
+          className="text-primary text-sm underline"
+          data-testid="converted-from"
+        >
+          {ar.orders.convertedFrom(order.converted_from)}
+        </Link>
+      )}
 
       {order.status === "cancelled" && order.cancel_reason && (
         <Alert>
@@ -101,36 +143,139 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
 
       <section aria-labelledby="order-items" className="flex flex-col gap-2">
         <h2 id="order-items" className="font-bold">
-          {ar.orders.items} ({ar.orders.itemsCount(order.items.length)})
+          {ar.orders.items} ({ar.orders.itemsCount(liveItems(order).length)})
         </h2>
         <ul className="flex flex-col divide-y rounded-xl border">
-          {order.items.map((item) => (
-            <li key={item.sku_id} className="flex items-start justify-between gap-3 p-3 text-sm">
+          {groupOrderLines(order.items).map(({ item, components }) => (
+            <li
+              key={item.id}
+              data-testid={`order-line-${item.id}`}
+              className={
+                item.removed_at === null
+                  ? "flex items-start justify-between gap-3 p-3 text-sm"
+                  : "text-muted-foreground flex items-start justify-between gap-3 p-3 text-sm line-through"
+              }
+            >
               <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{item.product_name}</span>
-                <span className="text-muted-foreground">
-                  {ar.orders.quantityOf(item.quantity, item.unit)} × {formatMoney(item.unit_price)}
+                <span className="font-medium">
+                  {item.product_name}
+                  {item.is_bundle && (
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {ar.orders.bundle}
+                    </Badge>
+                  )}
+                  {item.removed_at !== null ? (
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {ar.orders.lineRemoved}
+                    </Badge>
+                  ) : (
+                    changed.has(item.id) && (
+                      <Badge variant="secondary" className="ms-2 text-xs">
+                        {ar.orders.lineChanged}
+                      </Badge>
+                    )
+                  )}
                 </span>
+                {variantOf(item) !== null && (
+                  <span className="text-muted-foreground text-xs" data-testid={`variant-${item.id}`}>
+                    {variantOf(item)}
+                  </span>
+                )}
+                {item.converted_quantity > 0 && (
+                  <span className="text-primary text-xs" data-testid={`converted-${item.id}`}>
+                    {ar.orders.convertedOf(item.converted_quantity, item.quantity, item.unit)}
+                  </span>
+                )}
+                {item.delivered_quantity !== null && item.delivered_quantity < item.quantity && (
+                  <span className="text-destructive text-xs" data-testid={`delivered-${item.id}`}>
+                    {ar.orders.deliveredOf(item.delivered_quantity, item.quantity, item.unit)}
+                  </span>
+                )}
+                <span className="text-muted-foreground">
+                  {ar.orders.quantityOf(item.quantity, item.unit)} ×{" "}
+                  {item.manual_discount !== null && (
+                    <s aria-label={ar.orders.listPrice} data-testid="list-price">
+                      {formatMoney(item.list_unit_price)}
+                    </s>
+                  )}{" "}
+                  {formatMoney(item.unit_price)}
+                </span>
+                <BundleComponentsList bundle={item} components={components} />
               </div>
               <span className="font-medium whitespace-nowrap">{formatMoney(item.line_total)}</span>
             </li>
           ))}
         </ul>
+        {order.discount !== null && (
+          <>
+            <p className="text-muted-foreground flex justify-between text-sm">
+              <span>{ar.orders.itemsTotal}</span>
+              <span>{formatMoney(order.items_total)}</span>
+            </p>
+            <p className="text-muted-foreground flex justify-between text-sm" data-testid="order-discount">
+              <span>{ar.orders.orderDiscount}</span>
+              <span>−{formatMoney(order.discount.amount)}</span>
+            </p>
+          </>
+        )}
         <p className="flex justify-between font-bold">
           <span>{ar.orders.total}</span>
           <span>{formatMoney(order.order_total)}</span>
         </p>
+        {order.returned_total !== "0.00" && (
+          <>
+            <p className="text-muted-foreground flex justify-between text-sm">
+              <span>{ar.orders.returnedTotal}</span>
+              <span>−{formatMoney(order.returned_total)}</span>
+            </p>
+            <p className="flex justify-between font-bold" data-testid="order-net-total">
+              <span>{ar.orders.netTotal}</span>
+              <span>{formatMoney(order.net_total)}</span>
+            </p>
+          </>
+        )}
       </section>
 
-      <section aria-labelledby="order-payment" className="flex flex-col gap-1 text-sm">
-        <h2 id="order-payment" className="font-bold">
-          {ar.orders.collection}
-        </h2>
-        <p>
-          {ar.orders.collectionStatuses[order.collection_status]}
-          {order.collection_status !== "unpaid" && ` · ${ar.orders.collected(formatMoney(order.collected_amount))}`}
-        </p>
-      </section>
+      {order.returns.length > 0 && (
+        <section aria-labelledby="order-returns" className="flex flex-col gap-2">
+          <h2 id="order-returns" className="font-bold">
+            {ar.orders.returns}
+          </h2>
+          <ul className="flex flex-col divide-y rounded-xl border">
+            {order.returns.map((orderReturn) => (
+              <li key={orderReturn.number} className="flex flex-col gap-1 p-3 text-sm">
+                <span className="flex justify-between font-medium">
+                  <span>
+                    {ar.orders.returnNumber(orderReturn.number)} · {formatDateTime(orderReturn.returned_at)}
+                  </span>
+                  <span>{formatMoney(orderReturn.total)}</span>
+                </span>
+                {orderReturn.items.map((item, index) => (
+                  <span key={`${item.sku_code}-${index}`} className="text-muted-foreground">
+                    {item.product_name} · {ar.orders.quantityOf(item.quantity, item.unit)} ×{" "}
+                    {formatMoney(item.unit_price)}
+                  </span>
+                ))}
+                {orderReturn.refund_amount !== "0.00" && (
+                  <span>{ar.orders.refunded(formatMoney(orderReturn.refund_amount))}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {!preorder && (
+        <section aria-labelledby="order-payment" className="flex flex-col gap-1 text-sm">
+          <h2 id="order-payment" className="font-bold">
+            {ar.orders.collection}
+          </h2>
+          <p>
+            {ar.orders.collectionStatuses[order.collection_status]}
+            {order.collection_status !== "unpaid" && ` · ${ar.orders.collected(formatMoney(order.collected_amount))}`}
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="order-delivery" className="flex flex-col gap-1">
         <h2 id="order-delivery" className="font-bold">
@@ -149,7 +294,9 @@ function OrderDetailBody({ order }: { order: OrderDetail }) {
         </section>
       )}
 
-      {order.status === "pending" && <CancelOrderDialog number={order.number} />}
+      {order.status === "pending" && order.preorder_state !== "converted" && (
+        <CancelOrderDialog number={order.number} preorder={preorder} />
+      )}
     </main>
   );
 }
@@ -171,8 +318,8 @@ export function StatusTimeline({ history }: { history: readonly OrderHistoryEntr
   );
 }
 
-/** BR-O02: a pending order can be cancelled by the customer, with a reason. */
-export function CancelOrderDialog({ number }: { number: number }) {
+/** BR-O02: a pending order can be cancelled by the customer, with a reason; so can an open pre-order (BR-O14). */
+export function CancelOrderDialog({ number, preorder = false }: { number: number; preorder?: boolean }) {
   const cancel = useCancelOrder(number);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -199,12 +346,12 @@ export function CancelOrderDialog({ number }: { number: number }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant="outline" className="text-destructive h-11" onClick={() => setOpen(true)}>
-        {ar.orders.cancel}
+        {preorder ? ar.orders.cancelPreorder : ar.orders.cancel}
       </Button>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{ar.orders.cancelTitle}</DialogTitle>
-          <DialogDescription>{ar.orders.cancelBody}</DialogDescription>
+          <DialogTitle>{preorder ? ar.orders.cancelPreorder : ar.orders.cancelTitle}</DialogTitle>
+          <DialogDescription>{preorder ? ar.orders.cancelPreorderBody : ar.orders.cancelBody}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} noValidate className="flex flex-col gap-3">
           <FieldLabel htmlFor="cancel-reason">{ar.orders.cancelReason}</FieldLabel>

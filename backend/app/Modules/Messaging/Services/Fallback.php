@@ -7,6 +7,7 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Messaging\Data\DriverResult;
 use App\Modules\Messaging\Data\FallbackRoute;
 use App\Modules\Messaging\Enums\Channel;
+use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Enums\Provider;
 use App\Modules\Messaging\Models\OutboundMessage;
 
@@ -14,7 +15,7 @@ use App\Modules\Messaging\Models\OutboundMessage;
  * BR-CU07 and D70: the channel order is store number → platform number → SMS. A failed message from the store
  * number is re-sent from the platform number, unless the recipient is not on WhatsApp at all, then it goes
  * straight to SMS. A failed platform WhatsApp message is re-sent as SMS. An SMS failure is final, so the chain
- * always ends.
+ * always ends. Order status messages stop after WhatsApp: they never fall back to SMS (D80).
  */
 final readonly class Fallback
 {
@@ -26,10 +27,12 @@ final readonly class Fallback
             return null;
         }
 
+        $sms = $message->purpose !== MessagePurpose::OrderStatus;
+
         if ($message->provider === Provider::WaGateway && ! $result->notOnWhatsApp) {
             return new FallbackRoute(Channel::WhatsApp, $this->drivers->for(Channel::WhatsApp)->provider());
         }
 
-        return new FallbackRoute(Channel::Sms, $this->drivers->for(Channel::Sms)->provider());
+        return $sms ? new FallbackRoute(Channel::Sms, $this->drivers->for(Channel::Sms)->provider()) : null;
     }
 }

@@ -25,7 +25,7 @@ function cartSku(App\Modules\Tenancy\Models\Tenant $tenant, ProductStatus $statu
             ->state(['name' => 'الأضواء علوم', 'status' => $status])
             ->withSku(['selling_unit_id' => $carton->id, 'conversion_factor' => 20, 'moq' => 5, 'base_price' => '90.00'], onHand: $onHand)
             ->create()
-            ->sku()
+            ->skus()
             ->sole();
         SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10, 'unit_price' => '85.00']);
 
@@ -46,6 +46,7 @@ test('BR-CU06 an empty cart has no items and a zero total', function (): void {
             'removed_items' => [],
             'items_total' => '0.00',
             'mov' => ['enabled' => false, 'amount' => null, 'satisfied' => true],
+            'preorders' => ['items' => [], 'items_total' => '0.00'],
         ]]);
 });
 
@@ -55,13 +56,18 @@ test('BR-CU06 BR-PR04 adding a sku returns the cart with the price resolved for 
         ->assertExactJson(['data' => [
             'items' => [[
                 'sku_id' => $this->sku->id,
+                'sku_unit_id' => $this->defaultUnitId($this->sku),
                 'product_name' => 'الأضواء علوم',
+                'variant' => null,
+                'is_bundle' => false,
                 'product_slug' => $this->sku->product->slug,
                 'unit' => 'كرتونة',
                 'conversion_factor' => 20,
                 'quantity' => 6,
                 'unit_price' => '90.00',
                 'tier_min_quantity' => null,
+                'price_source' => 'base',
+                'promotion' => null,
                 'line_total' => '540.00',
                 'moq' => 5,
                 'available' => 400,
@@ -69,9 +75,10 @@ test('BR-CU06 BR-PR04 adding a sku returns the cart with the price resolved for 
             'removed_items' => [],
             'items_total' => '540.00',
             'mov' => ['enabled' => false, 'amount' => null, 'satisfied' => true],
+            'preorders' => ['items' => [], 'items_total' => '0.00'],
         ]]);
 
-    $this->assertDatabaseHas('cart_items', ['sku_id' => $this->sku->id, 'quantity' => 6]);
+    $this->assertDatabaseHas('cart_items', ['sku_unit_id' => $this->defaultUnitId($this->sku), 'quantity' => 6]);
 });
 
 test('BR-PR04 the tier price applies from its minimum quantity, the base price below it', function (int $quantity, string $unitPrice, ?int $tier, string $lineTotal): void {
@@ -98,7 +105,7 @@ test('BR-MOQ01 a quantity below the moq is refused', function (): void {
     addToCart($this->sku->id, 4)
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'cart_line_invalid')
-        ->assertJsonPath('error.items.0', ['sku_id' => $this->sku->id, 'reason' => 'below_moq', 'moq' => 5]);
+        ->assertJsonPath('error.items.0', ['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'below_moq', 'moq' => 5]);
 
     $this->assertDatabaseCount('cart_items', 0);
 });
@@ -107,7 +114,7 @@ test('BR-INV01 more than the stock is refused, with what is left in selling unit
     addToCart($this->sku->id, 21)
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'cart_line_invalid')
-        ->assertJsonPath('error.items.0', ['sku_id' => $this->sku->id, 'reason' => 'insufficient_stock', 'available' => 20]);
+        ->assertJsonPath('error.items.0', ['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'insufficient_stock', 'available' => 20]);
 });
 
 test('BR-INV01 exactly the stock is accepted', function (): void {
@@ -151,18 +158,18 @@ test('BR-MOV02 the mov check compares the items total after tier pricing', funct
 test('BR-CU06 changing a quantity re-checks it and re-prices the cart', function (): void {
     addToCart($this->sku->id, 5)->assertOk();
 
-    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->sku->id}", ['quantity' => 4])
+    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}", ['quantity' => 4])
         ->assertUnprocessable()
         ->assertJsonPath('error.items.0.reason', 'below_moq');
 
-    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->sku->id}", ['quantity' => 6])
+    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}", ['quantity' => 6])
         ->assertOk()
         ->assertJsonPath('data.items.0.quantity', 6)
         ->assertJsonPath('data.items_total', '540.00');
 });
 
 test('changing or removing a sku that is not in the cart is 404', function (string $method): void {
-    $this->tenantJson($method, "/api/store/cart/items/{$this->sku->id}", ['quantity' => 5])
+    $this->tenantJson($method, "/api/store/cart/items/{$this->defaultUnitId($this->sku)}", ['quantity' => 5])
         ->assertNotFound()
         ->assertJsonPath('error.code', 'not_found');
 })->with(['PATCH', 'DELETE']);
@@ -170,7 +177,7 @@ test('changing or removing a sku that is not in the cart is 404', function (stri
 test('BR-CU06 removing a sku returns the cart without it', function (): void {
     addToCart($this->sku->id, 5)->assertOk();
 
-    $this->tenantJson('DELETE', "/api/store/cart/items/{$this->sku->id}")
+    $this->tenantJson('DELETE', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}")
         ->assertOk()
         ->assertJsonPath('data.items', []);
 });
@@ -217,7 +224,7 @@ test('add-to-cart validation', function (array $body, string $field): void {
 ]);
 
 test('update quantity validation', function (): void {
-    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->sku->id}", ['quantity' => 0])
+    $this->tenantJson('PATCH', "/api/store/cart/items/{$this->defaultUnitId($this->sku)}", ['quantity' => 0])
         ->assertUnprocessable()
         ->assertJsonStructure(['error' => ['details' => ['quantity']]]);
 });
@@ -230,3 +237,75 @@ test('BR-CU05 a customer blocked mid-session loses the cart', function (Customer
         ->assertJsonPath('error.code', $status->value);
     addToCart($this->sku->id, 5)->assertForbidden();
 })->with(['blocked' => [CustomerStatus::Blocked], 'pending approval' => [CustomerStatus::PendingApproval]]);
+
+/*
+| D91 (V2 Task 13): the SKU is also sold by the piece (factor 1, 5.00, MOQ 10).
+*/
+
+test('D91 BR-CU06 a unit is added by sku_unit_id and sits next to the SKU\'s other unit as its own line', function (): void {
+    $piece = $this->addUnit($this->sku, ['conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10]);
+    addToCart($this->sku->id, 6)->assertOk();
+
+    $this->tenantJson('POST', '/api/store/cart/items', ['sku_unit_id' => $piece->id, 'quantity' => 12])
+        ->assertOk()
+        ->assertJsonCount(2, 'data.items')
+        ->assertJsonPath('data.items.1.sku_id', $this->sku->id)
+        ->assertJsonPath('data.items.1.sku_unit_id', $piece->id)
+        ->assertJsonPath('data.items.1.conversion_factor', 1)
+        ->assertJsonPath('data.items.1.line_total', '60.00')
+        ->assertJsonPath('data.items_total', '600.00');
+});
+
+test('D91 BR-CU06 a line is changed and removed by its SKU unit, the other unit left alone', function (): void {
+    $piece = $this->addUnit($this->sku, ['conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10]);
+    addToCart($this->sku->id, 6)->assertOk();
+    $this->tenantJson('POST', '/api/store/cart/items', ['sku_unit_id' => $piece->id, 'quantity' => 12])->assertOk();
+
+    $this->tenantJson('PATCH', "/api/store/cart/items/{$piece->id}", ['quantity' => 20])->assertOk()->assertJsonPath('data.items.1.quantity', 20)->assertJsonPath('data.items.0.quantity', 6);
+    $this->tenantJson('DELETE', "/api/store/cart/items/{$piece->id}")->assertOk()->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.sku_unit_id', $this->defaultUnitId($this->sku));
+});
+
+test('D91 BR-INV01 the pieces asked next to the cartons in the cart must fit what is left', function (): void {
+    $piece = $this->addUnit($this->sku, ['conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10]);
+    addToCart($this->sku->id, 19)->assertOk();
+
+    $this->tenantJson('POST', '/api/store/cart/items', ['sku_unit_id' => $piece->id, 'quantity' => 21])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.items.0', ['sku_id' => $this->sku->id, 'sku_unit_id' => $piece->id, 'reason' => 'insufficient_stock', 'available' => 20]);
+});
+
+test('D91 BR-T04 a SKU unit of another tenant is not found and nothing is written', function (): void {
+    $theirs = cartSku($this->otherTenant());
+
+    $this->tenantJson('POST', '/api/store/cart/items', ['sku_unit_id' => $this->defaultUnitId($theirs), 'quantity' => 5])->assertNotFound();
+
+    $this->assertDatabaseCount('cart_items', 0);
+});
+
+test('BR-P14 two colours of one pen are two lines, each naming its variant', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر'], prices: ['أحمر' => '12.00']);
+    [$blue, $red] = $this->inTenant(fn (): array => Sku::query()->whereIn('code', ['PEN-1', 'PEN-2'])->orderBy('code')->get()->all());
+
+    addToCart($blue->id, 3)->assertOk();
+    addToCart($red->id, 2)
+        ->assertOk()
+        ->assertJsonCount(2, 'data.items')
+        ->assertJsonPath('data.items.*.sku_id', [$blue->id, $red->id])
+        ->assertJsonPath('data.items.*.product_name', ['قلم جاف', 'قلم جاف'])
+        ->assertJsonPath('data.items.*.variant', ['أزرق', 'أحمر'])
+        ->assertJsonPath('data.items.*.line_total', ['30.00', '24.00'])
+        ->assertJsonPath('data.items_total', '54.00');
+});
+
+test('BR-P14 an inactive variant is refused as product_inactive', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    $red = $this->inTenant(fn (): Sku => Sku::query()->where('code', 'PEN-2')->sole());
+    $this->inTenant(fn () => $red->update(['status' => 'inactive']));
+
+    addToCart($red->id, 3)
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'cart_line_invalid')
+        ->assertJsonPath('error.items.0', ['sku_id' => $red->id, 'sku_unit_id' => $this->defaultUnitId($red), 'reason' => 'product_inactive']);
+
+    $this->assertDatabaseCount('cart_items', 0);
+});

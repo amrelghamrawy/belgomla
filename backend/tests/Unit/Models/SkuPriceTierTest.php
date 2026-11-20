@@ -12,7 +12,7 @@ test('to array', function (): void {
     $tier = $this->inTenant(fn () => SkuPriceTier::factory()->create()->fresh());
 
     expect(array_keys($tier->toArray()))->toBe([
-        'id', 'tenant_id', 'sku_id', 'min_quantity', 'unit_price', 'discount_percent', 'created_at', 'updated_at',
+        'id', 'tenant_id', 'min_quantity', 'unit_price', 'discount_percent', 'created_at', 'updated_at', 'sku_unit_id',
     ]);
 });
 
@@ -24,18 +24,18 @@ test('money and percent are 2-decimal strings, the threshold is an integer', fun
         ->and($tier->discount_percent)->toBe('30.00');
 });
 
-test('a tier belongs to its sku and the sku lists its tiers lowest threshold first', function (): void {
-    [$sku, $tier] = $this->inTenant(function (): array {
-        $sku = Sku::factory()->create();
-        SkuPriceTier::factory()->for($sku)->create(['min_quantity' => 50, 'unit_price' => '80.00']);
+test('D91 a tier belongs to its sku unit and the unit lists its tiers lowest threshold first', function (): void {
+    [$unit, $tier] = $this->inTenant(function (): array {
+        $unit = Sku::factory()->create()->defaultUnit;
+        SkuPriceTier::factory()->for($unit)->create(['min_quantity' => 50, 'unit_price' => '80.00']);
 
-        return [$sku, SkuPriceTier::factory()->for($sku)->create(['min_quantity' => 10])];
+        return [$unit, SkuPriceTier::factory()->for($unit)->create(['min_quantity' => 10])];
     });
 
-    $this->inTenant(fn () => $sku->load('tiers'));
+    $this->inTenant(fn () => $unit->load('tiers'));
 
-    expect($this->inTenant(fn () => $tier->sku->is($sku)))->toBeTrue()
-        ->and($sku->tiers->pluck('min_quantity')->all())->toBe([10, 50]);
+    expect($this->inTenant(fn () => $tier->skuUnit->is($unit)))->toBeTrue()
+        ->and($unit->tiers->pluck('min_quantity')->all())->toBe([10, 50]);
 });
 
 test('BR-T03 a tier created in tenant context gets that tenant id', function (): void {
@@ -61,13 +61,25 @@ test('BR-T03 tier queries in context never see another tenant', function (): voi
     expect($this->inTenant(fn () => SkuPriceTier::query()->count()))->toBe(0);
 });
 
-test('BR-PR05 two tiers of one sku cannot share a threshold', function (): void {
+test('BR-PR05 two tiers of one sku unit cannot share a threshold', function (): void {
     $this->inTenant(function (): void {
-        $sku = Sku::factory()->create();
-        SkuPriceTier::factory()->for($sku)->create(['min_quantity' => 10]);
-        SkuPriceTier::factory()->for($sku)->create(['min_quantity' => 10]);
+        $unit = Sku::factory()->create()->defaultUnit;
+        SkuPriceTier::factory()->for($unit)->create(['min_quantity' => 10]);
+        SkuPriceTier::factory()->for($unit)->create(['min_quantity' => 10]);
     });
 })->throws(UniqueConstraintViolationException::class);
+
+test('D91 two units of one sku may share a threshold', function (): void {
+    $count = $this->inTenant(function (): int {
+        $sku = Sku::factory()->create();
+        SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10]);
+        SkuPriceTier::factory()->for($this->addUnit($sku))->create(['min_quantity' => 10]);
+
+        return SkuPriceTier::query()->count();
+    });
+
+    expect($count)->toBe(2);
+});
 
 test('database checks guard the threshold, the price and the percent', function (array $attributes, string $constraint): void {
     expect(fn () => $this->inTenant(fn () => SkuPriceTier::factory()->create($attributes)))

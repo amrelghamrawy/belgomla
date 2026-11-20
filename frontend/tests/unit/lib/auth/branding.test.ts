@@ -49,6 +49,16 @@ describe("applyBranding", () => {
     expect(document.title).toBe("مكتبة النور");
   });
 
+  it("D104 leaves the title to the dashboard, which names each tab after its page", () => {
+    document.title = "الطلبات · مكتبة النور";
+    document.documentElement.classList.add("dash-theme");
+
+    applyBranding(tenantSettings());
+
+    expect(document.title).toBe("الطلبات · مكتبة النور");
+    document.documentElement.classList.remove("dash-theme");
+  });
+
   it("adds the favicon link when the store has one", () => {
     applyBranding(tenantSettings({ favicon_url: "http://alnoor.gomal.test/storage/favicon.png" }));
 

@@ -6,8 +6,10 @@ use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Customers\Models\CustomerInvitation;
 use App\Modules\Customers\Models\CustomerOtp;
+use App\Modules\Customers\Models\CustomerSkuPrice;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,6 +24,8 @@ dataset('customers models', [
     'invitation' => [CustomerInvitation::class],
     'cart' => [Cart::class],
     'cart item' => [CartItem::class],
+    'customer group' => [CustomerGroup::class],
+    'customer sku price' => [CustomerSkuPrice::class],
 ]);
 
 test('BR-CU01 a model created in tenant context gets that tenant id', function (string $model): void {

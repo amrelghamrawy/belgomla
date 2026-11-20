@@ -27,7 +27,7 @@ final readonly class Messenger
     {
         $phone = PhoneNumber::toE164($payload->toPhone) ?? throw InvalidPhoneNumber::for($payload->toPhone);
 
-        $this->limiter->ensurePhoneAllowed($phone);
+        $this->limiter->ensurePhoneAllowed($phone, $payload->purpose);
 
         $message = OutboundMessage::query()->create([
             'uuid' => (string) Str::uuid(),
@@ -37,6 +37,7 @@ final readonly class Messenger
             'provider' => $this->drivers->choose($payload->channel, $payload->purpose)->provider(),
             'status' => MessageStatus::Queued,
             'body' => $payload->text,
+            'order_id' => $payload->orderId,
         ]);
 
         SendMessage::dispatch($message->id)->afterCommit();

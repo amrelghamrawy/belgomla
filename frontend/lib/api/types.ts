@@ -6,6 +6,8 @@ type Schemas = components["schemas"];
 export type ErrorCode = Schemas["ErrorCode"];
 export type ErrorEnvelope = Schemas["ErrorEnvelope"];
 export type Money = Schemas["Money"];
+export type UnitCost = Schemas["UnitCost"];
+export type MerchantAdjustmentReason = Schemas["MerchantAdjustmentReason"];
 export type TenantSettings = Schemas["TenantSettings"];
 export type Customer = Schemas["Customer"];
 export type CustomerLoginRequest = Schemas["CustomerLoginRequest"];
@@ -24,7 +26,12 @@ export type FacetOption = Schemas["FacetOption"];
 export type CustomFieldValue = Schemas["CustomFieldValue"];
 export type PriceTier = Schemas["PriceTier"];
 export type StoreSku = Schemas["StoreSku"];
+/** One unit a SKU is sold in (V2 Task 13, D91). */
+export type StoreSkuUnit = Schemas["StoreSkuUnit"];
 export type StoreProduct = Schemas["StoreProduct"];
+/** A variant option with the values some active SKU uses (V2 Task 14, BR-P14). */
+export type StoreProductOption = Schemas["StoreProductOption"];
+export type PriceRange = Schemas["PriceRange"];
 export type StoreProductDetail = Schemas["StoreProductDetail"];
 export type ProductImage = Schemas["ProductImage"];
 export type RelatedProduct = Schemas["RelatedProduct"];
@@ -65,13 +72,28 @@ export type FieldOption = Schemas["FieldOption"];
 export type FieldRequest = Schemas["FieldRequest"];
 export type DashboardTier = Schemas["DashboardTier"];
 export type DashboardSku = Schemas["DashboardSku"];
+export type DashboardSkuUnit = Schemas["DashboardSkuUnit"];
+export type SkuUnitRequest = Schemas["SkuUnitRequest"];
 export type DashboardProduct = Schemas["DashboardProduct"];
+/** A variant option with every value (V2 Task 14, BR-P14, D92). */
+export type DashboardProductOption = Schemas["DashboardProductOption"];
+export type SkuStatus = Schemas["SkuStatus"];
+export type ProductOptionRequest = Schemas["ProductOptionRequest"];
+export type SkuRequest = Schemas["SkuRequest"];
 export type ProductRelation = Schemas["ProductRelation"];
 export type ProductRequest = Schemas["ProductRequest"];
 export type TierRequest = Schemas["TierRequest"];
 export type PricingRequest = Schemas["PricingRequest"];
 export type ProductFilter = Schemas["ProductFilter"];
 export type BulkStatusResult = Schemas["BulkStatusResult"];
+
+// Catalog import / export (V2 Task 06)
+export type ImportPreview = Schemas["ImportPreview"];
+export type ImportRowError = Schemas["ImportRowError"];
+export type CatalogImport = Schemas["CatalogImport"];
+export type ImportStatus = Schemas["ImportStatus"];
+export type QueuedExport = Schemas["QueuedExport"];
+export type SpreadsheetFormat = "xlsx" | "csv";
 export type SkuPricing = Schemas["SkuPricing"];
 export type BulkPricingRequest = Schemas["BulkPricingRequest"];
 export type BulkPricingResult = Schemas["BulkPricingResult"];
@@ -83,13 +105,35 @@ export type BulkAdjustResult = Schemas["BulkAdjustResult"];
 export type CustomerStatus = Schemas["CustomerStatus"];
 export type DashboardCustomer = Schemas["DashboardCustomer"];
 export type InviteResult = Schemas["InviteResult"];
+
+// Customer groups and negotiated prices (V2 Task 11, BR-PR12..PR14)
+export type PriceSource = Schemas["PriceSource"];
+export type CustomerPriceSource = Schemas["CustomerPriceSource"];
+export type CustomerGroup = Schemas["CustomerGroup"];
+export type CustomerGroupRef = Schemas["CustomerGroupRef"];
+export type CustomerGroupStatus = Schemas["CustomerGroupStatus"];
+
+// Promotions (V2 Task 12, BR-PR15, D90)
+export type Promotion = Schemas["Promotion"];
+export type PromotionStatus = Schemas["PromotionStatus"];
+export type PromotionSummary = Schemas["PromotionSummary"];
+export type PromotionPreview = Schemas["PromotionPreview"];
+export type PromotionRequest = Schemas["PromotionRequest"];
+export type PromotionPatch = Schemas["PromotionPatch"];
+export type CustomerSkuPrice = Schemas["CustomerSkuPrice"];
 export type CollectionStatus = Schemas["CollectionStatus"];
 export type DashboardOrder = Schemas["DashboardOrder"];
 export type DashboardOrderDetail = Schemas["DashboardOrderDetail"];
+export type OrderQuote = Schemas["OrderQuote"];
+export type OrderQuoteLine = Schemas["OrderQuoteLine"];
+export type OrderQuoteRequest = Schemas["OrderQuoteRequest"];
+export type MerchantOrderRequest = Schemas["MerchantOrderRequest"];
 export type DashboardOrderHistoryEntry = Schemas["DashboardOrderHistoryEntry"];
 export type MerchantNotification = Schemas["MerchantNotification"];
 export type Collection = Schemas["Collection"];
-export type StatementOrder = Schemas["StatementOrder"];
+export type Expense = Schemas["Expense"];
+export type ExpenseCategory = Schemas["ExpenseCategory"];
+export type ExpenseCategoryOption = Schemas["ExpenseCategoryOption"];
 export type StatementSummary = Schemas["StatementSummary"];
 export type CustomerRef = Schemas["CustomerRef"];
 export type OverviewReport = Schemas["OverviewReport"];
@@ -98,3 +142,57 @@ export type SalesReport = Schemas["SalesReport"];
 export type OutstandingCustomer = Schemas["OutstandingCustomer"];
 export type LowStockSku = Schemas["LowStockSku"];
 export type AuditLog = Schemas["AuditLog"];
+
+// V2 Task 01 — returns
+export type OrderReturn = Schemas["OrderReturn"];
+export type OrderReturnLine = Schemas["OrderReturnLine"];
+export type ReturnableLine = Schemas["ReturnableLine"];
+export type StoreOrderReturn = Schemas["StoreOrderReturn"];
+
+// V2 Task 02 — credit and statement
+export type LedgerRow = Schemas["LedgerRow"];
+export type LedgerMeta = Schemas["LedgerMeta"];
+export type StoreStatementSummary = Schemas["StoreStatementSummary"];
+export type CustomerCredit = Schemas["CustomerCredit"];
+
+// V2 Task 09 — order editing and partial delivery
+export type OrderItemChange = Schemas["OrderItemChange"];
+export type DashboardOrderItemChange = Schemas["DashboardOrderItemChange"];
+export type OrderLinesRequest = Schemas["OrderLinesRequest"];
+
+// V2 Task 10 — pre-orders
+export type CartLineKind = Schemas["CartLineKind"];
+export type PreorderCartItem = Schemas["PreorderCartItem"];
+export type StorePreorder = Schemas["StorePreorder"];
+export type OrderKind = Schemas["OrderKind"];
+export type PreorderState = Schemas["PreorderState"];
+export type OrderConversion = Schemas["OrderConversion"];
+export type ProductPreorder = Schemas["ProductPreorder"];
+export type PreorderDemand = Schemas["PreorderDemand"];
+export type PreorderDemandCounts = Schemas["PreorderDemandCounts"];
+export type PreorderConversion = Schemas["PreorderConversion"];
+export type DashboardPreorder = Schemas["DashboardPreorder"];
+
+// V2 Task 15 — bundles and grade sets (BR-P15, D93)
+export type ProductType = Schemas["ProductType"];
+export type BundlePricing = Schemas["BundlePricing"];
+export type BundleRequest = Schemas["BundleRequest"];
+export type DashboardBundle = Schemas["DashboardBundle"];
+export type DashboardBundleComponent = Schemas["DashboardBundleComponent"];
+export type StoreBundleComponent = Schemas["StoreBundleComponent"];
+export type BundleReport = Schemas["BundleReport"];
+
+// V2 Task 16 — advanced reports (D94)
+export type ReportName = Schemas["ReportName"];
+export type ProfitAndLossReport = Schemas["ProfitAndLossReport"];
+export type ProfitAndLossFigures = Schemas["ProfitAndLossFigures"];
+export type ProductReportSort = Schemas["ProductReportSort"];
+export type CustomerReportView = Schemas["CustomerReportView"];
+export type SalesAnalyticsReport = Schemas["SalesAnalyticsReport"];
+export type ProductPerformanceRow = Schemas["ProductPerformanceRow"];
+export type CustomerPatternRow = Schemas["CustomerPatternRow"];
+export type ReportMovements = Schemas["ReportMovements"];
+export type InventoryAnalyticsRow = Schemas["InventoryAnalyticsRow"];
+export type InventorySummary = Schemas["InventorySummary"];
+export type ReportAging = Schemas["ReportAging"];
+export type CollectionsReport = Schemas["CollectionsReport"];

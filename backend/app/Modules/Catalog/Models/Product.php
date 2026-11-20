@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\ProductType;
+use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Models\Casts\JsonObject;
 use App\Modules\Catalog\Observers\ProductObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -19,7 +21,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * BR-P01..P04. V1 invariant (app-enforced): exactly one SKU per product.
+ * BR-P01..P04. A product has 1..N SKUs (BR-P02): one without options, one per variant when it has options (BR-P14,
+ * V2 Task 14, D92; `options`, at most two). A Coming Soon product may take pre-orders
+ * (`preorder_enabled`, V2 Task 10, D88). A bundle (`type`, BR-P15, V2 Task 15, D93) has one SKU made of component SKU units
+ * (`Sku::bundleItems`) and no stock of its own.
  *
  * @property int $id
  * @property int $tenant_id
@@ -28,13 +33,18 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $slug
  * @property string|null $description
  * @property ProductStatus $status
+ * @property ProductType $type simple, or a bundle of component SKU units (D93)
  * @property array<string, int|float|string|bool> $custom_fields select values are option ids
+ * @property bool $preorder_enabled customers may pre-order it while it is Coming Soon (BR-P04, BR-O14, D88)
+ * @property CarbonImmutable|null $expected_at the day the merchant expects it, shown on the storefront
+ * @property int|null $preorder_limit at most this many selling units over every open pre-order; null = no cap
  * @property int|null $created_by
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Category $category
  * @property-read Collection<int, Sku> $skus
- * @property-read Sku|null $sku
+ * @property-read Collection<int, Sku> $activeSkus
+ * @property-read Collection<int, ProductOption> $options
  * @property-read Collection<int, ProductImage> $images
  * @property-read ProductImage|null $mainImage
  * @property-read Collection<int, ProductRelation> $relations
@@ -50,7 +60,11 @@ final class Product extends Model
 
     protected $attributes = [
         'status' => 'active',
+        'type' => 'simple',
         'custom_fields' => '{}',
+        'preorder_enabled' => false,
+        'expected_at' => null,
+        'preorder_limit' => null,
     ];
 
     protected static function newFactory(): ProductFactory
@@ -67,21 +81,33 @@ final class Product extends Model
     }
 
     /**
+     * Every SKU (variant) of the product, active and inactive, in the merchant's order (BR-P02, BR-P14).
+     *
      * @return HasMany<Sku, $this>
      */
     public function skus(): HasMany
     {
-        return $this->hasMany(Sku::class);
+        return $this->hasMany(Sku::class)->orderBy('skus.sort_order')->orderBy('skus.id');
     }
 
     /**
-     * The single V1 SKU (BR-P02).
+     * The SKUs that can be shown and ordered (BR-P14).
      *
-     * @return HasOne<Sku, $this>
+     * @return HasMany<Sku, $this>
      */
-    public function sku(): HasOne
+    public function activeSkus(): HasMany
     {
-        return $this->hasOne(Sku::class)->oldestOfMany();
+        return $this->skus()->where('skus.status', SkuStatus::Active);
+    }
+
+    /**
+     * The variant options (D92), in the merchant's order.
+     *
+     * @return HasMany<ProductOption, $this>
+     */
+    public function options(): HasMany
+    {
+        return $this->hasMany(ProductOption::class)->orderBy('sort_order')->orderBy('id');
     }
 
     /**
@@ -120,6 +146,11 @@ final class Product extends Model
         return $this->hasMany(ProductRelation::class, 'related_product_id');
     }
 
+    public function isBundle(): bool
+    {
+        return $this->type === ProductType::Bundle;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -127,7 +158,11 @@ final class Product extends Model
     {
         return [
             'status' => ProductStatus::class,
+            'type' => ProductType::class,
             'custom_fields' => JsonObject::class,
+            'preorder_enabled' => 'boolean',
+            'expected_at' => 'datetime', // a date column: the day only (Y-m-d), *_at columns cast to datetime
+            'preorder_limit' => 'integer',
         ];
     }
 }

@@ -1,20 +1,21 @@
-import { PackageIcon, TrendingUpIcon } from "lucide-react";
+import { BoxesIcon, CalendarClockIcon, PackageIcon, TrendingUpIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 import type { StoreProduct } from "@/lib/api/types";
 import { ar } from "@/lib/copy/ar";
+import { formatDay } from "@/lib/format/date";
 import { formatPercent } from "@/lib/format/money";
+import { isBundle, savingLabel } from "@/lib/store/bundles";
 import { unitSummary } from "@/lib/store/quantity";
 
 import { GeneratedCover } from "./GeneratedCover";
-import { PriceBlock } from "./PriceBlock";
-import { QuickAdd } from "./QuickAdd";
+import { CardPricing } from "./CardPricing";
 
 /**
  * One product in a grid or rail (D67): the photo or a generated cover with the retailer's margin as a badge,
  * name, pack summary, the price panel, and add-to-cart in place. Coming-soon and out-of-stock
- * show as a tag.
+ * show as a tag; a Coming Soon product that takes pre-orders (BR-O14) adds the expected day and books in place.
  */
 export function ProductCard({ product, priority = false }: { product: StoreProduct; priority?: boolean }) {
   const href = `/p/${encodeURIComponent(product.slug)}`;
@@ -22,6 +23,9 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
   const outOfStock = !comingSoon && product.sku?.in_stock === false;
   const pack = product.sku === null ? "" : unitSummary(product.sku);
   const margin = product.prices_hidden === true ? null : (product.sku?.discount_percent ?? null);
+  const preorder = comingSoon && product.preorder?.enabled === true ? product.preorder : null;
+  // BR-P15, D93: a bundle says so and what it saves against its components bought alone.
+  const saving = savingLabel(product);
 
   return (
     <article className="group bg-card hover:border-primary/30 hover:shadow-card flex h-full flex-col overflow-hidden rounded-2xl border transition-[box-shadow,border-color,translate] duration-200 motion-safe:hover:-translate-y-0.5">
@@ -65,24 +69,34 @@ export function ProductCard({ product, priority = false }: { product: StoreProdu
           </Link>
         </h3>
         {comingSoon && <span className="sr-only">{ar.catalog.comingSoon}</span>}
+        {isBundle(product) && (
+          <p className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="bundle-card">
+            <span className="bg-brand-soft text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold">
+              <BoxesIcon className="size-3.5" aria-hidden />
+              {ar.catalog.bundle}
+            </span>
+            {saving !== null && (
+              <span className="bg-highlight text-highlight-foreground rounded-full px-2 py-0.5 font-bold">
+                {saving}
+              </span>
+            )}
+          </p>
+        )}
         {pack && (
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <PackageIcon className="size-3.5 shrink-0" aria-hidden />
             {pack}
           </p>
         )}
-        <div className="bg-brand-soft mt-1 rounded-xl px-2 py-2 sm:px-3 sm:py-2.5">
-          <PriceBlock
-            sku={product.sku}
-            pricesHidden={product.prices_hidden === true}
-            kind={product.category?.kind ?? null}
-            loginNext={href}
-            showMargin={false}
-          />
-        </div>
-        <div className="mt-auto pt-2">
-          <QuickAdd product={product} />
-        </div>
+        {preorder !== null && (
+          <p className="text-primary flex items-center gap-1.5 text-xs font-semibold" data-testid="preorder-note">
+            <CalendarClockIcon className="size-3.5 shrink-0" aria-hidden />
+            {preorder.expected_at === null
+              ? ar.catalog.finalPriceNote
+              : `${ar.catalog.expectedAt(formatDay(preorder.expected_at))} · ${ar.catalog.finalPriceNote}`}
+          </p>
+        )}
+        <CardPricing product={product} href={href} />
       </div>
     </article>
   );

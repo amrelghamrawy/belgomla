@@ -38,23 +38,33 @@ test('BR-CU06 the cart query loads a customer\'s lines oldest first with what pr
     $lines = app(CartQuery::class)->linesOf($customer);
 
     expect($lines->pluck('id')->all())->toBe([$first->id, $second->id])
-        ->and($lines[0]->relationLoaded('sku'))->toBeTrue()
-        ->and(array_keys($lines[0]->sku->getRelations()))->toBe(['product', 'sellingUnit', 'tiers', 'inventory']);
+        ->and($lines[0]->relationLoaded('skuUnit'))->toBeTrue()
+        ->and(array_keys($lines[0]->skuUnit->getRelations()))->toBe(['sku', 'unit', 'tiers'])
+        ->and(array_keys($lines[0]->skuUnit->sku->getRelations()))->toBe(['product', 'inventory', 'defaultUnit', 'bundleItems']);
 });
 
-test('the cart sku query loads the sku with its product, unit, tiers and stock', function (): void {
-    $sku = Product::factory()->withSku(onHand: 5)->create()->sku()->sole();
+test('D91 the cart sku query loads a sku unit with its unit, tiers and its sku\'s product, stock and default unit', function (): void {
+    $sku = Product::factory()->withSku(onHand: 5)->create()->skus()->sole();
 
-    $found = app(CartSkuQuery::class)->find($sku->id);
+    $found = app(CartSkuQuery::class)->find($this->defaultUnitId($sku));
 
-    expect(array_keys($found->getRelations()))->toBe(['product', 'sellingUnit', 'tiers', 'inventory']);
+    expect(array_keys($found->getRelations()))->toBe(['sku', 'unit', 'tiers'])
+        ->and(array_keys($found->sku->getRelations()))->toBe(['product', 'inventory', 'defaultUnit', 'bundleItems']);
+});
+
+test('D91 the cart sku query finds the default unit of a sku, archived units too by id', function (): void {
+    $sku = Product::factory()->withSku()->create()->skus()->sole();
+    $archived = App\Modules\Catalog\Models\SkuUnit::factory()->archived()->create(['sku_id' => $sku->id]);
+
+    expect(app(CartSkuQuery::class)->findDefault($sku->id)->id)->toBe($this->defaultUnitId($sku))
+        ->and(app(CartSkuQuery::class)->find($archived->id)->id)->toBe($archived->id);
 });
 
 test('BR-T04 the cart sku query does not find another tenant\'s sku', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->sku()->sole(), $this->otherTenant());
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->skus()->sole(), $this->otherTenant());
     app(TenantContext::class)->set($this->tenant);
 
-    app(CartSkuQuery::class)->find($foreign->id);
+    app(CartSkuQuery::class)->findDefault($foreign->id);
 })->throws(ModelNotFoundException::class);
 
 test('the customer list is newest first and filters by status', function (): void {
@@ -158,4 +168,26 @@ test('BR-CU08 the settings query reads the store invitation text, null by defaul
     TenantSetting::query()->whereKey($this->tenant->id)->update(['invitation_message' => 'أهلًا {اسم_العميل}']);
 
     expect(app(CurrentTenantSettingsQuery::class)->invitationMessage())->toBe('أهلًا {اسم_العميل}');
+});
+
+test('BR-O11 the cart sku query finds several skus keyed by id, leaving out unknown and other tenants\' ones', function (): void {
+    $a = Product::factory()->withSku()->create()->skus()->sole();
+    $b = Product::factory()->withSku()->create()->skus()->sole();
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku()->create()->skus()->sole(), $this->otherTenant());
+    app(TenantContext::class)->set($this->tenant);
+
+    [$unitA, $unitB, $foreignUnit] = [$this->defaultUnitId($a), $this->defaultUnitId($b), $this->asTenant(App\Modules\Tenancy\Models\Tenant::query()->findOrFail($foreign->tenant_id), fn (): int => $this->defaultUnitId($foreign))];
+
+    $found = app(CartSkuQuery::class)->findMany([$unitB, $unitA, $foreignUnit, 999999]);
+
+    expect($found->keys()->sort()->values()->all())->toBe(collect([$unitA, $unitB])->sort()->values()->all())
+        ->and(array_keys($found->get($unitA)?->getRelations() ?? []))->toBe(['sku', 'unit', 'tiers']);
+});
+
+test('D85 the sales discount cap of the store, null until the owner sets one', function (): void {
+    expect(app(CurrentTenantSettingsQuery::class)->maxDiscountPercentSales())->toBeNull();
+
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['max_discount_percent_sales' => '12.5']);
+
+    expect(app(CurrentTenantSettingsQuery::class)->maxDiscountPercentSales())->toBe('12.50');
 });

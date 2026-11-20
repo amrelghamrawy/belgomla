@@ -26,8 +26,8 @@ test('the merchant lists every order of the store, newest first, with customer a
         ->assertJsonPath('data.1.is_stale', false)
         ->assertJsonPath('meta.total', 2)
         ->assertExactJsonStructure(['data' => ['*' => [
-            'id', 'number', 'status', 'status_label', 'placed_at', 'items_total', 'order_total', 'collection_status', 'collected_amount',
-            'delivery', 'customer_note', 'cancel_reason', 'cancelled_by', 'customer', 'confirmed_at', 'delivered_at', 'cancelled_at', 'is_stale',
+            'id', 'number', 'kind', 'status', 'status_label', 'placed_at', 'preorder_state', 'converted_at', 'items_total', 'discount', 'order_total', 'returned_total', 'net_total', 'collection_status', 'collected_amount',
+            'delivery', 'customer_note', 'cancel_reason', 'cancelled_by', 'customer', 'placed_by', 'placed_by_id', 'confirmed_at', 'delivered_at', 'cancelled_at', 'is_stale', 'expires_at',
         ]], 'links', 'meta']);
 });
 
@@ -49,6 +49,33 @@ test('BR-INV07 the stale threshold is the tenant setting', function (): void {
     $this->inTenant(fn () => $order->forceFill(['placed_at' => now()->subHours(2)])->save());
 
     $this->tenantJson('GET', '/api/dashboard/orders?stale=1')->assertJsonCount(1, 'data')->assertJsonPath('data.0.is_stale', true);
+});
+
+test('D81 with the expiry on, a pending order says when it cancels itself; others and stores without it say null', function (): void {
+    $this->freezeSecond();
+    $pending = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $confirmed = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $this->inTenant(fn () => $confirmed->forceFill(['status' => 'confirmed'])->save());
+
+    $this->tenantJson('GET', '/api/dashboard/orders')->assertJsonPath('data.0.expires_at', null)->assertJsonPath('data.1.expires_at', null);
+
+    TenantSetting::query()->whereKey($this->tenant->id)->update(['pending_expiry_hours' => 48]);
+
+    $this->tenantJson('GET', '/api/dashboard/orders')
+        ->assertJsonPath('data.0.number', $confirmed->number)
+        ->assertJsonPath('data.0.expires_at', null)
+        ->assertJsonPath('data.1.expires_at', $pending->placed_at->addHours(48)->toIso8601String());
+    $this->tenantJson('GET', "/api/dashboard/orders/{$pending->number}")->assertJsonPath('data.expires_at', $pending->placed_at->addHours(48)->toIso8601String());
+});
+
+test('D81 an expired order shows as cancelled by the system, with no actor', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $this->inTenant(fn () => app(App\Modules\Orders\Actions\CancelOrder::class)->handle($order, new App\Modules\Orders\Data\CancelData('انتهت مهلة تأكيد الطلب'), App\Modules\Orders\Enums\CancelledBy::System));
+
+    $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
+        ->assertJsonPath('data.cancelled_by', 'system')
+        ->assertJsonPath('data.history.1.by', 'system')
+        ->assertJsonPath('data.history.1.actor_id', null);
 });
 
 test('the list filters by status, collection status, customer, days and search', function (string $query): void {
@@ -109,6 +136,7 @@ test('BR-T04 the list never shows another tenant\'s orders', function (): void {
 });
 
 test('the merchant opens an order with lines, history, customer and collections', function (): void {
+    $this->freezeSecond();
     $order = $this->placeOrder($this->customer, [$this->sku->id => 12], 'صباحًا');
 
     $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
@@ -147,4 +175,43 @@ test('BR-T04 an order number of another tenant is 404 here', function (): void {
 
 test('Tech §6 a dashboard session of this store is refused on another store\'s host', function (): void {
     $this->tenantJson('GET', '/api/dashboard/orders', tenant: $this->otherTenant())->assertUnauthorized();
+});
+
+test('BR-N03 the order page lists the messages sent about the order', function (): void {
+    Illuminate\Support\Facades\Queue::fake();
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+
+    $this->tenantJson('POST', "/api/dashboard/orders/{$order->number}/transition", ['to' => 'confirmed'])->assertOk();
+
+    $response = $this->tenantJson('GET', "/api/dashboard/orders/{$order->number}")
+        ->assertOk()
+        ->assertJsonCount(1, 'data.messages')
+        ->assertJsonPath('data.messages.0.purpose', 'order_status')
+        ->assertJsonPath('data.messages.0.channel', 'whatsapp')
+        ->assertJsonPath('data.messages.0.status', 'queued');
+
+    expectDocumentedShape($response->json('data.messages.0'), 'OrderMessage');
+});
+
+test('BR-O14 ?kind= keeps the normal orders or the pre-orders only', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 5]);
+    $preorder = $this->placePreorder($this->customer, [$this->preorderableSku()->id => 5]);
+
+    $this->tenantJson('GET', '/api/dashboard/orders?kind=preorder')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.number', $preorder->number)
+        ->assertJsonPath('data.0.kind', 'preorder')
+        ->assertJsonPath('data.0.preorder_state', 'open');
+    $this->tenantJson('GET', '/api/dashboard/orders?kind=order')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.number', $order->number);
+});
+
+test('BR-O14 an unknown kind is refused', function (): void {
+    $this->tenantJson('GET', '/api/dashboard/orders?kind=backorder')
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonValidationErrorFor('kind', 'error.details');
 });

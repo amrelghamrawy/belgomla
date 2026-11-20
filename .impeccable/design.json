@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-19T20:43:02.020Z",
+  "title": "Design System: BelGomla Dashboard",
+  "extensions": {
+    "colorMeta": {
+      "brand-indigo": {
+        "role": "primary",
+        "displayName": "Brand Indigo",
+        "canonical": "oklch(49.2% 0.281 273.9)",
+        "tonalRamp": [
+          "#050031",
+          "#16066d",
+          "#2b0ab4",
+          "#4023f7",
+          "#5e6df8",
+          "#8b9df7",
+          "#bbc8fa",
+          "#e9eefe"
+        ]
+      },
+      "brand-indigo-deep": {
+        "role": "primary",
+        "displayName": "Deep Indigo",
+        "canonical": "oklch(42.8% 0.264 272.9)",
+        "tonalRamp": [
+          "#050033",
+          "#150270",
+          "#2819ad",
+          "#3c30ee",
+          "#5b6cfd",
+          "#889dfb",
+          "#bac8fc",
+          "#e9eefd"
+        ]
+      },
+      "brand-mist": {
+        "role": "primary",
+        "displayName": "Indigo Mist",
+        "canonical": "oklch(95.9% 0.022 294.6)",
+        "tonalRamp": [
+          "#0b0a10",
+          "#24222c",
+          "#403e4a",
+          "#5e5b69",
+          "#817e8c",
+          "#a5a2b0",
+          "#cbc9d2",
+          "#eeeef1"
+        ]
+      },
+      "lavender-ground": {
+        "role": "neutral",
+        "displayName": "Lavender Ground",
+        "canonical": "oklch(97.6% 0.010 267.4)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#222428",
+          "#3d4045",
+          "#5b5e63",
+          "#7d8086",
+          "#a2a4aa",
+          "#c9cace",
+          "#eeeef0"
+        ]
+      },
+      "panel-white": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#808080",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ]
+      },
+      "navy-ink": {
+        "role": "neutral",
+        "displayName": "Navy Ink",
+        "canonical": "oklch(28.9% 0.094 271.1)",
+        "tonalRamp": [
+          "#050821",
+          "#171f4a",
+          "#2e3b71",
+          "#4a5a93",
+          "#6c7db9",
+          "#91a2da",
+          "#bdc9f0",
+          "#e9eefc"
+        ]
+      },
+      "slate-ink": {
+        "role": "neutral",
+        "displayName": "Slate Ink",
+        "canonical": "oklch(55.6% 0.063 269.0)",
+        "tonalRamp": [
+          "#060a1a",
+          "#19223e",
+          "#323e61",
+          "#4f5c82",
+          "#717fa7",
+          "#96a4c9",
+          "#c0cae4",
+          "#ebeef8"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(94.6% 0.014 268.5)",
+        "tonalRamp": [
+          "#0a0b0f",
+          "#21242a",
+          "#3c4047",
+          "#5a5d66",
+          "#7d8089",
+          "#a1a4ad",
+          "#c8cad0",
+          "#edeef0"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field Line",
+        "canonical": "oklch(92.2% 0.018 269.1)",
+        "tonalRamp": [
+          "#090b10",
+          "#21242c",
+          "#3c404a",
+          "#595d68",
+          "#7c808c",
+          "#a0a4af",
+          "#c7cad2",
+          "#edeef1"
+        ]
+      },
+      "row-hover": {
+        "role": "neutral",
+        "displayName": "Row Hover",
+        "canonical": "oklch(98.5% 0.007 268.5)",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232427",
+          "#3e4044",
+          "#5c5d62",
+          "#7e8084",
+          "#a3a4a9",
+          "#c9cacd",
+          "#eeeeef"
+        ]
+      },
+      "ok": {
+        "role": "state",
+        "displayName": "Success Green",
+        "canonical": "oklch(51.2% 0.112 161.7)",
+        "tonalRamp": [
+          "#000f07",
+          "#012c1b",
+          "#0e4c33",
+          "#0e6f4b",
+          "#31956b",
+          "#66b891",
+          "#a4d9bd",
+          "#e1f4ea"
+        ]
+      },
+      "ok-soft": {
+        "role": "state",
+        "displayName": "Mint",
+        "canonical": "oklch(96.9% 0.022 179.2)",
+        "tonalRamp": [
+          "#060d0b",
+          "#1a2724",
+          "#334440",
+          "#51625e",
+          "#738580",
+          "#98a9a5",
+          "#c2cdcb",
+          "#ebefee"
+        ]
+      },
+      "warn": {
+        "role": "state",
+        "displayName": "Amber Ink",
+        "canonical": "oklch(52.5% 0.120 62.7)",
+        "tonalRamp": [
+          "#140800",
+          "#361d04",
+          "#5c3508",
+          "#874d04",
+          "#b26e26",
+          "#d4955b",
+          "#edc19b",
+          "#fbebde"
+        ]
+      },
+      "warn-soft": {
+        "role": "state",
+        "displayName": "Cream",
+        "canonical": "oklch(97.3% 0.038 92.2)",
+        "tonalRamp": [
+          "#0e0b03",
+          "#292411",
+          "#473f28",
+          "#655d45",
+          "#888067",
+          "#aca48d",
+          "#cfcabb",
+          "#f0eee9"
+        ]
+      },
+      "info": {
+        "role": "state",
+        "displayName": "Info Blue",
+        "canonical": "oklch(49.9% 0.216 266.3)",
+        "tonalRamp": [
+          "#010133",
+          "#060971",
+          "#1021af",
+          "#264ad5",
+          "#4472ff",
+          "#7ca1fc",
+          "#b4cafd",
+          "#e8effe"
+        ]
+      },
+      "info-soft": {
+        "role": "state",
+        "displayName": "Ice",
+        "canonical": "oklch(96.5% 0.011 256.7)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#212428",
+          "#3c4046",
+          "#5a5e64",
+          "#7c8187",
+          "#a1a5ab",
+          "#c8cbcf",
+          "#edeef0"
+        ]
+      },
+      "danger": {
+        "role": "state",
+        "displayName": "Signal Red",
+        "canonical": "oklch(58.3% 0.228 28.2)",
+        "tonalRamp": [
+          "#1f0000",
+          "#4a0203",
+          "#7c0205",
+          "#ae1614",
+          "#e92521",
+          "#fa7768",
+          "#fab7ae",
+          "#fee9e6"
+        ]
+      },
+      "danger-soft": {
+        "role": "state",
+        "displayName": "Blush",
+        "canonical": "oklch(96.4% 0.016 22.1)",
+        "tonalRamp": [
+          "#0f0a09",
+          "#2a2121",
+          "#483c3c",
+          "#675a59",
+          "#8a7d7c",
+          "#aea1a0",
+          "#d1c8c8",
+          "#f1eeed"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page title in the page header, from 768px."
+      },
+      "display-phone": {
+        "displayName": "Display (phone)",
+        "purpose": "Page title below 768px."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Stat-card and KPI values, tabular."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel titles."
+      },
+      "nav": {
+        "displayName": "Nav",
+        "purpose": "Sidebar items; 700 when active."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Table cells, lists, BarList rows; the first table cell is 700."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Table heads, KPI labels, hints, stacked-card field labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel",
+        "value": "-14px 17px 40px 4px rgb(112 144 176 / 0.08)",
+        "purpose": "Every resting surface on the ground: panels, tables, sidebar, tab bars, the tool pill, filter panel, KPI tiles, stacked list cards. x mirrored from Horizon for RTL."
+      },
+      {
+        "name": "menu",
+        "value": "-14px 17px 40px 4px rgb(112 144 176 / 0.18)",
+        "purpose": "Popovers and dropdown menus."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 60px -12px rgb(27 37 89 / 0.25)",
+        "purpose": "Dialogs and alert dialogs."
+      },
+      {
+        "name": "tab-active",
+        "value": "0 8px 18px -8px color-mix(in srgb, #422afb 70%, transparent)",
+        "purpose": "Under the open tab only."
+      },
+      {
+        "name": "focus-field",
+        "value": "0 0 0 3px color-mix(in srgb, #422afb 15%, transparent)",
+        "purpose": "Focused input, textarea and native select, with an indigo border."
+      }
+    ],
+    "motion": [
+      {
+        "name": "stat-lift",
+        "value": "translateY(-2px) on hover",
+        "purpose": "A linked stat card rises 2px."
+      },
+      {
+        "name": "details-chevron",
+        "value": "rotate(180deg) on open",
+        "purpose": "The DetailsBlock chevron."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "main-max",
+        "value": "1600px"
+      },
+      {
+        "name": "sidebar-width",
+        "value": "17.5rem"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action of a view.",
+      "html": "<button class=\"ds-btn-primary\">راجع الطلبات المعلقة</button>",
+      "css": ".ds-btn-primary{background:#422afb;color:#fff;height:40px;padding:0 17.6px;border:0;border-radius:14px;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:background .15s}.ds-btn-primary:hover{background:#3311db}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(66 42 251 / .35)}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions.",
+      "html": "<button class=\"ds-btn-outline\">تصفية</button>",
+      "css": ".ds-btn-outline{background:#fff;color:#1b2559;height:40px;padding:0 17.6px;border:1px solid #e0e5f2;border-radius:14px;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer}.ds-btn-outline:hover{background:#f4f7fe}.ds-btn-outline:focus-visible{outline:none;box-shadow:0 0 0 3px rgb(66 42 251 / .35)}"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text, date and select fields.",
+      "html": "<input class=\"ds-input\" placeholder=\"رقم الطلب\" dir=\"rtl\">",
+      "css": ".ds-input{background:#fff;color:#1b2559;height:40px;padding:0 14.4px;border:1px solid #e0e5f2;border-radius:14px;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;font-size:14px;outline:none}.ds-input::placeholder{color:#5f6c94}.ds-input:focus-visible{border-color:#422afb;box-shadow:0 0 0 3px color-mix(in srgb,#422afb 15%,transparent)}"
+    },
+    {
+      "name": "Tabs",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "A white bar of 40px pills; the open one is solid brand.",
+      "html": "<div class=\"ds-tabs\" dir=\"rtl\"><button class=\"ds-tab ds-tab-on\">المبيعات</button><button class=\"ds-tab\">المنتجات</button><button class=\"ds-tab\">التحصيل</button></div>",
+      "css": ".ds-tabs{display:inline-flex;gap:4px;padding:5.6px;background:#fff;border-radius:16px;box-shadow:-14px 17px 40px 4px rgb(112 144 176 / .08);}.ds-tab{height:40px;padding:0 16px;border:0;border-radius:12px;background:transparent;color:#5f6c94;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer}.ds-tab:hover:not(.ds-tab-on){background:#f4f7fe;color:#1b2559}.ds-tab-on{background:#422afb;color:#fff;box-shadow:0 8px 18px -8px color-mix(in srgb,#422afb 70%,transparent)}.ds-tab:focus-visible{outline:2px solid #422afb;outline-offset:2px}"
+    },
+    {
+      "name": "Sidebar Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Active: navy bold text, indigo icon, a 4x36px brand bar on the sidebar's inner edge; no fill.",
+      "html": "<nav class=\"ds-side\" dir=\"rtl\"><a class=\"ds-nav ds-nav-on\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/></svg><span>الرئيسية</span></a><a class=\"ds-nav\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z\"/><path d=\"M3 6h18\"/></svg><span>الطلبات</span></a></nav>",
+      "css": ".ds-side{width:240px;background:#fff;padding:8px 16px;box-shadow:-14px 17px 40px 4px rgb(112 144 176 / .08);}.ds-nav{position:relative;display:flex;align-items:center;gap:14px;height:44px;padding-inline-start:12px;color:#5f6c94;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;font-size:15.2px;font-weight:500;text-decoration:none}.ds-nav:hover{color:#1b2559}.ds-nav-on{color:#1b2559;font-weight:700}.ds-nav-on svg{color:#422afb}.ds-nav-on::after{content:'';position:absolute;inset-inline-end:-16px;top:50%;width:4px;height:36px;transform:translateY(-50%);background:#422afb;border-radius:999px}.ds-nav:focus-visible{outline:2px solid #422afb;outline-offset:2px;border-radius:12px}"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-warn",
+      "description": "Soft tint with same-hue ink; out for delivery is solid brand.",
+      "html": "<div dir=\"rtl\" style=\"display:flex;gap:6px;flex-wrap:wrap\"><span class=\"ds-badge ds-b-warn\">قيد الانتظار</span><span class=\"ds-badge ds-b-info\">مؤكد</span><span class=\"ds-badge ds-b-primary\">قيد التجهيز</span><span class=\"ds-badge ds-b-solid\">خرج للتوصيل</span><span class=\"ds-badge ds-b-ok\">تم التوصيل</span><span class=\"ds-badge ds-b-danger\">غير محصل</span></div>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;height:22.4px;padding:0 10.4px;border-radius:10px;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;font-size:12px;font-weight:700;white-space:nowrap}.ds-b-warn{background:#fff6da;color:#9a5800}.ds-b-info{background:#eff4fb;color:#2a50db}.ds-b-primary{background:#f2efff;color:#422afb}.ds-b-solid{background:#422afb;color:#fff}.ds-b-ok{background:#e6faf5;color:#017a52}.ds-b-danger{background:#feefee;color:#c81414}"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "stat-icon-tile",
+      "description": "Overview tile: a round icon tile, label over figure; a figure needing action turns amber and says so.",
+      "html": "<div dir=\"rtl\" style=\"display:flex;gap:16px;background:#f4f7fe;padding:16px\"><a class=\"ds-stat\" href=\"#\"><span class=\"ds-stat-ic\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z\"/><path d=\"M3 6h18\"/></svg></span><span class=\"ds-stat-tx\"><span class=\"ds-stat-l\">طلبات اليوم</span><span class=\"ds-stat-v\">26</span></span></a><a class=\"ds-stat\" href=\"#\"><span class=\"ds-stat-ic ds-warn\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg></span><span class=\"ds-stat-tx\"><span class=\"ds-stat-l\">طلبات متأخرة</span><span class=\"ds-stat-v\">3</span><span class=\"ds-stat-w\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z\"/><path d=\"M12 9v4M12 17h.01\"/></svg>يحتاج متابعة</span></span></a></div>",
+      "css": ".ds-stat{display:flex;align-items:center;gap:16px;padding:16px 20px;background:#fff;border-radius:20px;box-shadow:-14px 17px 40px 4px rgb(112 144 176 / .08);text-decoration:none;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;transition:transform .15s}.ds-stat:hover{transform:translateY(-2px)}.ds-stat:focus-visible{outline:2px solid #422afb;outline-offset:2px}.ds-stat-ic{display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:999px;background:#f4f7fe;color:#422afb}.ds-stat-ic.ds-warn{background:#fff6da;color:#9a5800}.ds-stat-tx{display:flex;flex-direction:column;gap:4px}.ds-stat-l{color:#5f6c94;font-size:14px}.ds-stat-v{color:#1b2559;font-size:22.4px;font-weight:700;font-variant-numeric:tabular-nums}.ds-stat-w{display:flex;align-items:center;gap:4px;color:#9a5800;font-size:12px;font-weight:700}"
+    },
+    {
+      "name": "Panel Table",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "A list as a white panel: quiet head, bold sticky first column, Money with a muted currency and dimmed zero.",
+      "html": "<div class=\"ds-tbl\" dir=\"rtl\"><table><thead><tr><th>الطلب</th><th>العميل</th><th>الإجمالي</th></tr></thead><tbody><tr><td>#95</td><td>مكتبة النور</td><td>1,050.00 <span class=\"ds-cur\">ج.م</span></td></tr><tr><td>#94</td><td>مكتبة الهدى</td><td class=\"ds-zero\">0.00 <span class=\"ds-cur\">ج.م</span></td></tr></tbody></table></div>",
+      "css": ".ds-tbl{background:#fff;border-radius:20px;padding:8px 12px;box-shadow:-14px 17px 40px 4px rgb(112 144 176 / .08);font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;}.ds-tbl table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.ds-tbl th{height:44px;padding:0 12px;text-align:start;color:#5f6c94;font-size:12px;font-weight:500;border-bottom:1px solid #e9edf7}.ds-tbl td{padding:13.6px 12px;color:#1b2559;font-size:14px;font-weight:500;border-bottom:1px solid color-mix(in srgb,#e9edf7 60%,transparent)}.ds-tbl td:first-child{font-weight:700;position:sticky;inset-inline-start:0;background:#fff}.ds-tbl tbody tr:hover td{background:#f8faff}.ds-cur{color:#5f6c94;font-size:.75em;font-weight:400}.ds-zero{color:#5f6c94;font-weight:400}"
+    },
+    {
+      "name": "BarList",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Ranked horizontal bars: one hue, one scale from zero, text beside the bar, growing from the start edge.",
+      "html": "<ul class=\"ds-bars\" dir=\"rtl\"><li><a href=\"#\"><span class=\"ds-bar-t\"><span>مكتبة الزهراء</span><b>49,640.00 ج.م</b></span><span class=\"ds-track\"><span style=\"width:100%\"></span></span></a></li><li><a href=\"#\"><span class=\"ds-bar-t\"><span>مكتبة الهدى</span><b>38,156.20 ج.م</b></span><span class=\"ds-track\"><span style=\"width:77%\"></span></span></a></li><li><a href=\"#\"><span class=\"ds-bar-t\"><span>ملغى</span><b>15</b></span><span class=\"ds-track\"><span class=\"ds-mut\" style=\"width:30%\"></span></span></a></li></ul>",
+      "css": ".ds-bars{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;width:320px;font-family:'DM Sans','IBM Plex Sans Arabic',system-ui,sans-serif;}.ds-bars a{display:flex;flex-direction:column;gap:4px;padding:6px 8px;border-radius:12px;color:#1b2559;text-decoration:none}.ds-bars a:hover{background:#f4f7fe}.ds-bars a:focus-visible{outline:2px solid #422afb}.ds-bar-t{display:flex;justify-content:space-between;font-size:14px}.ds-bar-t b{font-weight:600;font-variant-numeric:tabular-nums}.ds-track{display:block;height:8px;background:#f4f7fe;border-radius:999px;overflow:hidden}.ds-track span{display:block;height:100%;background:#422afb;border-radius:999px}.ds-track .ds-mut{background:rgb(100 114 153 / .4)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Daylight Back Office",
+    "overview": "The dashboard is a bright, calm workroom: white panels floating on a cool lavender ground, one saturated indigo that marks where you are and what to press, and navy ink for everything worth reading. It is BelGomla's platform identity (D104), worn the same way by every merchant; the tenant contributes only its name and logo in the sidebar and top bar, never its colours. The look is taken from the MIT-licensed Figma community file *Horizon UI Free* (Chakra source: horizon-ui/horizon-ui-chakra), which the product owner pinned as the reference after a first \"carbon invoice book\" direction was built and discarded.\n\nDensity is moderate and even: 40px controls, 20px panel corners, 16px to 24px gaps. The same screens serve an owner on a phone and staff at a desk, so lists turn into stacked cards below 768px and the first column of a wide table stays put while the rest scrolls. Reports lead with a chart and fold their long tables underneath. Every warning is said in words and an icon, not colour alone.\n\nThe system departs from Horizon in two deliberate places. The muted ink and the state inks are darker than the reference so they pass WCAG AA on their tints. Headings keep zero letter-spacing because negative tracking breaks Arabic letter joining. The storefront is out of scope: it keeps its own D67 identity under `.store-theme` and is not described here.",
+    "keyCharacteristics": [
+      "Cool lavender ground, white borderless panels, one soft ambient shadow.",
+      "A single brand hue (indigo) for the active place, the primary action, chart marks and links.",
+      "Navy ink for text and figures; slate ink for labels, meta and axes.",
+      "Soft-tint status badges, each a light wash with a readable ink of the same hue.",
+      "DM Sans for Latin and figures, IBM Plex Sans Arabic for Arabic, tabular numbers in tables.",
+      "Phone-ready lists (`<Table stack>`) and chart-first reports."
+    ],
+    "rules": [
+      {
+        "name": "The One Hue Rule",
+        "body": "Indigo is the only accent. Charts with one series use it alone; a second series is either slate (previous period, dashed) or red (returns). The extra chart tokens defined in the theme (sky, violet, coral) are not used and need a decision before they are.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tint-and-Ink Rule",
+        "body": "A status is a pale wash with a dark ink of the same hue and a word inside it. \"On the road\" is the one solid badge (indigo with white), because it is the state in motion.",
+        "section": "colors"
+      },
+      {
+        "name": "The Platform Not Tenant Rule",
+        "body": "The dashboard's colours come from `.dash-theme` only. A tenant's brand colours never reach the dashboard; its logo and name do.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Tracking Rule",
+        "body": "No negative letter-spacing anywhere; it breaks Arabic joining. Horizon's tight headings are reproduced with weight and size only.",
+        "section": "typography"
+      },
+      {
+        "name": "The Exact Money Rule",
+        "body": "Amounts in tables and lists use the Money component: tabular figures, the currency «ج.م» at 0.75em in slate, and a zero amount dimmed to slate at normal weight, so the rows that carry money stand out. The text stays «1,250.50 ج.م» for screen readers and copy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Borderless Panel Rule",
+        "body": "Panels have no border. Separation comes from the white-on-lavender step and the panel shadow; hairlines appear only inside a panel (header rule, row rules).",
+        "section": "elevation"
+      },
+      {
+        "name": "The Lift-on-Hover Rule",
+        "body": "A stat card that is a link rises 2px on hover; nothing else moves.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put every surface on the lavender ground (#f4f7fe) as a white, borderless panel with 20px corners and the Panel shadow.",
+      "Do keep indigo (#422afb) for the one active place, the primary action, links and single-series chart marks; deepen to #3311db on hover.",
+      "Do show status as a soft tint with same-hue ink and a word, using the five tones (warn, info, primary, ok, danger).",
+      "Do say a warning in words and an icon («يحتاج متابعة» with a warning glyph), never by colour alone.",
+      "Do render amounts in tables and lists with the Money component, and use tabular figures in every table.",
+      "Do mark every dashboard list `<Table stack>` so it becomes cards below 768px, and keep the first column the row's name.",
+      "Do lead a report with KPI tiles and a chart, and fold its long table under a DetailsBlock.",
+      "Do mirror physical shadow offsets and chart axes for RTL: shadow x is negative, time runs right to left, the value axis sits on the right."
+    ],
+    "donts": [
+      "Don't use negative letter-spacing on any text; it breaks Arabic joining.",
+      "Don't lighten the slate ink or the state inks back to Horizon's values; they were darkened for WCAG AA.",
+      "Don't let a tenant's colours into the dashboard theme; only its name and logo appear.",
+      "Don't add borders to panels or give a table inside a card its own shadow.",
+      "Don't reference `var(--font-dm)` in a font stack; name \"DM Sans\" directly so Arabic falls through to IBM Plex Sans Arabic.",
+      "Don't apply this system to the storefront, which keeps its D67 identity (`.store-theme`)."
+    ]
+  }
+}

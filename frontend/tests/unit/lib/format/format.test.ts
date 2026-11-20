@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { formatClock, formatDate, formatDateTime } from "@/lib/format/date";
-import { formatMoney, formatPercent } from "@/lib/format/money";
+import { formatClock, formatDate, formatDateTime, formatDay } from "@/lib/format/date";
+import { formatMoney, formatPercent, formatUnitCost } from "@/lib/format/money";
 import { phoneField } from "@/lib/forms/phone";
 import { formatPhone, whatsappLink } from "@/lib/format/phone";
 
@@ -21,6 +21,21 @@ describe("formatMoney", () => {
   });
 });
 
+describe("formatUnitCost", () => {
+  it.each([
+    ["5.5000", "5.50 ج.م"],
+    ["4.1667", "4.1667 ج.م"],
+    ["0.0025", "0.0025 ج.م"],
+    ["1234.5000", "1,234.50 ج.م"],
+  ])("D96 a %s per base unit shows as %s, the last two decimals only when not zero", (cost, expected) => {
+    expect(formatUnitCost(cost)).toBe(expected);
+  });
+
+  it("refuses anything that is not a 4-decimal cost", () => {
+    expect(() => formatUnitCost("5.50")).toThrow(RangeError);
+  });
+});
+
 describe("formatDate", () => {
   it("shows the Cairo date, one hour later in summer time", () => {
     expect(formatDate("2026-07-01T21:30:00Z")).toBe("2 يوليو 2026");
@@ -32,6 +47,16 @@ describe("formatDate", () => {
 
   it("rejects an invalid date", () => {
     expect(() => formatDate("yesterday")).toThrow(RangeError);
+  });
+});
+
+describe("formatDay", () => {
+  it("shows a calendar day as it is, with no time zone shift", () => {
+    expect(formatDay("2026-12-01")).toBe("1 ديسمبر 2026");
+  });
+
+  it("refuses something that is not a day", () => {
+    expect(() => formatDay("soon")).toThrow(RangeError);
   });
 });
 

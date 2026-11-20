@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, type FieldErrors, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api/errors";
@@ -32,22 +33,41 @@ import {
   productDefaults,
   type ProductFormValues,
   productSchema,
-  SERVER_FIELDS,
+  serverFields,
+  serverTierProblems,
+  serverVariantTierProblems,
+  type UnitFormValues,
 } from "@/lib/dashboard/product-form";
 import { useRecomputePricing } from "@/lib/dashboard/pricing";
 
 import { CategoryPicker } from "../common/CategoryPicker";
 import { LabelText } from "../common/LabelText";
 import { ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { BundleForm } from "./BundleEditor";
 import { CustomFieldInputs } from "./CustomFieldInputs";
 import { ProductImages } from "./ProductImages";
 import { ProductRelations } from "./ProductRelations";
-import { PriceInput } from "./PriceInput";
-import { TiersEditor } from "./TiersEditor";
+import { PreorderPanel } from "./PreorderPanel";
+import { ProductOptionsEditor } from "./ProductOptionsEditor";
+import { SkuUnitsEditor } from "./SkuUnitsEditor";
+import { VariantsEditor } from "./VariantsEditor";
 
 const copy = ar.dashboard.productForm;
 const STATUSES: ProductStatus[] = ["active", "coming_soon", "inactive"];
 type Tab = "basics" | "fields" | "pricing" | "images" | "relations";
+
+/** The tab holding the first invalid field: the SKU's units, the options and the variants are on «التسعير». */
+function tabOf(errors: FieldErrors<ProductFormValues>): Tab {
+  const basics = ["name", "category_id", "code", "base_unit_id", "opening_stock", "expected_at", "preorder_limit"];
+
+  if (basics.some((name) => name in errors)) {
+    return "basics";
+  }
+
+  return errors.units !== undefined || errors.options !== undefined || errors.variants !== undefined
+    ? "pricing"
+    : "basics";
+}
 
 /** Loads what the form needs (the product on edit, fields, units, categories) and renders it. */
 export function ProductEditor({ productId }: { productId?: number }) {
@@ -68,6 +88,18 @@ export function ProductEditor({ productId }: { productId?: number }) {
     (productId !== undefined && product.data === undefined)
   ) {
     return <LoadingBlock rows={8} />;
+  }
+
+  // BR-P15, D93: a bundle has its own editor (the product payload refuses it with 409 is_bundle).
+  if (product.data?.type === "bundle") {
+    return (
+      <BundleForm
+        key={`${product.data.id}-${product.data.updated_at}`}
+        product={product.data}
+        units={units.data}
+        categories={categories.data}
+      />
+    );
   }
 
   return (
@@ -94,43 +126,85 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   const save = useSaveProduct();
   const creating = product === null;
   const [tab, setTab] = useState<Tab>("basics");
-  const [tierErrors, setTierErrors] = useState<Record<number, string>>({});
+  const [tierErrors, setTierErrors] = useState<Record<number, Record<number, string>>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [serverTierProblems, setServerTierProblems] = useState<string[]>([]);
+  const [serverTiers, setServerTiers] = useState<Record<number, string[]>>({});
+  // V2 Task 14: the same per variant, and which variant rows show their units and prices.
+  const [variantTierErrors, setVariantTierErrors] = useState<Record<number, Record<number, Record<number, string>>>>(
+    {},
+  );
+  const [variantServerTiers, setVariantServerTiers] = useState<Record<number, Record<number, string[]>>>({});
+  const [openVariants, setOpenVariants] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: productDefaults(product),
   });
   const errors = form.formState.errors;
-  const [coverPrice, baseMode, baseValue, categoryId] = useWatch({
-    control: form.control,
-    name: ["cover_price", "base_mode", "base_value", "category_id"],
-  });
+  const categoryId = useWatch({ control: form.control, name: "category_id" });
+  const hasOptions = useWatch({ control: form.control, name: "options" }).length > 0;
   // The chosen category's section (D68): names the reference price and picks the custom fields (D69).
   const kind = kindOfCategory(categories, categoryId === "" ? null : Number(categoryId));
   const referenceLabel = ar.product.referencePrice(kind);
   const tierMessages = { ...copy.tierErrors, percentNeedsCover: copy.tierErrors.percentNeedsCover(referenceLabel) };
-  const cover = coverPrice.trim() === "" ? null : coverPrice.trim();
-  const basePrice =
-    baseMode === "percent" ? (cover === null ? null : priceFromPercent(cover, baseValue)) : baseValue.trim() || null;
+  const storedSkus = product === null ? [] : product.skus.length > 0 ? product.skus : product.sku ? [product.sku] : [];
   const activeUnits = units.filter(
     (unit) =>
-      unit.status === "active" || unit.id === product?.sku?.selling_unit?.id || unit.id === product?.sku?.base_unit?.id,
+      unit.status === "active" ||
+      storedSkus.some(
+        (sku) => sku.base_unit?.id === unit.id || (sku.units ?? []).some((sold) => sold.unit?.id === unit.id),
+      ),
   );
   const activeCategories = activeOnly(categories);
 
-  const onInvalid = () => setTab("basics");
+  const onInvalid = (invalid: FieldErrors<ProductFormValues>) => setTab(tabOf(invalid));
+
+  /** The client tier problems of one SKU's units, by unit index. */
+  const unitTierProblems = (skuUnits: readonly UnitFormValues[]) => {
+    const tiers: Record<number, Record<number, string>> = {};
+
+    skuUnits.forEach((unit, index) => {
+      const cover = unit.cover_price.trim() === "" ? null : unit.cover_price.trim();
+      const basePrice =
+        unit.base_mode === "percent"
+          ? cover === null
+            ? null
+            : priceFromPercent(cover, unit.base_value)
+          : unit.base_value.trim() || null;
+      const problems = tierProblems(unit.tiers, { cover, basePrice }, tierMessages);
+
+      if (Object.keys(problems).length > 0) {
+        tiers[index] = problems;
+      }
+    });
+
+    return tiers;
+  };
 
   const submit = form.handleSubmit((valid) => {
     setError(null);
-    setServerTierProblems([]);
-    const tiers = tierProblems(valid.tiers, { cover, basePrice }, tierMessages);
+    setServerTiers({});
+    setVariantServerTiers({});
+    const withOptions = valid.options.length > 0;
+    const tiers = withOptions ? {} : unitTierProblems(valid.units);
+    const variantTiers: Record<number, Record<number, Record<number, string>>> = {};
+
+    if (withOptions) {
+      valid.variants.forEach((variant, index) => {
+        const problems = unitTierProblems(variant.units);
+
+        if (Object.keys(problems).length > 0) {
+          variantTiers[index] = problems;
+        }
+      });
+    }
+
     const custom = customFieldProblems(definitions, valid.custom, kind, {
       required: copy.required,
       number: copy.invalidInteger,
     });
     setTierErrors(tiers);
+    setVariantTierErrors(variantTiers);
     setFieldErrors(custom);
 
     if (Object.keys(custom).length > 0) {
@@ -138,7 +212,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
       return;
     }
 
-    if (Object.keys(tiers).length > 0) {
+    if (Object.keys(tiers).length > 0 || Object.keys(variantTiers).length > 0) {
       setTab("pricing");
       return;
     }
@@ -158,22 +232,44 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
   }, onInvalid);
 
   const showServerErrors = (failure: unknown) => {
+    const values = form.getValues();
+    const fieldKeys = serverFields(
+      values.units.length,
+      values.options.length === 0 ? [] : values.variants.map((variant) => variant.units.length),
+      values.options.map((option) => option.values.length),
+    );
+
     if (isApiError(failure, "invalid_tiers")) {
-      const problems = failure.details?.tiers;
-      setServerTierProblems(Array.isArray(problems) ? problems.map(String) : [failure.message]);
+      if (values.options.length > 0) {
+        setVariantServerTiers(serverVariantTierProblems(failure.details, failure.message));
+      } else {
+        setServerTiers(serverTierProblems(failure.details, failure.message));
+      }
       setTab("pricing");
       return;
     }
 
+    if (isApiError(failure, "cover_price_required")) {
+      for (const [field, key] of fieldKeys) {
+        if (failure.details?.[key] !== undefined) {
+          form.setError(field, { type: "server", message: failure.message });
+          setTab("pricing");
+          return;
+        }
+      }
+    }
+
     if (isApiError(failure, "validation_failed")) {
       let mapped = false;
+      let pricing = false;
 
-      for (const [field, key] of SERVER_FIELDS) {
+      for (const [field, key] of fieldKeys) {
         const message = failure.fieldMessage(key);
 
         if (message !== null) {
           form.setError(field, { type: "server", message });
           mapped = true;
+          pricing ||= ["units", "options", "variants"].some((prefix) => field.startsWith(prefix));
         }
       }
 
@@ -199,6 +295,8 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
 
       if (Object.keys(custom).length > 0) {
         setTab("fields");
+      } else if (pricing) {
+        setTab("pricing");
       } else if (mapped) {
         setTab("basics");
       }
@@ -216,12 +314,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
     setError(messageFor(failure));
   };
 
-  const text = (
-    name: "name" | "code" | "conversion_factor" | "moq" | "opening_stock" | "cover_price",
-    label: string,
-    need: "required" | "optional",
-    ltr = false,
-  ) => (
+  const text = (name: "name" | "code" | "opening_stock", label: string, need: "required" | "optional", ltr = false) => (
     <Field data-invalid={errors[name] !== undefined}>
       <FieldLabel htmlFor={`product-${name}`}>
         <LabelText text={label} need={need} />
@@ -237,7 +330,7 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
     </Field>
   );
 
-  const unitSelect = (name: "selling_unit_id" | "base_unit_id", label: string) => (
+  const unitSelect = (name: "base_unit_id", label: string) => (
     <Field data-invalid={errors[name] !== undefined}>
       <FieldLabel htmlFor={`product-${name}`}>
         <LabelText text={label} need="required" />
@@ -326,11 +419,52 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
               </Field>
             )}
             {text("code", copy.code, "required", true)}
-            {unitSelect("selling_unit_id", copy.sellingUnit)}
             {unitSelect("base_unit_id", copy.baseUnit)}
-            {text("conversion_factor", copy.conversion, "required", true)}
-            {creating && text("opening_stock", copy.openingStock, "optional", true)}
+            {creating && !hasOptions && text("opening_stock", copy.openingStock, "optional", true)}
           </div>
+          <fieldset className="mt-6 grid gap-4 rounded-xl border p-4 md:grid-cols-3" data-testid="preorder-settings">
+            <legend className="px-1 font-bold">{copy.preorder.title}</legend>
+            <p className="text-muted-foreground text-sm md:col-span-3">{copy.preorder.hint}</p>
+            <Field orientation="horizontal" className="md:col-span-3">
+              <Controller
+                control={form.control}
+                name="preorder_enabled"
+                render={({ field }) => (
+                  <Switch id="product-preorder_enabled" checked={field.value} onCheckedChange={field.onChange} />
+                )}
+              />
+              <FieldLabel htmlFor="product-preorder_enabled">{copy.preorder.enabled}</FieldLabel>
+            </Field>
+            <Field data-invalid={errors.expected_at !== undefined}>
+              <FieldLabel htmlFor="product-expected_at">
+                <LabelText text={copy.preorder.expectedAt} need="optional" />
+              </FieldLabel>
+              <Input
+                id="product-expected_at"
+                type="date"
+                dir="ltr"
+                className="text-start"
+                aria-invalid={errors.expected_at !== undefined}
+                {...form.register("expected_at")}
+              />
+              <FieldError errors={[errors.expected_at]} />
+            </Field>
+            <Field data-invalid={errors.preorder_limit !== undefined}>
+              <FieldLabel htmlFor="product-preorder_limit">
+                <LabelText text={copy.preorder.limit} need="optional" />
+              </FieldLabel>
+              <Input
+                id="product-preorder_limit"
+                dir="ltr"
+                className="text-start"
+                inputMode="numeric"
+                aria-invalid={errors.preorder_limit !== undefined}
+                {...form.register("preorder_limit")}
+              />
+              <FieldError errors={[errors.preorder_limit]} />
+            </Field>
+          </fieldset>
+          {!creating && <PreorderPanel product={product} />}
         </TabsContent>
 
         <TabsContent value="fields" forceMount className="data-[state=inactive]:hidden">
@@ -352,52 +486,35 @@ export function ProductForm({ product, definitions, units, categories }: FormPro
         </TabsContent>
 
         <TabsContent value="pricing" forceMount className="data-[state=inactive]:hidden">
-          <div className="grid gap-4 pt-4 md:grid-cols-2">
-            {text("cover_price", referenceLabel, "optional", true)}
-            <Controller
-              control={form.control}
-              name="base_value"
-              render={({ field }) => (
-                <PriceInput
-                  id="product-base_value"
-                  label={<LabelText text={copy.basePrice} need="required" />}
-                  mode={baseMode}
-                  onModeChange={(mode) => form.setValue("base_mode", mode)}
-                  value={field.value}
-                  onChange={field.onChange}
-                  cover={cover}
-                  referenceLabel={referenceLabel}
-                  error={errors.base_value?.message}
-                />
-              )}
+          <div className="flex flex-col gap-4 pt-4">
+            <ProductOptionsEditor
+              form={form}
+              images={product?.images ?? []}
+              onCombinationsChange={() => {
+                setOpenVariants([]);
+                setVariantTierErrors({});
+                setVariantServerTiers({});
+              }}
             />
-            {text("moq", copy.moq, "required", true)}
-            <div className="md:col-span-2">
-              {serverTierProblems.length > 0 && (
-                <Alert variant="destructive" className="mb-3">
-                  <AlertDescription>
-                    <ul>
-                      {serverTierProblems.map((problem) => (
-                        <li key={problem}>{problem}</li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-              <Controller
-                control={form.control}
-                name="tiers"
-                render={({ field }) => (
-                  <TiersEditor
-                    tiers={field.value}
-                    onChange={field.onChange}
-                    cover={cover}
-                    referenceLabel={referenceLabel}
-                    problems={tierErrors}
-                  />
-                )}
+            {hasOptions ? (
+              <VariantsEditor
+                form={form}
+                units={activeUnits}
+                referenceLabel={referenceLabel}
+                tierErrors={variantTierErrors}
+                serverTierProblems={variantServerTiers}
+                open={openVariants}
+                onOpenChange={setOpenVariants}
               />
-            </div>
+            ) : (
+              <SkuUnitsEditor
+                form={form}
+                units={activeUnits}
+                referenceLabel={referenceLabel}
+                tierErrors={tierErrors}
+                serverTierProblems={serverTiers}
+              />
+            )}
             {!creating && <RecomputeButton productId={product.id} />}
           </div>
         </TabsContent>

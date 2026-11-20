@@ -22,32 +22,44 @@ beforeEach(function (): void {
 test('BR-PR06 checkout answers 201 with the order detail', function (): void {
     $this->freezeSecond();
 
-    ($this->checkout)(['customer_note' => 'صباحًا'])
-        ->assertCreated()
-        ->assertExactJson(['data' => ['order' => [
-            'number' => 1,
-            'status' => 'pending',
-            'status_label' => 'قيد الانتظار',
-            'placed_at' => now()->toIso8601String(),
-            'items_total' => '1020.00',
-            'order_total' => '1020.00',
-            'collection_status' => 'unpaid',
-            'collected_amount' => '0.00',
-            'delivery' => [
-                'name' => 'مكتبة الأمل',
-                'phone' => '+201012345678',
-                'address' => ['label' => 'المحل', 'governorate' => 'القاهرة', 'city' => 'مدينة نصر', 'address_line' => '12 شارع عباس العقاد', 'landmark' => null],
-            ],
-            'customer_note' => 'صباحًا',
-            'cancel_reason' => null,
-            'cancelled_by' => null,
-            'items' => [[
-                'sku_id' => $this->sku->id, 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
-                'conversion_factor' => 20, 'quantity' => 12, 'cover_price' => null, 'unit_price' => '85.00', 'discount_percent' => null,
-                'tier_min_quantity' => 10, 'line_total' => '1020.00',
-            ]],
-            'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
-        ]]]);
+    $response = ($this->checkout)(['customer_note' => 'صباحًا'])->assertCreated();
+    $itemId = $this->inTenant(fn (): int => App\Modules\Orders\Models\OrderItem::query()->sole()->id);
+
+    $response->assertExactJson(['data' => ['order' => [
+        'number' => 1,
+        'kind' => 'order',
+        'status' => 'pending',
+        'status_label' => 'قيد الانتظار',
+        'placed_at' => now()->toIso8601String(),
+        'preorder_state' => null,
+        'converted_at' => null,
+        'items_total' => '1020.00',
+        'discount' => null,
+        'order_total' => '1020.00',
+        'returned_total' => '0.00',
+        'net_total' => '1020.00',
+        'collection_status' => 'unpaid',
+        'collected_amount' => '0.00',
+        'delivery' => [
+            'name' => 'مكتبة الأمل',
+            'phone' => '+201012345678',
+            'address' => ['label' => 'المحل', 'governorate' => 'القاهرة', 'city' => 'مدينة نصر', 'address_line' => '12 شارع عباس العقاد', 'landmark' => null],
+        ],
+        'customer_note' => 'صباحًا',
+        'cancel_reason' => null,
+        'cancelled_by' => null,
+        'items' => [[
+            'id' => $itemId, 'sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'product_name' => 'الأضواء علوم', 'sku_code' => 'ADW-SCI', 'sku_name' => 'الأضواء علوم', 'unit' => 'كرتونة',
+            'conversion_factor' => 20, 'quantity' => 12, 'cover_price' => null, 'list_unit_price' => '85.00', 'manual_discount' => null,
+            'unit_price' => '85.00', 'discount_percent' => null, 'tier_min_quantity' => 10, 'price_source' => 'tier', 'line_total' => '1020.00',
+            'delivered_quantity' => null, 'removed_at' => null, 'converted_quantity' => 0, 'is_bundle' => false, 'parent_item_id' => null,
+        ]],
+        'converted_from' => null,
+        'conversions' => [],
+        'changes' => [],
+        'history' => [['from' => null, 'to' => 'pending', 'at' => now()->toIso8601String(), 'by' => 'customer']],
+        'returns' => [],
+    ]]]);
 
     $this->assertDatabaseHas('sku_inventory', ['sku_id' => $this->sku->id, 'on_hand' => 400, 'reserved' => 240]);
     $this->assertDatabaseCount('cart_items', 0);
@@ -68,7 +80,7 @@ test('BR-PR06 a failing line answers 422 checkout_failed with the sku and leaves
         ->assertExactJson(['error' => [
             'code' => 'checkout_failed',
             'message' => 'تعذر إتمام الطلب، راجع العناصر التالية',
-            'items' => [['sku_id' => $this->sku->id, 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 7]],
+            'items' => [['sku_id' => $this->sku->id, 'sku_unit_id' => $this->defaultUnitId($this->sku), 'reason' => 'insufficient_stock', 'requested' => 12, 'available' => 7]],
         ]]);
 
     $this->assertDatabaseCount('orders', 0);
@@ -171,4 +183,26 @@ test('BR-N02 the merchant finds the new order in the notifications', function ()
     ($this->checkout)()->assertCreated();
 
     expect(MerchantNotification::withoutTenantScope()->where('tenant_id', $this->tenant->id)->sole()->data['order_number'])->toBe(1);
+});
+
+test('BR-C05 D78 an order past the credit limit answers 422 with the limit, the balance and the order total, and orders nothing', function (): void {
+    $this->inTenant(fn () => $this->customer->forceFill(['credit_limit' => '1500.00'])->save());
+    $this->inTenant(fn (): Order => Order::factory()->delivered()->for($this->customer)->create(['items_total' => '500.00', 'order_total' => '500.00']));
+
+    ($this->checkout)()
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'checkout_failed')
+        ->assertJsonPath('error.details.credit', ['limit' => '1500.00', 'exposure' => '500.00', 'order_total' => '1020.00'])
+        ->assertJsonPath('error.items', []);
+
+    $this->assertDatabaseCount('orders', 1);
+    $this->assertDatabaseCount('cart_items', 1);
+});
+
+test('BR-C05 once the balance is collected the same order fits under the limit', function (): void {
+    $this->inTenant(fn () => $this->customer->forceFill(['credit_limit' => '1500.00'])->save());
+    $order = $this->inTenant(fn (): Order => Order::factory()->delivered()->for($this->customer)->create(['items_total' => '500.00', 'order_total' => '500.00']));
+    $this->inTenant(fn () => app(App\Modules\Collections\Actions\RecordCollection::class)->handle($order, new App\Modules\Collections\Data\CollectionData('500.00')));
+
+    ($this->checkout)()->assertCreated();
 });

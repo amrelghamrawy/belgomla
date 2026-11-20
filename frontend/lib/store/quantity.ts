@@ -18,6 +18,17 @@ export function quantityBounds(stock: Stock): QuantityBounds {
   return { min: Math.max(1, stock.moq), max };
 }
 
+/** The most selling units one cart line may hold (AddCartItemRequest::MAX_QUANTITY). */
+export const MAX_CART_QUANTITY = 100_000;
+
+/**
+ * BR-O14, D88: a pre-order needs the MOQ and no stock; it stays under what remains of the merchant's cap, or the
+ * cart's maximum when there is no cap (`remaining` null).
+ */
+export function preorderBounds(sku: { moq: number }, remaining: number | null = null): QuantityBounds {
+  return { min: Math.max(1, sku.moq), max: remaining ?? MAX_CART_QUANTITY };
+}
+
 export function canOrder(bounds: QuantityBounds): boolean {
   return bounds.max >= bounds.min;
 }

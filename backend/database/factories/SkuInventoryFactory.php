@@ -24,8 +24,8 @@ final class SkuInventoryFactory extends Factory
         ];
     }
 
-    public function stock(int $onHand, int $reserved = 0): static
+    public function stock(int $onHand, int $reserved = 0, ?string $avgCost = null): static
     {
-        return $this->state(['on_hand' => $onHand, 'reserved' => $reserved]);
+        return $this->state(['on_hand' => $onHand, 'reserved' => $reserved, 'avg_cost' => $avgCost]);
     }
 }

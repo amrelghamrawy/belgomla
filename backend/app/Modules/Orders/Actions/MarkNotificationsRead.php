@@ -6,16 +6,18 @@ namespace App\Modules\Orders\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Orders\Models\MerchantNotification;
+use App\Modules\Orders\Queries\NotificationsQuery;
 use Illuminate\Support\Facades\DB;
 
 /**
  * POST /api/dashboard/notifications/read (BR-N02): marks the given notifications of the tenant read, or all of
- * them when no ids are given. Ids of another tenant or already read ones are skipped. Returns how many changed;
+ * them when no ids are given. Ids of another tenant, ones the user's role may not see (D82) or already read ones are
+ * skipped. Returns how many changed;
  * audits `notifications.read` when any did (BR-L).
  */
 final readonly class MarkNotificationsRead
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(private AuditLogger $audit, private NotificationsQuery $notifications) {}
 
     /**
      * @param  list<int>|null  $ids  null = all
@@ -23,7 +25,7 @@ final readonly class MarkNotificationsRead
     public function handle(?array $ids): int
     {
         return DB::transaction(function () use ($ids): int {
-            $query = MerchantNotification::query()->whereNull('read_at');
+            $query = $this->notifications->visible()->whereNull('read_at');
 
             if ($ids !== null) {
                 $query->whereKey($ids);

@@ -65,3 +65,22 @@ test('an address of another customer is not found and the whole update rolls bac
     expect($this->customer->refresh()->name)->toBe('قديم')
         ->and(AuditLog::query()->count())->toBe(0);
 });
+
+test('BR-C05 BR-C06 changed credit terms are saved and audited as customer.credit_terms_changed', function (): void {
+    app(UpdateCustomerByMerchant::class)->handle($this->customer, new CustomerData($this->customer->name, null, null, '500.00', 30, ['credit_limit', 'payment_terms_days']));
+
+    expect($this->customer->refresh()->only(['credit_limit', 'payment_terms_days']))->toBe(['credit_limit' => '500.00', 'payment_terms_days' => 30])
+        ->and(AuditLog::query()->where('action', 'customer.credit_terms_changed')->sole()->only(['old_values', 'new_values']))->toBe([
+            'old_values' => ['credit_limit' => null, 'payment_terms_days' => null],
+            'new_values' => ['credit_limit' => '500.00', 'payment_terms_days' => 30],
+        ]);
+});
+
+test('BR-C05 credit terms not sent stay as they are', function (): void {
+    $this->customer->forceFill(['credit_limit' => '800.00'])->save();
+
+    app(UpdateCustomerByMerchant::class)->handle($this->customer, new CustomerData('جديد', null, null));
+
+    expect($this->customer->refresh()->credit_limit)->toBe('800.00')
+        ->and(AuditLog::query()->where('action', 'customer.credit_terms_changed')->count())->toBe(0);
+});

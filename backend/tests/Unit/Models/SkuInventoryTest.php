@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 test('to array', function (): void {
     $stock = $this->inTenant(fn () => SkuInventory::factory()->create()->fresh());
 
-    expect(array_keys($stock->toArray()))->toBe(['sku_id', 'tenant_id', 'on_hand', 'reserved', 'created_at', 'updated_at']);
+    expect(array_keys($stock->toArray()))->toBe(['sku_id', 'tenant_id', 'on_hand', 'reserved', 'created_at', 'updated_at', 'avg_cost']);
 });
 
 test('BR-INV02 available is on hand minus reserved, all integers', function (): void {

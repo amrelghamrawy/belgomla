@@ -45,6 +45,9 @@ arch('data classes are final readonly value objects')
     ->ignoring([
         App\Modules\Tenancy\Data\TenantUserChanges::class,
         App\Modules\Pricing\Data\ResolvedPrice::class,
+        App\Modules\Pricing\Data\ListedPrice::class, // V2 Task 11: what the storefront lists for a SKU and customer, not request input
+        App\Modules\Pricing\Data\PricingContext::class, // V2 Task 11: the customer's pricing inputs, read by PricingContextQuery
+        App\Modules\Pricing\Data\PromotionPrice::class, // V2 Task 12: a SKU's live promotion, read by ActivePromotions
         App\Modules\Messaging\Data\MessagePayload::class, // names fixed by tasks/4-messaging.md
         App\Modules\Messaging\Data\DriverResult::class,
         App\Modules\Messaging\Data\FallbackRoute::class, // value returned by Fallback (D70), not request input
@@ -53,7 +56,16 @@ arch('data classes are final readonly value objects')
         App\Modules\Customers\Data\PricedCartLine::class,
         App\Modules\Orders\Data\CheckoutLine::class, // checkout read models (CheckoutValidator, OrderStateMachine), not request input
         App\Modules\Orders\Data\CheckoutProblem::class,
+        App\Modules\Orders\Data\CheckoutReport::class,
+        App\Modules\Orders\Data\CheckoutComponent::class, // V2 Task 15: a checked bundle line's component, not request input
+        App\Modules\Orders\Data\OrderQuote::class,
+        App\Modules\Orders\Data\CartLineInput::class, // V2 Task 07: a line to order, from the cart or the merchant's form
         App\Modules\Orders\Data\TransitionPlan::class,
+        App\Modules\Orders\Data\EditedOrder::class, // V2 Task 09: what EditOrderLines leaves, not request input
+        App\Modules\Orders\Data\ConvertedPreorders::class, // V2 Task 10: the merchant's summary of ConvertPreorders, not request input
+        App\Modules\Catalog\Data\CatalogLookups::class, // V2 Task 06 read models of the catalog import, not request input
+        App\Modules\Catalog\Data\ImportRowResult::class,
+        App\Modules\Catalog\Data\ImportPreview::class,
     ])
     ->toExtendNothing();
 

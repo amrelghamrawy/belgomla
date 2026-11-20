@@ -63,3 +63,26 @@ test('subtract gives the difference at two decimals', function (string $a, strin
     'nothing left' => ['90', '90.00', '0.00'],
     'below zero' => ['10.00', '10.01', '-0.01'],
 ]);
+
+test('divide shares an amount over a whole count, half-up to the piaster', function (string $amount, int $count, string $share): void {
+    expect(Money::divide($amount, $count))->toBe($share);
+})->with([
+    'exact' => ['300.00', 2, '150.00'],
+    'a third' => ['302.00', 3, '100.67'],
+    'half a piaster up' => ['0.05', 2, '0.03'],
+    'below zero' => ['-0.05', 2, '-0.03'],
+]);
+
+test('divide refuses a count below one', function (): void {
+    expect(fn (): string => Money::divide('10.00', 0))->toThrow(InvalidArgumentException::class);
+});
+
+test('percentOf gives a part of a whole in percent, half-up, and null for a whole not above zero', function (string $part, string $whole, ?string $percent): void {
+    expect(Money::percentOf($part, $whole))->toBe($percent);
+})->with([
+    'a fifth' => ['1', '5', '20.00'],
+    'a third' => ['280.00', '380.00', '73.68'],
+    'more than all of it' => ['150.00', '100.00', '150.00'],
+    'a zero whole' => ['10.00', '0.00', null],
+    'a negative whole' => ['10.00', '-5.00', null],
+]);

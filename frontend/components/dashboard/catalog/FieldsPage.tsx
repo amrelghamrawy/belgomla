@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PlusIcon, TrashIcon } from "lucide-react";
+import { ArchiveIcon, ListIcon, PencilIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -87,7 +87,7 @@ export function FieldsPage() {
       {fields.data?.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {fields.data !== undefined && fields.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.label}</TableHead>
@@ -127,10 +127,12 @@ export function FieldsPage() {
                   <TableCell>{field.is_filterable ? field.filter_order : ar.dashboard.none}</TableCell>
                   <TableCell className="flex flex-wrap gap-1">
                     <Button variant="ghost" size="sm" onClick={() => setEditing(field)}>
+                      <PencilIcon aria-hidden />
                       {ar.dashboard.edit}
                     </Button>
                     {field.type === "select" && (
                       <Button variant="ghost" size="sm" onClick={() => setOptionsOf(field.id)}>
+                        <ListIcon aria-hidden />
                         {copy.options} ({field.options.filter((option) => option.status === "active").length})
                       </Button>
                     )}
@@ -158,6 +160,7 @@ function ArchiveFieldButton({ id }: { id: number }) {
       disabled={archive.isPending}
       onClick={() => archive.mutate(id, { onError: (error) => toast.error(messageFor(error)) })}
     >
+      <ArchiveIcon aria-hidden />
       {ar.dashboard.archive}
     </Button>
   );
@@ -476,6 +479,7 @@ function OptionRow({ fieldId, option }: { fieldId: number; option?: FieldOption 
             disabled={archive.isPending}
             onClick={() => archive.mutate(option.id, { onError: (failure) => setError(messageFor(failure)) })}
           >
+            <ArchiveIcon aria-hidden />
             {ar.dashboard.archive}
           </Button>
         )}

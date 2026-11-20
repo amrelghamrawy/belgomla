@@ -16,7 +16,7 @@ Product constraints it serves: **Arabic only, RTL-first, mobile-first** (01 §6,
 | Server state   | TanStack Query. No other global store                                                           |
 | Forms          | react-hook-form + zod (`@hookform/resolvers`), shadcn `Field` components for layout and errors  |
 | API types      | `openapi-typescript` from `backend/openapi.json` → `lib/api/schema.d.ts` (generated, never edited) |
-| Font           | IBM Plex Sans Arabic via `next/font/google` (D40); storefront headings Cairo, `font-display` (D67) |
+| Font           | IBM Plex Sans Arabic via `next/font/google` (D40); storefront headings Cairo, `font-display` (D67); dashboard Latin and figures DM Sans before Plex (D104) |
 | Storefront look | Brand-tinted neutrals (`.store-theme`), `highlight`/`brand-soft` tokens, `shadow-card`, `ledger` and `store-wallpaper` utilities (D67) |
 | Unit tests     | Vitest + Testing Library + jsdom; `fetch` stubbed per test (`stubFetch` in `tests/unit/http.ts`) |
 | E2E            | Playwright, `mobile` (390×844) and `desktop` projects                                            |
@@ -83,6 +83,7 @@ Which file to write:
 | A list page that must paint fast (LCP)         | prefetch its first screen in the server page with `prefetchListing()` (`lib/server/store-data.ts`) into a `HydrationBoundary`, under the same query keys as the client hooks; give the query a `staleTime` so hydration does not refetch |
 | State in the URL (filters, sort, search)       | parse/serialise in a pure `lib/store/*` module, `router.replace(..., { scroll: false })`; never local state. Dashboard lists use `useListQuery(keys)` (`lib/dashboard/use-list-query.ts`); changing a filter resets `page` |
 | A dashboard page                               | `app/(dashboard)/dashboard/(shell)/<area>/page.tsx` rendering a component from `components/dashboard/<area>/`; the shell already guards the session, so pages never call `useRequiredDashboardUser()` themselves |
+| A file the API sends as an attachment (an export, V2 Task 06) | `apiDownload()` from `lib/api/client.ts` (resolves to the file, or to `queued` on `202`), then `saveDownload()` from `lib/api/download.ts` (object URL on a temporary `<a download>`; works on http) |
 | A retry-safe write (D55)                       | `useIdempotencyKey(prefix)` (`lib/api/idempotency.ts`) and send `Idempotency-Key: keyFor(body)`; `reset()` on success |
 | A list endpoint with extra top-level keys      | `apiFetchPage<T, Meta, { unread_count: number }>()` keeps them next to `data`/`meta` |
 | A dropdown in a dashboard form or filter       | `NativeSelect` from `components/ui/native-select` (the phone's own picker, works with `register()`); a searchable one is a `Popover` + `Command` like `CategoryPicker` |
@@ -135,7 +136,7 @@ Which file to write:
 - Hooks: `useX`, one concern each. Server components by default; `'use client'` only for interactivity, as low in the tree as possible.
 - No `any`; no non-null `!` except on values the type system cannot see (comment why). Types for API data come from `lib/api/types.ts` aliases of the generated schema.
 - No inline Arabic strings in components; no `console.log`.
-- Class names: `cn()` from `@/lib/utils` for conditionals; brand colours only through theme tokens (`bg-primary`, `text-primary-foreground`), which `applyBranding()` drives from tenant settings.
+- Class names: `cn()` from `@/lib/utils` for conditionals; brand colours only through theme tokens (`bg-primary`, `text-primary-foreground`). On the storefront `applyBranding()` drives them from tenant settings; the dashboard wears the fixed BelGomla theme (`.dash-theme` in `globals.css`, D104, `DESIGN.md`): style shared primitives there, not page by page.
 
 ---
 

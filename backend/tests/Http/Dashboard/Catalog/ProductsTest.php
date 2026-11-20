@@ -11,23 +11,39 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\Unit;
 
+const DASHBOARD_SKU_KEYS = [
+    'id', 'code', 'base_unit' => ['id', 'name'], 'selling_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
+    'units' => ['*' => ['id', 'unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default']],
+    'label', 'status', 'sort_order', 'option_values',
+];
+
 const DASHBOARD_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'category' => ['id', 'name', 'kind'], 'custom_fields',
-    'sku' => ['id', 'code', 'selling_unit' => ['id', 'name'], 'base_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq'],
+    'id', 'name', 'slug', 'description', 'status', 'type', 'category' => ['id', 'name', 'kind'], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
+    'sku' => DASHBOARD_SKU_KEYS,
+    'skus' => ['*' => DASHBOARD_SKU_KEYS],
+    'options',
     'main_image_url', 'created_at', 'updated_at',
 ];
 
-/** The detail (show, create, update) also carries the tiers and the stock (08-api-contract.md §6). */
+/** The detail (show, create, update) also carries each unit's tiers and the stock (08-api-contract.md §6, D91). */
+const DASHBOARD_SKU_DETAIL_KEYS = [
+    'id', 'code', 'base_unit' => ['id', 'name'], 'selling_unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
+    'units' => ['*' => ['id', 'unit' => ['id', 'name'], 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default', 'tiers']],
+    'inventory' => ['on_hand', 'reserved', 'available'],
+    'label', 'status', 'sort_order', 'option_values',
+];
+
 const DASHBOARD_PRODUCT_DETAIL_KEYS = [
     ...DASHBOARD_PRODUCT_KEYS,
-    'sku' => [...DASHBOARD_PRODUCT_KEYS['sku'], 'tiers', 'inventory' => ['on_hand', 'reserved', 'available']],
+    'sku' => DASHBOARD_SKU_DETAIL_KEYS,
+    'skus' => ['*' => DASHBOARD_SKU_DETAIL_KEYS],
 ];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
 });
 
-test('BR-P02 creating a product creates exactly one sku in the same call, audited', function (): void {
+test('BR-P02 BR-P14 creating a product without options creates exactly one sku in the same call, audited', function (): void {
     $response = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload())
         ->assertCreated()
         ->assertExactJsonStructure(['data' => [...DASHBOARD_PRODUCT_DETAIL_KEYS, 'images', 'relations']])
@@ -41,6 +57,8 @@ test('BR-P02 creating a product creates exactly one sku in the same call, audite
         ->assertJsonPath('data.sku.cover_price', '120.00')
         ->assertJsonPath('data.sku.base_price', '90.00')
         ->assertJsonPath('data.sku.moq', 5)
+        ->assertJsonPath('data.sku.units.0.unit.name', 'كرتونة')
+        ->assertJsonPath('data.sku.units.0.is_default', true)
         ->assertJsonPath('data.images', [])
         ->assertJsonPath('data.relations', []);
 
@@ -52,8 +70,8 @@ test('BR-P02 creating a product creates exactly one sku in the same call, audite
 });
 
 test('BR-MOQ01 the moq defaults to 1 and prices are normalised to two decimals', function (): void {
-    $payload = $this->productPayload(['sku' => ['base_price' => 90, 'cover_price' => '120.5']]);
-    unset($payload['sku']['moq']);
+    $payload = $this->productPayload(['sku' => ['units' => [['base_price' => 90, 'cover_price' => '120.5']]]]);
+    unset($payload['sku']['units'][0]['moq']);
 
     $this->tenantJson('POST', '/api/dashboard/products', $payload)
         ->assertCreated()
@@ -120,23 +138,23 @@ test('product creation validation', function (array $overrides, string $field): 
     'missing sku code' => [['sku' => ['code' => null]], 'sku.code'],
     'sku code with spaces' => [['sku' => ['code' => 'ADW SCI']], 'sku.code'],
     'sku code too long' => [['sku' => ['code' => str_repeat('A', 61)]], 'sku.code'],
-    'missing selling unit' => [['sku' => ['selling_unit_id' => null]], 'sku.selling_unit_id'],
+    'missing selling unit' => [['sku' => ['units' => [['unit_id' => null]]]], 'sku.units.0.unit_id'],
     'missing base unit' => [['sku' => ['base_unit_id' => null]], 'sku.base_unit_id'],
-    'BR-U05 fractional conversion factor' => [['sku' => ['conversion_factor' => 1.5]], 'sku.conversion_factor'],
-    'BR-U02 conversion factor below 1' => [['sku' => ['conversion_factor' => 0]], 'sku.conversion_factor'],
-    'BR-PR01 missing base price' => [['sku' => ['base_price' => null]], 'sku.base_price'],
-    'BR-PR01 zero base price' => [['sku' => ['base_price' => 0]], 'sku.base_price'],
-    'base price with 3 decimals' => [['sku' => ['base_price' => '1.005']], 'sku.base_price'],
-    'negative cover price' => [['sku' => ['cover_price' => -1]], 'sku.cover_price'],
-    'BR-PR03 tier without a minimum quantity' => [['sku' => ['tiers' => [['unit_price' => 80]]]], 'sku.tiers.0.min_quantity'],
-    'BR-PR03 tier without a price or percent' => [['sku' => ['tiers' => [['min_quantity' => 10]]]], 'sku.tiers.0.unit_price'],
-    'BR-PR05 tier price of 0' => [['sku' => ['tiers' => [['min_quantity' => 10, 'unit_price' => 0]]]], 'sku.tiers.0.unit_price'],
-    'BR-U05 fractional tier quantity' => [['sku' => ['tiers' => [['min_quantity' => 2.5, 'unit_price' => 80]]]], 'sku.tiers.0.min_quantity'],
-    'BR-PR10 tier percent of 100' => [['sku' => ['tiers' => [['min_quantity' => 10, 'discount_percent' => 100]]]], 'sku.tiers.0.discount_percent'],
-    'tiers not a list' => [['sku' => ['tiers' => 'x']], 'sku.tiers'],
-    'BR-PR10 percent of 100' => [['sku' => ['base_price_percent' => 100]], 'sku.base_price_percent'],
-    'BR-MOQ01 moq of 0' => [['sku' => ['moq' => 0]], 'sku.moq'],
-    'BR-U05 fractional moq' => [['sku' => ['moq' => 2.5]], 'sku.moq'],
+    'BR-U05 fractional conversion factor' => [['sku' => ['units' => [['conversion_factor' => 1.5]]]], 'sku.units.0.conversion_factor'],
+    'BR-U02 conversion factor below 1' => [['sku' => ['units' => [['conversion_factor' => 0]]]], 'sku.units.0.conversion_factor'],
+    'BR-PR01 missing base price' => [['sku' => ['units' => [['base_price' => null]]]], 'sku.units.0.base_price'],
+    'BR-PR01 zero base price' => [['sku' => ['units' => [['base_price' => 0]]]], 'sku.units.0.base_price'],
+    'base price with 3 decimals' => [['sku' => ['units' => [['base_price' => '1.005']]]], 'sku.units.0.base_price'],
+    'negative cover price' => [['sku' => ['units' => [['cover_price' => -1]]]], 'sku.units.0.cover_price'],
+    'BR-PR03 tier without a minimum quantity' => [['sku' => ['units' => [['tiers' => [['unit_price' => 80]]]]]], 'sku.units.0.tiers.0.min_quantity'],
+    'BR-PR03 tier without a price or percent' => [['sku' => ['units' => [['tiers' => [['min_quantity' => 10]]]]]], 'sku.units.0.tiers.0.unit_price'],
+    'BR-PR05 tier price of 0' => [['sku' => ['units' => [['tiers' => [['min_quantity' => 10, 'unit_price' => 0]]]]]], 'sku.units.0.tiers.0.unit_price'],
+    'BR-U05 fractional tier quantity' => [['sku' => ['units' => [['tiers' => [['min_quantity' => 2.5, 'unit_price' => 80]]]]]], 'sku.units.0.tiers.0.min_quantity'],
+    'BR-PR10 tier percent of 100' => [['sku' => ['units' => [['tiers' => [['min_quantity' => 10, 'discount_percent' => 100]]]]]], 'sku.units.0.tiers.0.discount_percent'],
+    'tiers not a list' => [['sku' => ['units' => [['tiers' => 'x']]]], 'sku.units.0.tiers'],
+    'BR-PR10 percent of 100' => [['sku' => ['units' => [['base_price_percent' => 100]]]], 'sku.units.0.base_price_percent'],
+    'BR-MOQ01 moq of 0' => [['sku' => ['units' => [['moq' => 0]]]], 'sku.units.0.moq'],
+    'BR-U05 fractional moq' => [['sku' => ['units' => [['moq' => 2.5]]]], 'sku.units.0.moq'],
     'unknown status' => [['status' => 'draft'], 'status'],
     'BR-INV02 negative opening stock' => [['opening_stock' => -1], 'opening_stock'],
     'BR-U05 fractional opening stock' => [['opening_stock' => 2.5], 'opening_stock'],
@@ -144,14 +162,14 @@ test('product creation validation', function (array $overrides, string $field): 
 ]);
 
 test('BR-PR10 a base price percentage is stored next to the price computed from the cover price', function (): void {
-    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['base_price' => null, 'base_price_percent' => 20]]))
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['units' => [['base_price' => null, 'base_price_percent' => 20]]]]))
         ->assertCreated()
         ->assertJsonPath('data.sku.base_price', '96.00')
         ->assertJsonPath('data.sku.base_price_percent', '20.00');
 });
 
 test('BR-PR10 a percentage without a cover price is refused with cover_price_required', function (): void {
-    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['cover_price' => null, 'base_price_percent' => 25]]))
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['units' => [['cover_price' => null, 'base_price_percent' => 25]]]]))
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'cover_price_required');
 
@@ -159,25 +177,25 @@ test('BR-PR10 a percentage without a cover price is refused with cover_price_req
 });
 
 test('BR-PR03 a product is created with its tiers, absolute or as a percent off the cover price', function (): void {
-    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['tiers' => [
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['units' => [['tiers' => [
         ['min_quantity' => 50, 'discount_percent' => 35],
         ['min_quantity' => 10, 'unit_price' => '85'],
-    ]]]))
+    ]]]]]))
         ->assertCreated()
-        ->assertJsonPath('data.sku.tiers', [
+        ->assertJsonPath('data.sku.units.0.tiers', [
             ['min_quantity' => 10, 'unit_price' => '85.00', 'discount_percent' => null],
             ['min_quantity' => 50, 'unit_price' => '78.00', 'discount_percent' => '35.00'],
         ]);
 });
 
 test('BR-PR05 duplicate tier thresholds on a product are refused with invalid_tiers', function (): void {
-    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['tiers' => [
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['sku' => ['units' => [['tiers' => [
         ['min_quantity' => 10, 'unit_price' => '85'],
         ['min_quantity' => 10, 'unit_price' => '80'],
-    ]]]))
+    ]]]]]))
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'invalid_tiers')
-        ->assertJsonCount(1, 'error.details.tiers');
+        ->assertJsonPath('error.details', ['sku.units.0.tiers' => ['الحد الأدنى 10 مكرر في أكثر من شريحة']]);
 });
 
 test('BR-INV06 the opening stock is written as an opening movement and in the creation audit', function (): void {
@@ -232,7 +250,7 @@ test('BR-T04 references of another tenant are rejected as unknown', function (st
     $other = $this->otherTenant();
     $foreign = $this->inTenant(fn (): array => [
         'category_id' => Category::factory()->create()->id,
-        'sku.selling_unit_id' => Unit::factory()->create()->id,
+        'sku.units.0.unit_id' => Unit::factory()->create()->id,
         'sku.base_unit_id' => Unit::factory()->create()->id,
     ], $other);
 
@@ -241,18 +259,76 @@ test('BR-T04 references of another tenant are rejected as unknown', function (st
         ->assertJsonStructure(['error' => ['details' => [$field]]]);
 
     $this->assertDatabaseCount('products', 0);
-})->with(['category_id', 'sku.selling_unit_id', 'sku.base_unit_id']);
+})->with(['category_id', 'sku.units.0.unit_id', 'sku.base_unit_id']);
 
 test('archived categories and units cannot be chosen for a new product', function (string $field): void {
     $archived = $this->inTenant(fn (): array => [
         'category_id' => Category::factory()->archived()->create()->id,
-        'sku.selling_unit_id' => Unit::factory()->archived()->create()->id,
+        'sku.units.0.unit_id' => Unit::factory()->archived()->create()->id,
     ]);
 
     $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(Illuminate\Support\Arr::undot([$field => $archived[$field]])))
         ->assertUnprocessable()
         ->assertJsonStructure(['error' => ['details' => [$field]]]);
-})->with(['category_id', 'sku.selling_unit_id']);
+})->with(['category_id', 'sku.units.0.unit_id']);
+
+test('D91 the sku units are validated', function (array $units, string $field): void {
+    $carton = $this->catalogBasics()['carton']->id;
+    $payload = $this->productPayload();
+    $payload['sku']['units'] = array_map(fn (array $unit): array => [...$unit, 'unit_id' => $unit['unit_id'] ?? $carton], $units);
+
+    $this->tenantJson('POST', '/api/dashboard/products', $payload)
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonStructure(['error' => ['details' => [$field]]]);
+
+    $this->assertDatabaseCount('products', 0);
+})->with([
+    'none' => [[], 'sku.units'],
+    'more than 10' => [array_fill(0, 11, ['conversion_factor' => 1, 'base_price' => 1]), 'sku.units'],
+    'the same unit twice' => [[['conversion_factor' => 1, 'base_price' => 1], ['conversion_factor' => 12, 'base_price' => 10]], 'sku.units.1.unit_id'],
+    'two defaults' => [[['conversion_factor' => 1, 'base_price' => 1, 'is_default' => true], ['unit_id' => null, 'conversion_factor' => 12, 'base_price' => 10, 'is_default' => true]], 'sku.units'],
+    'a default flag that is not a boolean' => [[['conversion_factor' => 1, 'base_price' => 1, 'is_default' => 'maybe']], 'sku.units.0.is_default'],
+    'an id that is not a number' => [[['id' => 'x', 'conversion_factor' => 1, 'base_price' => 1]], 'sku.units.0.id'],
+]);
+
+test('D91 a product is created in several units, one default, each with its own prices', function (): void {
+    $basics = $this->catalogBasics();
+    $payload = $this->productPayload();
+    $payload['sku']['units'][] = ['unit_id' => $basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00', 'moq' => 10, 'is_default' => true];
+
+    $this->tenantJson('POST', '/api/dashboard/products', $payload)
+        ->assertCreated()
+        ->assertJsonCount(2, 'data.sku.units')
+        ->assertJsonPath('data.sku.units.0.unit.name', 'قطعة')
+        ->assertJsonPath('data.sku.units.0.is_default', true)
+        ->assertJsonPath('data.sku.units.1.unit.name', 'كرتونة')
+        ->assertJsonPath('data.sku.units.1.base_price', '90.00')
+        ->assertJsonPath('data.sku.selling_unit.name', 'قطعة')
+        ->assertJsonPath('data.sku.base_price', '5.00')
+        ->assertJsonPath('data.sku.moq', 10);
+});
+
+test('D91 an update archives a unit left out; a unit id of another sku is refused on its line', function (): void {
+    $basics = $this->catalogBasics();
+    $payload = $this->productPayload();
+    $payload['sku']['units'][] = ['unit_id' => $basics['piece']->id, 'conversion_factor' => 1, 'base_price' => '5.00'];
+    $id = $this->tenantJson('POST', '/api/dashboard/products', $payload)->json('data.id');
+    $foreign = $this->inTenant(fn (): int => $this->defaultUnitId(Sku::factory()->create()));
+    $refused = $this->productPayload();
+    $refused['sku']['units'][0]['id'] = $foreign;
+
+    $this->tenantJson('PUT', "/api/dashboard/products/{$id}", $refused)
+        ->assertUnprocessable()
+        ->assertJsonStructure(['error' => ['details' => ['sku.units.0.id']]]);
+    $this->tenantJson('PUT', "/api/dashboard/products/{$id}", $this->productPayload())
+        ->assertOk()
+        ->assertJsonCount(1, 'data.sku.units')
+        ->assertJsonPath('data.sku.units.0.unit.name', 'كرتونة');
+
+    $this->assertDatabaseHas('sku_units', ['unit_id' => $basics['piece']->id, 'status' => 'archived', 'is_default' => false]);
+    $this->assertDatabaseHas('sku_units', ['id' => $foreign, 'status' => 'active']);
+});
 
 test('the dashboard list shows every status, newest first, paginated with meta', function (): void {
     [$active, $inactive] = $this->inTenant(fn (): array => [
@@ -338,6 +414,16 @@ test('D36 low_stock=1 keeps products whose stock is at most one minimum order, i
     expect($listed)->toEqualCanonicalizing([$ids['low'], $ids['no stock row']]);
 });
 
+test('D93 low_stock=1 never lists a bundle', function (): void {
+    $simple = $this->inTenant(fn (): int => Product::factory()->withSku()->create()->id);
+    $this->inTenant(fn () => Product::factory()->bundle()->withSku()->create());
+
+    $this->tenantJson('GET', '/api/dashboard/products?low_stock=1')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', $simple);
+});
+
 test('dashboard list validation', function (string $query, string $field): void {
     $this->tenantJson('GET', "/api/dashboard/products?{$query}")
         ->assertUnprocessable()
@@ -378,7 +464,7 @@ test('the product detail includes the stock, the gallery and relations both ways
 test('an owner updates product and sku fields; the audit keeps only what changed', function (): void {
     $id = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload())->json('data.id');
 
-    $this->tenantJson('PUT', "/api/dashboard/products/{$id}", $this->productPayload(['name' => 'اسم جديد', 'sku' => ['base_price' => '85.00', 'moq' => 10]]))
+    $this->tenantJson('PUT', "/api/dashboard/products/{$id}", $this->productPayload(['name' => 'اسم جديد', 'sku' => ['units' => [['base_price' => '85.00', 'moq' => 10]]]]))
         ->assertOk()
         ->assertJsonPath('data.name', 'اسم جديد')
         ->assertJsonPath('data.sku.base_price', '85.00')
@@ -422,3 +508,25 @@ test('BR-T04 a product of another tenant is 404 on show and update, and untouche
 
     $this->assertDatabaseHas('products', ['id' => $foreign->id, 'name' => 'original']);
 })->with(['GET', 'PUT']);
+test('D88 the product form takes the pre-order settings; a product left out of them keeps its own', function (): void {
+    $created = $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload([
+        'status' => 'coming_soon',
+        'preorder' => ['enabled' => true, 'expected_at' => '2027-01-15', 'limit' => 300],
+    ]))->assertCreated()->assertJsonPath('data.preorder', ['enabled' => true, 'expected_at' => '2027-01-15', 'limit' => 300]);
+
+    $this->tenantJson('PUT', '/api/dashboard/products/'.$created->json('data.id'), $this->productPayload())
+        ->assertOk()
+        ->assertJsonPath('data.preorder', ['enabled' => true, 'expected_at' => '2027-01-15', 'limit' => 300]);
+});
+
+test('D88 the pre-order settings are validated', function (array $preorder, string $field): void {
+    $this->tenantJson('POST', '/api/dashboard/products', $this->productPayload(['preorder' => $preorder]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor($field, 'error.details');
+})->with([
+    'flag missing' => [['limit' => 5], 'preorder.enabled'],
+    'flag not boolean' => [['enabled' => 'yes'], 'preorder.enabled'],
+    'day not a date' => [['enabled' => true, 'expected_at' => '15/01/2027'], 'preorder.expected_at'],
+    'cap below one' => [['enabled' => true, 'limit' => 0], 'preorder.limit'],
+    'cap too large' => [['enabled' => true, 'limit' => 10_000_001], 'preorder.limit'],
+]);

@@ -26,6 +26,7 @@ Route::prefix('store')->name('store.')->middleware(['tenant', 'tenant.active:sto
     require __DIR__.'/api/store/catalog.php';
     require __DIR__.'/api/store/customers.php';
     require __DIR__.'/api/store/orders.php';
+    require __DIR__.'/api/store/collections.php';
 });
 
 Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.active:dashboard'])->group(function (): void {
@@ -36,6 +37,7 @@ Route::prefix('dashboard')->name('dashboard.')->middleware(['tenant', 'tenant.ac
     require __DIR__.'/api/dashboard/customers.php';
     require __DIR__.'/api/dashboard/orders.php';
     require __DIR__.'/api/dashboard/collections.php';
+    require __DIR__.'/api/dashboard/expenses.php';
     require __DIR__.'/api/dashboard/reports.php';
     require __DIR__.'/api/dashboard/audit.php';
     require __DIR__.'/api/dashboard/messaging.php';

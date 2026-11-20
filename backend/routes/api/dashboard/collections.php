@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 use App\Modules\Collections\Http\Controllers\Dashboard\CollectionController;
 use App\Modules\Collections\Http\Controllers\Dashboard\CollectionVoidController;
+use App\Modules\Collections\Http\Controllers\Dashboard\CustomerCreditController;
+use App\Modules\Collections\Http\Controllers\Dashboard\CustomerCreditVoidController;
 use App\Modules\Collections\Http\Controllers\Dashboard\CustomerStatementController;
 use App\Modules\Collections\Http\Controllers\Dashboard\OrderCollectionController;
+use App\Modules\Collections\Http\Controllers\Dashboard\OrderCreditController;
 use Illuminate\Support\Facades\Route;
 
 /*
-| Dashboard collections (08-api-contract.md §10, BR-C02..C04). {order} is the per-tenant order number (BR-O09);
+| Dashboard collections, customer credits and statements (08-api-contract.md §10, BR-C02..C08). {order} is the per-tenant order number (BR-O09);
 | {collection} and {customer} bind tenant-scoped rows, so another tenant's id is 404 (BR-T04). Recording and
 | voiding honor `Idempotency-Key` (§0), like the other `POST /orders/{number}/…` writes.
 */
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
-    Route::get('collections', [CollectionController::class, 'index'])->name('collections.index');
-    Route::post('orders/{order}/collections', [OrderCollectionController::class, 'store'])->whereNumber('order')->middleware('idempotent')->name('orders.collections.store');
-    Route::post('collections/{collection}/void', [CollectionVoidController::class, 'store'])->whereNumber('collection')->middleware('idempotent')->name('collections.void');
-    Route::get('customers/{customer}/statement', [CustomerStatementController::class, 'show'])->whereNumber('customer')->name('customers.statement');
+    Route::get('collections', [CollectionController::class, 'index'])->middleware('permission:collections.manage')->name('collections.index');
+    Route::post('orders/{order}/collections', [OrderCollectionController::class, 'store'])->whereNumber('order')->middleware('idempotent')->middleware('permission:collections.manage')->name('orders.collections.store');
+    Route::post('collections/{collection}/void', [CollectionVoidController::class, 'store'])->whereNumber('collection')->middleware('idempotent')->middleware('permission:collections.manage')->name('collections.void');
+    Route::get('customers/{customer}/statement', [CustomerStatementController::class, 'show'])->whereNumber('customer')->middleware('permission:customers.manage,customers.credit,collections.manage')->name('customers.statement');
+    Route::get('customers/{customer}/credits', [CustomerCreditController::class, 'index'])->whereNumber('customer')->middleware('permission:customers.manage,customers.credit,collections.manage')->name('customers.credits');
+    Route::post('orders/{order}/apply-credit', [OrderCreditController::class, 'store'])->whereNumber('order')->middleware('idempotent')->middleware('permission:collections.manage')->name('orders.apply-credit');
+    Route::post('credits/{customerCredit}/void', [CustomerCreditVoidController::class, 'store'])->whereNumber('customerCredit')->middleware('idempotent')->middleware('permission:collections.manage')->name('credits.void');
 });

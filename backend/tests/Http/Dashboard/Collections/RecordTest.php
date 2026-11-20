@@ -25,10 +25,37 @@ test('BR-C02 the merchant records a cash collection and gets it back with the ne
         ->assertJsonPath('data.collected_at', now()->toIso8601String())
         ->assertJsonPath('data.is_voided', false)
         ->assertJsonPath('data.order', [
-            'id' => $this->order->id, 'number' => $this->order->number, 'order_total' => '540.00', 'collected_amount' => '200.00', 'collection_status' => 'partially_collected',
+            'id' => $this->order->id, 'number' => $this->order->number, 'order_total' => '540.00', 'net_total' => '540.00', 'collected_amount' => '200.00', 'collection_status' => 'partially_collected',
         ])
-        ->assertExactJsonStructure(['data' => ['id', 'order' => ['id', 'number', 'order_total', 'collected_amount', 'collection_status'], 'amount', 'method', 'method_label', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']]);
+        ->assertExactJsonStructure(['data' => ['id', 'order' => ['id', 'number', 'order_total', 'net_total', 'collected_amount', 'collection_status'], 'kind', 'kind_label', 'order_return_id', 'customer_credit_id', 'amount', 'method', 'method_label', 'reference', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']]);
 });
+
+test('BR-C10 a payment by InstaPay keeps its method and reference', function (): void {
+    ($this->record)(['amount' => '300.00', 'method' => 'instapay', 'reference' => ' IP-55120 '])
+        ->assertCreated()
+        ->assertJsonPath('data.method', 'instapay')
+        ->assertJsonPath('data.method_label', 'إنستاباي')
+        ->assertJsonPath('data.reference', 'IP-55120');
+
+    $this->assertDatabaseHas('collections', ['order_id' => $this->order->id, 'method' => 'instapay', 'reference' => 'IP-55120']);
+});
+
+test('D103 c a payment without a method is cash, so older clients keep working', function (): void {
+    ($this->record)(['amount' => '100.00'])->assertCreated()->assertJsonPath('data.method', 'cash')->assertJsonPath('data.reference', null);
+});
+
+test('D103 a c credit or an unknown method and a reference over 60 characters are refused', function (array $body, string $field): void {
+    ($this->record)(['amount' => '100.00', ...$body])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonValidationErrors($field, 'error.details');
+
+    $this->assertDatabaseCount('collections', 0);
+})->with([
+    'credit is the system\'s' => [['method' => 'credit'], 'method'],
+    'unknown' => [['method' => 'cheque'], 'method'],
+    'reference 61' => [['method' => 'wallet', 'reference' => str_repeat('1', 61)], 'reference'],
+]);
 
 test('BR-C04 a deposit can be recorded on a pending order', function (): void {
     ($this->record)(['amount' => '100.00'])->assertCreated();

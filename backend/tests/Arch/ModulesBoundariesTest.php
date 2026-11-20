@@ -64,9 +64,9 @@ arch('pricing only touches the catalog product and sku it is handed, plus the sh
         'App\Modules\Catalog\Http',
     ]);
 
-arch('pricing models are used outside pricing only by the Sku tiers relation')
+arch('pricing models are used outside pricing only by the SkuUnit tiers relation')
     ->expect('App\Modules\Pricing\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Pricing', App\Modules\Catalog\Models\Sku::class, 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Pricing', App\Modules\Catalog\Models\SkuUnit::class, 'Database\Factories', 'Database\Seeders']);
 
 arch('catalog reaches pricing only through its actions, data, services and request concern')
     ->expect('App\Modules\Catalog')
@@ -109,6 +109,8 @@ arch('inventory models are written only by the StockLedger and read by inventory
         'App\Modules\Inventory\Http\Resources',
         App\Modules\Inventory\Actions\AdjustStock::class, // reads the movement the ledger returns, for the audit record
         App\Modules\Orders\Services\CheckoutValidator::class, // reads the stock rows checkout locked through the ledger
+        App\Modules\Orders\Actions\EditOrderLines::class, // V2 Task 09: checks on copies of the locked rows, the order's own reservation counted as available
+        App\Modules\Orders\Services\OrderQuoter::class, // V2 Task 09: the same copies for the quote of an edit
         App\Modules\Catalog\Models\Sku::class,
         'Database\Factories',
         'Database\Seeders', // demo data: writes through actions, reads the models they return (rules/02 §1)
@@ -123,6 +125,10 @@ arch('catalog reaches inventory only through its actions and queries')
         'App\Modules\Inventory\Http',
     ]);
 
+// V2 Task 06: OpenSpout is wrapped by one service, so a library swap or upgrade touches one class.
+arch('only the Spreadsheet service touches OpenSpout')
+    ->expect('OpenSpout')
+    ->toOnlyBeUsedIn([App\Modules\Catalog\Services\Spreadsheet::class]);
 arch('pricing does not depend on inventory')
     ->expect('App\Modules\Pricing')
     ->not->toUse('App\Modules\Inventory');
@@ -158,6 +164,8 @@ arch('messaging models are only used inside messaging')
     ->expect('App\Modules\Messaging\Models')
     ->toOnlyBeUsedIn(['App\Modules\Messaging', 'Database\Factories']);
 
+// V2 Task 03: Orders also lists an order's messages (OrderMessagesQuery) and tells merchants about a dropped store
+// number by filling Messaging's ConnectionAlerts contract (MerchantConnectionAlerts), nothing else.
 arch('other modules reach messaging only through Messenger, its payload and enums')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
     ->not->toUse([
@@ -167,7 +175,12 @@ arch('other modules reach messaging only through Messenger, its payload and enum
         'App\Modules\Messaging\Jobs',
         'App\Modules\Messaging\Models',
         'App\Modules\Messaging\Queries',
-    ]);
+    ])
+    ->ignoring([App\Modules\Orders\Queries\OrderDetailQuery::class, App\Modules\Orders\Services\MerchantConnectionAlerts::class]);
+
+arch('orders fill the connection alerts contract of messaging')
+    ->expect(App\Modules\Orders\Services\MerchantConnectionAlerts::class)
+    ->toImplement(App\Modules\Messaging\Contracts\ConnectionAlerts::class);
 
 arch('messaging does not depend on catalog, pricing or inventory')
     ->expect('App\Modules\Messaging')
@@ -195,6 +208,7 @@ arch('customers reach tenancy only through its context, concern, queries and the
         'App\Modules\Tenancy\Http\Resources',
     ]);
 
+// V2 Task 15 (D93): a bundle in the cart is as available as its components allow, which Catalog's BundleAvailability says.
 arch('customers only touch the catalog product and sku of a cart line')
     ->expect('App\Modules\Customers')
     ->not->toUse([
@@ -209,7 +223,8 @@ arch('customers only touch the catalog product and sku of a cart line')
         'App\Modules\Catalog\Services',
         'App\Modules\Catalog\Exceptions',
         'App\Modules\Catalog\Http',
-    ]);
+    ])
+    ->ignoring(App\Modules\Catalog\Services\BundleAvailability::class);
 
 arch('customers price only through the pricing services and read stock only through the sku')
     ->expect('App\Modules\Customers')
@@ -257,11 +272,16 @@ arch('orders only touch the catalog sku and product of an order line')
         App\Modules\Catalog\Models\ProductFieldOption::class,
         'App\Modules\Catalog\Models\Scopes',
         'App\Modules\Catalog\Actions',
-        'App\Modules\Catalog\Queries',
         'App\Modules\Catalog\Services',
         'App\Modules\Catalog\Exceptions',
         'App\Modules\Catalog\Http',
     ]);
+
+// V2 Task 07: the merchant's order form finds the SKUs of its lines the way the cart does (BR-O11).
+arch('orders find skus only through the cart sku query')
+    ->expect('App\Modules\Catalog\Queries')
+    ->not->toBeUsedIn('App\Modules\Orders')
+    ->ignoring(App\Modules\Catalog\Queries\CartSkuQuery::class);
 
 arch('orders move stock only through the StockLedger')
     ->expect('App\Modules\Orders')
@@ -297,9 +317,14 @@ arch('orders use customers only through its queries, cart actions, contracts and
         'App\Modules\Customers\Http',
     ]);
 
-arch('orders do not depend on messaging')
-    ->expect('App\Modules\Orders')
-    ->not->toUse('App\Modules\Messaging');
+arch('orders send messages only to tell customers about their order (BR-N03)')
+    ->expect('App\Modules\Messaging')
+    ->not->toBeUsedIn('App\Modules\Orders')
+    ->ignoring([
+        App\Modules\Orders\Actions\NotifyCustomerOfStatus::class,
+        App\Modules\Orders\Queries\OrderDetailQuery::class,
+        App\Modules\Orders\Services\MerchantConnectionAlerts::class,
+    ]);
 
 arch('orders models are used outside orders only by collections and reports')
     ->expect('App\Modules\Orders\Models')
@@ -320,6 +345,10 @@ arch('orders fill the reservation holders contract of inventory')
     ->expect(App\Modules\Orders\Services\OrdersHoldingSku::class)
     ->toImplement(App\Modules\Inventory\Contracts\ReservationHolders::class);
 
+arch('orders fill the pre-order demand contract of catalog')
+    ->expect(App\Modules\Orders\Queries\PreorderDemandQuery::class)
+    ->toImplement(App\Modules\Catalog\Contracts\PreorderDemand::class);
+
 arch('orders fill the recent orders contract of customers')
     ->expect(App\Modules\Orders\Services\CustomerRecentOrders::class)
     ->toImplement(App\Modules\Customers\Contracts\RecentOrders::class);
@@ -332,7 +361,7 @@ arch('orders fill the recent orders contract of customers')
 
 arch('collection models are only used inside collections')
     ->expect('App\Modules\Collections\Models')
-    ->toOnlyBeUsedIn(['App\Modules\Collections', 'Database\Factories']);
+    ->toOnlyBeUsedIn(['App\Modules\Collections', 'Database\Factories', 'Database\Seeders']);
 
 arch('collections use orders only through the order, its enums, contracts and ApplyCollectedAmount')
     ->expect('App\Modules\Collections')
@@ -383,6 +412,32 @@ arch('collections fill the order collections contract of orders')
     ->expect(App\Modules\Collections\Services\OrderCollectionRecords::class)
     ->toImplement(App\Modules\Orders\Contracts\OrderCollections::class);
 
+/*
+| Returns (V2 Task 01, BR-R01..R06) live in Orders. Reports read them for net sales; Collections pays a return's
+| refund through Orders' RefundsPayments contract (ReturnRefunds) and never touches the return rows or actions.
+*/
+
+arch('return models are used only by orders and, for reading, reports')
+    ->expect([App\Modules\Orders\Models\OrderReturn::class, App\Modules\Orders\Models\OrderReturnItem::class])
+    ->toOnlyBeUsedIn(['App\Modules\Orders', 'App\Modules\Reports\Queries', App\Providers\OrdersServiceProvider::class, 'Database\Factories', 'Database\Seeders']);
+
+arch('collections reach returns only through the refunds contract')
+    ->expect('App\Modules\Collections')
+    ->not->toUse([
+        App\Modules\Orders\Models\OrderReturn::class,
+        App\Modules\Orders\Models\OrderReturnItem::class,
+        App\Modules\Orders\Actions\RecordReturn::class,
+        App\Modules\Orders\Actions\VoidReturn::class,
+    ]);
+
+arch('collections fill the refunds payments contract of orders')
+    ->expect(App\Modules\Collections\Services\ReturnRefunds::class)
+    ->toImplement(App\Modules\Orders\Contracts\RefundsPayments::class);
+
+arch('collections fill the customer exposure contract of orders')
+    ->expect(App\Modules\Collections\Queries\CustomerExposureQuery::class)
+    ->toImplement(App\Modules\Orders\Contracts\CustomerExposure::class);
+
 arch('collections fill the outstanding balances contract of customers')
     ->expect(App\Modules\Collections\Queries\OutstandingByCustomerQuery::class)
     ->toImplement(App\Modules\Customers\Contracts\OutstandingBalances::class);
@@ -425,10 +480,12 @@ arch('no module depends on reports')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Support'])
     ->not->toUse('App\Modules\Reports');
 
-test('reports contain only queries, their input, enums and http', function (): void {
+// V2 Task 16: Services holds ReportCache (D94, the TTL cache of the advanced reports) and ReportExporter (the files,
+// through Catalog's Spreadsheet); neither writes to the database.
+test('reports contain only queries, their input, enums, http and the cache and export services', function (): void {
     $folders = array_map(basename(...), glob(dirname(__DIR__, 2).'/app/Modules/Reports/*', GLOB_ONLYDIR) ?: []);
 
-    expect($folders)->toBe(['Data', 'Enums', 'Http', 'Queries']);
+    expect($folders)->toBe(['Data', 'Enums', 'Http', 'Queries', 'Services']);
 });
 
 /*
@@ -454,3 +511,25 @@ arch('platform reaches other modules only through their queries, services, data,
 arch('no business module depends on platform')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports'])
     ->not->toUse('App\Modules\Platform');
+
+// V2 Task 11 (BR-PR14): the storefront reads a customer's prices through Pricing's contract, filled by Customers.
+arch('customers fill the customer pricing contract of pricing')
+    ->expect(App\Modules\Customers\Queries\PricingContextQuery::class)
+    ->toImplement(App\Modules\Pricing\Contracts\CustomerPricing::class);
+
+arch('pricing contracts are interfaces')
+    ->expect('App\Modules\Pricing\Contracts')
+    ->toBeInterfaces();
+
+/*
+| Expenses (V2 Task 19, D100): what the shop spends to run. It needs only Tenancy's context and concern and Audit's
+| logger; Reports reads its totals through ExpenseTotalsQuery. Nothing else depends on it.
+*/
+
+arch('expenses depend on no business module')
+    ->expect('App\Modules\Expenses')
+    ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports', 'App\Modules\Tenancy\Models', 'App\Modules\Audit\Models']);
+
+arch('only reports read expenses, and only through their totals query')
+    ->expect('App\Modules\Expenses')
+    ->toOnlyBeUsedIn(['App\Modules\Expenses', 'App\Modules\Reports\Queries', 'Database\Factories', 'Database\Seeders']);

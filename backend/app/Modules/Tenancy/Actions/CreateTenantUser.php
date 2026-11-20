@@ -6,11 +6,10 @@ namespace App\Modules\Tenancy\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Tenancy\Data\TenantUserData;
-use App\Modules\Tenancy\Enums\TenantUserRole;
 use App\Modules\Tenancy\Exceptions\TenantUserConflict;
 use App\Modules\Tenancy\Models\TenantUser;
 
-/** BR-T06: adds another owner to the current tenant. */
+/** BR-T06, D82: adds a dashboard user with a role (an owner by default) to the current tenant. */
 final readonly class CreateTenantUser
 {
     public function __construct(private AuditLogger $audit) {}
@@ -25,10 +24,10 @@ final readonly class CreateTenantUser
             'name' => $data->name,
             'email' => $data->email,
             'password' => $data->password,
-            'role' => TenantUserRole::Owner,
+            'role' => $data->role,
         ]);
 
-        $this->audit->log('tenant_user.created', $user, null, ['name' => $user->name, 'email' => $user->email]);
+        $this->audit->log('tenant_user.created', $user, null, ['name' => $user->name, 'email' => $user->email, 'role' => $user->role->value]);
 
         return $user;
     }

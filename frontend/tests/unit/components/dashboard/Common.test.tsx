@@ -7,6 +7,7 @@ import { Pager } from "@/components/dashboard/common/Pager";
 import { ReasonDialog } from "@/components/dashboard/common/ReasonDialog";
 import { StaleBadge } from "@/components/dashboard/orders/OrderBadges";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api/errors";
 import { ar } from "@/lib/copy/ar";
 
@@ -98,7 +99,80 @@ describe("Pager", () => {
   });
 });
 
+describe("Table stack", () => {
+  it("D104 labels every cell with its column header so a phone can show rows as cards", async () => {
+    const { rerender } = render(
+      <Table stack>
+        <TableHeader>
+          <TableRow>
+            <TableHead>الرقم</TableHead>
+            <TableHead>الإجمالي</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>#10482</TableCell>
+            <TableCell>8,450.00</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    expect(screen.getByRole("table")).toHaveAttribute("data-stack");
+    expect(screen.getByText("8,450.00")).toHaveAttribute("data-label", "الإجمالي");
+
+    rerender(
+      <Table stack>
+        <TableHeader>
+          <TableRow>
+            <TableHead>الرقم</TableHead>
+            <TableHead>الإجمالي</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>#10483</TableCell>
+            <TableCell>12,300.00</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    await waitFor(() => expect(screen.getByText("12,300.00")).toHaveAttribute("data-label", "الإجمالي"));
+  });
+
+  it("leaves a plain table unlabelled", () => {
+    render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>الرقم</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>#10482</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    expect(screen.getByRole("table")).not.toHaveAttribute("data-stack");
+    expect(screen.getByText("#10482")).not.toHaveAttribute("data-label");
+  });
+});
+
 describe("FilterPanel", () => {
+  it("D104 opens on arrival when filters are already set", () => {
+    render(
+      <FilterPanel active={2}>
+        <select aria-label="الحالة" />
+      </FilterPanel>,
+    );
+
+    expect(screen.getByLabelText("الحالة")).toBeInTheDocument();
+  });
+
   it("keeps the filters hidden until the filter button opens them", async () => {
     const user = userEvent.setup();
     render(

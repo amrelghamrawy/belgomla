@@ -7,9 +7,11 @@ use App\Modules\Collections\Actions\RecordCollection;
 use App\Modules\Collections\Actions\VoidCollection;
 use App\Modules\Collections\Data\CollectionData;
 use App\Modules\Collections\Exceptions\AlreadyVoided;
+use App\Modules\Collections\Exceptions\PaymentHasRefunds;
 use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 
@@ -55,6 +57,28 @@ test('BR-C02 a collection is voided only once', function (): void {
     });
 
     expect(AuditLog::query()->count())->toBe(1);
+});
+
+test('BR-R04 voiding a refund adds it back to what was collected', function (): void {
+    $return = OrderReturn::factory()->for($this->order)->create();
+    $refund = CashCollection::factory()->for($this->order)->refund($return->id)->create(['amount' => '100.00']);
+    $this->order->forceFill(['collected_amount' => '400.00'])->save();
+
+    ($this->void)($refund);
+
+    expect($this->order->refresh()->collected_amount)->toBe('500.00');
+});
+
+test('BR-R04 a payment is voided only if what stays collected covers the live refunds', function (): void {
+    $return = OrderReturn::factory()->for($this->order)->create();
+    CashCollection::factory()->for($this->order)->refund($return->id)->create(['amount' => '250.00']);
+    $this->order->forceFill(['collected_amount' => '250.00'])->save();
+
+    expect(fn () => ($this->void)($this->second))->toThrow(function (PaymentHasRefunds $e): void {
+        expect([$e->status, $e->errorCode])->toBe([409, 'void_refund_first']);
+    });
+
+    expect($this->second->refresh()->voided_at)->toBeNull();
 });
 
 test('BR-L a void is audited as collection.voided', function (): void {

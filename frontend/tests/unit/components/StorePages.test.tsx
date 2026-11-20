@@ -7,10 +7,13 @@ import { AccountOverview } from "@/components/store/AccountOverview";
 import { PriceListView } from "@/components/store/PriceListView";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHome } from "@/components/store/StoreHome";
+import { saveDownload } from "@/lib/api/download";
 
 import { cart, cartItem, customer, facet, omit, page, storeProduct, tenantSettings } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { renderWithQuery, router, searchParams } from "../render";
+
+vi.mock("@/lib/api/download", () => ({ saveDownload: vi.fn() }));
 
 const tree = [
   { id: 1, name: "المرحلة الإعدادية", slug: "prep", kind: "books", icon: null, image_url: null, children: [] },
@@ -32,8 +35,10 @@ describe("StoreHome", () => {
     renderWithQuery(<StoreHome />);
 
     expect(await screen.findByRole("link", { name: "المرحلة الإعدادية" })).toHaveAttribute("href", "/c/prep");
-    expect(await screen.findByRole("link", { name: "الأضواء علوم أولى إعدادي" })).toBeInTheDocument();
-    expect(callsTo(fetchMock, "GET /api/store/products")[0]?.url.search).toBe("?sort=-created_at&per_page=8");
+    expect((await screen.findAllByRole("link", { name: "الأضواء علوم أولى إعدادي" }))[0]).toBeInTheDocument();
+    expect(callsTo(fetchMock, "GET /api/store/products").map((call) => call.url.search)).toContain(
+      "?sort=-created_at&per_page=8",
+    );
   });
 
   it("D41 a store without categories shows a WhatsApp contact button", async () => {
@@ -156,6 +161,43 @@ describe("PriceListView", () => {
     expect(callsTo(fetchMock, "GET /api/store/price-list")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
   });
 
+  it("BR-P14 shows a variant row's label under the product name", async () => {
+    stubList({}, [
+      { ...rows[0], sku_id: 81, variant: "أزرق / M" },
+      { ...rows[1], variant: null },
+    ]);
+    renderWithQuery(<PriceListView />);
+
+    const table = await screen.findByTestId("price-list");
+    expect(within(table).getAllByTestId("price-list-variant")).toHaveLength(1);
+    expect(table).toHaveTextContent("الأضواء علومأزرق / MBK-001");
+  });
+
+  it("BR-PR15 marks the rows a promotion priced with the offer badge", async () => {
+    stubList({}, [
+      {
+        ...rows[0],
+        base_price: "76.50",
+        promotion: { id: 4, name: "عرض", discount_percent: "15.00", ends_at: "2030-01-01T00:00:00Z" },
+      },
+      rows[1],
+    ]);
+    renderWithQuery(<PriceListView />);
+
+    const table = await screen.findByTestId("price-list");
+    expect(within(table).getAllByTestId("offer-badge")).toHaveLength(1);
+    expect(within(table).getByTestId("offer-badge")).toHaveTextContent("عرض 15%");
+  });
+
+  it("BR-PR14 marks the rows priced at the customer's own price", async () => {
+    stubList({}, [{ ...rows[0], base_price: "85.00", price_source: "group" }, rows[1]]);
+    renderWithQuery(<PriceListView />);
+
+    const table = await screen.findByTestId("price-list");
+    expect(within(table).getAllByTestId("your-price")).toHaveLength(1);
+    expect(table).toHaveTextContent("85.00 ج.مسعرك الخاص");
+  });
+
   it("D68 names the reference column after the category's section, and both ways without a category", async () => {
     searchParams.value = new URLSearchParams("category=supplies");
     stubApi({
@@ -204,6 +246,42 @@ describe("PriceListView", () => {
     await screen.findByTestId("price-list");
     expect(screen.queryByRole("columnheader", { name: "سعر الجملة" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "سجل الدخول لعرض الأسعار في القائمة" })).toBeInTheDocument();
+  });
+
+  it("D83 downloads the same selection as an Excel file", async () => {
+    searchParams.value = new URLSearchParams("category=prep&f[grade]=7");
+    const fetchMock = stubApi({
+      "GET /api/store/tenant": json(200, { data: tenantSettings() }),
+      "GET /api/store/categories": json(200, { data: tree }),
+      "GET /api/store/filters": json(200, { data: [facet()] }),
+      "GET /api/store/price-list": json(200, {
+        data: rows,
+        meta: { count: 2, truncated: false, prices_hidden: false },
+      }),
+      "GET /api/store/price-list/export": () =>
+        new Response("x", { headers: { "Content-Disposition": "attachment; filename=price-list-2026-10-20.xlsx" } }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<PriceListView />);
+    await screen.findByTestId("price-list");
+
+    await user.click(screen.getByRole("button", { name: "تحميل Excel" }));
+
+    await waitFor(() =>
+      expect(saveDownload).toHaveBeenCalledWith(expect.objectContaining({ fileName: "price-list-2026-10-20.xlsx" })),
+    );
+    expect(callsTo(fetchMock, "GET /api/store/price-list/export")[0]?.url.search).toBe("?category=prep&f%5Bgrade%5D=7");
+  });
+
+  it("D1 offers no Excel file while prices are hidden", async () => {
+    stubList(
+      { prices_hidden: true },
+      rows.map((row) => omit(row, "cover_price", "base_price")),
+    );
+    renderWithQuery(<PriceListView />);
+
+    await screen.findByTestId("price-list");
+    expect(screen.queryByRole("button", { name: "تحميل Excel" })).not.toBeInTheDocument();
   });
 
   it("says when the list was cut at the limit", async () => {
@@ -344,5 +422,39 @@ describe("AccountOverview", () => {
     renderWithQuery(<AccountOverview />);
 
     expect(await screen.findByText("حسابك في انتظار موافقة المتجر")).toBeInTheDocument();
+  });
+
+  it("BR-N03 turns the order messages off and keeps the answer as the session", async () => {
+    const fetchMock = stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "PATCH /api/store/account/preferences": json(200, { data: customer({ order_notifications: false }) }),
+    });
+    const success = vi.spyOn(toast, "success").mockImplementation(() => "t");
+    const user = userEvent.setup();
+    renderWithQuery(<AccountOverview />);
+
+    const toggle = await screen.findByRole("switch", { name: "رسائل واتساب عن طلباتي" });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+
+    await waitFor(() => expect(screen.getByRole("switch", { name: "رسائل واتساب عن طلباتي" })).not.toBeChecked());
+    expect(callsTo(fetchMock, "PATCH /api/store/account/preferences")[0]?.body).toEqual({ order_notifications: false });
+    expect(callsTo(fetchMock, "GET /api/store/me")).toHaveLength(1);
+    expect(success).toHaveBeenCalledWith("تم حفظ اختيارك");
+  });
+
+  it("BR-N03 says why the switch did not move", async () => {
+    stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "PATCH /api/store/account/preferences": envelopeError(500, "server_error", "حدث خطأ غير متوقع"),
+    });
+    const failure = vi.spyOn(toast, "error").mockImplementation(() => "t");
+    const user = userEvent.setup();
+    renderWithQuery(<AccountOverview />);
+
+    await user.click(await screen.findByRole("switch", { name: "رسائل واتساب عن طلباتي" }));
+
+    await waitFor(() => expect(failure).toHaveBeenCalledOnce());
+    expect(screen.getByRole("switch", { name: "رسائل واتساب عن طلباتي" })).toBeChecked();
   });
 });

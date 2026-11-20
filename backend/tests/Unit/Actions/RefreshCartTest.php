@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Customers\Actions\RefreshCart;
 use App\Modules\Customers\Data\PricedCartLine;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerGroup;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Tenancy\TenantContext;
 
 beforeEach(function (): void {
@@ -19,7 +22,7 @@ beforeEach(function (): void {
 
 function cartLine(Cart $cart, string $name, ProductStatus $status = ProductStatus::Active): CartItem
 {
-    $sku = Product::factory()->state(['name' => $name, 'status' => $status])->withSku(['base_price' => '10.00'], onHand: 100)->create()->sku()->sole();
+    $sku = Product::factory()->state(['name' => $name, 'status' => $status])->withSku(['base_price' => '10.00'], onHand: 100)->create()->skus()->sole();
 
     return CartItem::factory()->for($cart)->create(['sku_id' => $sku->id, 'quantity' => 2]);
 }
@@ -47,4 +50,81 @@ test('a customer without a cart gets an empty one', function (): void {
     $cart = app(RefreshCart::class)->handle(Customer::factory()->create());
 
     expect([$cart->lines, $cart->removed, $cart->itemsTotal])->toBe([[], [], '0.00']);
+});
+
+test('BR-O14 pre-order lines are priced apart; those whose product no longer takes pre-orders are dropped as preorder_closed', function (): void {
+    $open = Product::factory()->state(['name' => 'محجوز'])->preorderable()->withSku(['base_price' => '10.00'])->create()->skus()->sole();
+    $closed = Product::factory()->state(['name' => 'صار متاحًا'])->withSku(['base_price' => '10.00'], onHand: 100)->create()->skus()->sole();
+    $order = cartLine($this->cart, 'متاح');
+    CartItem::factory()->preorder()->for($this->cart)->create(['sku_id' => $open->id, 'quantity' => 4]);
+    $gone = CartItem::factory()->preorder()->for($this->cart)->create(['sku_id' => $closed->id, 'quantity' => 4]);
+
+    $cart = app(RefreshCart::class)->handle($this->customer);
+
+    expect(array_map(fn (PricedCartLine $line): int => $line->skuId, $cart->lines))->toBe([$order->sku_id])
+        ->and(array_map(fn (PricedCartLine $line): array => [$line->skuId, $line->available, $line->expectedAt], $cart->preorderLines))->toBe([[$open->id, 0, '2026-12-01']])
+        ->and($cart->preorderTotal)->toBe('40.00')
+        ->and($cart->itemsTotal)->toBe('20.00')
+        ->and($cart->removed)->toBe([['product_name' => 'صار متاحًا', 'reason' => 'preorder_closed']])
+        ->and(CartItem::query()->find($gone->id))->toBeNull();
+});
+
+test('BR-P04 an order line of a coming soon product is still dropped as inactive', function (): void {
+    $line = cartLine($this->cart, 'قريبًا', ProductStatus::ComingSoon);
+
+    expect(app(RefreshCart::class)->handle($this->customer)->removed)->toBe([['product_name' => 'قريبًا', 'reason' => 'inactive']])
+        ->and(CartItem::query()->find($line->id))->toBeNull();
+});
+
+test('BR-PR14 the refreshed cart shows the customer\'s group price', function (): void {
+    $group = CustomerGroup::factory()->create(['discount_percent' => '20.00']);
+    $customer = $this->makeCustomer(['customer_group_id' => $group->id]);
+    $sku = $this->orderableSku(['code' => 'GRP-1'], name: 'كتاب المستوى');
+    $this->fillCart($customer, [$sku->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    $line = app(RefreshCart::class)->handle($customer)->lines[0];
+
+    expect($line->price->unitPrice)->toBe('72.00')
+        ->and($line->price->source)->toBe(PriceSource::Group);
+});
+
+test('BR-PR15 the refreshed cart shows a live promotion to a customer without a group', function (): void {
+    $customer = $this->makeCustomer();
+    $sku = $this->orderableSku(['code' => 'PRM-1'], name: 'كتاب العرض');
+    $this->inTenant(fn () => App\Modules\Pricing\Models\Promotion::factory()->covering($sku)->percent('20.00')->create());
+    $this->fillCart($customer, [$sku->id => 5]);
+    app(TenantContext::class)->set($this->tenant);
+
+    $line = app(RefreshCart::class)->handle($customer)->lines[0];
+
+    expect($line->price->unitPrice)->toBe('72.00')
+        ->and($line->price->source)->toBe(PriceSource::Promotion);
+});
+
+test('D91 a line in a unit no longer sold is deleted and reported, the SKU\'s other unit kept', function (): void {
+    $kept = cartLine($this->cart, 'كشكول');
+    $box = App\Modules\Catalog\Models\SkuUnit::factory()->create(['sku_id' => $kept->sku_id, 'base_price' => '100.00', 'conversion_factor' => 10]);
+    $gone = CartItem::factory()->for($this->cart)->create(['sku_id' => $kept->sku_id, 'sku_unit_id' => $box->id, 'quantity' => 1]);
+    $box->forceFill(['status' => App\Modules\Catalog\Enums\ArchiveStatus::Archived])->save();
+
+    $cart = app(RefreshCart::class)->handle($this->customer);
+
+    expect(array_map(fn (PricedCartLine $line): int => $line->skuUnitId, $cart->lines))->toBe([$kept->sku_unit_id])
+        ->and($cart->removed)->toBe([['product_name' => 'كشكول', 'reason' => 'inactive']])
+        ->and(CartItem::query()->whereKey($gone->id)->exists())->toBeFalse();
+});
+
+test('BR-P14 the line of a variant made inactive is dropped as inactive, its sibling kept with its label', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر']);
+    [$blue, $red] = Sku::query()->whereIn('code', ['PEN-1', 'PEN-2'])->orderBy('code')->get()->all();
+    CartItem::factory()->for($this->cart)->create(['sku_id' => $blue->id, 'quantity' => 2]);
+    $gone = CartItem::factory()->for($this->cart)->create(['sku_id' => $red->id, 'quantity' => 2]);
+    $red->update(['status' => 'inactive']);
+
+    $cart = app(RefreshCart::class)->handle($this->customer);
+
+    expect(array_map(fn (PricedCartLine $line): array => [$line->skuId, $line->variant], $cart->lines))->toBe([[$blue->id, 'أزرق']])
+        ->and($cart->removed)->toBe([['product_name' => 'قلم جاف', 'reason' => 'inactive']])
+        ->and(CartItem::query()->whereKey($gone->id)->exists())->toBeFalse();
 });

@@ -13,6 +13,7 @@
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
+        "openspout/openspout": "5.12.2",
         "predis/predis": "^3.7",
         "symfony/yaml": "^8.1"
     },
@@ -73,7 +74,7 @@
         "test:types": "phpstan analyse --memory-limit=1G",
         "test:type-coverage": "php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100",
         "test:arch": "pest --filter=arch",
-        "test:unit": "pest --parallel",
+        "test:unit": "pest --parallel --coverage --min=99",
         "test": [
             "@test:lint",
             "@test:types",
@@ -91,6 +92,7 @@
     },
     "config": {
         "optimize-autoloader": true,
+        "process-timeout": 0,
         "preferred-install": "dist",
         "sort-packages": true,
         "allow-plugins": {

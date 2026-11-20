@@ -5,19 +5,21 @@ declare(strict_types=1);
 namespace App\Modules\Pricing\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Services\SkuPricePlanner;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Sets cover price, base price, MOQ and replaces the tiers of one SKU atomically (BR-PR01..05, BR-PR10,
- * BR-MOQ01). Each kind of change is its own audit record so the history reads as such (BR-L):
+ * Sets cover price, base price, MOQ and replaces the tiers of one SKU unit atomically (BR-PR01..05, BR-PR10,
+ * BR-MOQ01; per unit since V2 Task 13, D91). The audit records are on the unit (`sku_units`). Each kind of change is its own audit record so the history reads as such (BR-L):
  * `sku.price_changed` (cover/base price and its %), `sku.tiers_changed`, `sku.moq_changed`; nothing is
  * audited when nothing changed. Bulk pricing passes its batch id.
  *
- * A SKU that is not saved yet (product create, duplicate) is saved with its prices and tiers and not
+ * A unit that is not saved yet (product create or edit, duplicate) is saved with its prices and tiers and not
  * audited here: its creation is audited by the Catalog action that creates it.
+ *
+ * A changed base price reprices the bundles priced off it (RepriceBundles, BR-P15, D93).
  *
  * Opens a transaction, which nests into the caller's when there is one (CreateProduct, bulk pricing).
  */
@@ -26,15 +28,16 @@ final readonly class UpdateSkuPricing
     public function __construct(
         private SkuPricePlanner $planner,
         private AuditLogger $audit,
+        private RepriceBundles $bundles,
     ) {}
 
-    public function handle(Sku $sku, SkuPricingData $data, ?string $batchId = null): Sku
+    public function handle(SkuUnit $unit, SkuPricingData $data, ?string $batchId = null): SkuUnit
     {
-        $before = $sku->exists ? $this->planner->current($sku) : null;
-        $after = $this->planner->plan($sku, $data);
+        $before = $unit->exists ? $this->planner->current($unit) : null;
+        $after = $this->planner->plan($unit, $data);
 
-        return DB::transaction(function () use ($sku, $before, $after, $batchId): Sku {
-            $sku->fill([
+        return DB::transaction(function () use ($unit, $before, $after, $batchId): SkuUnit {
+            $unit->fill([
                 'cover_price' => $after['cover_price'],
                 'base_price' => $after['base_price'],
                 'base_price_percent' => $after['base_price_percent'],
@@ -42,17 +45,21 @@ final readonly class UpdateSkuPricing
             ])->save();
 
             if ($before === null || $before['tiers'] !== $after['tiers']) {
-                $sku->tiers()->delete();
-                $sku->tiers()->createMany($after['tiers']);
+                $unit->tiers()->delete();
+                $unit->tiers()->createMany($after['tiers']);
             }
 
-            $sku->load('tiers');
+            $unit->load('tiers');
 
             if ($before !== null) {
-                $this->auditChanges($sku, $before, $after, $batchId);
+                $this->auditChanges($unit, $before, $after, $batchId);
             }
 
-            return $sku;
+            if ($before !== null && $before['base_price'] !== $after['base_price']) {
+                $this->bundles->handle([$unit->id], $batchId);
+            }
+
+            return $unit;
         });
     }
 
@@ -60,22 +67,22 @@ final readonly class UpdateSkuPricing
      * @param  array{cover_price: string|null, base_price: string, base_price_percent: string|null, moq: int, tiers: list<array<string, mixed>>}  $before
      * @param  array{cover_price: string|null, base_price: string, base_price_percent: string|null, moq: int, tiers: list<array<string, mixed>>}  $after
      */
-    private function auditChanges(Sku $sku, array $before, array $after, ?string $batchId): void
+    private function auditChanges(SkuUnit $unit, array $before, array $after, ?string $batchId): void
     {
         $prices = ['cover_price', 'base_price', 'base_price_percent'];
         $oldPrices = array_intersect_key($before, array_flip($prices));
         $newPrices = array_intersect_key($after, array_flip($prices));
 
         if ($oldPrices !== $newPrices) {
-            $this->audit->log('sku.price_changed', $sku, $oldPrices, $newPrices, $batchId);
+            $this->audit->log('sku.price_changed', $unit, $oldPrices, $newPrices, $batchId);
         }
 
         if ($before['tiers'] !== $after['tiers']) {
-            $this->audit->log('sku.tiers_changed', $sku, ['tiers' => $before['tiers']], ['tiers' => $after['tiers']], $batchId);
+            $this->audit->log('sku.tiers_changed', $unit, ['tiers' => $before['tiers']], ['tiers' => $after['tiers']], $batchId);
         }
 
         if ($before['moq'] !== $after['moq']) {
-            $this->audit->log('sku.moq_changed', $sku, ['moq' => $before['moq']], ['moq' => $after['moq']], $batchId);
+            $this->audit->log('sku.moq_changed', $unit, ['moq' => $before['moq']], ['moq' => $after['moq']], $batchId);
         }
     }
 }

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Customers\Enums\AddressStatus;
+use App\Modules\Customers\Enums\CartLineKind;
+use App\Modules\Customers\Enums\CustomerGroupStatus;
 use App\Modules\Customers\Enums\CustomerStatus;
 use App\Modules\Customers\Enums\OtpPurpose;
 
@@ -11,7 +13,11 @@ test('every customers enum exposes labels for all cases', function (string $enum
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([CustomerStatus::class, OtpPurpose::class, AddressStatus::class]);
+})->with([CustomerStatus::class, OtpPurpose::class, AddressStatus::class, CartLineKind::class, CustomerGroupStatus::class]);
+
+test('BR-O14 a cart line is to order or to pre-order', function (): void {
+    expect(CartLineKind::toArray())->toBe(['order' => 'طلب', 'preorder' => 'حجز مسبق']);
+});
 
 test('BR-CU05 the customer statuses match the domain model', function (): void {
     expect(array_map(fn (CustomerStatus $status): string => $status->value, CustomerStatus::cases()))
@@ -49,4 +55,8 @@ test('BR-CU05 the customer state machine', function (CustomerStatus $from, Custo
 
 test('BR-CU07 the otp purposes', function (): void {
     expect(array_map(fn (OtpPurpose $purpose): string => $purpose->value, OtpPurpose::cases()))->toBe(['register', 'password_reset']);
+});
+
+test('BR-PR12 a customer group is active or archived', function (): void {
+    expect(CustomerGroupStatus::toArray())->toBe(['active' => 'نشط', 'archived' => 'مؤرشف']);
 });

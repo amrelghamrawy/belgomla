@@ -23,7 +23,7 @@ test('BR-C02 the collections list shows every collection with its order and cust
         ->assertJsonPath('data.1.id', $old->id)
         ->assertJsonPath('data.0.customer', ['id' => $this->customer->id, 'name' => $this->customer->name])
         ->assertJsonPath('meta.total', 2)
-        ->assertExactJsonStructure(['data' => ['*' => ['id', 'order' => ['id', 'number', 'order_total', 'collected_amount', 'collection_status'], 'customer' => ['id', 'name'], 'amount', 'method', 'method_label', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']], 'links', 'meta']);
+        ->assertExactJsonStructure(['data' => ['*' => ['id', 'order' => ['id', 'number', 'order_total', 'net_total', 'collected_amount', 'collection_status'], 'customer' => ['id', 'name'], 'kind', 'kind_label', 'order_return_id', 'customer_credit_id', 'amount', 'method', 'method_label', 'reference', 'collected_at', 'recorded_by', 'note', 'is_voided', 'voided_at', 'void_reason', 'voided_by', 'created_at']], 'links', 'meta']);
 });
 
 test('D60 the from/to filters are cairo business days', function (): void {
@@ -34,6 +34,19 @@ test('D60 the from/to filters are cairo business days', function (): void {
         ->assertOk()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.id', $inside->id);
+});
+
+test('D103 e the list filters by how the money came in', function (): void {
+    ($this->collect)();
+    $transfer = ($this->collect)(['method' => 'bank_transfer', 'reference' => 'TRX-1']);
+
+    $this->tenantJson('GET', '/api/dashboard/collections?method=bank_transfer')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $transfer->id)
+        ->assertJsonPath('data.0.method_label', 'تحويل بنكي')
+        ->assertJsonPath('data.0.reference', 'TRX-1');
+    $this->tenantJson('GET', '/api/dashboard/collections?method=cheque')->assertUnprocessable();
 });
 
 test('the list filters by customer and by order number', function (): void {

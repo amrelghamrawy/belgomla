@@ -13,7 +13,9 @@ use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\Scopes\VisibleOnStore;
 use App\Modules\Catalog\Services\FacetCacheVersion;
 use App\Modules\Tenancy\TenantContext;
+use App\Support\ArabicText;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -21,6 +23,10 @@ use Illuminate\Support\Facades\Cache;
  * and the number of visible products each option would leave, given the *other* selected facets
  * (a facet never filters its own counts). Options with no products are left out. Inside a category,
  * only the fields of its section (and the section-less ones) are facets (D69).
+ *
+ * After the fields come the variant options (BR-P14, V2 Task 14): one facet per option name (folded, D32, so «اللون» of
+ * every product is one facet), type `option`, key `o:<folded name>`, each value (folded, the id sent back as `f[key]`)
+ * counting the visible products with an active SKU of that value. Labels are the spelling most products use.
  *
  * One grouped query per facet; the result is cached per tenant + selection and invalidated by bumping
  * the tenant's FacetCacheVersion on any product, field, option or category change (Tech §9b).
@@ -76,7 +82,59 @@ final readonly class FacetQuery
             }
         }
 
+        return [...$facets, ...$this->optionFacets($filter)];
+    }
+
+    /**
+     * @return list<Facet>
+     */
+    private function optionFacets(ProductFilterData $filter): array
+    {
+        $facets = [];
+        $names = $this->optionRows($filter)
+            ->selectRaw(ArabicText::sql('product_options.name').' as folded, mode() within group (order by product_options.name) as label')
+            ->groupByRaw(ArabicText::sql('product_options.name'))
+            ->orderByRaw('min(product_options.name)')
+            ->get();
+
+        foreach ($names as $name) {
+            $folded = is_string($name->folded) ? $name->folded : '';
+            $key = FilteredProductsQuery::OPTION_PREFIX.$folded;
+            $options = [];
+
+            $values = $this->optionRows($filter->without($key))
+                ->selectRaw(ArabicText::sql('product_option_values.value').' as id, mode() within group (order by product_option_values.value) as label, count(distinct products.id) as total')
+                ->whereRaw(ArabicText::sql('product_options.name').' = ?', [$folded])
+                ->groupByRaw(ArabicText::sql('product_option_values.value'))
+                ->orderByRaw('min(product_option_values.sort_order), 2')
+                ->get();
+
+            foreach ($values as $value) {
+                if (is_string($value->id) && is_string($value->label) && is_numeric($value->total)) {
+                    $options[] = ['id' => $value->id, 'label' => $value->label, 'count' => (int) $value->total];
+                }
+            }
+
+            if ($options !== []) {
+                $facets[] = ['key' => $key, 'label' => is_string($name->label) ? $name->label : $folded, 'type' => 'option', 'options' => $options];
+            }
+        }
+
         return $facets;
+    }
+
+    /** The selection's visible products joined to the option values of their active SKUs. */
+    private function optionRows(ProductFilterData $filter): QueryBuilder
+    {
+        return $this->filtered->builder($filter)
+            ->tap(new VisibleOnStore)
+            ->reorder()
+            ->toBase()
+            ->join('skus', 'skus.product_id', '=', 'products.id')
+            ->join('sku_option_values', 'sku_option_values.sku_id', '=', 'skus.id')
+            ->join('product_options', 'product_options.id', '=', 'sku_option_values.product_option_id')
+            ->join('product_option_values', 'product_option_values.id', '=', 'sku_option_values.product_option_value_id')
+            ->where('skus.status', 'active');
     }
 
     /**

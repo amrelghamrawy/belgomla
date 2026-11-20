@@ -80,7 +80,7 @@ export function useCreateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: { name: string; email: string; password: string }) =>
+    mutationFn: (body: { name: string; email: string; password: string; role: TenantUser["role"] }) =>
       apiFetch<TenantUser>("/api/dashboard/users", { method: "POST", body }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardUsers }),
   });
@@ -91,8 +91,15 @@ export function useUpdateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: number; status?: TenantUser["status"]; password?: string }) =>
-      apiFetch<TenantUser>(`/api/dashboard/users/${id}`, { method: "PATCH", body }),
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: number;
+      status?: TenantUser["status"];
+      password?: string;
+      role?: TenantUser["role"];
+    }) => apiFetch<TenantUser>(`/api/dashboard/users/${id}`, { method: "PATCH", body }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardUsers }),
   });
 }

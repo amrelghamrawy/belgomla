@@ -15,10 +15,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api/errors";
 import { useRequiredCustomer } from "@/lib/auth/session";
 import { ar, messageFor } from "@/lib/copy/ar";
+import { useTenant } from "@/lib/auth/tenant";
 import { formatMoney } from "@/lib/format/money";
+import { formatPhone } from "@/lib/format/phone";
 import { useAddresses } from "@/lib/store/addresses";
 import { useCart } from "@/lib/store/cart";
-import { useCheckout } from "@/lib/store/checkout";
+import { useCheckout, type CheckoutKind } from "@/lib/store/checkout";
 import { checkoutFailure, type CheckoutFailure } from "@/lib/store/checkout-errors";
 
 import { AddressFormDialog } from "./AddressFormDialog";
@@ -30,14 +32,20 @@ const NOTE_MAX = 1000;
 /**
  * `/checkout` (BR-PR06): choose the delivery address, add a note, place the order. The server re-prices and
  * re-checks everything; a refusal lists each line's problem with a link back to the product or the cart.
+ * `/checkout/preorder` (`kind="preorder"`, BR-O14) confirms the cart's pre-order lines the same way: no minimum order
+ * value, an indicative total, and the note that nothing is taken from stock until the product arrives.
  */
-export function CheckoutForm() {
+export function CheckoutForm({ kind = "order" }: { kind?: CheckoutKind }) {
   const router = useRouter();
   const session = useRequiredCustomer();
   const active = session.data?.status === "active";
   const cart = useCart(active);
   const addresses = useAddresses(active);
-  const checkout = useCheckout();
+  const checkout = useCheckout(kind);
+  const preorder = kind === "preorder";
+  const lines = preorder ? cart.data?.preorders.items : cart.data?.items;
+  const total = preorder ? cart.data?.preorders.items_total : cart.data?.items_total;
+  const tenant = useTenant();
   const [chosen, setChosen] = useState<number | null>(null);
   const [note, setNote] = useState("");
   const [adding, setAdding] = useState(false);
@@ -64,12 +72,12 @@ export function CheckoutForm() {
     checkout.mutate(
       { address_id: addressId, customer_note: note.trim() === "" ? null : note.trim() },
       {
-        onSuccess: (order) => router.replace(`/checkout/success?order=${order.number}`),
+        onSuccess: (order) => router.replace(`/checkout/success?order=${order.number}${preorder ? "&preorder=1" : ""}`),
         onError: (failed) => {
-          const lines = checkoutFailure(failed, cart.data?.items ?? []);
+          const problems = checkoutFailure(failed, lines ?? []);
 
-          if (lines !== null) {
-            setFailure(lines);
+          if (problems !== null) {
+            setFailure(problems);
           } else if (isApiError(failed, "cart_empty")) {
             router.replace("/cart");
           } else {
@@ -80,7 +88,7 @@ export function CheckoutForm() {
     );
   };
 
-  if (cart.data !== undefined && cart.data.items.length === 0 && !checkout.isPending && !checkout.isSuccess) {
+  if (lines !== undefined && lines.length === 0 && !checkout.isPending && !checkout.isSuccess) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center gap-3 px-4 py-12 text-center">
         <p className="font-bold">{ar.cart.empty}</p>
@@ -93,7 +101,8 @@ export function CheckoutForm() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 pt-6 pb-32 md:pb-6">
-      <h1 className="text-xl font-bold">{ar.checkout.title}</h1>
+      <h1 className="text-xl font-bold">{preorder ? ar.checkout.preorderTitle : ar.checkout.title}</h1>
+      {preorder && <p className="text-muted-foreground text-sm">{ar.checkout.preorderNote}</p>}
 
       {failure !== null && (
         <Alert variant="destructive" role="alert">
@@ -117,6 +126,17 @@ export function CheckoutForm() {
                 </li>
               ))}
               {failure.mov !== null && <li>{failure.mov}</li>}
+              {failure.credit !== null && (
+                <li data-testid="credit-limit-failure">
+                  {failure.credit}
+                  {(tenant.data?.whatsapp ?? tenant.data?.phone) && (
+                    <span className="block">
+                      {ar.checkout.creditContact}{" "}
+                      <bdi>{formatPhone(tenant.data?.whatsapp ?? tenant.data?.phone ?? "")}</bdi>
+                    </span>
+                  )}
+                </li>
+              )}
             </ul>
           </AlertDescription>
         </Alert>
@@ -164,7 +184,7 @@ export function CheckoutForm() {
           />
         </div>
 
-        {cart.data && <MovProgress cart={cart.data} />}
+        {cart.data && !preorder && <MovProgress cart={cart.data} />}
         {error !== null && <FieldError role="alert">{error}</FieldError>}
       </form>
 
@@ -172,7 +192,7 @@ export function CheckoutForm() {
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <div className="flex flex-1 flex-col">
             <span className="text-muted-foreground text-xs">{ar.checkout.total}</span>
-            <span className="text-lg font-bold">{cart.data ? formatMoney(cart.data.items_total) : "—"}</span>
+            <span className="text-lg font-bold">{total !== undefined ? formatMoney(total) : "—"}</span>
           </div>
           <Button
             type="submit"
@@ -181,7 +201,13 @@ export function CheckoutForm() {
             className="h-11 flex-1"
             disabled={checkout.isPending || cart.data === undefined}
           >
-            {checkout.isPending ? ar.checkout.placing : ar.checkout.placeOrder}
+            {checkout.isPending
+              ? preorder
+                ? ar.checkout.placingPreorder
+                : ar.checkout.placing
+              : preorder
+                ? ar.checkout.placePreorder
+                : ar.checkout.placeOrder}
           </Button>
         </div>
       </div>

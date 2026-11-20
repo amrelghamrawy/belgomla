@@ -27,6 +27,12 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $require_customer_approval
  * @property int $stale_pending_hours
  * @property string|null $invitation_message
+ * @property int|null $default_payment_terms_days applied to new customers (BR-C06)
+ * @property string|null $default_credit_limit applied to new customers (BR-C05)
+ * @property list<string> $order_notify_statuses the order statuses customers are told about (BR-N03)
+ * @property array<string, string|null>|null $order_status_messages status => the store's own wording (null = default)
+ * @property string|null $max_discount_percent_sales the most a sales user may take off a line, in %; null = sales users cannot discount (D85)
+ * @property int|null $pending_expiry_hours unconfirmed orders cancel themselves after this many hours; null = off (BR-INV07)
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Tenant $tenant
@@ -67,6 +73,12 @@ final class TenantSetting extends Model
             'require_login_for_prices' => 'boolean',
             'require_customer_approval' => 'boolean',
             'stale_pending_hours' => 'integer',
+            'default_payment_terms_days' => 'integer',
+            'default_credit_limit' => 'decimal:2',
+            'order_notify_statuses' => 'array',
+            'order_status_messages' => 'array',
+            'pending_expiry_hours' => 'integer',
+            'max_discount_percent_sales' => 'decimal:2',
         ];
     }
 }

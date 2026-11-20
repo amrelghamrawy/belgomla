@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Http\Requests;
 
 use App\Modules\Orders\Data\OrderFiltersData;
 use App\Modules\Orders\Enums\CollectionStatus;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Support\Http\PaginatedRequest;
 use Carbon\CarbonImmutable;
@@ -13,7 +14,7 @@ use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Rules\In;
 
 /**
- * GET /api/dashboard/orders: `?status=&collection_status=&customer_id=&from=&to=&q=&stale=1&sort=` (08-api-contract.md §9).
+ * GET /api/dashboard/orders: `?status=&collection_status=&customer_id=&from=&to=&q=&stale=1&kind=&sort=` (08-api-contract.md §9).
  * `from`/`to` are calendar days of `placed_at`, both inclusive.
  */
 final class ListDashboardOrdersRequest extends PaginatedRequest
@@ -35,6 +36,7 @@ final class ListDashboardOrdersRequest extends PaginatedRequest
             'to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:from'],
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
             'stale' => ['sometimes', 'boolean'],
+            'kind' => ['sometimes', 'string', new Enum(OrderKind::class)],
             'sort' => ['sometimes', 'string', 'in:'.implode(',', [...self::SORTS, ...array_map(fn (string $sort): string => '-'.$sort, self::SORTS)])],
         ];
     }
@@ -52,6 +54,7 @@ final class ListDashboardOrdersRequest extends PaginatedRequest
             search: $q === '' ? null : $q,
             stale: $this->boolean('stale'),
             sort: $this->sort() ?? ['placed_at', 'desc'],
+            kind: $this->enum('kind', OrderKind::class),
         );
     }
 

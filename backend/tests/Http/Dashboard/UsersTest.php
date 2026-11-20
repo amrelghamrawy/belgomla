@@ -29,6 +29,38 @@ test('an owner creates another owner with a lower-cased email', function (): voi
     $this->assertDatabaseHas('audit_logs', ['tenant_id' => $this->tenant->id, 'action' => 'tenant_user.created', 'actor_id' => $this->me->id]);
 });
 
+test('D82 an owner creates a user with a role, audited with it', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/users', ['name' => 'سارة', 'email' => 'sara@alnoor.test', 'password' => 'secret123', 'role' => 'accountant'])
+        ->assertCreated()
+        ->assertJsonPath('data.role', 'accountant')
+        ->assertJsonPath('data.role_label', 'محاسب');
+
+    expect(AuditLog::query()->where('action', 'tenant_user.created')->sole()->new_values)->toMatchArray(['role' => 'accountant']);
+});
+
+test('D82 an owner changes a user\'s role', function (): void {
+    $user = $this->makeOwner(attributes: ['role' => App\Modules\Tenancy\Enums\TenantUserRole::Sales]);
+
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$user->id}", ['role' => 'warehouse'])
+        ->assertOk()
+        ->assertJsonPath('data.role', 'warehouse')
+        ->assertJsonPath('data.role_label', 'مخزن');
+});
+
+test('D82 the last active owner cannot demote themselves', function (): void {
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$this->me->id}", ['role' => 'manager'])
+        ->assertConflict()
+        ->assertExactJson(['error' => ['code' => 'last_owner', 'message' => 'لا يمكن تغيير دور آخر مالك نشط أو تعطيله']]);
+});
+
+test('D82 an unknown role is refused', function (string $method): void {
+    $uri = $method === 'POST' ? '/api/dashboard/users' : "/api/dashboard/users/{$this->me->id}";
+
+    $this->tenantJson($method, $uri, ['name' => 'س', 'email' => 's@alnoor.test', 'password' => 'secret123', 'role' => 'admin'])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['error' => ['details' => ['role']]]);
+})->with(['POST', 'PATCH']);
+
 test('user creation validation', function (array $body, string $field): void {
     $this->tenantJson('POST', '/api/dashboard/users', $body)
         ->assertUnprocessable()

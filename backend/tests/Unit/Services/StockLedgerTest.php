@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Inventory\Enums\MovementType;
 use App\Modules\Inventory\Exceptions\BelowReserved;
+use App\Modules\Inventory\Exceptions\CountOutdated;
 use App\Modules\Inventory\Exceptions\InsufficientStock;
 use App\Modules\Inventory\Exceptions\NotInTransaction;
 use App\Modules\Inventory\Models\InventoryMovement;
@@ -174,6 +175,45 @@ test('BR-INV05 a deduction takes the units from on hand and reserved as a negati
         ]);
 });
 
+test('BR-R03 a restock puts returned units back on hand as a positive return movement of the order', function (): void {
+    $sku = Sku::factory()->withStock(10, 4)->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->restock($sku, 6, $order->id, null);
+
+    expect(($this->stock)($sku)->only(['on_hand', 'reserved']))->toBe(['on_hand' => 16, 'reserved' => 4])
+        ->and($movement->only(['sku_id', 'type', 'quantity', 'on_hand_after', 'order_id', 'reason', 'actor_type', 'actor_id']))->toBe([
+            'sku_id' => $sku->id, 'type' => MovementType::Return, 'quantity' => 6, 'on_hand_after' => 16, 'order_id' => $order->id,
+            'reason' => null, 'actor_type' => ActorType::System, 'actor_id' => null,
+        ]);
+});
+
+test('BR-R06 an unrestock takes voided returned units off again as a negative return movement by the merchant', function (): void {
+    $owner = $this->makeOwner();
+    $sku = Sku::factory()->withStock(10, 4)->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->unrestock($sku, 6, $order->id, $owner->id);
+
+    expect(($this->stock)($sku)->only(['on_hand', 'reserved']))->toBe(['on_hand' => 4, 'reserved' => 4])
+        ->and($movement->only(['type', 'quantity', 'on_hand_after', 'order_id', 'actor_type', 'actor_id']))->toBe([
+            'type' => MovementType::Return, 'quantity' => -6, 'on_hand_after' => 4, 'order_id' => $order->id,
+            'actor_type' => ActorType::TenantUser, 'actor_id' => $owner->id,
+        ]);
+});
+
+test('D76 an unrestock never takes more than is available, so reserved or sold units stay', function (): void {
+    $sku = Sku::factory()->withStock(10, 5)->create();
+    $order = Order::factory()->delivered()->create();
+
+    expect(fn (): InventoryMovement => ($this->ledger)()->unrestock($sku, 6, $order->id))->toThrow(function (InsufficientStock $e) use ($sku): void {
+        expect([$e->status, $e->errorCode, $e->items])->toBe([422, 'insufficient_stock', [['sku_id' => $sku->id, 'reason' => 'insufficient_stock', 'available' => 5]]]);
+    });
+
+    expect(($this->stock)($sku)->on_hand)->toBe(10)
+        ->and(InventoryMovement::query()->count())->toBe(0);
+});
+
 test('release and deduct never take back more than is reserved', function (Closure $call): void {
     $sku = Sku::factory()->withStock(10, 2)->create();
 
@@ -191,6 +231,8 @@ test('stock quantities must be positive and on hand never negative', function (C
     'reserve zero' => [fn (StockLedger $ledger, Sku $sku) => $ledger->reserve($sku, 0), 'must be positive'],
     'release zero' => [fn (StockLedger $ledger, Sku $sku) => $ledger->release($sku, 0), 'must be positive'],
     'deduct negative' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->deduct($sku, -1, 1), 'must be positive'],
+    'restock zero' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->restock($sku, 0, 1), 'must be positive'],
+    'unrestock negative' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->unrestock($sku, -2, 1), 'must be positive'],
     'negative opening stock' => [fn (StockLedger $ledger, Sku $sku) => $ledger->openingStock($sku, -1), 'cannot be negative'],
     'negative adjustment' => [fn (StockLedger $ledger, Sku $sku): ?\App\Modules\Inventory\Models\InventoryMovement => $ledger->adjust($sku, -1, 'x'), 'cannot be negative'],
 ]);
@@ -206,4 +248,158 @@ test('Tech §11 locking and reservation changes refuse to run outside a transact
     'reserve' => [fn (StockLedger $ledger, Sku $sku) => $ledger->reserve($sku, 1), 'reserve'],
     'release' => [fn (StockLedger $ledger, Sku $sku) => $ledger->release($sku, 1), 'release'],
     'deduct' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->deduct($sku, 1, 1), 'deduct'],
+    'restock' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->restock($sku, 1, 1), 'restock'],
+    'unrestock' => [fn (StockLedger $ledger, Sku $sku): InventoryMovement => $ledger->unrestock($sku, 1, 1), 'unrestock'],
 ]);
+
+test('BR-INV09 a receipt adds the units as a positive receive movement at the cost paid and moves the average', function (): void {
+    $owner = $this->makeOwner();
+    $sku = Sku::factory()->withStock(100, 30, avgCost: '5.0000')->create();
+
+    $movement = ($this->ledger)()->receive($sku, 100, '6.0000', 'مكتبة النور', $owner->id);
+
+    // (100 × 5 + 100 × 6) ÷ 200 = 5.5000
+    expect(($this->stock)($sku)->only(['on_hand', 'reserved', 'avg_cost']))->toBe(['on_hand' => 200, 'reserved' => 30, 'avg_cost' => '5.5000'])
+        ->and($movement->only(['sku_id', 'type', 'quantity', 'on_hand_after', 'reason', 'unit_cost', 'order_id', 'actor_type', 'actor_id']))->toBe([
+            'sku_id' => $sku->id, 'type' => MovementType::Receive, 'quantity' => 100, 'on_hand_after' => 200, 'reason' => 'مكتبة النور',
+            'unit_cost' => '6.0000', 'order_id' => null, 'actor_type' => ActorType::TenantUser, 'actor_id' => $owner->id,
+        ]);
+});
+
+test('BR-INV09 the first receipt of a sku without a stock row or a cost sets the average to the cost paid', function (): void {
+    $sku = Sku::factory()->create();
+
+    ($this->ledger)()->receive($sku, 12, '7.2500');
+
+    expect(($this->stock)($sku)->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 12, 'avg_cost' => '7.2500']);
+});
+
+test('BR-INV09 a receipt of nothing is refused', function (): void {
+    $sku = Sku::factory()->withStock(10)->create();
+
+    expect(fn (): InventoryMovement => ($this->ledger)()->receive($sku, 0, '1.0000'))->toThrow(RuntimeException::class, 'must be positive');
+
+    expect(InventoryMovement::query()->count())->toBe(0);
+});
+
+test('D96 c an adjustment moves at the average cost either way and never changes it', function (int $newOnHand): void {
+    $sku = Sku::factory()->withStock(50, avgCost: '4.1250')->create();
+
+    $movement = ($this->ledger)()->adjust($sku, $newOnHand, 'كسر');
+
+    expect($movement?->unit_cost)->toBe('4.1250')
+        ->and(($this->stock)($sku)->avg_cost)->toBe('4.1250');
+})->with(['down' => [45], 'up' => [60]]);
+
+test('D96 e an adjustment of a sku without a cost moves at no cost', function (): void {
+    $sku = Sku::factory()->withStock(50)->create();
+
+    expect(($this->ledger)()->adjust($sku, 40, 'كسر')?->unit_cost)->toBeNull();
+});
+
+test('BR-INV09 a deduction moves at the average of that moment and leaves the average', function (): void {
+    $sku = Sku::factory()->withStock(10, 6, avgCost: '3.3333')->create();
+    $order = Order::factory()->create();
+
+    $movement = ($this->ledger)()->deduct($sku, 6, orderId: $order->id);
+
+    expect($movement->unit_cost)->toBe('3.3333')
+        ->and(($this->stock)($sku)->avg_cost)->toBe('3.3333');
+});
+
+test('BR-INV09 a restock at the sale\'s frozen cost moves the average like a receipt', function (): void {
+    $sku = Sku::factory()->withStock(30, avgCost: '8.0000')->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->restock($sku, 10, $order->id, unitCost: '6.0000');
+
+    // (30 × 8 + 10 × 6) ÷ 40 = 300 ÷ 40 = 7.5000
+    expect($movement->unit_cost)->toBe('6.0000')
+        ->and(($this->stock)($sku)->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 40, 'avg_cost' => '7.5000']);
+});
+
+test('D96 c a restock of a sale without a cost leaves the average', function (): void {
+    $sku = Sku::factory()->withStock(30, avgCost: '8.0000')->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->restock($sku, 10, $order->id);
+
+    expect($movement->unit_cost)->toBeNull()
+        ->and(($this->stock)($sku)->avg_cost)->toBe('8.0000');
+});
+
+test('D96 c an unrestock moves at the cost the goods came back at and leaves the average', function (): void {
+    $sku = Sku::factory()->withStock(40, avgCost: '7.5000')->create();
+    $order = Order::factory()->delivered()->create();
+
+    $movement = ($this->ledger)()->unrestock($sku, 10, $order->id, unitCost: '6.0000');
+
+    expect($movement->unit_cost)->toBe('6.0000')
+        ->and(($this->stock)($sku)->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 30, 'avg_cost' => '7.5000']);
+});
+
+test('D96 c stock reaching zero keeps the last average', function (): void {
+    $sku = Sku::factory()->withStock(5, 5, avgCost: '2.5000')->create();
+    $order = Order::factory()->create();
+
+    ($this->ledger)()->deduct($sku, 5, orderId: $order->id);
+
+    expect(($this->stock)($sku)->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 0, 'avg_cost' => '2.5000']);
+});
+
+test('D96 d setting the cost replaces the average without a movement and returns the one it replaced', function (?string $old): void {
+    $sku = Sku::factory()->withStock(20, avgCost: $old)->create();
+
+    expect(($this->ledger)()->setCost($sku, '4.7500'))->toBe($old)
+        ->and(($this->stock)($sku)->only(['on_hand', 'avg_cost']))->toBe(['on_hand' => 20, 'avg_cost' => '4.7500'])
+        ->and(InventoryMovement::query()->count())->toBe(0);
+})->with(['no cost yet' => [null], 'a wrong cost' => ['9.0000']]);
+
+test('D96 e opening stock moves at no cost', function (): void {
+    $sku = Sku::factory()->create();
+
+    ($this->ledger)()->openingStock($sku, 10);
+
+    expect(InventoryMovement::query()->sole()->unit_cost)->toBeNull()
+        ->and(($this->stock)($sku)->avg_cost)->toBeNull();
+});
+
+test('D99 a a count against what was expected moves on hand by the difference from where it is now', function (int $current, int $expected, int $counted, int $after, int $quantity): void {
+    $sku = Sku::factory()->withStock($current)->create();
+
+    $movement = ($this->ledger)()->adjust($sku, $counted, 'جرد', expectedOnHand: $expected);
+
+    expect(($this->stock)($sku)->on_hand)->toBe($after)
+        ->and($movement?->only(['quantity', 'on_hand_after']))->toBe(['quantity' => $quantity, 'on_hand_after' => $after]);
+})->with([
+    'nothing moved during the count: 50 + (45 − 50)' => [50, 50, 45, 45, -5],
+    '10 sold during the count: 40 + (45 − 50), not 45' => [40, 50, 45, 35, -5],
+    'a return during the count: 56 + (52 − 50)' => [56, 50, 52, 58, 2],
+]);
+
+test('D99 a a count equal to what was expected changes nothing, even when on hand moved since', function (): void {
+    $sku = Sku::factory()->withStock(40)->create();
+
+    expect(($this->ledger)()->adjust($sku, 50, 'جرد', expectedOnHand: 50))->toBeNull()
+        ->and(($this->stock)($sku)->on_hand)->toBe(40)
+        ->and(InventoryMovement::query()->count())->toBe(0);
+});
+
+test('D99 b a difference that would go below zero is refused with the three figures', function (): void {
+    $sku = Sku::factory()->withStock(5)->create();
+
+    // 5 + (2 − 10) = −3
+    expect(fn () => ($this->ledger)()->adjust($sku, 2, 'جرد', expectedOnHand: 10))->toThrow(function (CountOutdated $e): void {
+        expect([$e->status, $e->errorCode, $e->details])->toBe([409, 'count_outdated', ['expected_on_hand' => 10, 'counted' => 2, 'on_hand' => 5]])
+            ->and($e->getMessage())->toBe('تغيّر الرصيد منذ بدء الجرد (كان 10 وأصبح 5)، ولا يمكن تطبيق الفرق. أعد عدّ الصنف.');
+    });
+
+    expect(($this->stock)($sku)->on_hand)->toBe(5);
+});
+
+test('D99 a BR-INV08 the difference still never goes below reserved', function (): void {
+    $sku = Sku::factory()->withStock(50, 45)->create();
+
+    // 50 + (40 − 50) = 40 < 45 reserved
+    ($this->ledger)()->adjust($sku, 40, 'جرد', expectedOnHand: 50);
+})->throws(BelowReserved::class);

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Collections\Enums\CollectionKind;
 use App\Modules\Collections\Enums\CollectionMethod;
+use App\Modules\Collections\Enums\LedgerEntryType;
 use App\Modules\Orders\Enums\CollectionStatus;
 use App\Modules\Reports\Enums\SalesGrouping;
 
@@ -11,10 +13,23 @@ test('every collections and reports enum exposes labels for all cases', function
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([CollectionMethod::class, SalesGrouping::class]);
+})->with([CollectionMethod::class, CollectionKind::class, LedgerEntryType::class, SalesGrouping::class]);
 
-test('BR-C02 cash is the only collection method in V1', function (): void {
-    expect(CollectionMethod::toArray())->toBe(['cash' => 'نقدي']);
+test('BR-C08 a statement row is an order, a return, a payment, credit applied, a refund, a refund to credit or a credit created', function (): void {
+    expect(array_keys(LedgerEntryType::toArray()))->toBe(['order', 'return', 'payment', 'credit_applied', 'refund', 'refund_to_credit', 'credit_created']);
+});
+
+test('BR-C02 BR-C07 BR-C10 money moves in cash, by InstaPay, to a wallet, by bank transfer, or from customer credit', function (): void {
+    expect(CollectionMethod::toArray())->toBe(['cash' => 'نقدي', 'instapay' => 'إنستاباي', 'wallet' => 'محفظة إلكترونية', 'bank_transfer' => 'تحويل بنكي', 'credit' => 'رصيد العميل']);
+});
+
+test('D103 a the merchant records every method but credit, which is the system\'s', function (): void {
+    expect(CollectionMethod::recordableValues())->toBe(['cash', 'instapay', 'wallet', 'bank_transfer'])
+        ->and(CollectionMethod::recordable())->not->toContain(CollectionMethod::Credit);
+});
+
+test('BR-R04 a collection is a payment or a refund', function (): void {
+    expect(CollectionKind::toArray())->toBe(['payment' => 'تحصيل', 'refund' => 'رد']);
 });
 
 test('D5 the sales report groups by day, week or month', function (): void {
@@ -29,5 +44,6 @@ test('BR-C03 the collection status is derived from the collected amount against 
     'a piaster short' => ['499.99', '500.00', CollectionStatus::PartiallyCollected],
     'exactly the total' => ['500.00', '500.00', CollectionStatus::Collected],
     'more than the total' => ['500.01', '500.00', CollectionStatus::Collected],
-    'an empty order' => ['0.00', '0.00', CollectionStatus::Unpaid],
+    'BR-R05 an order returned in full owes nothing' => ['0.00', '0.00', CollectionStatus::Collected],
+    'BR-R06 a voided refund leaves more collected than the net total' => ['500.00', '300.00', CollectionStatus::Collected],
 ]);

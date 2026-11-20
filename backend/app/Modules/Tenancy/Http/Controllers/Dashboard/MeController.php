@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers\Dashboard;
 
 use App\Modules\Tenancy\Actions\AuthenticateTenantUser;
+use App\Modules\Tenancy\Enums\Permission;
 use App\Modules\Tenancy\Http\Resources\TenantResource;
 use App\Modules\Tenancy\Http\Resources\TenantUserResource;
 use App\Modules\Tenancy\Models\TenantUser;
@@ -15,7 +16,7 @@ use Illuminate\Http\Request;
 
 final readonly class MeController
 {
-    /** GET /api/dashboard/me — the signed-in user and their tenant. */
+    /** GET /api/dashboard/me — the signed-in user, their tenant and what their role may do (D82). */
     public function show(Request $request, TenantContext $context): JsonResponse
     {
         $user = $request->user(AuthenticateTenantUser::GUARD);
@@ -27,6 +28,7 @@ final readonly class MeController
         return response()->json(['data' => [
             'user' => new TenantUserResource($user)->resolve($request),
             'tenant' => new TenantResource($context->get())->resolve($request),
+            'permissions' => array_map(fn (Permission $permission): string => $permission->value, $user->role->permissions()),
         ]]);
     }
 }

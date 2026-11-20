@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Http\Requests;
 
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Support\Http\PaginatedRequest;
 use Illuminate\Validation\Rules\Enum;
 
-/** GET /api/store/orders: the customer's orders, newest first, `?status=` (08-api-contract.md §3). */
+/** GET /api/store/orders: the customer's orders, newest first, `?status=&kind=` (08-api-contract.md §3; pre-orders, BR-O14). */
 final class ListOrdersRequest extends PaginatedRequest
 {
     /**
@@ -19,11 +20,17 @@ final class ListOrdersRequest extends PaginatedRequest
         return [
             ...parent::rules(),
             'status' => ['sometimes', 'string', new Enum(OrderStatus::class)],
+            'kind' => ['sometimes', 'string', new Enum(OrderKind::class)],
         ];
     }
 
     public function status(): ?OrderStatus
     {
         return $this->enum('status', OrderStatus::class);
+    }
+
+    public function kind(): ?OrderKind
+    {
+        return $this->enum('kind', OrderKind::class);
     }
 }

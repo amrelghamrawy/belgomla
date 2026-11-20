@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Models\Product;
 
-const INVENTORY_ROW_KEYS = ['sku_id', 'product_id', 'code', 'name', 'status', 'on_hand', 'reserved', 'available', 'min_allowed', 'moq', 'conversion_factor', 'low_stock'];
+const INVENTORY_ROW_KEYS = ['sku_id', 'product_id', 'code', 'name', 'variant', 'status', 'on_hand', 'reserved', 'available', 'min_allowed', 'moq', 'conversion_factor', 'low_stock', 'avg_cost'];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -29,15 +29,15 @@ test('BR-INV02 the inventory lists every sku of the tenant with its stock in bas
         ->assertJsonPath('data.0.status', 'inactive')
         ->assertJsonPath('data.0.on_hand', 0)
         ->assertJsonPath('data.1', [
-            'sku_id' => $this->inTenant(fn () => $science->sku()->sole()->id), 'product_id' => $science->id, 'code' => 'SCI-1', 'name' => 'علوم', 'status' => 'active',
-            'on_hand' => 140, 'reserved' => 30, 'available' => 110, 'min_allowed' => 30, 'moq' => 5, 'conversion_factor' => 20, 'low_stock' => false,
+            'sku_id' => $this->inTenant(fn () => $science->skus()->sole()->id), 'product_id' => $science->id, 'code' => 'SCI-1', 'name' => 'علوم', 'variant' => null, 'status' => 'active',
+            'on_hand' => 140, 'reserved' => 30, 'available' => 110, 'min_allowed' => 30, 'moq' => 5, 'conversion_factor' => 20, 'low_stock' => false, 'avg_cost' => null,
         ]);
 });
 
 test('the inventory list searches, filters low stock and sorts by available', function (string $query, array $expected): void {
     $ids = $this->inTenant(fn (): array => [
-        'science' => Product::factory()->withSku(['code' => 'SCI-1'], onHand: 50)->create(['name' => 'علوم'])->sku->id,
-        'math' => Product::factory()->withSku(['code' => 'MAT-1'], onHand: 1)->create(['name' => 'رياضيات'])->sku->id,
+        'science' => Product::factory()->withSku(['code' => 'SCI-1'], onHand: 50)->create(['name' => 'علوم'])->skus->first()->id,
+        'math' => Product::factory()->withSku(['code' => 'MAT-1'], onHand: 1)->create(['name' => 'رياضيات'])->skus->first()->id,
     ]);
 
     $listed = $this->tenantJson('GET', "/api/dashboard/inventory?{$query}")
@@ -53,6 +53,17 @@ test('the inventory list searches, filters low stock and sorts by available', fu
     'code descending' => ['sort=-code', ['science', 'math']],
 ]);
 
+test('BR-P14 every variant is its own inventory row naming the variant', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أحمر'], sizes: ['M'], stock: ['أحمر / M' => 7]);
+
+    $this->tenantJson('GET', '/api/dashboard/inventory')
+        ->assertOk()
+        ->assertJsonPath('data.*.code', ['PEN-1', 'PEN-2'])
+        ->assertJsonPath('data.*.name', ['قلم جاف', 'قلم جاف'])
+        ->assertJsonPath('data.*.variant', ['أزرق / M', 'أحمر / M'])
+        ->assertJsonPath('data.*.on_hand', [50, 7]);
+});
+
 test('inventory list validation', function (string $query, string $field): void {
     $this->tenantJson('GET', "/api/dashboard/inventory?{$query}")
         ->assertUnprocessable()
@@ -66,7 +77,7 @@ test('inventory list validation', function (string $query, string $field): void 
 ]);
 
 test('BR-INV08 one sku shows its stock and the minimum on hand an adjustment may set', function (): void {
-    $sku = $this->inTenant(fn () => Product::factory()->withSku(['code' => 'SCI-1'], onHand: 100, reserved: 80)->create()->sku()->sole());
+    $sku = $this->inTenant(fn () => Product::factory()->withSku(['code' => 'SCI-1'], onHand: 100, reserved: 80)->create()->skus()->sole());
 
     $this->tenantJson('GET', "/api/dashboard/inventory/{$sku->id}")
         ->assertOk()
@@ -78,7 +89,7 @@ test('BR-INV08 one sku shows its stock and the minimum on hand an adjustment may
 });
 
 test('BR-T04 a sku of another tenant is 404 and untouched', function (): void {
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->sku()->sole(), $this->otherTenant());
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->skus()->sole(), $this->otherTenant());
 
     $this->tenantJson('GET', "/api/dashboard/inventory/{$foreign->id}")
         ->assertNotFound()

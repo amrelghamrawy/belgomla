@@ -18,6 +18,7 @@ export const queryKeys = {
   ordersLists: ["store", "orders", "list"] as const,
   ordersList: (params: ListParams) => ["store", "orders", "list", params] as const,
   order: (number: number) => ["store", "orders", "detail", number] as const,
+  accountStatement: (params: ListParams) => ["store", "statement", params] as const,
 
   // Dashboard (tasks/10)
   dashboardSettings: ["dashboard", "settings"] as const,
@@ -29,12 +30,18 @@ export const queryKeys = {
   dashboardSales: (params: ListParams) => ["dashboard", "reports", "sales", params] as const,
   dashboardOutstanding: (page: number) => ["dashboard", "reports", "outstanding", page] as const,
   dashboardLowStock: (page: number, perPage: number) => ["dashboard", "reports", "low-stock", page, perPage] as const,
+  // V2 Task 15 (BR-P15): bundles sold and the component units they consumed.
+  dashboardBundleReport: (params: ListParams) => ["dashboard", "reports", "bundles", params] as const,
+  // V2 Task 16 (D94): the advanced reports, by name (sales-analytics, products, …) and their filters + page.
+  dashboardAdvancedReport: (report: string, params: ListParams) =>
+    ["dashboard", "reports", "advanced", report, params] as const,
   dashboardCategories: ["dashboard", "categories"] as const,
   dashboardUnits: ["dashboard", "units"] as const,
   dashboardFields: ["dashboard", "fields"] as const,
   dashboardProductsLists: ["dashboard", "products", "list"] as const,
   dashboardProductsList: (params: ListParams) => ["dashboard", "products", "list", params] as const,
   dashboardProduct: (id: number) => ["dashboard", "products", "detail", id] as const,
+  dashboardImport: (id: number) => ["dashboard", "imports", id] as const,
   dashboardInventoryLists: ["dashboard", "inventory", "list"] as const,
   dashboardInventoryList: (params: ListParams) => ["dashboard", "inventory", "list", params] as const,
   dashboardInventoryRow: (skuId: number) => ["dashboard", "inventory", "row", skuId] as const,
@@ -42,10 +49,29 @@ export const queryKeys = {
   dashboardCustomersLists: ["dashboard", "customers", "list"] as const,
   dashboardCustomersList: (params: ListParams) => ["dashboard", "customers", "list", params] as const,
   dashboardCustomer: (id: number) => ["dashboard", "customers", "detail", id] as const,
-  dashboardStatement: (id: number, page: number) => ["dashboard", "customers", "statement", id, page] as const,
+  dashboardStatement: (id: number, params: ListParams) => ["dashboard", "customers", "statement", id, params] as const,
+  dashboardCustomerCredits: (id: number) => ["dashboard", "customers", "credits", id] as const,
+  // V2 Task 11 (BR-PR12, BR-PR13): customer groups and the prices negotiated with one customer.
+  dashboardCustomerGroups: ["dashboard", "customer-groups"] as const,
+  dashboardCustomerPrices: (id: number, params: ListParams) =>
+    ["dashboard", "customers", "prices", id, params] as const,
+  // V2 Task 12 (BR-PR15): promotions.
+  dashboardPromotionsLists: ["dashboard", "promotions", "list"] as const,
+  dashboardPromotionsList: (params: ListParams) => ["dashboard", "promotions", "list", params] as const,
+  dashboardPromotion: (id: number) => ["dashboard", "promotions", "detail", id] as const,
   dashboardOrdersLists: ["dashboard", "orders", "list"] as const,
   dashboardOrdersList: (params: ListParams) => ["dashboard", "orders", "list", params] as const,
   dashboardOrder: (number: number) => ["dashboard", "orders", "detail", number] as const,
+  dashboardOrderQuote: (params: ListParams) => ["dashboard", "orders", "quote", params] as const,
+  // V2 Task 10 (BR-O14): a product's pre-order demand and the pre-order list.
+  dashboardPreorderDemand: (productId: number) => ["dashboard", "preorders", "demand", productId] as const,
+  dashboardPreordersLists: ["dashboard", "preorders", "list"] as const,
+  dashboardPreordersList: (params: ListParams) => ["dashboard", "preorders", "list", params] as const,
   dashboardCollectionsLists: ["dashboard", "collections", "list"] as const,
+  dashboardExpensesList: (params: ListParams) => ["dashboard", "expenses", "list", params] as const,
+  dashboardExpenseCategories: ["dashboard", "expenses", "categories"] as const,
   dashboardCollectionsList: (params: ListParams) => ["dashboard", "collections", "list", params] as const,
+  dashboardOrderReturns: (number: number) => ["dashboard", "orders", "returns", number] as const,
+  dashboardReturnsLists: ["dashboard", "returns", "list"] as const,
+  dashboardReturnsList: (params: ListParams) => ["dashboard", "returns", "list", params] as const,
 };

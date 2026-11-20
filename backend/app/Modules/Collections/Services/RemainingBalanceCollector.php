@@ -25,7 +25,7 @@ final readonly class RemainingBalanceCollector implements CollectsPayments
 
     public function collectRemaining(Order $order, ?int $actorId): void
     {
-        $remaining = Money::subtract($order->order_total, $this->collected->forOrder($order->id));
+        $remaining = Money::subtract($order->netTotal(), $this->collected->forOrder($order->id));
 
         if (Money::compare($remaining, '0.00') <= 0) {
             return;

@@ -35,7 +35,7 @@ beforeEach(function (): void {
 
         return app(TenantContext::class)->runAs($tenant, function () use ($tenant): array {
             // 5 cartons of 20 left; each customer wants all 5.
-            $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1], onHand: 100)->create()->sku()->sole();
+            $sku = Product::factory()->withSku(['conversion_factor' => 20, 'moq' => 1], onHand: 100)->create()->skus()->sole();
             $buyer = function () use ($sku): array {
                 $customer = Customer::factory()->create();
                 CartItem::factory()->for(Cart::factory()->for($customer))->create(['sku_id' => $sku->id, 'quantity' => 5]);
@@ -83,7 +83,7 @@ test('BR-INV03 two checkouts for the last units: the second waits on the row loc
 
     expect($blocked)->toBe('55P03')
         ->and(fn () => ($this->on)('pgsql_session_b', fn (): Order => ($this->checkout)('b')))->toThrow(function (CheckoutFailed $e): void {
-            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
+            expect($e->items)->toBe([['sku_id' => $this->race['sku']->id, 'sku_unit_id' => $this->defaultUnitId($this->race['sku']), 'reason' => 'insufficient_stock', 'requested' => 5, 'available' => 0]]);
         })
         ->and(($this->on)('pgsql_session_a', fn (): array => [
             Order::query()->pluck('number')->all(),

@@ -16,13 +16,15 @@ type Props = {
   onClear?: () => void;
   /** Controls that stay visible next to the button (search, view toggles). */
   leading?: ReactNode;
+  /** Pushed to the far end of the same row (a report's range and export). */
+  trailing?: ReactNode;
   /** The filters, hidden until the button opens them. */
   children: ReactNode;
 };
 
-/** A dashboard list's filters behind a filter button, closed on every visit; their values live in the URL. */
-export function FilterPanel({ active, onClear, leading, children }: Props) {
-  const [open, setOpen] = useState(false);
+/** A dashboard list's filters behind a filter button; their values live in the URL. It opens on arrival when some are set, so a filtered list shows why (D104). */
+export function FilterPanel({ active, onClear, leading, trailing, children }: Props) {
+  const [open, setOpen] = useState(active > 0);
   const id = useId();
 
   return (
@@ -45,9 +47,12 @@ export function FilterPanel({ active, onClear, leading, children }: Props) {
             {copy.clearFilters}
           </Button>
         )}
+        {trailing !== undefined && (
+          <div className="ms-auto flex flex-wrap items-center gap-x-4 gap-y-2">{trailing}</div>
+        )}
       </div>
       {open && (
-        <div id={id} className="flex flex-wrap items-end gap-2 rounded-md border p-3">
+        <div id={id} className="bg-card shadow-panel flex flex-wrap items-end gap-3 rounded-[20px] p-4">
           {children}
         </div>
       )}

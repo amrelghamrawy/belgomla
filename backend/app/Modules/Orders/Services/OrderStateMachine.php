@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Services;
 
 use App\Modules\Orders\Data\TransitionPlan;
 use App\Modules\Orders\Enums\OrderStatus;
+use App\Modules\Orders\Exceptions\CannotCancel;
 use App\Modules\Orders\Exceptions\InvalidOrderTransition;
 use App\Modules\Orders\Models\Order;
 
@@ -15,6 +16,9 @@ use App\Modules\Orders\Models\Order;
  *
  * `confirmed_at` is set the first time the order leaves `pending` forward, even when steps are skipped, so
  * a skipped confirmation still has a time.
+ *
+ * A pre-order (BR-O14, D88) can only be cancelled, and only while something is left to convert; it holds no stock, so
+ * the release finds nothing to give back (ApplyTransition releases reserved lines only).
  */
 final readonly class OrderStateMachine
 {
@@ -24,6 +28,10 @@ final readonly class OrderStateMachine
 
         if (! $from->canTransitionTo($to)) {
             throw InvalidOrderTransition::from($from, $to);
+        }
+
+        if ($order->isPreorder()) {
+            return $this->planPreorder($order, $to);
         }
 
         if ($to === OrderStatus::Cancelled) {
@@ -37,5 +45,18 @@ final readonly class OrderStateMachine
         }
 
         return new TransitionPlan($from, $to, $timestamps);
+    }
+
+    private function planPreorder(Order $order, OrderStatus $to): TransitionPlan
+    {
+        if ($to !== OrderStatus::Cancelled) {
+            throw InvalidOrderTransition::preorder($order->status, $to);
+        }
+
+        if ($order->converted_at !== null) {
+            throw CannotCancel::converted();
+        }
+
+        return new TransitionPlan($order->status, $to, ['cancelled_at'], releasesStock: true);
     }
 }

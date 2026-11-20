@@ -23,7 +23,7 @@ test('tenant:demo creates a school-books store with its owner, the demo catalog 
 
     expect($tenant->vertical)->toBe(Vertical::SchoolBooks)
         ->and($tenant->name)->toBe('مكتبة النور')
-        ->and($products)->toBe(44)
+        ->and($products)->toBe(46)
         ->and($customers)->toBe(14)
         ->and($orders)->toBeGreaterThan(0);
     $this->assertDatabaseHas('tenant_users', ['tenant_id' => $tenant->id, 'email' => 'owner@showroom.test', 'role' => 'owner']);
@@ -81,4 +81,15 @@ test('a failure while seeding leaves no demo tenant behind', function (): void {
 
     expect(Tenant::query()->where('subdomain', 'demo')->exists())->toBeFalse();
     $this->assertDatabaseMissing('tenant_users', ['email' => 'owner@demo.test']);
+});
+
+test('BR-N03 the demo store tells nobody about its orders: its customers have invented phones', function (): void {
+    $this->artisan('tenant:demo', ['subdomain' => 'quiet', '--owner-email' => 'owner@quiet.test', '--owner-password' => 'secret123'])->assertSuccessful();
+
+    $tenant = Tenant::query()->where('subdomain', 'quiet')->sole();
+
+    expect($tenant->settings->order_notify_statuses)->toBe([])
+        ->and($tenant->settings->primary_color)->toBe('#1F3C88')
+        ->and($this->tenant->settings()->sole()->only(['primary_color', 'order_notify_statuses']))->toBe(['primary_color' => '#0F766E', 'order_notify_statuses' => ['confirmed', 'out_for_delivery', 'delivered', 'cancelled', 'edited']])
+        ->and(App\Modules\Messaging\Models\OutboundMessage::withoutTenantScope()->where('tenant_id', $tenant->id)->where('purpose', 'order_status')->count())->toBe(0);
 });

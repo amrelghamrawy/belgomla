@@ -1,12 +1,13 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardShell } from "@/components/dashboard/shell/DashboardShell";
-import { isActive } from "@/components/dashboard/shell/DashboardNav";
+import { isActive, pageTitle } from "@/components/dashboard/shell/DashboardNav";
+import { OrderSearch } from "@/components/dashboard/shell/OrderSearch";
 import { NOTIFICATIONS_POLL_MS } from "@/lib/dashboard/notifications";
 
-import { notification, shellRoutes, stubDashboard } from "../../dashboard-fixtures";
+import { dashboardMe, notification, shellRoutes, stubDashboard } from "../../dashboard-fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { pathname, renderWithQuery, router } from "../../render";
 
@@ -121,6 +122,52 @@ describe("isActive", () => {
   });
 });
 
+describe("OrderSearch", () => {
+  it("D104 opens the orders list filtered by the number typed, and ignores an empty search", async () => {
+    const user = userEvent.setup();
+    render(<OrderSearch />);
+    const search = screen.getByRole("searchbox", { name: "ابحث برقم الطلب" });
+
+    await user.type(search, "   {Enter}");
+    expect(router.push).not.toHaveBeenCalled();
+
+    await user.type(search, " 1048 {Enter}");
+    expect(router.push).toHaveBeenCalledWith("/dashboard/orders?q=1048");
+  });
+});
+
+describe("pageTitle", () => {
+  it("D104 names the tab after the section and the store, on sub-pages too", () => {
+    expect(pageTitle("/dashboard/orders/12", "مكتبة النور")).toBe("الطلبات · مكتبة النور");
+    expect(pageTitle("/dashboard", "مكتبة النور")).toBe("الرئيسية · مكتبة النور");
+    expect(pageTitle("/dashboard/unknown", "مكتبة النور")).toBe("مكتبة النور");
+  });
+});
+
+describe("DashboardNav per role (D82)", () => {
+  it("shows a sales user only the sections their role opens", async () => {
+    stubApi({ ...shellRoutes(), "GET /api/dashboard/me": json(200, { data: dashboardMe({ role: "sales" }) }) });
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    const nav = await screen.findByRole("navigation", { name: "القائمة الرئيسية" });
+    expect(within(nav).getByRole("link", { name: "الطلبات" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "العملاء" })).toBeInTheDocument();
+    for (const hidden of ["الإعدادات", "المستخدمون", "سجل التغييرات", "التقارير", "التحصيلات", "العروض"]) {
+      expect(within(nav).queryByRole("link", { name: hidden })).toBeNull();
+    }
+  });
+
+  it("shows the owner every section", async () => {
+    stubApi(shellRoutes());
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    const nav = await screen.findByRole("navigation", { name: "القائمة الرئيسية" });
+    expect(within(nav).getByRole("link", { name: "الإعدادات" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "المستخدمون" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "العروض" })).toHaveAttribute("href", "/dashboard/promotions");
+  });
+});
+
 describe("NotificationsBell", () => {
   it("polls the unread count every 30 seconds", () => {
     expect(NOTIFICATIONS_POLL_MS).toBe(30_000);
@@ -137,6 +184,54 @@ describe("NotificationsBell", () => {
 
     const links = await screen.findAllByRole("link", { name: /طلب #1001 من مكتبة الأمل/ });
     expect(links[0]).toHaveAttribute("href", "/dashboard/orders/1001");
+  });
+
+  it("BR-N02 a dropped store WhatsApp number links to settings", async () => {
+    stubApi(
+      shellRoutes(
+        [
+          notification({
+            id: 9,
+            type: "whatsapp_dropped",
+            type_label: "انفصل رقم واتساب المتجر",
+            details: { phone: "+201001234567", reason: "logged_out" },
+          }),
+        ],
+        1,
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await user.click(await screen.findByRole("button", { name: "الإشعارات، 1 غير مقروءة" }));
+
+    const link = await screen.findByRole("link", { name: /اربطه من جديد من الإعدادات/ });
+    expect(link).toHaveAttribute("href", "/dashboard/settings");
+    expect(link).toHaveTextContent("01001234567");
+  });
+
+  it("BR-O14 a new pre-order links to the pre-order", async () => {
+    stubApi(shellRoutes([notification({ id: 5, type: "new_preorder", type_label: "حجز مسبق جديد" })], 1));
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await user.click(await screen.findByRole("button", { name: "الإشعارات، 1 غير مقروءة" }));
+
+    const link = await screen.findByRole("link", { name: /حجز مسبق جديد/ });
+    expect(link).toHaveAttribute("href", "/dashboard/orders/1001");
+    expect(link).toHaveTextContent("حجز مسبق #1001 من مكتبة الأمل");
+  });
+
+  it("D81 an expired order links to the order", async () => {
+    stubApi(shellRoutes([notification({ id: 4, type: "order_expired", type_label: "إلغاء تلقائي لطلب غير مؤكد" })], 1));
+    const user = userEvent.setup();
+    renderWithQuery(<DashboardShell>{null}</DashboardShell>);
+
+    await user.click(await screen.findByRole("button", { name: "الإشعارات، 1 غير مقروءة" }));
+
+    const link = await screen.findByRole("link", { name: /إلغاء تلقائي لطلب غير مؤكد/ });
+    expect(link).toHaveAttribute("href", "/dashboard/orders/1001");
+    expect(link).toHaveTextContent("طلب #1001 من مكتبة الأمل");
   });
 
   it("marks everything read and refreshes the count", async () => {

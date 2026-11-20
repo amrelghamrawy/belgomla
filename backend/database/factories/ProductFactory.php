@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Modules\Catalog\Enums\ProductStatus;
+use App\Modules\Catalog\Enums\ProductType;
 use App\Modules\Catalog\Models\Product;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -42,6 +43,18 @@ final class ProductFactory extends Factory
     public function comingSoon(): static
     {
         return $this->state(['status' => ProductStatus::ComingSoon]);
+    }
+
+    /** BR-O14, D88: Coming Soon and taking pre-orders, optionally capped (selling units over every open pre-order). */
+    public function preorderable(?int $limit = null, ?string $expectedAt = '2026-12-01'): static
+    {
+        return $this->state(['status' => ProductStatus::ComingSoon, 'preorder_enabled' => true, 'preorder_limit' => $limit, 'expected_at' => $expectedAt]);
+    }
+
+    /** BR-P15, D93: a bundle product (its SKU, components and pricing are made apart). */
+    public function bundle(): static
+    {
+        return $this->state(['type' => ProductType::Bundle]);
     }
 
     public function inactive(): static

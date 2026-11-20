@@ -20,7 +20,7 @@ function login(string $email = 'owner@alnoor.test', string $password = 'secret12
 test('an owner logs in and reads their profile and tenant', function (): void {
     login()
         ->assertOk()
-        ->assertExactJsonStructure(['data' => ['id', 'name', 'email', 'role', 'status', 'last_login_at']])
+        ->assertExactJsonStructure(['data' => ['id', 'name', 'email', 'role', 'role_label', 'status', 'last_login_at']])
         ->assertJsonPath('data.email', 'owner@alnoor.test')
         ->assertJsonPath('data.role', 'owner');
 
@@ -32,6 +32,18 @@ test('an owner logs in and reads their profile and tenant', function (): void {
 
     expect(TenantUser::withoutTenantScope()->first()?->last_login_at)->not->toBeNull();
 });
+
+test('D82 /me lists what the role may do', function (App\Modules\Tenancy\Enums\TenantUserRole $role, array $permissions): void {
+    $this->actingAsOwner($this->makeOwner(attributes: ['role' => $role, 'email' => "{$role->value}@alnoor.test"]));
+
+    $this->tenantJson('GET', '/api/dashboard/me')
+        ->assertOk()
+        ->assertJsonPath('data.user.role', $role->value)
+        ->assertJsonPath('data.permissions', $permissions);
+})->with([
+    'sales' => [App\Modules\Tenancy\Enums\TenantUserRole::Sales, ['orders.view', 'orders.manage', 'orders.create', 'orders.edit', 'orders.discount', 'customers.manage']],
+    'accountant' => [App\Modules\Tenancy\Enums\TenantUserRole::Accountant, ['orders.view', 'customers.credit', 'collections.manage', 'expenses.manage', 'reports.view']],
+]);
 
 test('email matching is case-insensitive', function (): void {
     login('Owner@Alnoor.TEST')->assertOk();

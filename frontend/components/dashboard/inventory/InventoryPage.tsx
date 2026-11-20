@@ -1,5 +1,6 @@
 "use client";
 
+import { CoinsIcon, EllipsisIcon, HistoryIcon, PackagePlusIcon, SlidersHorizontalIcon } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -7,33 +8,48 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { BulkAdjustResult, InventoryRow } from "@/lib/api/types";
+import type { BulkAdjustResult, InventoryRow, MerchantAdjustmentReason } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { INVENTORY_LIST_KEYS, useBulkAdjustStock, useInventory } from "@/lib/dashboard/inventory";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
+import { useCan } from "@/lib/dashboard/permissions";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
+import { formatUnitCost } from "@/lib/format/money";
 
 import { FilterPanel } from "../common/FilterPanel";
 import { Pager } from "../common/Pager";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
 import { AdjustStockSheet } from "./AdjustStockSheet";
+import { ReasonFields, type ReasonValue, reasonProblem } from "./ReasonFields";
+import { type CostMode, ReceiveStockSheet } from "./ReceiveStockSheet";
 
 const copy = ar.dashboard.inventory;
 
-/** Stock per SKU with on hand, reserved, available and the minimum allowed; adjust one or many. */
+/** Stock per SKU with on hand, reserved, available, the minimum allowed and the average cost; adjust, receive, set the cost. */
 export function InventoryPage() {
   const [query, setQuery] = useListQuery(INVENTORY_LIST_KEYS);
   const inventory = useInventory(query);
   const [adjusting, setAdjusting] = useState<InventoryRow | null>(null);
+  const [costing, setCosting] = useState<{ row: InventoryRow; mode: CostMode } | null>(null);
+  const can = useCan();
+  const canReceive = can("inventory.adjust");
   const [bulk, setBulk] = useState(false);
   const [q, setQ] = useState(query.q ?? "");
   const rows = inventory.data?.data ?? [];
+  // D96 g: the average comes only to users allowed to see it; the column follows the data.
+  const showsCost = rows.some((row) => row.avg_cost !== undefined);
 
   const search = (event: FormEvent) => {
     event.preventDefault();
@@ -104,7 +120,7 @@ export function InventoryPage() {
           <BulkAdjustTable rows={rows} onDone={() => setBulk(false)} />
         ) : (
           <div className="overflow-x-auto rounded-md border">
-            <Table>
+            <Table stack>
               <TableHeader>
                 <TableRow>
                   <TableHead>{copy.code}</TableHead>
@@ -113,6 +129,7 @@ export function InventoryPage() {
                   <TableHead>{copy.reserved}</TableHead>
                   <TableHead>{copy.available}</TableHead>
                   <TableHead>{copy.minAllowed}</TableHead>
+                  {showsCost && <TableHead>{copy.avgCost}</TableHead>}
                   <TableHead>{ar.dashboard.list.actions}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -122,7 +139,10 @@ export function InventoryPage() {
                     <TableCell>
                       <bdi>{row.code}</bdi>
                     </TableCell>
-                    <TableCell className="max-w-56">{row.name ?? ar.dashboard.none}</TableCell>
+                    <TableCell className="max-w-56">
+                      {row.name ?? ar.dashboard.none}
+                      {row.variant && <span className="text-muted-foreground block text-xs">{row.variant}</span>}
+                    </TableCell>
                     <TableCell>{row.on_hand}</TableCell>
                     <TableCell>{row.reserved}</TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -134,13 +154,53 @@ export function InventoryPage() {
                       )}
                     </TableCell>
                     <TableCell>{row.min_allowed}</TableCell>
-                    <TableCell className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => setAdjusting(row)}>
-                        {copy.adjust}
-                      </Button>
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/dashboard/inventory/${row.sku_id}`}>{copy.movements}</Link>
-                      </Button>
+                    {showsCost && (
+                      <TableCell className="whitespace-nowrap" data-testid={`cost-${row.sku_id}`}>
+                        {row.avg_cost ? formatUnitCost(row.avg_cost) : copy.noCost}
+                      </TableCell>
+                    )}
+                    {/* D104: one visible action (the day's job: receiving, else adjusting) and the rest behind «⋯». */}
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {canReceive ? (
+                          <Button variant="outline" size="sm" onClick={() => setCosting({ row, mode: "receive" })}>
+                            <PackagePlusIcon aria-hidden />
+                            {copy.receive}
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => setAdjusting(row)}>
+                            <SlidersHorizontalIcon aria-hidden />
+                            {copy.adjust}
+                          </Button>
+                        )}
+                        <DropdownMenu dir="rtl">
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" aria-label={copy.moreActions(row.code)}>
+                              <EllipsisIcon aria-hidden />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            {canReceive && (
+                              <DropdownMenuItem onSelect={() => setAdjusting(row)}>
+                                <SlidersHorizontalIcon aria-hidden />
+                                {copy.adjust}
+                              </DropdownMenuItem>
+                            )}
+                            {canReceive && (
+                              <DropdownMenuItem onSelect={() => setCosting({ row, mode: "cost" })}>
+                                <CoinsIcon aria-hidden />
+                                {copy.setCost}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/inventory/${row.sku_id}`}>
+                                <HistoryIcon aria-hidden />
+                                {copy.movements}
+                              </Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -150,6 +210,7 @@ export function InventoryPage() {
         ))}
       <Pager meta={inventory.data?.meta} onPage={(page) => setQuery({ page })} />
       {adjusting !== null && <AdjustStockSheet row={adjusting} onClose={() => setAdjusting(null)} />}
+      {costing !== null && <ReceiveStockSheet row={costing.row} mode={costing.mode} onClose={() => setCosting(null)} />}
     </>
   );
 }
@@ -161,16 +222,23 @@ export function InventoryPage() {
 export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone: () => void }) {
   const bulk = useBulkAdjustStock();
   const [values, setValues] = useState<Record<number, string>>({});
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<ReasonValue>({ reason: "", note: "" });
+  const [reasonProblems, setReasonProblems] = useState<{ reason?: string; note?: string }>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<BulkAdjustResult | null>(null);
   const codes = new Map(rows.map((row) => [row.sku_id, row.code]));
+  const shown = new Map(rows.map((row) => [row.sku_id, row.on_hand]));
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const items = Object.entries(values)
       .filter(([, value]) => value.trim() !== "")
-      .map(([skuId, value]) => ({ sku_id: Number(skuId), new_on_hand: Number(value), reason: reason.trim() }));
+      // D99 a: each count is against the on hand this page showed.
+      .map(([skuId, value]) => ({
+        sku_id: Number(skuId),
+        new_on_hand: Number(value),
+        expected_on_hand: shown.get(Number(skuId)) ?? 0,
+      }));
 
     if (items.length === 0) {
       setProblem(copy.bulkNothing);
@@ -182,30 +250,37 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
       return;
     }
 
-    if (reason.trim() === "") {
-      setProblem(ar.dashboard.reasonRequired);
+    const reasonCheck = reasonProblem(reason);
+    setReasonProblems(reasonCheck ?? {});
+
+    if (reasonCheck !== null || reason.reason === "") {
+      setProblem(null);
       return;
     }
 
+    const note = reason.note.trim() || null;
     setProblem(null);
-    bulk.mutate(items, {
-      onSuccess: (outcome) => {
-        setResult(outcome);
-        toast.success(copy.bulkApplied(outcome.applied));
+    bulk.mutate(
+      items.map((item) => ({ ...item, reason: reason.reason as MerchantAdjustmentReason, note })),
+      {
+        onSuccess: (outcome) => {
+          setResult(outcome);
+          toast.success(copy.bulkApplied(outcome.applied));
 
-        if (outcome.skipped.length === 0) {
-          onDone();
-        }
+          if (outcome.skipped.length === 0) {
+            onDone();
+          }
+        },
+        onError: (failure) => setProblem(messageFor(failure)),
       },
-      onError: (failure) => setProblem(messageFor(failure)),
-    });
+    );
   };
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
       <p className="text-muted-foreground text-sm">{copy.bulkHint}</p>
       <div className="overflow-x-auto rounded-md border">
-        <Table>
+        <Table stack>
           <TableHeader>
             <TableRow>
               <TableHead>{copy.code}</TableHead>
@@ -221,7 +296,10 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
                 <TableCell>
                   <bdi>{row.code}</bdi>
                 </TableCell>
-                <TableCell className="max-w-56">{row.name}</TableCell>
+                <TableCell className="max-w-56">
+                  {row.name}
+                  {row.variant && <span className="text-muted-foreground block text-xs">{row.variant}</span>}
+                </TableCell>
                 <TableCell>{row.on_hand}</TableCell>
                 <TableCell>{row.min_allowed}</TableCell>
                 <TableCell>
@@ -239,11 +317,10 @@ export function BulkAdjustTable({ rows, onDone }: { rows: InventoryRow[]; onDone
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex min-w-60 flex-1 flex-col gap-1">
-          <Label htmlFor="bulk-reason">{copy.bulkReason}</Label>
-          <Input id="bulk-reason" maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} />
-        </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ReasonFields id="bulk" label={copy.bulkReason} value={reason} problems={reasonProblems} onChange={setReason} />
+      </div>
+      <div className="flex justify-end">
         <Button type="submit" disabled={bulk.isPending}>
           {bulk.isPending ? ar.saving : copy.bulkApply}
         </Button>

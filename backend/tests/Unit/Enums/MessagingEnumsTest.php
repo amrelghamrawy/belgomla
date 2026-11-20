@@ -18,7 +18,7 @@ test('every messaging enum exposes labels for all cases', function (string $enum
 test('the enum values match the domain model', function (string $enum, array $values): void {
     expect(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))->toBe($values);
 })->with([
-    'BR-N01 purposes' => [MessagePurpose::class, ['otp', 'invitation', 'system_alert']],
+    'BR-N01 purposes' => [MessagePurpose::class, ['otp', 'invitation', 'system_alert', 'order_status']],
     'BR-CU07 channels' => [Channel::class, ['whatsapp', 'sms']],
     'statuses' => [MessageStatus::class, ['queued', 'sent', 'delivered', 'failed', 'fell_back']],
     'D11 D70 providers' => [Provider::class, ['hypersender', 'meta_cloud', 'log', 'wa_gateway']],

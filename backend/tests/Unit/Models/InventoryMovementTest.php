@@ -16,7 +16,7 @@ test('to array', function (): void {
     $movement = $this->inTenant(fn () => InventoryMovement::factory()->create()->fresh());
 
     expect(array_keys($movement->toArray()))->toBe([
-        'id', 'tenant_id', 'sku_id', 'type', 'quantity', 'on_hand_after', 'order_id', 'reason', 'actor_type', 'actor_id', 'created_at',
+        'id', 'tenant_id', 'sku_id', 'type', 'quantity', 'on_hand_after', 'order_id', 'reason', 'actor_type', 'actor_id', 'created_at', 'unit_cost', 'reason_code',
     ]);
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { BanIcon } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -7,10 +8,11 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ar } from "@/lib/copy/ar";
 import { activeFilters, hasFilters } from "@/lib/dashboard/list-query";
-import { COLLECTION_LIST_KEYS, useCollections, useVoidCollection } from "@/lib/dashboard/orders";
+import { COLLECTION_LIST_KEYS, PAYMENT_METHODS, useCollections, useVoidCollection } from "@/lib/dashboard/orders";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -23,7 +25,7 @@ import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/Stat
 
 const copy = ar.dashboard.collections;
 
-/** Every collection, voided included, filtered by Cairo days (D60), customer or order number. */
+/** Every collection, voided included, filtered by Cairo days (D60), customer, order number or method (D103 e). */
 export function CollectionsPage() {
   const [query, setQuery] = useListQuery(COLLECTION_LIST_KEYS);
   const collections = useCollections(query);
@@ -72,6 +74,18 @@ export function CollectionsPage() {
           {ar.dashboard.list.to}
           <Input type="date" value={query.to ?? ""} onChange={(event) => setQuery({ to: event.target.value })} />
         </label>
+        <NativeSelect
+          aria-label={copy.paidBy}
+          value={query.method ?? ""}
+          onChange={(event) => setQuery({ method: event.target.value || null })}
+        >
+          <option value="">{copy.allMethods}</option>
+          {PAYMENT_METHODS.map((method) => (
+            <option key={method} value={method}>
+              {copy.methods[method]}
+            </option>
+          ))}
+        </NativeSelect>
       </FilterPanel>
       {query.customer_id !== undefined && (
         <p className="text-muted-foreground text-sm">{copy.customerFilter(query.customer_id)}</p>
@@ -81,7 +95,7 @@ export function CollectionsPage() {
       {collections.data?.data.length === 0 && <EmptyBlock>{copy.none}</EmptyBlock>}
       {collections.data !== undefined && collections.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.when}</TableHead>
@@ -113,7 +127,7 @@ function CollectionRow({ collection }: { collection: Collection }) {
       <TableCell className="whitespace-nowrap">{formatDateTime(collection.collected_at)}</TableCell>
       <TableCell>
         <Link href={`/dashboard/orders/${collection.order.number}`} className="font-medium hover:underline">
-          <bdi>#{collection.order.number}</bdi>
+          <bdi className="text-primary font-bold tabular-nums">#{collection.order.number}</bdi>
         </Link>
       </TableCell>
       <TableCell>
@@ -128,9 +142,22 @@ function CollectionRow({ collection }: { collection: Collection }) {
       <TableCell
         className={collection.is_voided ? "text-muted-foreground whitespace-nowrap line-through" : "whitespace-nowrap"}
       >
+        {collection.kind === "refund" ? "−" : ""}
         {formatMoney(collection.amount)}
       </TableCell>
-      <TableCell>{collection.method_label}</TableCell>
+      <TableCell>
+        {collection.method_label}
+        {collection.reference !== null && (
+          <span className="text-muted-foreground ms-2 text-xs" dir="ltr">
+            {collection.reference}
+          </span>
+        )}
+        {collection.kind === "refund" && (
+          <Badge variant="outline" className="ms-2">
+            {copy.refundBadge}
+          </Badge>
+        )}
+      </TableCell>
       <TableCell>
         {collection.is_voided ? (
           <div className="flex flex-col items-start gap-1">
@@ -145,6 +172,7 @@ function CollectionRow({ collection }: { collection: Collection }) {
           <ReasonDialog
             trigger={(open) => (
               <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                <BanIcon aria-hidden />
                 {copy.void}
               </Button>
             )}

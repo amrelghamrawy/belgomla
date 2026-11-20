@@ -51,9 +51,33 @@ There is no cross-tenant product listing in V1.
 
 A tenant has one or more tenant users.
 
-V1 has a single role: `owner`. All tenant users have full dashboard access.
+Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are fixed by the platform:
 
-Roles and granular permissions are V2.
+| Permission | owner | manager | sales | warehouse | accountant |
+| ---------- | :---: | :-----: | :---: | :-------: | :--------: |
+| `catalog.manage` (products, categories, units, fields) | ✓ | ✓ | | | |
+| `pricing.manage` (incl. promotions, V2 Task 12, BR-PR15) | ✓ | ✓ | | | |
+| `pricing.customers` (customer groups, negotiated prices, the group on the customer form; V2 Task 11, BR-PR12, BR-PR13) | ✓ | ✓ | | | |
+| `inventory.adjust` | ✓ | ✓ | | ✓ | |
+| `orders.view` (also reading the catalog and stock) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `orders.manage` (transition, cancel, address) | ✓ | ✓ | ✓ | ✓ (preparing / out for delivery only, no cancel) | |
+| `orders.create` (place an order for a customer, V2 Task 07, BR-O11) | ✓ | ✓ | ✓ | | |
+| `orders.override_mov` (waive the minimum order value of one such order, D84) | ✓ | ✓ | | | |
+| `orders.edit` (change the lines of a pending or confirmed order, V2 Task 09, BR-O12) | ✓ | ✓ | ✓ | | |
+| `orders.discount` (manual discounts, V2 Task 08, BR-PR08; sales: line discounts up to the store's cap only, D85) | ✓ | ✓ | ✓ | | |
+| `orders.returns` | ✓ | ✓ | | ✓ | |
+| `customers.manage` | ✓ | ✓ | ✓ | | |
+| `customers.credit` (limits, terms) | ✓ | ✓ | | | ✓ |
+| `collections.manage` | ✓ | ✓ | | | ✓ |
+| `reports.view` | ✓ | ✓ | | | ✓ |
+| `settings.manage` (incl. the WhatsApp link) | ✓ | | | | |
+| `users.manage` | ✓ | | | | |
+| `audit.view` | ✓ | ✓ | | | |
+
+- Every dashboard endpoint needs a permission; without it the answer is `403 forbidden` and the screen is hidden. Customers can be listed by anyone with `customers.manage`, `customers.credit` or `collections.manage`; changing a customer's name or addresses needs `customers.manage`, changing the credit terms `customers.credit`. Delivering with "collect the full amount" needs `collections.manage`.
+- A user sees only the notifications their role covers: order notifications need `orders.manage`, `whatsapp_dropped` needs `settings.manage`. Read state stays shared (D57).
+- A store always keeps at least one active owner: the last active owner can be neither demoted nor disabled (`409 last_owner`). A role change is audited (`tenant_user.role_changed`).
+- `tenant:create` and `tenant:demo` create an owner; a user added from the dashboard is an owner unless a role is picked.
 
 ### BR-T07 — Tenant Lifecycle
 
@@ -77,13 +101,9 @@ Every product belongs to exactly one tenant.
 
 `Product` and `SKU` are separate entities. A product has one or more SKUs (1:N).
 
-In V1:
-
-- The dashboard creates exactly one SKU per product automatically.
-- Variants (color/size) are not exposed in the UI.
-- Pricing, MOQ, inventory and order items are attached to the SKU, never to the product.
-
-This keeps V2 variants possible without a data migration.
+- A product without options has exactly one SKU (the V1 shape, still the default in the product form).
+- Since V2 Task 14 a product may have options (colour, size) and then has one SKU per combination it sells (BR-P14, D92).
+- Pricing, MOQ, units, inventory and order items are attached to the SKU, never to the product.
 
 ### BR-P03 — SKU Is Tenant-Scoped
 
@@ -106,7 +126,9 @@ V1 supports:
 - Coming Soon (visible on the storefront with "قريبًا", not orderable, no stock check)
 - Inactive
 
-Coming Soon exists because publishers announce new-year editions and final revisions before they ship, and retailers plan purchases around them. Pre-ordering a Coming Soon product is V2 (see `06-open-decisions.md` D21).
+Coming Soon exists because publishers announce new-year editions and final revisions before they ship, and retailers plan purchases around them.
+
+V2 (Task 10, D21 resolved, D88): the merchant may open a Coming Soon product to **pre-orders** (`preorder_enabled`), with the day it is expected (`expected_at`, shown on the storefront) and an optional cap on the total pre-ordered quantity (`preorder_limit`, selling units). Customers then pre-order it ("احجز الآن", BR-O14); it is still not orderable as a normal order and no stock is checked or held. Going `active` does not convert anything by itself: the merchant sees the pre-order demand and converts the pre-orders when the stock is in.
 
 Inactive products:
 
@@ -165,7 +187,8 @@ Storefront behavior:
 - Filterable fields are shown as facets in the order defined by the merchant (`filter_order`). For school books this is Grade → Subject → Publisher.
 - Facets combine with AND; each facet shows only options that still have active products given the other selected facets.
 - Facet selections are reflected in the URL so a merchant can share a link such as "كل كتب أولى إعدادي الأضواء".
-- Basic search matches product name, SKU code, and the option labels of `select` custom fields (so "علوم تانية اعدادي الأضواء" finds the book). Every word must match; both sides are folded the same way (D32: tashkeel removed, alef forms unified, ى→ي, ة→ه, colloquial ث→ت, ذ→د, ظ→ض).
+- Variant options (BR-P14) are facets too, after the custom fields: one facet per option name across the store's products (folded, D32: «اللون» of every product is one facet), each value counting the visible products with an active SKU of that value. They are not custom fields.
+- Basic search matches product name, every SKU code (variants included), and the option labels of `select` custom fields (so "علوم تانية اعدادي الأضواء" finds the book). Every word must match; both sides are folded the same way (D32: tashkeel removed, alef forms unified, ى→ي, ة→ه, colloquial ث→ت, ذ→د, ظ→ض).
 
 ### BR-P09 — Vertical Templates
 
@@ -211,11 +234,33 @@ School-book merchants replace most of the catalog every academic year. V1 suppor
 - Bulk status change by filter (e.g. inactivate all products where `academic_year = 2025/2026`).
 - Bulk pricing by filter (BR-PR11).
 - Duplicate product (BR-P11).
-- Full bulk import/export remains V2.
+- Catalog import / export (V2 Task 06): the catalog (or any filter of it) downloads as an Excel or CSV file in the import format, and a file in that format imports back: a new SKU code creates the product, a known one updates it, after a preview that lists every row error and writes nothing (D95). Categories, units and options must exist; images are not imported.
 
 ### BR-P13 — Printable Price List
 
-Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL; the browser's print-to-PDF is used in V1. Excel/PDF export is V2.
+Retailers today receive wholesale price lists as images or PDFs in WhatsApp/Telegram groups. The storefront provides a print-friendly price list page for any facet selection (e.g. all الأضواء books for أولى إعدادي) showing name, cover price, wholesale price, MOQ and availability. A logged-in customer sees their own wholesale price (BR-PR14, V2 Task 11). The page itself lets the visitor change the selection (search, category, facets), hidden when printed. The merchant can share its URL. The page also downloads the same selection as an Excel file (V2 Task 06); PDF is the browser's print-to-PDF of the page (D83). A guest of a store that hides prices gets no file. A product with variants has one row per unit of each active variant, naming the variant (BR-P14).
+
+### BR-P14 — Product Variants (V2 Task 14)
+
+A product may have up to two **options** (e.g. «اللون», «المقاس») with up to twenty values each (D92). Each combination the merchant sells is its own SKU with its own code (BR-P03), units and prices (D91), and stock (BR-INV02); a combination may be left out (not every colour comes in every size).
+
+- The dashboard product form has a «خيارات المنتج» section; options generate the variants table (one row per combination, codes `{base}-{value slug}`, an Arabic value slugged by its position). Each variant can be set inactive: it disappears from the storefront and cannot be ordered, while the product and its other variants stay on sale.
+- A variant removed from the form is deleted when nothing points at it; when it has history (order lines, stock movements, negotiated prices, promotions) it is set inactive and kept (BR-P05). An option or value removed from the form is deleted; the variants keep their label.
+- The storefront shows one product with option selectors (a swatch when the value has one of the product's images, a button otherwise); combinations that are not sold or not in stock are disabled; price, stock, units and the cart follow the chosen variant. The product card shows the price range «من … إلى …» and is in stock when any variant is.
+- The order line snapshots the variant label («أزرق / M») as `sku_name` (BR-PR07). Tiers never combine across variants (BR-PR02): each variant is its own SKU.
+- Books keep D16: a final revision is a separate product, not a variant. Product-level custom fields (D33's stationery colour) stay for products without variants; option values are not custom fields.
+- Duplicating a product (BR-P11) copies every variant; the catalog file (BR-P12, D95 format v3) groups the rows of one product by `product_key`.
+
+### BR-P15 — Bundles and Full-Grade Sets (V2 Task 15)
+
+A **bundle** (باقة) is a sellable product made of component SKU units with fixed quantities, for example every book of أولى إعدادي, first term, from الأضواء (D93).
+
+- It has one SKU sold in one unit (its own code and MOQ). Its components are units of active simple products; a bundle never contains a bundle.
+- It is priced at a fixed price or at the components' base prices summed less a %; group, promotion and negotiated prices apply to the bundle price like to any SKU (BR-PR14, BR-PR15). The storefront shows what the components cost on their own and the saving («وفّر»).
+- It has no stock of its own: it is available while every component is, as many times as the scarcest component allows (BR-INV02). The product page lists the components and names the one that is missing.
+- Ordering a bundle reserves, deducts and returns its components. The order keeps the bundle line (price, total) and one line per component with the price allocated to it; a partial delivery counts whole bundles; a return brings back components at their allocated price.
+- The merchant can generate a draft «طقم» from a facet selection (grade + term + publisher) in one step and review it before activating it.
+- Bundles are exported in the catalog file (second sheet) but not imported (D93).
 
 ### BR-P07 — Product Images
 
@@ -241,17 +286,15 @@ Each tenant defines its own unit names such as:
 
 Unit names are not hardcoded to a single vertical.
 
-### BR-U02 — One Selling Unit Per SKU
+### BR-U02 — Selling Units of a SKU
 
-In V1 every SKU is sold in exactly **one** selling unit.
+A SKU has one `base_unit` (e.g. Piece), the unit its stock is kept in (BR-U03), and is sold in **one or more selling units** (V2 Task 13, D91; V1 allowed exactly one). Each selling unit defines:
 
-A SKU defines:
+- its `unit` (e.g. Carton), at most once per SKU;
+- `conversion_factor` = how many base units in one of it (e.g. 240; 1 for the base unit itself);
+- its own prices, MOQ and tiers (BR-U04).
 
-- `selling_unit` (e.g. Carton)
-- `base_unit` (e.g. Piece)
-- `conversion_factor` = how many base units in one selling unit (e.g. 240)
-
-Selling the same SKU in several units (piece and carton) is V2. If a merchant needs that in V1, they create two SKUs.
+One active selling unit is the **default**: shown first, and used where a single unit stands for the SKU (the product card, the price list order, the pre-order cap). A notebook can be sold by the piece (factor 1, 12 EGP) and by the carton of 48 (factor 48, its own price and tiers); both draw on the same stock. A unit the merchant stops selling is archived, not deleted.
 
 ### BR-U03 — Base Unit Is the Inventory Unit
 
@@ -261,7 +304,7 @@ Ordered quantity in base units = `quantity × conversion_factor`.
 
 ### BR-U04 — Pricing and MOQ Are in the Selling Unit
 
-Pricing tiers, base price and MOQ are expressed in the SKU's selling unit.
+Pricing tiers, base price and MOQ are expressed in the selling unit they belong to: every selling unit of a SKU has its own (V2 Task 13, D91). A cart or order line is in one selling unit; two units of one SKU are two lines.
 
 Example:
 
@@ -290,7 +333,7 @@ Invalid:
 
 ### BR-MOQ01 — SKU-Level MOQ
 
-Minimum Order Quantity is defined per SKU, in its selling unit. Default = 1.
+Minimum Order Quantity is defined per SKU selling unit, in that unit (V2 Task 13, D91: each unit has its own). Default = 1.
 
 Example:
 
@@ -300,7 +343,7 @@ The customer cannot order fewer than 5 cartons of that SKU.
 
 ### BR-MOQ02 — MOQ Is Not Aggregated
 
-MOQ is evaluated per SKU.
+MOQ is evaluated per SKU selling unit (a line), never summed across lines or units.
 
 Example:
 
@@ -315,15 +358,15 @@ Ordering 5 of A + 5 of B does not satisfy either MOQ.
 
 ### BR-PR01 — Base Price Is Mandatory
 
-Every SKU has a mandatory `base_price` per selling unit.
+Every selling unit of a SKU has a mandatory `base_price` (V2 Task 13, D91).
 
 Pricing tiers are optional and only reduce the price for larger quantities.
 
 ### BR-PR02 — Independent Tiers Per SKU
 
-Every SKU has its own quantity pricing tiers.
+Every SKU selling unit has its own quantity pricing tiers (V2 Task 13, D91).
 
-Quantities from different SKUs are never combined to reach a pricing tier.
+Quantities from different SKUs, or from different units of one SKU, are never combined to reach a pricing tier.
 
 ### BR-PR03 — Tier Structure
 
@@ -349,9 +392,9 @@ Example: quantity 35 → 90 EGP. Quantity 7 with tiers starting at 10 → base p
 
 ### BR-PR05 — No Duplicate Tier Thresholds
 
-Two tiers of the same SKU cannot share the same `min_quantity`. Tier prices must be `> 0`.
+Two tiers of the same SKU selling unit cannot share the same `min_quantity`. Tier prices must be `> 0`.
 
-A tier may not cost more than the SKU's base price (D28: no surcharges); a tier equal to the base price is allowed. Violations are rejected together with `422 invalid_tiers`, one Arabic message per problem in `details.tiers`.
+A tier may not cost more than its unit's base price (D28: no surcharges); a tier equal to the base price is allowed. Violations are rejected together with `422 invalid_tiers`, one Arabic message per problem in `details.tiers`.
 
 ### BR-PR06 — Checkout Recalculation
 
@@ -407,9 +450,32 @@ A merchant with hundreds of books sets prices per publisher or per grade, not pe
 
 Products without `cover_price` are skipped and reported.
 
-### BR-PR08 — No Manual Discount in V1
+### BR-PR08 — Manual Discounts (V2 Task 08, D85)
 
-Manual order/item discounts are explicitly postponed to V2.
+V1 had none. From V2 the merchant may lower the price of an order that is still `pending` or `confirmed`:
+
+- **Line discount**: per unit, an amount in EGP or a % off the line's list price (the price the order was placed at, `list_unit_price`). The line's `unit_price` becomes the discounted price, never below 0.01, and `line_total = unit_price × quantity` as before.
+- **Order discount**: an amount or a % of the items total (after the line discounts), with a required reason; the order total never goes below 0.01.
+- Percentages are rounded half-up to the piaster (D27). Removing a discount restores the list price.
+- Who: `orders.discount` (owner, manager, sales). A sales user gives line discounts only, each at most the store's `max_discount_percent_sales` % (none by default = no discounts by sales).
+- The new total can never be below what was already collected. The collection status is derived again.
+- Every change is audited (`order.discount_changed`, old and new values) and noted in the order history («خصم»). The customer sees the discounted prices and the order discount (not the reason), and gets a WhatsApp message only if the store notifies `discount` (BR-N03).
+- A line's `discount_percent` (shown next to a tier price) is unrelated: it is the display margin off the cover price (BR-PR10).
+### BR-PR12 — Customer Groups (V2 Task 11, D89)
+
+The merchant defines wholesale levels («موزع», «مكتبة كبيرة», «مكتبة صغيرة»), each with one discount percentage off the base price (0–90) and a place in the list. A customer belongs to at most one group, set from the customer form or assigned in bulk (ticked customers, or every customer the list's filter selects). A group customer pays the group price, `base_price × (100 − %) / 100`, rounded half-up to the piaster (D27), whenever it is lower than the normal price (BR-PR14). Archiving a group stops its discount at once; its customers keep it and get their prices back if it is restored. Names are unique in the store. Groups, assignment and changes are audited (`customer_group.created/updated/archived/assigned`, `customer.group_changed`). Who: `pricing.customers`.
+
+### BR-PR13 — Negotiated Customer Prices (V2 Task 11, D89)
+
+The merchant sets a unit price for one customer on one SKU (in its selling unit, > 0, with an optional note), from the customer's page («أسعار خاصة»). It applies at every quantity and wins over the base price, the tiers and the group price, even when it is higher (BR-PR14). One price per customer and SKU; setting it again replaces it, removing it brings the normal price back. Audited (`customer.price_set`, `customer.price_removed`). Who: `pricing.customers`.
+
+### BR-PR14 — Price Precedence (V2 Task 11, D89)
+
+For a customer, SKU and quantity: (1) the customer's negotiated price for the SKU, if any; (2) otherwise the lowest of the normal price (BR-PR04: base or tier), the group price (BR-PR12) and the price of a live promotion on the SKU (BR-PR15, V2 Task 12, D90). Guests and customers without a group or negotiated price pay the normal price. The PriceResolver stays the single authority: it receives the customer's pricing context (their active group's % and their negotiated prices, read once per request) and never queries. Every price the customer sees or pays follows this rule: the storefront product list and page, the price list and its Excel file, the cart, checkout (BR-PR06), the merchant's quote and order (BR-O11), order edits (BR-O12) and pre-orders and their conversion (BR-O14). The order line snapshots the price and where it came from (`price_source`: base, tier, group or customer, BR-PR07); the storefront marks a group or negotiated price «سعرك الخاص». Manual discounts (BR-PR08) apply on top.
+
+### BR-PR15 — Promotions (V2 Task 12, D90)
+
+The merchant runs time-boxed offers («خصم 15% على كتب الأضواء حتى آخر الشهر»): a name, one % off the base price (more than 0, below 90), a start and an end in Cairo time, and the products it covers, chosen by the same filter as bulk pricing (BR-PR11, not empty) or as an explicit list of SKUs. The covered SKUs are fixed when the promotion is saved. While a promotion is live (`starts_at ≤ now < ends_at`, not a draft, not cancelled) every customer and guest pays the promotion price, `base_price × (100 − %) / 100` rounded half-up to the piaster, whenever it is the lowest price they can get (BR-PR14): a negotiated price still wins outright; otherwise the lowest of the normal price, the group price and the promotion price applies. Promotions never stack: a SKU in two live promotions gets the higher %. The storefront shows the offer's % and when it ends on the card, product page, cart and price list. Checkout prices at the moment of the order (BR-PR06), so an offer that ended in the meantime is not applied; order lines keep `price_source = promotion` and the promotion's id (BR-PR07). Only a draft or a promotion that has not started can be edited; any promotion that has not ended can be cancelled. Audited (`promotion.created`, `promotion.updated`, `promotion.cancelled`). Who: `pricing.manage`.
 
 ### BR-PR09 — Taxes
 
@@ -467,6 +533,8 @@ Formula:
 
 `Available = On Hand - Reserved`
 
+A bundle (BR-P15, V2 Task 15) has no stock of its own: its availability is derived, the minimum over its components of their Available divided by what one bundle takes of them (D93).
+
 ### BR-INV03 — Reservation at Order Creation
 
 Stock is reserved when the order is created (status `Pending`), inside the checkout transaction.
@@ -489,17 +557,23 @@ When the order becomes `Delivered`:
 
 `Reserved -= reserved quantity`
 
+V2 (Task 09, BR-O13): when a line is delivered short, only the delivered units leave On Hand (`sale` movement of `delivered × conversion_factor`) and the rest of its reservation is released. A line the merchant removed (BR-O12) already gave its reservation back and is neither deducted nor released.
+
 ### BR-INV06 — Inventory Movements
 
 Every change to On Hand is recorded as an inventory movement with type:
 
 - `opening` (initial stock)
-- `adjustment` (manual merchant change, with reason)
+- `adjustment` (manual merchant change, with a reason from a fixed list and an optional note, required for «أخرى», D97)
 - `sale` (delivery deduction, linked to the order)
+- `return` (V2, BR-R03/R06: goods a customer brought back, positive and linked to the order; negative when the return is voided)
+- `receive` (V2 costing, BR-INV09: goods the merchant bought, positive, at the price paid)
 
 Reservation changes are not movements; they are derived from order status.
 
-**Returns (المرتجع) are not in V1. They are planned for V2** (decided 2026-10-09). Because the school-book trade relies on end-of-season returns, the domain model reserves the `return` movement type and an `order_returns` entity now, so V2 returns ship without migrating existing data.
+Each movement carries the cost per base unit it moved at, when known (BR-INV09).
+
+Returns (المرتجع) were left out of V1 and shipped as the first V2 increment (D20, §H2).
 
 ### BR-INV08 — Adjustments Cannot Go Below Reserved
 
@@ -509,11 +583,25 @@ Dashboard behavior:
 
 - The adjustment form shows On Hand, Reserved and Available side by side, and states the minimum allowed value: "أقل كمية ممكنة: {reserved} (محجوزة لطلبات قائمة)".
 - If the merchant enters a lower value, the request is rejected with an Arabic message listing the open orders holding the reservation, each linked to the order page: "لا يمكن تقليل المخزون إلى {x} لأن {reserved} وحدة محجوزة للطلبات: #1024، #1031. ألغِ الطلبات أو سلّمها أولًا."
-- The same rule applies to bulk adjustments; the response reports the SKUs that were skipped and why (`below_reserved` with `reserved`/`min_allowed`, `not_found`, `unchanged`), and the valid ones are applied.
+- The same rule applies to bulk adjustments; the response reports the SKUs that were skipped and why (`below_reserved` with `reserved`/`min_allowed`, `not_found`, `unchanged`, `count_outdated`), and the valid ones are applied.
+- A count (V2, D99) is applied as the difference between what was counted and what the form showed when the count began, on top of the current On Hand, so sales and returns recorded during the count are not lost.
+
+### BR-INV09 — Purchase Cost and Average Cost (V2 costing, D96)
+
+Each SKU has one **average cost per base unit**, unknown until the merchant enters one.
+
+- **Receiving goods** (استلام بضاعة): the merchant enters the quantity in one of the SKU's units and the price paid per that unit. `On Hand += quantity × conversion_factor`, written as a positive `receive` movement at cost = price ÷ conversion_factor.
+- **Average:** `new = (On Hand before × average + received × cost) ÷ (On Hand before + received)`, half-up to 4 decimals. With no average yet, or nothing on hand, the received cost becomes the average. Example: 100 pieces at 5.0000, then 2 cartons of 50 at 300.00 per carton (6.0000 a piece) → (100 × 5 + 100 × 6) ÷ 200 = 5.5000.
+- Only goods coming in at a known cost move the average: a receipt, or a return of a sale whose cost is known (at that sale's cost). Sales, adjustments, opening stock and voided returns leave it as it is.
+- The merchant may set the average by hand (stock that existed before costing, or a correction); it is audited.
+- **Delivery freezes the cost:** each order line that leaves the stock records the average at that moment, so a later receipt never changes the cost of what was already sold. A return brings goods back at the cost frozen on the line it returns (BR-R03).
+- The average is visible to users who can adjust stock or view reports, never to sales staff.
 
 ### BR-INV07 — Unconfirmed Orders Hold Stock
 
-A `Pending` order holds its reservation until the merchant confirms or cancels it. There is no automatic expiry in V1. The dashboard should highlight Pending orders older than 24 hours.
+A `Pending` order holds its reservation until the merchant confirms or cancels it. The dashboard highlights Pending orders older than `stale_pending_hours` (default 24, D10).
+
+Optional automatic expiry (V2 Task 04, D81): a store may set `pending_expiry_hours` (1–720, off by default, never below `stale_pending_hours`). A Pending order still unconfirmed that many hours after it was placed is cancelled by the system (`cancelled_by = system`, reason "انتهت مهلة تأكيد الطلب"), which releases its stock (BR-INV04). The merchant gets an `order_expired` notification and the customer the cancelled message when the store sends it (BR-N03). An order with money collected is never expired (BR-O03); it is left pending and logged. The check runs every 15 minutes, so an order may expire up to 15 minutes late. The orders list shows when each pending order will expire. A pre-order (BR-O14) holds no stock and waits for its product by design: it is never stale and never expires.
 
 ---
 
@@ -531,10 +619,14 @@ Only forward transitions along this path are allowed. Skipping a step is allowed
 
 `Delivered` and `Cancelled` are terminal.
 
+V2 (Task 10, BR-O14): a pre-order (`kind = preorder`) stays `Pending` until it is cancelled; it never moves forward. It becomes normal orders by conversion.
+
 ### BR-O02 — Who Can Cancel
 
 - Customer: only while the order is `Pending`.
 - Merchant: from any status except `Delivered`.
+
+Orders are placed by the customer at checkout, or by the merchant on the customer's behalf (V2, BR-O11).
 
 Cancellation requires a reason (free text) and releases the reservation (BR-INV04).
 
@@ -550,9 +642,14 @@ Every status change is recorded in order status history with actor, timestamp an
 
 Order totals and item prices are snapshots and must remain stable even if catalog pricing changes later.
 
-### BR-O06 — Orders Are Immutable After Creation
+### BR-O06 — When Order Lines Change
 
-Order items (SKUs, quantities, prices) cannot be edited after creation in V1. The merchant cancels and the customer re-orders. Partial fulfilment is V2.
+V1 orders were immutable. From V2 (Task 09) the lines of an order change in exactly two ways:
+
+- While it is `pending` or `confirmed`, the merchant edits them (add a SKU, remove a line, change a quantity, BR-O12) instead of cancelling and asking the customer to re-order.
+- On delivery, the merchant records what each line actually delivered when it is less than ordered (partial delivery, BR-O13).
+
+From `preparing` on, nothing but a short delivery changes the lines. The customer never edits an order. Goods brought back after delivery are returns (§H2), which leave the lines as they were.
 
 ### BR-O07 — Merchant Delivery
 
@@ -561,6 +658,10 @@ The merchant is responsible for delivery in V1.
 ### BR-O08 — Order Total
 
 `order_total = Σ line_total`. No fees, discounts or taxes in V1.
+
+V2 (Task 08): `items_total = Σ line_total` (line totals after their line discounts) and `order_total = items_total − discount_amount`, the order discount (BR-PR08). A CHECK holds it.
+
+V2 (Task 01): `net_total = order_total − returned_total`, where `returned_total` is the sum of the order's live returns (BR-R04). Everything the customer owes is computed on the net total.
 
 ### BR-O09 — Order Number
 
@@ -572,6 +673,85 @@ The order stores a snapshot of the chosen delivery address and the customer phon
 
 The customer cannot change it afterwards. The merchant may edit the address snapshot while the order is before `Out for Delivery` (audited). Pending confirmation, see `06-open-decisions.md` (D9).
 
+### BR-O11 — Merchant-Placed Orders (V2 Task 07, D84)
+
+Many wholesale orders arrive by phone or WhatsApp. A dashboard user with `orders.create` (owner, manager, sales) places the order for an existing **active** customer and one of their addresses. It goes through exactly the checkout checks of BR-PR06 (current prices and tiers, product active, MOQ, stock, minimum order value, credit limit BR-C05), reserves stock and takes the next order number of the store (BR-O09), and from then on lives like any other order. Differences:
+
+- The actor of the history entry and of the `order.created` audit is the dashboard user; the order records `placed_by` (customer | tenant_user) and the dashboard shows «أنشأه التاجر».
+- No `new_order` notification (the merchant made it).
+- The owner or a manager (`orders.override_mov`) may waive the minimum order value for one order; it is audited. MOQ, stock and the credit limit are never waived.
+- The customer gets a WhatsApp «تم تسجيل طلبك» message only when the merchant asks for it (and they did not opt out, BR-N03).
+- Before placing, the form asks for a **quote**: the same checks as a dry run, nothing saved.
+
+A blocked customer cannot be ordered for (`409 customer_blocked`), nor one who has not activated their account (`409 customer_not_active`).
+
+### BR-O12 — Editing an Order's Lines (V2 Task 09, D87)
+
+A dashboard user with `orders.edit` (owner, manager, sales) changes the lines of a `pending` or `confirmed` order (`409 order_locked` from `preparing` on). The request is the full list of lines the order should have:
+
+- A line kept with another quantity is re-priced at the current tiers (BR-PR04) and keeps its manual discount (BR-PR08) on the new list price. Its reservation follows: the difference is reserved or released.
+- A new SKU is checked and snapshotted like checkout (BR-PR06, BR-PR07) and reserved.
+- A line left out is removed: its reservation is released, and the line is kept for history (`removed_at`), out of every total, stock move and return.
+- An unchanged line keeps its snapshot price even when the catalog price changed (BR-O05). A line's SKU never changes (remove it and add the other).
+- The added and changed lines go through the checkout line checks (product active, MOQ, stock); what the order already holds of a SKU counts as available to it. Any failure refuses the whole edit like checkout (`422 checkout_failed`) and nothing changes.
+- Totals are recomputed (BR-O08): a % order discount is taken off the new items total; an EGP one that no longer fits refuses the edit (`422 discount_too_large`). The total can never be below what was collected (`409 below_collected`); the collection status is derived again.
+- A higher total must fit the customer's credit limit (BR-C05), counting the order's old total once. The minimum order value (BR-MOV02) is not enforced: going below it is allowed and the merchant is warned.
+- Every change is recorded as a line change (`added`, `removed`, `quantity`, with the quantities, the prices before and after and the user), the history gets the note «تعديل الطلب» (plus the merchant's note), and `order.lines_changed` is audited. Sending the lines the order already has changes nothing.
+- The customer gets the `edited` WhatsApp text with the new total (on by default, BR-N03) and sees the changed and removed lines on the order page.
+
+### BR-O13 — Partial Delivery (V2 Task 09, D86)
+
+When moving an order to `delivered`, the merchant may record what each line actually delivered (0 up to the ordered quantity, selling units); a line not mentioned went out in full. Delivering nothing at all is refused: the order is cancelled instead.
+
+- Only the delivered units are deducted (BR-INV05); the remainder is released to stock. There is no back-order or second shipment; the merchant places a new order for the rest (BR-O11).
+- Each line keeps its `delivered_quantity` and is charged for it (`line_total = unit_price × delivered_quantity`); the order totals are recomputed (BR-O08). A % order discount follows the new items total; an EGP one is capped so the order still costs 0.01.
+- What was already collected must still fit (`409 below_collected`); "collect the full amount" collects the new total.
+- Each short line is recorded as a `delivered_short` line change; the history note defaults to «تسليم جزئي»; the audit lists the short lines.
+- Returns count the delivered quantity (BR-R02).
+
+### BR-O14 — Pre-orders (V2 Task 10, D88)
+
+A customer secures a quantity of a Coming Soon product that takes pre-orders (BR-P04) before it ships.
+
+- **Creation.** Pre-order lines sit in the cart apart from the order lines (BR-CU06) and are confirmed on their own (`POST /store/checkout/preorder`). The result is an order of `kind = preorder` with the next order number (BR-O09): `pending`, priced at today's tiers (indicative), its lines snapshotted like checkout (BR-PR07). The checks: the product is still Coming Soon with pre-orders on, the MOQ (BR-MOQ01), the merchant's cap over every open pre-order (under the product row lock), and the credit limit (BR-C05). No stock check and no minimum order value. The merchant gets a `new_preorder` notification.
+- **No reservation.** A pre-order holds no stock (BR-INV01 stays true): its lines are not reserved, a cancel releases nothing, and it never appears among the orders holding a SKU (BR-INV08). It is never stale and never expires (BR-INV07).
+- **What it cannot do.** It is never confirmed or moved on (`409 invalid_transition`); its lines and prices are not edited and take no discount (`409 order_locked`); it takes no collection or credit (`409 is_preorder`). Its delivery address can still be edited by the merchant (BR-O10).
+- **Conversion, FIFO.** Once the product is `active` the merchant converts its open pre-orders (`orders.manage`), oldest `placed_at` first. Each pre-order, in its own transaction, gets what the stock allows of its lines of that product: a normal pending order of those quantities, placed by the merchant (`converted_from_id`), delivered to the pre-order's address snapshot with its note, re-priced at today's tiers for the quantity converted and reserved (BR-INV03). The MOQ, the minimum order value and the credit limit are not checked again. What is left stays on the pre-order (`converted_quantity`, recorded as a `converted` line change) until a later conversion or a cancel; a pre-order with nothing left is closed (`converted_at`). Pre-orders that get nothing (no stock left, or a customer who can no longer order) are untouched. The customer gets the `preorder_converted` WhatsApp text for each new order (BR-N03); the merchant gets the summary (orders created, partly converted, untouched).
+- **Cancellation.** The customer cancels their open pre-order at any time, the merchant too (BR-O02); a partly converted one cancels only what is left, its converted orders live on. A pre-order converted in full cannot be cancelled.
+- **Reports.** Pre-orders are left out of the overview counts (D5); they never reach sales (only delivered orders do).
+---
+
+## H2. Returns (المرتجع) — V2 Task 01 (D20)
+
+### BR-R01 — Only Delivered Orders Take Returns
+
+A return records goods the customer brings back **after delivery**. Before delivery the merchant cancels the order instead (BR-O02). There is no return window (D75): any delivered order can take returns. Returns are recorded by the merchant from the dashboard; customers cannot request them from the storefront.
+
+### BR-R02 — Never More Than Delivered
+
+Per order line, the returnable quantity is the delivered quantity (`delivered_quantity`: less than ordered after a partial delivery, BR-O13; a removed line has none, BR-O12) minus what live returns already brought back (selling units). A return line above it is rejected (`422 return_exceeds_delivered`, each offending line listed). A line appears once per return. Two returns recorded at the same time queue on the order row lock, so the last unit is never returned twice.
+
+### BR-R03 — Returned Goods Go Back Into Stock
+
+`On Hand += quantity × conversion_factor`, written as a positive `return` movement linked to the order (BR-INV06). Reserved is unchanged.
+
+### BR-R04 — Return Price and Refund
+
+A returned line is priced at the order line's snapshot `unit_price` (D74), never re-priced by tier. When the order has an order discount (BR-PR08), the line returns at that price less the discount's share (`× order_total / items_total`), rounded half-up per return line; the return that brings the last units of the order back takes exactly what is left of the order total, so returns never add up to more than it (D85). The order's `returned_total` rises by the return's total and its **net total** (`order_total − returned_total`, BR-O08) drops. If the order was already collected beyond the new net total, the difference goes back to the customer in cash: the merchant must confirm it (`refund: true`, otherwise `422 refund_required` with the amount and nothing is saved), and it is recorded as a `refund` collection tied to the return. Keeping it as customer credit instead is Task 02.
+
+### BR-R05 — Returns in Totals and Reports
+
+- What a customer owes, the statement, the outstanding report and the overview are net of returns (D59).
+- Sales report: gross = delivered orders by `delivered_at`; returns = live returns by `returned_at`; net = gross − returns, on Cairo days (D60).
+- Each order numbers its returns 1, 2, …; the status history gets a note «مرتجع #n» (no status change, no merchant notification).
+- The customer sees the live returns of their order on "my orders", without the merchant's reason.
+
+### BR-R06 — Voiding a Return
+
+A wrong return is voided with a reason, never deleted. Voiding takes the goods off the stock again (a negative `return` movement) and lowers `returned_total`. A return whose cash refund is still live is voided only after the refund (`409 return_has_refund`, like D7). Goods sold or reserved since cannot leave the stock again: `422 insufficient_stock` (D76); the merchant adjusts stock first. A second void is `409 already_voided`.
+
+Between voiding a refund and voiding its return, the order is collected beyond its net total; its status is `collected` and it owes nothing.
+
 ---
 
 ## I. Collection / Payment
@@ -582,29 +762,31 @@ V1 has no payment gateway.
 
 ### BR-C02 — Collection Records
 
-The merchant records each cash collection as a collection record:
+The merchant records each payment as a collection record:
 
 - Order
 - Amount (> 0)
 - Collected at (date/time)
 - Recorded by (tenant user)
 - Note (optional)
+- Method and reference (V2 Task 20, BR-C10)
 
 A collection record can be voided (not deleted) with a reason.
 
-Method in V1 is always `cash`.
+In V1 the method was always `cash`; from V2 Task 20 it says how the money moved (BR-C10). A record is a `payment` (money received) or, from V2 Task 01, a `refund` (money paid back after a return, BR-R04); both keep a positive amount.
 
 ### BR-C03 — Collection Status Is Derived
 
-`collected_amount = Σ non-voided collection amounts`
+`collected_amount = Σ live payments − Σ live refunds` (refunds: BR-R04)
 
-| Condition                          | Status              |
-| ---------------------------------- | ------------------- |
-| collected_amount = 0               | Unpaid              |
-| 0 < collected_amount < order_total | Partially Collected |
-| collected_amount ≥ order_total     | Collected           |
+| Condition                        | Status              |
+| -------------------------------- | ------------------- |
+| net_total = 0                    | Collected           |
+| collected_amount = 0             | Unpaid              |
+| 0 < collected_amount < net_total | Partially Collected |
+| collected_amount ≥ net_total     | Collected           |
 
-Collecting more than the order total is rejected.
+`net_total = order_total − returned_total` (BR-O08). Collecting more than the net total is rejected. Voiding a payment that would leave more refunded than collected is rejected (`409 void_refund_first`).
 
 ### BR-C04 — Collection Is Independent of Order Status
 
@@ -614,9 +796,31 @@ Example:
 
 `Order = Delivered`, `Collection = Unpaid` is valid.
 
-Collections can be recorded at any order status except `Cancelled`.
+Collections can be recorded at any order status except `Cancelled`. A pre-order takes no collection or credit (`409 is_preorder`, D88); its converted orders are collected as usual.
 
 The "mark Delivered" action in the dashboard offers a shortcut "and collected full amount" to create both changes in one step.
+
+### BR-C05 — Credit Limit (V2 Task 02)
+
+Each customer may have a credit limit (`customers.credit_limit`; null = no limit; new customers start with the store default `default_credit_limit`). At checkout, the customer's **exposure** (D77: what they owe on delivered orders, net of returns and collections, plus the net totals of their open orders, minus their unused customer credit) plus the new order's total may reach the limit but not pass it; otherwise checkout fails with `422 checkout_failed` and `details.credit { limit, exposure, order_total }` (D78). Two checkouts of one customer queue on the customer row, so they cannot both fit under the limit. Changing the limit is audited (`customer.credit_terms_changed`).
+
+### BR-C06 — Payment Terms, Due Date and Overdue
+
+Each customer may have payment terms in days (`payment_terms_days`, 0–365; null = due on delivery; new customers start with `default_payment_terms_days`). On delivery the order gets `due_at = delivered_at + terms` — a snapshot: changing the terms later does not move existing due dates. An order is **overdue** when it is delivered, past `due_at` (orders delivered before V2 have none and fall due on delivery) and still has a net balance. The statement summary, the outstanding report (aged by days past due: not due yet, 1–30, 31–60, 61–90, over 90) and the overview show what is overdue.
+
+### BR-C07 — Customer Credit
+
+When a return leaves an order collected beyond its net total (BR-R04), the merchant may keep the difference as **customer credit** instead of paying it back: a `refund` collection with method `credit` lowers the order's collected amount as a cash refund would, and a `customer_credits` row of the same amount is created; no cash moves. The merchant applies credit to any later order of the same customer, as a `payment` collection with method `credit` (never more than the credit's remaining nor the order's balance; two uses of one credit queue on its row). Voiding a credit payment gives the amount back to the credit. A credit is voided (together with the refund that created it) only while none of it was applied.
+
+### BR-C08 — Account Statement
+
+The customer statement is a dated ledger of everything that changed what the customer owes: delivered orders (debit), returns (credit), payments (credit; `credit_applied` when drawn from credit), cash refunds (debit), returns kept as credit (`refund_to_credit`, debit) and the credit they create (an info line). Voided rows are left out. Rows are ordered by date with a running balance (positive = the customer owes the store); a date range (Cairo days, D60) starts from the opening balance of everything before it. The merchant sees it on the customer page with print; the customer sees the same rows in `/account/statement`. With no credit left, the closing balance equals what the customer owes (D59). A payment or refund row also says how the money moved and its reference (BR-C10).
+
+### BR-C10 — Payment Methods (V2 Task 20, D103)
+
+A payment or a refund records how the money moved: `cash` نقدي, `instapay` إنستاباي, `wallet` محفظة إلكترونية or `bank_transfer` تحويل بنكي, with an optional reference (≤ 60, the transfer or wallet transaction number). Without a method a payment is `cash`, so older clients keep working. `credit` is the system's method for customer credit (BR-C07): the merchant cannot choose it, and a `credit` row has no reference. Cheques are not a method (D103 a). A return paid back takes the same four methods (`refund_to`), or keeps the amount as credit. Payments recorded before V2 Task 20 stay `cash`. The collections list filters by method; the order's payments and both statements show the method and the reference; the collections report lists the range's payments per method, adding up to the same total as before. There is no reconciliation against a bank or a wallet.
+
+Example (the collections report, one range): payments cash 1,500.00 and 250.00, InstaPay 800.00, bank transfer 2,000.00, 300.00 drawn from credit, and a voided wallet payment of 400.00 → cash 1,750.00, InstaPay 800.00, wallet 0.00, bank transfer 2,000.00, credit 300.00; total 4,850.00 = the old cash 4,550.00 (the new methods folded in) + credit 300.00.
 
 ---
 
@@ -652,7 +856,7 @@ New customers can order immediately after verification. Tenant setting `require_
 
 OTP delivery order:
 
-1. Send the OTP via **WhatsApp**.
+1. Send the OTP via **WhatsApp**: from the store's own number when the tenant has linked one and it is connected, otherwise from the platform number (D70). A store-number failure other than "not on WhatsApp" is retried once from the platform number.
 2. If the WhatsApp provider reports the number is not reachable on WhatsApp (or the send fails), send the OTP via **SMS** automatically.
 3. The customer can also tap "send by SMS instead" after 60 seconds.
 
@@ -661,7 +865,7 @@ OTP rules:
 - 6 digits, valid for 10 minutes, single use.
 - Maximum 5 OTP sends per phone per hour, maximum 5 verification attempts per OTP.
 - OTP sends are logged (channel, provider message id, status) per tenant.
-- OTP is the only WhatsApp/SMS use in V1; order notifications remain V2.
+- OTP, customer invitations (BR-CU08) and order status messages (BR-N03, V2) are the only customer-facing WhatsApp/SMS uses (BR-N01). Order status messages have their own per-phone limit, so they never use up the OTP sends (D79). Operator alerts (D65) go to the platform operator, never to customers.
 
 ### BR-CU08 — Merchant-Created Customers and Invitations
 
@@ -694,23 +898,40 @@ Only `Active` customers can log in and order.
 
 Each customer has at most one open cart per tenant, stored server-side. Guest (anonymous) carts are not supported in V1; the customer must log in to add to cart.
 
+V2 (Task 10, BR-O14): the cart holds order lines and pre-order lines side by side (`kind`), each SKU once per kind. Checkout takes only the order lines; the pre-order confirmation only the pre-order lines.
+
 ---
 
 ## K. Notifications
 
 ### BR-N01 — Channels
 
-- Email is out of scope for V1.
-- WhatsApp and SMS exist in V1 **only** for OTP and customer invitations (BR-CU07, BR-CU08). Order status notifications over these channels are V2.
+- Email is out of scope.
+- WhatsApp and SMS reach customers for OTP and invitations (BR-CU07, BR-CU08) and, since V2 Task 03, for order status messages (BR-N03). Nothing else: no marketing or broadcast sends (D70).
+- Order status messages go by WhatsApp only (store number, then platform number) and never fall back to SMS (D80).
 
 ### BR-N02 — In-App Notifications
 
-V1 provides in-app (dashboard) notifications to the merchant for:
+The merchant gets in-app (dashboard) notifications for:
 
 - New order.
 - Customer cancellation.
+- An unconfirmed order the system cancelled after `pending_expiry_hours`: `order_expired` (V2 Task 04).
+- A customer's pre-order: `new_preorder` (V2 Task 10, BR-O14).
+- The store WhatsApp number dropped (logged out on the phone): `whatsapp_dropped`, linking to settings to scan the QR again (V2 Task 03).
 
-Customer-side notifications are an open decision, see `06-open-decisions.md`.
+Customers get no in-app notifications; they see the status on "my orders" and receive the WhatsApp messages of BR-N03 (D6).
+
+### BR-N03 — Order Status Messages (V2 Task 03)
+
+- When the merchant moves an order to a status in the store's `order_notify_statuses` list, the customer gets a WhatsApp message about it. The list can hold `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled`, from V2 Task 08 `discount` (the merchant changed the order's discounts; the message gives the new total, D85), and from V2 Task 09 `edited` (the merchant changed the order's lines, with the new total, D87); a new store starts with all but `preparing` and `discount`. `edited` was also added to every store that already notified something.
+- The merchant words each status in settings (`order_status_messages`), up to 500 characters, with the placeholders `{اسم_العميل}`, `{اسم_المتجر}`, `{رقم_الطلب}`, `{حالة_الطلب}`, `{الإجمالي}`, plus `{سبب_الإلغاء}` in the cancelled text only. Any other `{…}` is rejected. No wording (or the default sent back) = the platform default text.
+- A cancel tells the customer only when the merchant cancels; a customer cancelling their own order gets nothing.
+- V2 Task 10 (D88): each normal order converted from a customer's pre-order sends the `preorder_converted` text (with the new order's number and total) whatever `order_notify_statuses` says, like `placed`; the store may word it in `order_status_messages`; the customer's opt-out applies.
+- The message is sent after the change commits: a change that rolls back sends nothing. A customer over their order-message limit (D79) is skipped and logged, and the change still succeeds.
+- A customer can turn the messages off from their storefront account ("رسائل واتساب عن طلباتي", `customers.order_notifications_opt_out`). OTP and invitations are not affected.
+- The order page lists the messages sent about the order (purpose, channel, status, time).
+- The demo store (`tenant:demo`) starts with an empty list: its customers have invented phones.
 
 ---
 
@@ -755,6 +976,14 @@ Tenant settings include, at minimum:
 - Minimum Order Value amount.
 - `require_login_for_prices` (default off).
 - `require_customer_approval` (default off).
+- `stale_pending_hours`: when a `Pending` order is highlighted as stale (default 24, BR-INV07, D10).
+- `pending_expiry_hours`: when an unconfirmed order cancels itself (null = off, the default; 1–720, never below `stale_pending_hours`; BR-INV07, D81).
+- `invitation_message`: the merchant's wording of the customer invitation (null = platform default, BR-CU08, D72).
+- `default_payment_terms_days`, `default_credit_limit`: the credit terms a new customer starts with (null = none; BR-C05, BR-C06).
+- `order_notify_statuses`: the order statuses customers are told about by WhatsApp (default confirmed, out for delivery, delivered, cancelled; BR-N03).
+- `order_status_messages`: the merchant's wording per status (a missing entry = platform default; BR-N03).
+- `max_discount_percent_sales`: the most a sales user may take off an order line, in % (null = sales users cannot discount, the default; BR-PR08, D85).
+- Store WhatsApp number linked by QR (D70; kept in `whatsapp_connections`, not in the settings row).
 
 ---
 

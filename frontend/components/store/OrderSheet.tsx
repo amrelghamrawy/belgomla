@@ -77,7 +77,7 @@ function ActiveSheet({ cart }: { cart: NonNullable<ReturnType<typeof useCart>["d
       ) : (
         <ul className="flex flex-col text-sm">
           {lines.map((line) => (
-            <li key={line.sku_id} className="flex h-8 items-baseline gap-2">
+            <li key={line.sku_unit_id} className="flex h-8 items-baseline gap-2">
               <span className="min-w-0 truncate">{line.product_name}</span>
               <span
                 aria-hidden

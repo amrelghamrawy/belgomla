@@ -17,7 +17,7 @@ test('to array never exposes the body', function (): void {
 
     expect(array_keys($message->toArray()))->toBe([
         'id', 'tenant_id', 'uuid', 'to_phone', 'purpose', 'channel', 'provider', 'provider_request_id', 'provider_message_id',
-        'status', 'error_code', 'fallback_of_id', 'cost', 'created_at', 'updated_at',
+        'status', 'error_code', 'fallback_of_id', 'cost', 'created_at', 'updated_at', 'order_id',
     ]);
 });
 

@@ -17,3 +17,4 @@ Quick facts:
 - Tests run with `composer test` inside `backend/` and must be green before a feature is called done.
 - Frontend: `frontend/` (Next.js 16, React 19, Tailwind 4, shadcn/ui RTL), conventions in `rules/03-frontend.md`. `npm run typecheck && npm run lint && npm test` inside `frontend/` must be green; `npm run test:e2e` for user flows.
 - API types: `backend/openapi/openapi.yaml` → `php artisan api:openapi` → `npm run api:types` in `frontend/`.
+- Before a push or "done": `/preflight` (`scripts/preflight.sh` + `scripts/smoke.sh`). The `pre-push` hook runs the same script; never bypass it.

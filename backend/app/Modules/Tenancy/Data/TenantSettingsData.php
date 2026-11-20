@@ -32,6 +32,14 @@ final readonly class TenantSettingsData
         public ?string $invitationMessage,
         /** Fields the request explicitly sent, so nullable ones can be cleared. */
         public array $sent,
+        public ?int $defaultPaymentTermsDays = null,
+        public ?string $defaultCreditLimit = null,
+        /** @var list<string>|null */
+        public ?array $orderNotifyStatuses = null,
+        /** @var array<string, string|null>|null */
+        public ?array $orderStatusMessages = null,
+        public ?int $pendingExpiryHours = null,
+        public ?string $maxDiscountPercentSales = null,
     ) {}
 
     public static function fromRequest(UpdateSettingsRequest $request): self
@@ -52,6 +60,12 @@ final readonly class TenantSettingsData
             stalePendingHours: $request->stalePendingHours(),
             invitationMessage: $request->nullableString('invitation_message'),
             sent: $request->sentKeys(),
+            defaultPaymentTermsDays: $request->nullableInteger('default_payment_terms_days'),
+            defaultCreditLimit: $request->nullableMoney('default_credit_limit'),
+            orderNotifyStatuses: $request->orderNotifyStatuses(),
+            orderStatusMessages: $request->orderStatusMessages(),
+            pendingExpiryHours: $request->pendingExpiryHours(),
+            maxDiscountPercentSales: $request->nullableMoney('max_discount_percent_sales'),
         );
     }
 
@@ -76,6 +90,12 @@ final readonly class TenantSettingsData
             'require_customer_approval' => $this->requireCustomerApproval,
             'stale_pending_hours' => $this->stalePendingHours,
             'invitation_message' => $this->invitationMessage,
+            'default_payment_terms_days' => $this->defaultPaymentTermsDays,
+            'default_credit_limit' => $this->defaultCreditLimit,
+            'order_notify_statuses' => $this->orderNotifyStatuses,
+            'order_status_messages' => $this->orderStatusMessages === [] ? null : $this->orderStatusMessages,
+            'pending_expiry_hours' => $this->pendingExpiryHours,
+            'max_discount_percent_sales' => $this->maxDiscountPercentSales,
         ];
 
         return array_intersect_key($map, array_flip($this->sent));

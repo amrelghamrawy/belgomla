@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Http\Resources;
 
+use App\Modules\Orders\Data\PendingClockData;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderStatusHistory;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
- * An order on the dashboard (08-api-contract.md §9): the customer's shape plus the order id, the customer, the
- * status timestamps, `is_stale` (pending past `stale_pending_hours`, BR-INV07), history with the actor id and
- * note, and `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()).
+ * An order on the dashboard (08-api-contract.md §9): the customer's shape (the order discount with its reason, D85)
+ * plus the order id, the customer, who placed
+ * it (`placed_by` customer | tenant_user with `placed_by_id`, BR-O11), the
+ * status timestamps, `is_stale` (pending past `stale_pending_hours`, BR-INV07), `expires_at` (when a pending order
+ * cancels itself, null while expiry is off, D81), history with the actor id and
+ * note, `changes` with the actor id (BR-O12, BR-O13), `collections` on the detail page (shaped by Collections through OrderDetailQuery::collections()) and every
+ * return of the order, voided ones included, in the returns list shape without `order` (BR-R06).
  *
  * @property-read Order $resource
  */
@@ -24,8 +29,9 @@ final class DashboardOrderResource extends JsonResource
 {
     /**
      * @param  list<JsonResource>  $collections
+     * @param  list<array{purpose: string, purpose_label: string, channel: string, status: string, sent_at: string}>  $messages
      */
-    public function __construct(Order $resource, private readonly CarbonImmutable $staleBefore, private readonly array $collections = [])
+    public function __construct(Order $resource, private readonly PendingClockData $clock, private readonly array $collections = [], private readonly array $messages = [])
     {
         parent::__construct($resource);
     }
@@ -33,9 +39,9 @@ final class DashboardOrderResource extends JsonResource
     /**
      * @param  LengthAwarePaginator<int, Order>  $orders
      */
-    public static function page(LengthAwarePaginator $orders, CarbonImmutable $staleBefore): AnonymousResourceCollection
+    public static function page(LengthAwarePaginator $orders, PendingClockData $clock): AnonymousResourceCollection
     {
-        return new AnonymousResourceCollection($orders->through(fn (Order $order): self => new self($order, $staleBefore)), self::class);
+        return new AnonymousResourceCollection($orders->through(fn (Order $order): self => new self($order, $clock)), self::class);
     }
 
     /**
@@ -44,20 +50,25 @@ final class DashboardOrderResource extends JsonResource
     public function toArray(Request $request): array
     {
         $order = $this->resource;
-        $detail = $order->relationLoaded('items');
+        $detail = $order->relationLoaded('history'); // the pre-order list loads the lines too, not the page
+        $pending = $order->status === OrderStatus::Pending && ! $order->isPreorder(); // a pre-order waits by design (D88)
 
         return [
             'id' => $order->id,
             ...new OrderResource($order)->toArray($request),
+            'discount' => $order->discount_type === null ? null : ['type' => $order->discount_type->value, 'value' => $order->discount_value, 'amount' => $order->discount_amount, 'reason' => $order->discount_reason],
             'customer' => $this->whenLoaded('customer', fn (): array => [
                 'id' => $order->customer->id,
                 'name' => $order->customer->name,
                 'phone' => $order->customer->phone,
             ]),
+            'placed_by' => $order->placed_by_type->value,
+            'placed_by_id' => $order->placed_by_id,
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),
             'delivered_at' => $order->delivered_at?->toIso8601String(),
             'cancelled_at' => $order->cancelled_at?->toIso8601String(),
-            'is_stale' => $order->status === OrderStatus::Pending && $order->placed_at->lessThan($this->staleBefore),
+            'is_stale' => $pending && $order->placed_at->lessThan($this->clock->staleBefore),
+            'expires_at' => $pending && $this->clock->expiryHours !== null ? $order->placed_at->addHours($this->clock->expiryHours)->toIso8601String() : null,
             'history' => $this->whenLoaded('history', fn (): array => $order->history->map(fn (OrderStatusHistory $entry): array => [
                 'from' => $entry->from_status?->value,
                 'to' => $entry->to_status->value,
@@ -66,7 +77,10 @@ final class DashboardOrderResource extends JsonResource
                 'actor_id' => $entry->actor_id,
                 'note' => $entry->note,
             ])->values()->all()),
+            'changes' => $this->whenLoaded('itemChanges', fn (): array => OrderResource::changes($order, withActor: true)),
             'collections' => $this->when($detail, $this->collections),
+            'messages' => $this->when($detail, $this->messages),
+            'returns' => $this->whenLoaded('returns', fn (): array => $order->returns->map(fn (OrderReturn $return): array => new OrderReturnResource($return)->resolve($request))->values()->all()),
         ];
     }
 }

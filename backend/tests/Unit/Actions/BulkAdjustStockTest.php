@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\Sku;
 use App\Modules\Inventory\Actions\BulkAdjustStock;
 use App\Modules\Inventory\Data\BulkStockAdjustmentData;
 use App\Modules\Inventory\Data\StockAdjustmentData;
+use App\Modules\Inventory\Enums\AdjustmentReason;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Tenancy\TenantContext;
@@ -24,10 +25,10 @@ beforeEach(function (): void {
 
 test('BR-INV08 applies what it can and reports each skipped sku with its reason, in one audit batch', function (): void {
     $result = app(BulkAdjustStock::class)->handle(new BulkStockAdjustmentData([
-        $this->counted->id => new StockAdjustmentData(15, 'جرد'),
-        $this->held->id => new StockAdjustmentData(5, 'جرد'),
-        $this->same->id => new StockAdjustmentData(7, 'جرد'),
-        $this->foreign->id => new StockAdjustmentData(0, 'جرد'),
+        $this->counted->id => new StockAdjustmentData(15, AdjustmentReason::Stocktake),
+        $this->held->id => new StockAdjustmentData(5, AdjustmentReason::Stocktake),
+        $this->same->id => new StockAdjustmentData(7, AdjustmentReason::Stocktake),
+        $this->foreign->id => new StockAdjustmentData(0, AdjustmentReason::Stocktake),
     ]));
 
     $logs = AuditLog::query()->orderBy('id')->get();
@@ -49,8 +50,8 @@ test('BR-INV08 applies what it can and reports each skipped sku with its reason,
 
 test('a failure part way rolls back every adjustment and audit record of the batch', function (): void {
     $data = new BulkStockAdjustmentData([
-        $this->counted->id => new StockAdjustmentData(15, 'جرد'),
-        $this->same->id => new StockAdjustmentData(8, str_repeat('س', 201)),
+        $this->counted->id => new StockAdjustmentData(15, AdjustmentReason::Stocktake),
+        $this->same->id => new StockAdjustmentData(8, AdjustmentReason::Other, str_repeat('س', 201)),
     ]);
 
     expect(fn () => app(BulkAdjustStock::class)->handle($data))->toThrow(QueryException::class);
@@ -58,4 +59,14 @@ test('a failure part way rolls back every adjustment and audit record of the bat
     expect(SkuInventory::query()->findOrFail($this->counted->id)->on_hand)->toBe(10)
         ->and(InventoryMovement::query()->count())->toBe(0)
         ->and(AuditLog::query()->count())->toBe(0);
+});
+
+test('D99 b a stale count in a batch is skipped as count_outdated, the rest applied', function (): void {
+    $result = app(BulkAdjustStock::class)->handle(new BulkStockAdjustmentData([
+        $this->counted->id => new StockAdjustmentData(15, AdjustmentReason::Stocktake),
+        $this->same->id => new StockAdjustmentData(0, AdjustmentReason::Stocktake, expectedOnHand: 500),
+    ]));
+
+    expect($result['applied'])->toBe(1)
+        ->and($result['skipped'])->toBe([['sku_id' => $this->same->id, 'reason' => 'count_outdated']]);
 });

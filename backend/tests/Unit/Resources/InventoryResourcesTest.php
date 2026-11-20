@@ -16,13 +16,14 @@ beforeEach(function (): void {
 
 test('BR-INV02 the inventory row key set: stock in base units, min_allowed is reserved', function (): void {
     $product = Product::factory()->withSku(['code' => 'ADW-1', 'moq' => 5, 'conversion_factor' => 20], onHand: 140, reserved: 30)->create(['name' => 'علوم']);
-    $sku = Sku::query()->with(['product', 'inventory'])->findOrFail($product->sku()->sole()->id);
+    $sku = Sku::query()->with(['product', 'inventory', 'smallestUnit'])->findOrFail($product->skus()->sole()->id);
 
     expect(rendered(new InventoryRowResource($sku), dashboardRequest()))->toBe([
         'sku_id' => $sku->id,
         'product_id' => $product->id,
         'code' => 'ADW-1',
         'name' => 'علوم',
+        'variant' => null,
         'status' => 'active',
         'on_hand' => 140,
         'reserved' => 30,
@@ -42,6 +43,16 @@ test('D36 a sku without a stock row shows zeros and is low on stock', function (
     expect([$row['on_hand'], $row['reserved'], $row['available'], $row['low_stock']])->toBe([0, 0, 0, true]);
 });
 
+test('D36 D91 the moq and factor shown are the smallest active unit\'s, and low stock follows them', function (): void {
+    $product = Product::factory()->withSku(['moq' => 2, 'conversion_factor' => 48], onHand: 30)->create();
+    $sku = $product->skus()->sole();
+    $this->addUnit($sku, ['conversion_factor' => 6, 'moq' => 4]);
+
+    $row = rendered(new InventoryRowResource(Sku::query()->with(['product', 'inventory', 'smallestUnit'])->findOrFail($sku->id)), dashboardRequest());
+
+    expect([$row['moq'], $row['conversion_factor'], $row['low_stock']])->toBe([4, 6, false]);
+});
+
 test('BR-INV06 the movement key set', function (): void {
     $user = $this->makeOwner();
     $movement = InventoryMovement::factory()->adjustment(-10, 90, 'تالف')->create(['actor_type' => 'tenant_user', 'actor_id' => $user->id])->fresh();
@@ -53,6 +64,7 @@ test('BR-INV06 the movement key set', function (): void {
         'quantity' => -10,
         'on_hand_after' => 90,
         'reason' => 'تالف',
+        'reason_code' => null,
         'order_id' => null,
         'actor' => ['type' => 'tenant_user', 'id' => $user->id],
         'created_at' => $movement->created_at->toIso8601String(),

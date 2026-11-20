@@ -1,6 +1,7 @@
 import type { ApiErrorCode } from "@/lib/api/errors";
 import type { CategoryIcon, CategoryKind } from "@/lib/api/types";
 import { dashboard } from "@/lib/copy/ar-dashboard";
+import type { TimeLeft } from "@/lib/store/offer";
 
 // Every Arabic string the UI shows (rules/03 §5). No i18n framework in V1: Arabic only.
 
@@ -12,14 +13,22 @@ import { dashboard } from "@/lib/copy/ar-dashboard";
 const errors: Record<ApiErrorCode, string> = {
   address_locked: "لا يمكن تعديل العنوان بعد تأكيد الطلب",
   already_voided: "تم إلغاء هذا التحصيل من قبل",
+  below_collected: "لا يمكن أن يقل إجمالي الطلب عن المبلغ المحصل منه",
   blocked: "تم إيقاف حسابك، تواصل مع المتجر",
   cannot_disable_self: "لا يمكنك إيقاف حسابك بنفسك",
   cart_empty: "السلة فارغة",
   cart_line_invalid: "بعض أصناف السلة لم تعد متاحة بالكمية المطلوبة",
   category_cycle: "لا يمكن نقل القسم داخل أحد أقسامه الفرعية",
   checkout_failed: "تعذر إتمام الطلب، راجع السلة",
+  count_outdated: "تغيّر الرصيد منذ بدء الجرد، أعد عدّ الصنف",
+  credit_applied: "استُخدم جزء من هذا الرصيد، ألغِ التحصيلات المخصومة منه أولًا",
+  credit_voided: "تم إلغاء هذا الرصيد",
   cover_price_required: "أدخل السعر المرجعي (الغلاف أو القطاعي) أولًا لاستخدام النسبة",
   csrf_token_mismatch: "انتهت صلاحية الجلسة، أعد تحميل الصفحة",
+  customer_blocked: "هذا العميل محظور، ألغِ الحظر أولًا",
+  customer_not_active: "هذا العميل لم يفعّل حسابه بعد",
+  discount_over_limit: "الخصم أكبر من المسموح لك",
+  discount_too_large: "الخصم أكبر من السعر",
   duplicate_code: "الكود مستخدم من قبل",
   duplicate_key: "المفتاح مستخدم من قبل",
   duplicate_label: "الاسم مستخدم من قبل",
@@ -27,13 +36,17 @@ const errors: Record<ApiErrorCode, string> = {
   duplicate_relation: "هذا الربط موجود من قبل",
   email_taken: "البريد الإلكتروني مستخدم من قبل",
   exceeds_balance: "المبلغ أكبر من المتبقي على الطلب",
+  exceeds_credit: "المبلغ أكبر من المتبقي في رصيد العميل",
+  export_not_ready: "الملف قيد التجهيز، حاول بعد قليل",
   field_type_locked: "لا يمكن تغيير نوع الحقل بعد استخدامه",
   forbidden: "غير مسموح بهذا الإجراء",
   gallery_full: "وصلت للحد الأقصى من الصور",
+  group_archived: "هذا المستوى مؤرشف، أعد تفعيله أولًا",
   has_collections: "لا يمكن إلغاء طلب عليه تحصيلات",
   http_error: "حدث خطأ، حاول مرة أخرى",
   idempotency_in_progress: "الطلب قيد التنفيذ، انتظر لحظة",
   idempotency_key_reused: "تم إرسال هذا الطلب ببيانات مختلفة",
+  import_expired: "انتهت صلاحية الملف المرفوع، ارفعه مرة أخرى",
   in_use: "لا يمكن الحذف لأنه مستخدم",
   insufficient_stock: "الكمية المطلوبة غير متاحة",
   inventory_below_reserved: "لا يمكن تقليل المخزون عن الكمية المحجوزة",
@@ -45,10 +58,14 @@ const errors: Record<ApiErrorCode, string> = {
   invalid_transition: "لا يمكن تنفيذ هذا الإجراء في الحالة الحالية",
   invalid_vertical: "نوع النشاط غير صالح",
   invited: "أكمل التسجيل من رابط الدعوة أولًا",
+  is_bundle: "هذه باقة، عدّلها من محرر الباقات",
+  is_preorder: "لا يُسجَّل تحصيل على حجز مسبق، يُحصَّل على الطلب بعد تحويله",
   last_active_user: "يجب أن يبقى مستخدم نشط واحد على الأقل",
+  last_owner: "يجب أن يبقى مالك نشط واحد على الأقل",
   network_error: "تعذر الاتصال، تأكد من الإنترنت وحاول مرة أخرى",
   not_found: "العنصر غير موجود",
   order_cancelled: "الطلب ملغي",
+  order_locked: "لا يمكن تعديل الأسعار بعد بدء تجهيز الطلب",
   otp_attempts_exceeded: "تجاوزت عدد المحاولات، اطلب كودًا جديدًا",
   otp_expired: "انتهت صلاحية الكود، اطلب كودًا جديدًا",
   otp_invalid: "الكود غير صحيح",
@@ -57,8 +74,14 @@ const errors: Record<ApiErrorCode, string> = {
   phone_not_verified: "أكد رقم هاتفك أولًا",
   phone_taken: "رقم الهاتف مسجل من قبل",
   prices_hidden: "سجل الدخول لرؤية الأسعار",
+  product_not_active: "فعّل المنتج وأضف مخزونه قبل تحويل الحجوزات",
+  promotion_locked: "لا يمكن تعديل عرض بدأ أو انتهى أو أُلغي",
   rate_limited: "محاولات كثيرة، حاول لاحقًا",
+  refund_required: "يجب تأكيد رد المبلغ الزائد للعميل",
   reserved_subdomain: "اسم النطاق محجوز",
+  return_exceeds_delivered: "الكمية المرتجعة أكبر من المسلّمة",
+  return_has_refund: "ألغِ رد المبلغ من التحصيلات قبل إلغاء المرتجع",
+  return_not_allowed: "المرتجع للطلبات المسلّمة فقط",
   server_error: "حدث خطأ غير متوقع، حاول مرة أخرى",
   stateful_request_required: "افتح الموقع من رابط المتجر وحاول مرة أخرى",
   store_unavailable: "المتجر غير متاح حاليًا",
@@ -68,10 +91,30 @@ const errors: Record<ApiErrorCode, string> = {
   use_invitation: "لديك دعوة من المتجر، أكمل التسجيل من رابط الدعوة",
   user_disabled: "تم إيقاف حسابك، تواصل مع مالك المتجر",
   validation_failed: "راجع البيانات المدخلة",
+  void_refund_first: "ألغِ رد المبلغ للعميل أولًا",
   wa_gateway_capacity: "لا يمكن ربط أرقام جديدة الآن، تواصل مع الدعم",
   wa_gateway_unavailable: "خدمة ربط واتساب غير متاحة الآن، حاول بعد قليل",
   whatsapp_already_connected: "رقم واتساب مربوط بالفعل، افصله أولًا لربط رقم آخر",
 };
+
+/** Arabic counting for the offer countdown: 1 → «يوم»، 2 → «يومين»، 3–10 → «3 أيام»، 11+ → «11 يومًا». */
+const UNITS = {
+  days: ["يوم", "يومين", "أيام", "يومًا"],
+  hours: ["ساعة", "ساعتين", "ساعات", "ساعة"],
+  minutes: ["دقيقة", "دقيقتين", "دقائق", "دقيقة"],
+} as const;
+
+function countOf(value: number, [one, two, few, many]: readonly [string, string, string, string]): string {
+  if (value === 1) {
+    return one;
+  }
+
+  if (value === 2) {
+    return two;
+  }
+
+  return `${value} ${value <= 10 ? few : many}`;
+}
 
 export const ar = {
   appName: "بالجملة",
@@ -140,6 +183,9 @@ export const ar = {
     shopByCategory: "تسوّق حسب القسم",
     shopByCategoryHint: "اختر القسم ثم الصف لتصفح منتجاته.",
     featuredHint: "آخر ما أضافه المتجر.",
+    // BR-PR15 (V2 Task 12): the products on a live promotion.
+    offers: "عروض",
+    offersHint: "أسعار مخفضة لفترة محدودة.",
     viewAll: "عرض الكل",
     contactUs: "تواصل معنا",
     rights: (name: string) => `© ${name}. كل الحقوق محفوظة.`,
@@ -247,9 +293,35 @@ export const ar = {
     quickAdd: "أضف للسلة",
     quickAddMin: (moq: number, unit: string) => `أضف ${moq} ${unit}`,
     quickAddLabel: (name: string) => `أضف «${name}» إلى السلة`,
+    // BR-O14, D88: a Coming Soon product that takes pre-orders.
+    preorder: "احجز الآن",
+    preorderMin: (moq: number, unit: string) => `احجز ${moq} ${unit}`,
+    preorderLabel: (name: string) => `احجز «${name}»`,
+    expectedAt: (date: string) => `متوقع ${date}`,
+    finalPriceNote: "السعر النهائي عند التوفر",
+    preorderRemaining: (remaining: number, unit: string) => `متبقٍ للحجز ${remaining} ${unit}`,
+    preorderFull: "اكتمل الحجز",
+    inPreorders: (quantity: number, unit: string) => `محجوز ${quantity} ${unit}`,
     inCart: (quantity: number, unit: string) => `${quantity} ${unit} في السلة`,
+    // V2 Task 14 (BR-P14): a product with variants.
+    priceRange: (min: string, max: string) => `من ${min} إلى ${max}`,
+    chooseOptions: "اختر المواصفات",
+    chooseOptionsLabel: (name: string) => `اختر مواصفات «${name}»`,
+    // V2 Task 15 (BR-P15, D93): a bundle of several products at one price.
+    bundle: "باقة",
+    saving: (amount: string) => `وفّر ${amount}`,
   },
   product: {
+    // V2 Task 15 (BR-P15, D93): what a bundle holds, and what stops it when it is unavailable.
+    bundleComponents: "محتويات الباقة",
+    bundleComponentsHint: (n: number) => `${n} صنف في الباقة الواحدة`,
+    bundleQuantity: (quantity: number, unit: string) => `${quantity} ${unit}`,
+    componentInStock: "متوفر",
+    componentMissing: "غير متوفر",
+    bundleAvailable: (n: number) => `متاح الآن ${n} باقة`,
+    bundleSumNote: (sum: string) => `الأصناف منفردة بـ ${sum}`,
+    bundleUnavailable: (names: string) => `الباقة غير متاحة الآن: ينقص ${names}`,
+    bundleUnavailableAny: "الباقة غير متاحة الآن",
     /**
      * What a SKU's optional reference price is called (BR-PR10, D68): the printed cover price for books, the
      * retail price for every other section; both names when the section is not known yet.
@@ -257,6 +329,12 @@ export const ar = {
     referencePrice: (kind: CategoryKind | null) =>
       kind === "books" ? "سعر الغلاف" : kind === null ? "سعر الغلاف / القطاعي" : "سعر القطاعي",
     wholesalePrice: "سعر الجملة",
+    // BR-PR14 (V2 Task 11): the price is the customer's group or negotiated price.
+    yourPrice: "سعرك الخاص",
+    // BR-PR15 (V2 Task 12): a live promotion set the price.
+    offer: (percent: string) => `عرض ${percent}%`,
+    offerEndsIn: (left: TimeLeft) => `ينتهي خلال ${countOf(left.value, UNITS[left.unit])}`,
+    offerEnded: "انتهى العرض",
     margin: (percent: string) => `هامش ربحك ${percent}%`,
     tierShort: (min: number, unit: string, price: string) => `من ${min} ${unit}: ${price}`,
     tiers: "أسعار الكميات",
@@ -265,6 +343,11 @@ export const ar = {
     moq: "الحد الأدنى للطلب",
     unit: "وحدة البيع",
     conversion: (unit: string, factor: number) => `${unit} = ${factor} نسخة`,
+    // V2 Task 13 (D91): the units a SKU is sold in.
+    unitPicker: "اختر وحدة البيع",
+    unitWithFactor: (unit: string, factor: number) => `${unit} (${factor})`,
+    // V2 Task 14 (BR-P14): option selectors; a combination without stock cannot be picked.
+    valueUnavailable: "غير متوفر",
     code: "الكود",
     details: "تفاصيل المنتج",
     related: "نسخ أخرى من هذا الكتاب",
@@ -275,6 +358,8 @@ export const ar = {
     addToCart: "أضف إلى السلة",
     adding: "جاري الإضافة…",
     added: "تمت الإضافة إلى السلة",
+    preorderAdded: "أضيف إلى حجوزاتك في السلة",
+    preorderHint: "لا يُحجز من المخزون الآن: يتحول حجزك إلى طلب عند توفر المنتج، بالسعر وقتها.",
     viewCart: "عرض السلة",
     minQuantity: (min: number, unit: string) => `أقل كمية ${min} ${unit}`,
     totalPieces: (count: number) => `الإجمالي ${count} نسخة`,
@@ -298,6 +383,8 @@ export const ar = {
     truncated: (count: number) => `تعرض القائمة أول ${count} منتج فقط. حدد التصفية لتقليل النتائج.`,
     pricesHidden: "سجل الدخول لعرض الأسعار في القائمة",
     printedOn: (date: string) => `بتاريخ ${date}`,
+    downloadExcel: "تحميل Excel",
+    downloading: "جاري التحميل…",
     empty: "لا توجد منتجات في هذه القائمة",
     filtered: "حسب التصفية المختارة",
     search: "بحث في القائمة",
@@ -360,7 +447,12 @@ export const ar = {
     memberSince: "عميل منذ",
     orders: "طلباتي",
     addresses: "عناويني",
+    statement: "كشف حسابي",
     profileReadOnly: "لتعديل الاسم أو رقم الهاتف تواصل مع المتجر.",
+    // BR-N03: the customer's opt-out of order status messages.
+    orderNotifications: "رسائل واتساب عن طلباتي",
+    orderNotificationsHint: "نرسل لك رسالة عند تأكيد طلبك وخروجه للتوصيل وتوصيله أو إلغائه.",
+    preferencesSaved: "تم حفظ اختيارك",
   },
   addresses: {
     title: "عناويني",
@@ -389,7 +481,10 @@ export const ar = {
     browse: "تصفح المنتجات",
     itemsTotal: "إجمالي الأصناف",
     unitPrice: (price: string) => `${price} للوحدة`,
+    // V2 Task 13 (D91): a line is one unit of the SKU; the same product may be there in two units.
+    unitLine: (unit: string, factor: number) => (factor > 1 ? `الوحدة: ${unit} (${factor})` : `الوحدة: ${unit}`),
     tierApplied: (min: number) => `سعر الكمية من ${min}`,
+    bundle: "باقة",
     remove: "حذف من السلة",
     removedTitle: "تم حذف بعض الأصناف من سلتك لأنها لم تعد متاحة:",
     movRemaining: (amount: string) => `باقي ${amount} للحد الأدنى للطلب`,
@@ -397,6 +492,12 @@ export const ar = {
     movLabel: "التقدم نحو الحد الأدنى للطلب",
     checkout: "إتمام الطلب",
     loginTitle: "سجل الدخول لعرض سلتك",
+    // BR-O14: the pre-order lines, confirmed apart.
+    preordersTitle: "الحجز المسبق",
+    preordersHint: "أسعار الحجز مبدئية، والسعر النهائي عند التوفر. لا حد أدنى لقيمة الحجز.",
+    preordersTotal: "إجمالي الحجز (مبدئي)",
+    confirmPreorder: "تأكيد الحجز",
+    expectedAt: (date: string) => `متوقع ${date}`,
   },
   checkout: {
     title: "إتمام الطلب",
@@ -413,8 +514,13 @@ export const ar = {
       insufficient_stock: (available: number, unit: string) => `المتاح ${available} ${unit} فقط`,
       below_moq: (moq: number, unit: string) => `الحد الأدنى للطلب ${moq} ${unit}`,
       product_inactive: "لم يعد متاحًا للطلب",
+      preorder_unavailable: "لم يعد متاحًا للحجز",
+      preorder_limit: (remaining: number, unit: string) => `المتبقي للحجز ${remaining} ${unit} فقط`,
     },
     movShort: (required: string, current: string) => `الحد الأدنى للطلب ${required}، وإجمالي سلتك ${current}`,
+    creditShort: (limit: string, balance: string, order: string) =>
+      `الطلب يتجاوز حد الائتمان: الحد ${limit}، والمستحق عليك حاليًا ${balance}، وقيمة هذا الطلب ${order}. تواصل مع المتجر لترتيب السداد.`,
+    creditContact: "تواصل مع المتجر:",
     editInCart: "تعديل في السلة",
     viewProduct: "عرض المنتج",
     successTitle: "تم استلام طلبك",
@@ -422,6 +528,15 @@ export const ar = {
     orderNumber: "رقم الطلب",
     viewOrder: "عرض الطلب",
     continueShopping: "متابعة التسوق",
+    // BR-O14, D88: confirming the cart's pre-order lines.
+    preorderTitle: "تأكيد الحجز المسبق",
+    preorderNote: "لا يُخصم من المخزون الآن: يتحول الحجز إلى طلب عند توفر المنتج، والسعر النهائي عند التوفر.",
+    placePreorder: "تأكيد الحجز",
+    placingPreorder: "جاري تسجيل الحجز…",
+    preorderSuccessTitle: "تم تسجيل حجزك",
+    preorderSuccessBody: "سنرسل لك على واتساب عند توفر المنتج وتحويل حجزك إلى طلب.",
+    preorderNumber: "رقم الحجز",
+    viewPreorder: "عرض الحجز",
   },
   orders: {
     title: "طلباتي",
@@ -461,6 +576,63 @@ export const ar = {
     cancelled: "تم إلغاء الطلب",
     cancelledReason: (reason: string) => `سبب الإلغاء: ${reason}`,
     quantityOf: (quantity: number, unit: string) => `${quantity} ${unit}`,
+    returns: "المرتجعات",
+    returnNumber: (n: number) => `مرتجع #${n}`,
+    returnedTotal: "قيمة المرتجع",
+    netTotal: "الصافي بعد المرتجع",
+    refunded: (amount: string) => `تم رد ${amount} لك`,
+    // BR-PR08, D85: the merchant's discounts, shown as a crossed list price and a line in the totals.
+    itemsTotal: "إجمالي الأصناف",
+    orderDiscount: "خصم",
+    listPrice: "السعر قبل الخصم",
+    // BR-O12, BR-O13 (D87): lines the store changed, removed or delivered short.
+    lineRemoved: "حذفه المتجر",
+    lineChanged: "عدّله المتجر",
+    deliveredOf: (delivered: number, ordered: number, unit: string) => `تم تسليم ${delivered} من ${ordered} ${unit}`,
+    // BR-O14, D88: pre-orders.
+    kinds: { order: "الطلبات", preorder: "الحجوزات" },
+    preorder: "حجز مسبق",
+    preorderNumber: (n: number) => `حجز رقم ${n}`,
+    preorderStates: { open: "محجوز", converted: "تم التحويل إلى طلب", cancelled: "ملغي" },
+    preorderEmpty: "لا توجد حجوزات",
+    preorderPriceNote: "أسعار الحجز مبدئية، وتُحسب عند تحويله إلى طلب.",
+    convertedTo: "تحوّل إلى الطلبات",
+    convertedFrom: (n: number) => `من الحجز رقم ${n}`,
+    convertedOf: (converted: number, ordered: number, unit: string) =>
+      `تحوّل ${converted} من ${ordered} ${unit} إلى طلب`,
+    cancelPreorder: "إلغاء الحجز",
+    cancelPreorderBody: "يمكنك إلغاء ما لم يتحول بعد من حجزك.",
+    // V2 Task 15 (BR-P15, D93): a bundle line opens to the component lines it was delivered as.
+    bundle: "باقة",
+    showComponents: (n: number) => `عرض المكونات (${n})`,
+    hideComponents: "إخفاء المكونات",
+    components: (name: string) => `مكونات ${name}`,
+    inBundle: (name: string) => `ضمن ${name}`,
+  },
+  statement: {
+    title: "كشف الحساب",
+    date: "التاريخ",
+    entry: "البيان",
+    debit: "مدين",
+    credit: "دائن",
+    balance: "الرصيد",
+    opening: "رصيد أول المدة",
+    closing: "رصيد آخر المدة",
+    orderRef: (n: number) => `طلب #${n}`,
+    returnRef: (order: number, n: number) => `مرتجع #${n} من طلب #${order}`,
+    owes: "عليك",
+    outstanding: "المستحق عليك",
+    creditLimit: "حد الائتمان",
+    availableCredit: "المتاح من الحد",
+    creditBalance: "رصيدك لدى المتجر",
+    overdue: "متأخر السداد",
+    from: "من",
+    to: "إلى",
+    print: "طباعة",
+    empty: "لا توجد حركات في هذه الفترة",
+    link: "كشف حسابي",
+    previous: "السابق",
+    next: "التالي",
   },
   dashboard,
   validation: {

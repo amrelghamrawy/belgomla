@@ -19,7 +19,9 @@ use InvalidArgumentException;
 /**
  * A store to show BelGomla with, on any machine: a school-books tenant holding what `db:seed` gives the local
  * `alnoor` store, the demo catalog (StorefrontDemoSeeder) and two months of bookshops, orders and collections
- * (DemoActivitySeeder). Nothing reaches a phone: the demo customers are created without an invitation.
+ * (DemoActivitySeeder). Nothing reaches a phone: the demo customers are created without an invitation. The four staff
+ * users the activity adds (manager@, sales@, warehouse@, accountant@{subdomain}.test) get a random password nobody
+ * knows; the owner can reset them from the users screen.
  * One transaction, so a failure leaves no half-filled tenant behind.
  */
 final class TenantDemoCommand extends Command

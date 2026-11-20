@@ -23,7 +23,7 @@ final readonly class CustomerController
 {
     public function index(ListCustomersRequest $request, CustomerListQuery $customers, OutstandingAmountsQuery $outstanding): AnonymousResourceCollection
     {
-        $page = $customers->paginate($request->search(), $request->status(), $request->perPage());
+        $page = $customers->paginate($request->search(), $request->status(), $request->perPage(), $request->groupId());
 
         return CustomerResource::dashboardPage($page, $outstanding->ofPage($page));
     }

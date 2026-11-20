@@ -12,7 +12,7 @@ import { useTenant } from "@/lib/auth/tenant";
 import { ar } from "@/lib/copy/ar";
 import { formatMoney } from "@/lib/format/money";
 import { whatsappLink } from "@/lib/format/phone";
-import { useCategories, useCategoryProducts, useFeaturedProducts } from "@/lib/store/catalog";
+import { useCategories, useCategoryProducts, useFeaturedProducts, useOfferProducts } from "@/lib/store/catalog";
 
 import { CategoryGrid } from "./CategoryGrid";
 import { OrderSheet } from "./OrderSheet";
@@ -23,7 +23,7 @@ const CATEGORY_ROWS = 2;
 
 /**
  * Home (D67): a brand band with the store's name, description, ordering facts and the order sheet; then the
- * categories, the newest products and a row per top category; for guests, how ordering works. With no categories
+ * categories, the products on offer (BR-PR15, when any), the newest products and a row per top category; for guests, how ordering works. With no categories
  * yet, a contact card instead (D41).
  */
 export function StoreHome() {
@@ -74,6 +74,8 @@ export function StoreHome() {
                 </div>
               )}
             </section>
+
+            <OffersRow />
 
             <section className="flex flex-col gap-4" aria-labelledby="home-featured">
               <SectionHeading id="home-featured" title={ar.store.featured} hint={ar.store.featuredHint} />
@@ -177,6 +179,22 @@ function SectionHeading({ id, title, hint, href }: { id: string; title: string; 
         </Link>
       )}
     </div>
+  );
+}
+
+/** BR-PR15 (V2 Task 12): the products on a live promotion, only when there are some. */
+function OffersRow() {
+  const offers = useOfferProducts();
+
+  if (offers.data === undefined || offers.data.data.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="flex flex-col gap-4" aria-labelledby="home-offers" data-testid="home-offers">
+      <SectionHeading id="home-offers" title={ar.store.offers} hint={ar.store.offersHint} />
+      <ProductGrid products={offers.data.data} rail />
+    </section>
   );
 }
 

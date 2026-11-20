@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Customers\Actions\ClearCart;
+use App\Modules\Customers\Enums\CartLineKind;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
@@ -30,3 +31,17 @@ test('clearing a customer without a cart does nothing', function (): void {
 
     expect(Cart::query()->count())->toBe(0);
 });
+
+test('BR-O14 clearing one kind keeps the lines of the other', function (CartLineKind $kind, CartLineKind $kept): void {
+    $customer = Customer::factory()->create();
+    $cart = Cart::factory()->for($customer)->create();
+    CartItem::factory()->for($cart)->create();
+    CartItem::factory()->preorder()->for($cart)->create();
+
+    app(ClearCart::class)->handle($customer, $kind);
+
+    expect(CartItem::query()->get()->map(fn (CartItem $item): CartLineKind => $item->kind)->all())->toBe([$kept]);
+})->with([
+    'orders' => [CartLineKind::Order, CartLineKind::Preorder],
+    'pre-orders' => [CartLineKind::Preorder, CartLineKind::Order],
+]);

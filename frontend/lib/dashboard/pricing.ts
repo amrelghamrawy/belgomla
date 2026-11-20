@@ -33,7 +33,7 @@ export function useRecomputePricing(productId: number) {
 
   return useMutation({
     mutationFn: () =>
-      apiFetch<SkuPricing>(`/api/dashboard/products/${productId}/pricing/recompute`, { method: "POST" }),
+      apiFetch<SkuPricing[]>(`/api/dashboard/products/${productId}/pricing/recompute`, { method: "POST" }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardProduct(productId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardProductsLists });

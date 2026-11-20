@@ -46,8 +46,8 @@ test('BR-L filtering by batch id returns exactly the rows of a bulk action', fun
     $second = $this->orderableSku(['code' => 'B-1']);
     ($this->log)();
     $batch = $this->tenantJson('POST', '/api/dashboard/inventory/bulk-adjust', [
-        ['sku_id' => $first->id, 'new_on_hand' => 25, 'reason' => 'جرد'],
-        ['sku_id' => $second->id, 'new_on_hand' => 30, 'reason' => 'جرد'],
+        ['sku_id' => $first->id, 'new_on_hand' => 25, 'reason' => 'stocktake'],
+        ['sku_id' => $second->id, 'new_on_hand' => 30, 'reason' => 'stocktake'],
     ])->assertOk()->json('data.batch_id');
     $rows = AuditLog::withoutTenantScope()->where('batch_id', $batch)->orderByDesc('id')->pluck('id')->all();
 

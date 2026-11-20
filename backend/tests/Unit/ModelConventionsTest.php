@@ -3,21 +3,30 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Catalog\Models\BundleItem;
+use App\Modules\Catalog\Models\CatalogImport;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 use App\Modules\Catalog\Models\ProductImage;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Collections\Models\CashCollection;
+use App\Modules\Collections\Models\CustomerCredit;
 use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerAddress;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Customers\Models\CustomerInvitation;
 use App\Modules\Customers\Models\CustomerOtp;
+use App\Modules\Customers\Models\CustomerSkuPrice;
+use App\Modules\Expenses\Models\Expense;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\SkuInventory;
 use App\Modules\Messaging\Models\OutboundMessage;
@@ -26,8 +35,13 @@ use App\Modules\Messaging\Models\WhatsAppConnection;
 use App\Modules\Orders\Models\MerchantNotification;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Models\OrderItemChange;
+use App\Modules\Orders\Models\OrderReturn;
+use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Orders\Models\TenantOrderCounter;
+use App\Modules\Pricing\Models\BundlePricing;
+use App\Modules\Pricing\Models\Promotion;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Tenant;
@@ -71,21 +85,30 @@ function columnsEndingWith(string $model, array $suffixes): array
 test('the module model list is explicit so new models are reviewed', function (): void {
     expect(moduleModels())->toBe([
         AuditLog::class,
+        BundleItem::class,
+        CatalogImport::class,
         Category::class,
         Product::class,
         ProductFieldDefinition::class,
         ProductFieldOption::class,
         ProductImage::class,
+        ProductOption::class,
+        ProductOptionValue::class,
         ProductRelation::class,
         Sku::class,
+        SkuUnit::class,
         Unit::class,
         CashCollection::class,
+        CustomerCredit::class,
         Cart::class,
         CartItem::class,
         Customer::class,
         CustomerAddress::class,
+        CustomerGroup::class,
         CustomerInvitation::class,
         CustomerOtp::class,
+        CustomerSkuPrice::class,
+        Expense::class,
         InventoryMovement::class,
         SkuInventory::class,
         OutboundMessage::class,
@@ -94,8 +117,13 @@ test('the module model list is explicit so new models are reviewed', function ()
         MerchantNotification::class,
         Order::class,
         OrderItem::class,
+        OrderItemChange::class,
+        OrderReturn::class,
+        OrderReturnItem::class,
         OrderStatusHistory::class,
         TenantOrderCounter::class,
+        BundlePricing::class,
+        Promotion::class,
         SkuPriceTier::class,
         Tenant::class,
         TenantSetting::class,
@@ -120,6 +148,22 @@ test('every *_at column is cast to datetime', function (): void {
 
         foreach (columnsEndingWith($model, ['_at']) as $column) {
             if (($casts[$column] ?? null) !== 'datetime') {
+                $uncast[] = "{$model}::{$column}";
+            }
+        }
+    }
+
+    expect($uncast)->toBe([]);
+});
+
+test('D96 every cost per base unit is cast to decimal:4', function (): void {
+    $uncast = [];
+
+    foreach (moduleModels() as $model) {
+        $casts = (new $model)->getCasts();
+
+        foreach (columnsEndingWith($model, ['_cost']) as $column) {
+            if (($casts[$column] ?? null) !== 'decimal:4') {
                 $uncast[] = "{$model}::{$column}";
             }
         }

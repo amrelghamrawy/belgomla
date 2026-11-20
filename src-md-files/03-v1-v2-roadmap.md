@@ -155,17 +155,17 @@ V2 should focus on increasing merchant flexibility and operational capability af
 
 ### Catalog
 
-- Product variants (color/size) exposed in the UI.
-- Multiple selling units per SKU.
+- Product variants (color/size) exposed in the UI. **Done (V2 Task 14, BR-P14, D92).**
+- Multiple selling units per SKU. **Done (V2 Task 13, BR-U02, D91).**
 - Bulk catalog import/export.
 
 ### Pricing
 
 - Manual order discount.
 - Item-level discount.
-- Customer-specific pricing.
-- Negotiated customer pricing.
-- Promotional pricing.
+- Customer-specific pricing. **Done (V2 Task 11, BR-PR12..PR14).**
+- Negotiated customer pricing. **Done (V2 Task 11, BR-PR13).**
+- Promotional pricing. **Done (V2 Task 12, BR-PR15).**
 - Taxes / VAT handling if required.
 
 ### Orders (highest V2 priority for school books)
@@ -174,12 +174,12 @@ V2 should focus on increasing merchant flexibility and operational capability af
 - **Pre-orders** on Coming Soon products, converted to normal orders when stock arrives.
 - Order editing and partial fulfilment.
 - Automatic expiry of unconfirmed orders.
-- Product bundles / full-grade sets.
+- Product bundles / full-grade sets. **Done (V2 Task 15, BR-P15, D93).**
 
 ### Customer Management
 
-- Customer groups.
-- Wholesale customer levels.
+- Customer groups. **Done (V2 Task 11, BR-PR12).**
+- Wholesale customer levels. **Done (V2 Task 11: a group is a level with one % off the base price, D89).**
 - Credit limits and payment terms (آجل up to N days), as offered by Egyptian B2B platforms.
 - Customer account statement (كشف حساب).
 - Customer-specific catalogs.
@@ -218,11 +218,11 @@ V2 should focus on increasing merchant flexibility and operational capability af
 
 ### Reporting
 
-- Sales analytics.
-- Product performance.
-- Customer purchasing patterns.
-- Inventory analytics.
-- Collection reports.
+- Sales analytics. **Done (V2 Task 16, D94).**
+- Product performance. **Done (V2 Task 16, D94).**
+- Customer purchasing patterns. **Done (V2 Task 16, D94).**
+- Inventory analytics. **Done (V2 Task 16, D94).**
+- Collection reports. **Done (V2 Task 16, D94).**
 
 ---
 

@@ -7,10 +7,12 @@ namespace App\Modules\Inventory\Http\Resources;
 use App\Modules\Inventory\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * One ledger line (BR-INV06): signed quantity and resulting On Hand in base units, the order for a `sale`,
- * the reason for an `adjustment`, and who made it.
+ * the reason for an `adjustment` (the note of a `receive`), and who made it. `unit_cost` is the cost per base unit it moved at
+ * (BR-INV09), shown only to users who may adjust stock or view reports (D96 g).
  *
  * @property-read InventoryMovement $resource
  */
@@ -30,6 +32,8 @@ final class MovementResource extends JsonResource
             'quantity' => $movement->quantity,
             'on_hand_after' => $movement->on_hand_after,
             'reason' => $movement->reason,
+            'reason_code' => $movement->reason_code?->value,
+            'unit_cost' => $this->when(Gate::any(['inventory.adjust', 'reports.view']), $movement->unit_cost),
             'order_id' => $movement->order_id,
             'actor' => ['type' => $movement->actor_type->value, 'id' => $movement->actor_id],
             'created_at' => $movement->created_at->toIso8601String(),

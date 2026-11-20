@@ -67,3 +67,18 @@ test('the store whatsapp resource lists its keys, with logged_out_on_phone only 
     expect(array_keys($shown))->toBe(['enabled', 'status', 'status_label', 'phone', 'connected_at', 'disconnect_reason', 'qr'])
         ->and($unlinked['logged_out_on_phone'])->toBeFalse();
 });
+
+test('health reads the session counts and ignores malformed ones', function (array $body, array $expected): void {
+    Http::fake(['127.0.0.1:3100/health' => Http::response($body)]);
+
+    expect(app(WaGatewayClient::class)->health())->toBe($expected);
+})->with([
+    'counts' => [['ok' => true, 'sessions' => 3, 'open' => 2], ['sessions' => 3, 'open' => 2]],
+    'malformed' => [['ok' => true, 'sessions' => '3'], ['sessions' => 0, 'open' => 0]],
+]);
+
+test('health of a gateway that is down is unavailable', function (): void {
+    Http::fake(['*' => Http::response(['error' => 'server_error'], 500)]);
+
+    expect(fn () => app(WaGatewayClient::class)->health())->toThrow(WaGatewayUnavailable::down());
+});

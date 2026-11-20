@@ -35,6 +35,12 @@ final readonly class StoreWhatsAppConnectionQuery
             ->exists();
     }
 
+    /** How many store numbers are connected across all tenants (platform:monitor). */
+    public function connectedCount(): int
+    {
+        return WhatsAppConnection::withoutTenantScope()->where('status', ConnectionStatus::Connected)->count();
+    }
+
     /**
      * Every store number by status, keyed by session key.
      *

@@ -53,6 +53,132 @@ describe("OrderDetailView", () => {
     expect(screen.getByText("12 شارع عباس العقاد، مدينة نصر، القاهرة")).toBeInTheDocument();
   });
 
+  it("D85 shows a discounted line's crossed list price and the order discount in the totals", async () => {
+    const detail = order();
+    stubOrder(
+      order({
+        items_total: "486.00",
+        discount: { type: "amount", value: "6.00", amount: "6.00" },
+        order_total: "480.00",
+        net_total: "480.00",
+        items: detail.items.map((item) => ({
+          ...item,
+          manual_discount: { type: "percent", value: "10.00" },
+          unit_price: "81.00",
+          line_total: "486.00",
+        })),
+      }),
+    );
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("list-price")).toHaveTextContent("90.00 ج.م");
+    expect(screen.getByText(/6 كرتونة ×/)).toHaveTextContent("81.00 ج.م");
+    expect(screen.getByTestId("order-discount")).toHaveTextContent("−6.00 ج.م");
+    expect(screen.getByText("إجمالي الأصناف").nextSibling).toHaveTextContent("486.00 ج.م");
+  });
+
+  it("BR-O12 BR-O13 marks the lines the store removed, changed or delivered short", async () => {
+    const [line] = order().items;
+    const at = "2026-10-20T08:00:00Z";
+    stubOrder(
+      order({
+        status: "delivered",
+        status_label: "تم التوصيل",
+        items: [
+          { ...line!, id: 61, quantity: 6, delivered_quantity: 4, line_total: "360.00" },
+          { ...line!, id: 62, sku_id: 502, product_name: "كتاب ب", delivered_quantity: 6 },
+          { ...line!, id: 63, sku_id: 503, product_name: "كتاب ج", removed_at: at },
+        ],
+        changes: [
+          {
+            order_item_id: 62,
+            product_name: "كتاب ب",
+            sku_code: "B-1",
+            change: "added",
+            old_quantity: null,
+            new_quantity: 6,
+            unit_price_before: null,
+            unit_price_after: "90.00",
+            at,
+          },
+          {
+            order_item_id: 63,
+            product_name: "كتاب ج",
+            sku_code: "C-1",
+            change: "removed",
+            old_quantity: 6,
+            new_quantity: null,
+            unit_price_before: "90.00",
+            unit_price_after: null,
+            at,
+          },
+        ],
+      }),
+    );
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("delivered-61")).toHaveTextContent("تم تسليم 4 من 6 كرتونة");
+    expect(screen.getByTestId("order-line-62")).toHaveTextContent("عدّله المتجر");
+    expect(screen.getByTestId("order-line-63")).toHaveTextContent("حذفه المتجر");
+    expect(screen.getByTestId("order-line-63")).toHaveClass("line-through");
+    expect(screen.getByRole("heading", { name: /الأصناف/ })).toHaveTextContent("(2 صنف)");
+  });
+
+  it("an order without discounts shows no crossed price and no discount line", async () => {
+    stubOrder();
+    renderWithQuery(<OrderDetailView />);
+
+    await screen.findByRole("heading", { level: 1, name: "طلب رقم 1001" });
+    expect(screen.queryByTestId("list-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("order-discount")).not.toBeInTheDocument();
+  });
+
+  it("BR-R05 shows the returns of a delivered order and the net total", async () => {
+    stubOrder(
+      order({
+        status: "delivered",
+        status_label: "تم التوصيل",
+        returned_total: "180.00",
+        net_total: "360.00",
+        returns: [
+          {
+            number: 1,
+            total: "180.00",
+            refund_amount: "50.00",
+            refund_method: "cash",
+            returned_at: "2026-10-12T08:00:00Z",
+            items: [
+              {
+                product_name: "الأضواء علوم",
+                sku_code: "BK-001",
+                unit: "كرتونة",
+                quantity: 2,
+                unit_price: "90.00",
+                line_total: "180.00",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    renderWithQuery(<OrderDetailView />);
+
+    const returns = await screen.findByRole("region", { name: "المرتجعات" });
+    expect(within(returns).getByText(/مرتجع #1/)).toBeInTheDocument();
+    expect(within(returns).getByText("الأضواء علوم · 2 كرتونة × 90.00 ج.م")).toBeInTheDocument();
+    expect(within(returns).getByText("تم رد 50.00 ج.م لك")).toBeInTheDocument();
+    expect(screen.getByTestId("order-net-total")).toHaveTextContent("360.00 ج.م");
+  });
+
+  it("an order without returns shows no returns block", async () => {
+    stubOrder();
+    renderWithQuery(<OrderDetailView />);
+
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(screen.queryByRole("region", { name: "المرتجعات" })).not.toBeInTheDocument();
+  });
+
   it("BR-O02 a confirmed order cannot be cancelled by the customer", async () => {
     stubOrder(order({ status: "confirmed", status_label: "مؤكد" }));
     renderWithQuery(<OrderDetailView />);
@@ -168,5 +294,85 @@ describe("CheckoutSuccess", () => {
 
     expect(screen.queryByTestId("order-number")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "متابعة التسوق" })).toBeInTheDocument();
+  });
+});
+
+describe("pre-orders in the account (BR-O14)", () => {
+  const preorder = (overrides: Parameters<typeof order>[0] = {}) =>
+    order({ kind: "preorder", preorder_state: "open", ...overrides });
+
+  it("lists the normal orders by default and the pre-orders on their own tab, with where each stands", async () => {
+    const fetchMock = stubApi({
+      "GET /api/store/me": json(200, { data: customer() }),
+      "GET /api/store/orders": json(200, page([preorder(), preorder({ number: 1000, preorder_state: "converted" })])),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<OrdersList />);
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "GET /api/store/orders")[0]?.url.searchParams.get("kind")).toBe("order"),
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "الحجوزات" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "GET /api/store/orders").at(-1)?.url.searchParams.get("kind")).toBe("preorder"),
+    );
+    expect(await screen.findByRole("link", { name: /حجز رقم 1001/ })).toHaveTextContent("محجوز");
+    expect(screen.getByRole("link", { name: /حجز رقم 1000/ })).toHaveTextContent("تم التحويل إلى طلب");
+    expect(screen.queryByRole("button", { name: "ملغي" })).not.toBeInTheDocument();
+  });
+
+  it("an open pre-order says its prices are indicative, shows what was converted and can be cancelled", async () => {
+    const detail = preorder({
+      items: [{ ...order().items[0]!, converted_quantity: 2 }],
+      conversions: [{ number: 1005, status: "pending", order_total: "180.00", placed_at: "2026-10-12T08:00:00Z" }],
+    });
+    stubOrder(detail);
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByRole("heading", { name: "حجز رقم 1001" })).toBeInTheDocument();
+    expect(screen.getByTestId("order-status")).toHaveTextContent("محجوز");
+    expect(screen.getByText("أسعار الحجز مبدئية، وتُحسب عند تحويله إلى طلب.")).toBeInTheDocument();
+    expect(screen.getByTestId("converted-61")).toHaveTextContent("تحوّل 2 من 6 كرتونة إلى طلب");
+    expect(within(screen.getByTestId("conversions")).getByRole("link", { name: "طلب رقم 1005" })).toHaveAttribute(
+      "href",
+      "/account/orders/1005",
+    );
+    expect(screen.getByRole("button", { name: "إلغاء الحجز" })).toBeInTheDocument();
+    expect(screen.queryByText("التحصيل")).not.toBeInTheDocument();
+  });
+
+  it("a pre-order converted in full cannot be cancelled", async () => {
+    stubOrder(preorder({ preorder_state: "converted", converted_at: "2026-10-12T08:00:00Z" }));
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("order-status")).toHaveTextContent("تم التحويل إلى طلب");
+    expect(screen.queryByRole("button", { name: "إلغاء الحجز" })).not.toBeInTheDocument();
+  });
+
+  it("a converted order links back to its pre-order", async () => {
+    stubOrder(order({ converted_from: 990 }));
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("converted-from")).toHaveAttribute("href", "/account/orders/990");
+  });
+
+  it("the success page of a pre-order says what happens next", () => {
+    searchParams.value = new URLSearchParams("order=1002&preorder=1");
+    renderWithQuery(<CheckoutSuccess />);
+
+    expect(screen.getByRole("heading", { name: "تم تسجيل حجزك" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "عرض الحجز" })).toHaveAttribute("href", "/account/orders/1002");
+  });
+});
+
+describe("OrderDetailView variants (V2 Task 14)", () => {
+  it("BR-P14 shows the variant each line was ordered in", async () => {
+    const plain = order().items[0]!;
+    stubOrder(order({ items: [plain, { ...plain, id: 62, product_name: "قلم جاف", sku_name: "أحمر" }] }));
+    renderWithQuery(<OrderDetailView />);
+
+    expect(await screen.findByTestId("variant-62")).toHaveTextContent("أحمر");
+    expect(screen.queryByTestId("variant-61")).toBeNull();
   });
 });

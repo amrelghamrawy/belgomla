@@ -17,6 +17,8 @@ const dateTimeFormat = new Intl.DateTimeFormat(LOCALE, {
   minute: "2-digit",
 });
 
+const dayFormat = new Intl.DateTimeFormat(LOCALE, { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
+
 function parse(iso: string): Date {
   const date = new Date(iso);
 
@@ -30,6 +32,11 @@ function parse(iso: string): Date {
 /** "2026-07-01T21:30:00Z" → "2 يوليو 2026" (Cairo is UTC+3 in summer). */
 export function formatDate(iso: string): string {
   return dateFormat.format(parse(iso));
+}
+
+/** A calendar day without a time (`expected_at`, BR-O14): "2026-12-01" → "1 ديسمبر 2026", whatever the time zone. */
+export function formatDay(day: string): string {
+  return dayFormat.format(parse(`${day}T00:00:00Z`));
 }
 
 /** "2026-01-15T10:05:00Z" → "15 يناير 2026 في 12:05 م". */

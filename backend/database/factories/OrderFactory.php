@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Audit\Enums\ActorType;
 use App\Modules\Orders\Enums\CancelledBy;
+use App\Modules\Orders\Enums\OrderKind;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Support\Money;
@@ -29,8 +31,8 @@ final class OrderFactory extends Factory
             'number' => fake()->unique()->numberBetween(1, 9_999_999),
             'customer_id' => CustomerFactory::new(),
             'status' => OrderStatus::Pending,
-            'items_total' => '0.00',
             'order_total' => '0.00',
+            'items_total' => fn (array $attributes): string => is_scalar($attributes['order_total']) ? (string) $attributes['order_total'] : '0.00', // no discount: the totals agree (BR-O08)
             'delivery_name' => fake()->name(),
             'delivery_phone' => '+2010'.fake()->numerify('########'),
             'delivery_address' => [
@@ -41,6 +43,8 @@ final class OrderFactory extends Factory
                 'landmark' => null,
             ],
             'customer_note' => null,
+            'placed_by_type' => ActorType::Customer,
+            'placed_by_id' => null,
             'placed_at' => now(),
         ];
     }
@@ -99,6 +103,24 @@ final class OrderFactory extends Factory
     public function stale(int $hours = 25): static
     {
         return $this->state(['status' => OrderStatus::Pending, 'placed_at' => now()->subHours($hours)]);
+    }
+
+    /** BR-O14: a pre-order (pending, holding no stock); give its lines the OrderItemFactory preorderLine() state. */
+    public function preorder(): static
+    {
+        return $this->state(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending]);
+    }
+
+    /** D88: a pre-order with nothing left to convert. */
+    public function converted(): static
+    {
+        return $this->state(['kind' => OrderKind::Preorder, 'status' => OrderStatus::Pending, 'converted_at' => now()]);
+    }
+
+    /** BR-O11: placed from the dashboard by a store user on the customer's behalf. */
+    public function placedByMerchant(int $tenantUserId = 1): static
+    {
+        return $this->state(['placed_by_type' => ActorType::TenantUser, 'placed_by_id' => $tenantUserId]);
     }
 
     /** Some of the order collected already (BR-O03), as Collections (Task 7) would leave it. */

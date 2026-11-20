@@ -128,3 +128,36 @@ test('BR-O03 D7 an order with collected money cannot be cancelled', function (Ca
         ->and(($this->stock)()['reserved'])->toBe(120)
         ->and(MerchantNotification::query()->count())->toBe(0);
 })->with(['customer' => [CancelledBy::Customer], 'merchant' => [CancelledBy::TenantUser]]);
+
+test('BR-O14 BR-INV04 cancelling a pre-order releases nothing: it held nothing', function (CancelledBy $by): void {
+    $sku = $this->preorderableSku();
+    $preorder = $this->placePreorder($this->customer, [$sku->id => 6]);
+    $stockBefore = SkuInventory::query()->whereIn('sku_id', [$this->sku->id, $sku->id])->orderBy('sku_id')->get(['sku_id', 'on_hand', 'reserved'])->toArray();
+
+    $cancelled = app(CancelOrder::class)->handle($preorder, new CancelData('غيرت رأيي'), $by, $by === CancelledBy::Customer ? $this->customer->id : $this->owner->id);
+
+    expect($cancelled->status)->toBe(OrderStatus::Cancelled)
+        ->and($cancelled->preorderState())->toBe(App\Modules\Orders\Enums\PreorderState::Cancelled)
+        ->and(SkuInventory::query()->whereIn('sku_id', [$this->sku->id, $sku->id])->orderBy('sku_id')->get(['sku_id', 'on_hand', 'reserved'])->toArray())->toBe($stockBefore)
+        ->and(InventoryMovement::query()->count())->toBe(0);
+})->with(['by the customer' => [CancelledBy::Customer], 'by the merchant' => [CancelledBy::TenantUser]]);
+
+test('D88 cancelling a partly converted pre-order cancels what is left; the converted orders live on', function (): void {
+    $preorder = Order::factory()->for($this->customer)->preorder()->create();
+    $converted = Order::factory()->for($this->customer)->create(['converted_from_id' => $preorder->id]);
+
+    app(CancelOrder::class)->handle($preorder, new CancelData('يكفيني ما وصل'), CancelledBy::Customer, $this->customer->id);
+
+    expect($preorder->refresh()->status)->toBe(OrderStatus::Cancelled)
+        ->and($converted->refresh()->status)->toBe(OrderStatus::Pending);
+});
+
+test('D88 a pre-order converted in full cannot be cancelled', function (): void {
+    $preorder = Order::factory()->for($this->customer)->converted()->create();
+
+    expect(fn (): Order => app(CancelOrder::class)->handle($preorder, new CancelData('متأخر'), CancelledBy::Customer, $this->customer->id))
+        ->toThrow(function (CannotCancel $e): void {
+            expect($e->errorCode)->toBe('invalid_transition');
+        })
+        ->and($preorder->refresh()->status)->toBe(OrderStatus::Pending);
+});

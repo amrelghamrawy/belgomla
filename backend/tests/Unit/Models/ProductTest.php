@@ -11,6 +11,8 @@ use App\Modules\Catalog\Models\Scopes\VisibleOnStore;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Services\FacetCacheVersion;
 use App\Modules\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     app(TenantContext::class)->set($this->tenant);
@@ -21,6 +23,7 @@ test('to array', function (): void {
 
     expect(array_keys($product->toArray()))->toBe([
         'id', 'tenant_id', 'category_id', 'name', 'slug', 'description', 'status', 'custom_fields', 'created_by', 'created_at', 'updated_at',
+        'preorder_enabled', 'expected_at', 'preorder_limit', 'type',
     ]);
 });
 
@@ -59,12 +62,27 @@ test('the same slug is allowed in another tenant', function (): void {
     expect($foreign->slug)->toBe('قلم');
 });
 
-test('BR-P02 the sku relation returns the single sku', function (): void {
+test('BR-P02 BR-P14 a product without options has exactly one sku', function (): void {
     $product = $this->inTenant(fn () => Product::factory()->withSku(['code' => 'PEN-1'])->create());
 
-    expect($product->sku)->toBeInstanceOf(Sku::class)
-        ->and($product->sku->code)->toBe('PEN-1')
+    expect($product->skus->first())->toBeInstanceOf(Sku::class)
+        ->and($product->skus->first()->code)->toBe('PEN-1')
         ->and($product->skus)->toHaveCount(1);
+});
+
+test('BR-P14 skus are in the form order, active skus leave the inactive out, options are ordered', function (): void {
+    $product = $this->variantProduct(['أزرق', 'أسود', 'أحمر']);
+    $this->inTenant(function () use ($product): void {
+        Sku::query()->where('code', 'PEN-1')->update(['sort_order' => 5]);
+        Sku::query()->where('code', 'PEN-2')->update(['status' => 'inactive']);
+        $product->options()->create(['name' => 'المقاس', 'sort_order' => 1]);
+    });
+
+    $product = $this->inTenant(fn () => $product->refresh()->load('skus', 'activeSkus', 'options'));
+
+    expect($product->skus->pluck('code')->all())->toBe(['PEN-2', 'PEN-3', 'PEN-1'])
+        ->and($product->activeSkus->pluck('code')->all())->toBe(['PEN-3', 'PEN-1'])
+        ->and($product->options->pluck('name')->all())->toBe(['اللون', 'المقاس']);
 });
 
 test('images are ordered and the main image is exposed', function (): void {
@@ -128,4 +146,30 @@ test('deleting a product bumps the facet cache version', function (): void {
     $this->inTenant(fn () => $product->delete());
 
     expect(app(FacetCacheVersion::class)->current($this->tenant->id))->toBe($before + 1);
+});
+
+test('BR-O14 pre-orders are off by default; the settings are cast', function (): void {
+    $plain = $this->inTenant(fn () => Product::factory()->create()->fresh());
+    $preorderable = $this->inTenant(fn () => Product::factory()->preorderable(limit: 50, expectedAt: '2026-12-01')->create()->fresh());
+
+    expect($plain->preorder_enabled)->toBeFalse()
+        ->and($plain->expected_at)->toBeNull()
+        ->and($plain->preorder_limit)->toBeNull()
+        ->and($preorderable->preorder_enabled)->toBeTrue()
+        ->and($preorderable->expected_at?->toDateString())->toBe('2026-12-01')
+        ->and($preorderable->preorder_limit)->toBe(50);
+});
+
+test('BR-O14 the database refuses a pre-order cap below one', function (): void {
+    $product = $this->inTenant(fn () => Product::factory()->create());
+
+    DB::table('products')->where('id', $product->id)->update(['preorder_limit' => 0]);
+})->throws(QueryException::class, 'products_preorder_limit_positive');
+
+test('BR-P15 a product is simple unless made a bundle', function (): void {
+    [$simple, $bundle] = $this->inTenant(fn (): array => [Product::factory()->create()->fresh(), Product::factory()->bundle()->create()->fresh()]);
+
+    expect($simple->type)->toBe(App\Modules\Catalog\Enums\ProductType::Simple)
+        ->and($simple->isBundle())->toBeFalse()
+        ->and($bundle->isBundle())->toBeTrue();
 });

@@ -48,7 +48,7 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | ---- | -------------------------- | --------------------------------------------------------- |
 | 400  | `stateful_request_required` | login/OTP/invitation POST without a SPA origin (no session) |
 | 401  | `unauthenticated`          | no/invalid session, tenant mismatch                       |
-| 403  | `forbidden`                | a policy denied the action                                |
+| 403  | `forbidden`                | a policy denied the action, or the dashboard user's role lacks the endpoint's permission (D82; possible on every dashboard endpoint except auth and `me`) |
 | 403  | `pending_approval` / `blocked` / `phone_not_verified` / `invited` / `pending_verification` | customer not `active` (the code is the status, BR-CU05) |
 | 403  | `tenant_suspended`         | tenant suspended (dashboard, BR-T07)                      |
 | 403  | `user_disabled`            | disabled dashboard user logging in                        |
@@ -69,9 +69,15 @@ Every body is produced by a `JsonResource` (rules/02-architecture.md §4). Lists
 | 409  | `address_locked`           | editing the delivery address from `out_for_delivery` on (D9) |
 | 422  | `exceeds_balance`          | a collection above the order's remaining balance (BR-C03, `details.remaining`) |
 | 409  | `order_cancelled`          | recording a collection on a cancelled order (BR-C04)      |
+| 409  | `is_preorder`              | recording a collection or applying credit on a pre-order (D88) |
+| 409  | `group_archived`           | assigning a customer to an archived customer group (BR-PR12, D89) |
+| 409  | `promotion_locked`         | editing a promotion that started, ended or was cancelled, or cancelling an ended or cancelled one (BR-PR15, D90) |
+| 409  | `product_not_active`       | converting pre-orders of a product that is not active yet (BR-O14, `details.status`) |
 | 409  | `already_voided`           | voiding a collection twice (BR-C02, `details.voided_at`)  |
 | 409  | `idempotency_in_progress`  | same `Idempotency-Key` while the first request still runs (D55) |
 | 422  | `idempotency_key_reused`   | same `Idempotency-Key` with a different body (D55)        |
+| 422  | `import_expired`           | importing a preview token older than 24 h, or unknown (V2 Task 06) |
+| 409  | `export_not_ready`         | the signed link of a queued catalog export before its file is written (V2 Task 06) |
 | 429  | `rate_limited`             | OTP / login throttling                                    |
 | 503  | `store_unavailable`        | tenant suspended (storefront)                             |
 | 500  | `server_error`             | unexpected failure (no internals unless `app.debug`)      |
@@ -83,7 +89,7 @@ The complete list (also `otp_*`, `invalid_credentials`, `insufficient_stock`, `i
 - All text is Arabic; dates ISO-8601 UTC; money as string `"150.00"`.
 - Lists: `?page=`, `?per_page=` (max 100), `?sort=field|-field`.
 - Every mutating dashboard endpoint writes an audit record (BR-L).
-- `Idempotency-Key` header is honored on `POST /api/store/checkout` and on all `POST /api/dashboard/orders/{id}/...` transitions (24 h window).
+- `Idempotency-Key` header is honored on `POST /api/store/checkout`, on all `POST /api/dashboard/orders/{id}/...` transitions and on `POST /api/dashboard/products/import` (24 h window).
 
 ---
 
@@ -153,11 +159,19 @@ Item shape:
     "base_price": "90.00",
     "discount_percent": "25.00",
     "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }],
+    "units": [
+      { "id": 811, "unit": "كرتونة", "conversion_factor": 20, "moq": 5, "cover_price": "120.00", "base_price": "90.00", "discount_percent": "25.00", "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }], "is_default": true, "in_stock": true },
+      { "id": 812, "unit": "قطعة", "conversion_factor": 1, "moq": 10, "cover_price": "6.00", "base_price": "4.75", "discount_percent": "20.83", "tiers": [], "is_default": false, "in_stock": true }
+    ],
     "available": 140,
     "in_stock": true
   }
 }
 ```
+
+V2 Task 13 (BR-U02, D91): `sku.units` lists every active unit the SKU is sold in, the default first, each priced on its own (the shopper's own prices, BR-PR14/PR15) with its own `in_stock` (Available ≥ its factor); the flat `unit`, `conversion_factor`, `moq` and prices of `sku` are the default unit's, and `sku.in_stock` is true when any unit can be ordered.
+
+V2 Task 14 (BR-P14, D92): the product (list, page, related) also carries `skus` (every active variant, each shaped like `sku` plus `label` «أزرق / M» and `option_value_ids` in option order), `options: [{ id, name, values: [{ id, value, image_url }] }]` (only values an active variant uses; `image_url` = the swatch) and `price_range: { min, max }` (default units at the shopper's prices; left out when prices are hidden). `sku` is the first active variant in stock, else the first active one; `sku.label` / `sku.option_value_ids` are null / empty without options. Facets add `type: "option"` entries keyed `o:<folded option name>` whose option `id` is the folded value, sent back as `f[o:<name>]=<value>`. Price-list rows carry `sku_id` and `variant` (one row per unit of each active variant); cart lines carry `variant`; order items' `sku_name` is the variant label.
 
 If `require_login_for_prices` is on and no customer session: `sku.cover_price/base_price/tiers/discount_percent` are omitted and `prices_hidden: true` is added at the product level. `coming_soon` products return `in_stock:false, coming_soon:true` and `available` omitted.
 
@@ -173,7 +187,11 @@ Detail notes (Task 1): `gallery` items are `{ id, url, is_main, sort_order }`; `
 
 Same filters as the product list; returns all matching products (no pagination, max 2000) in a compact shape for the printable page (BR-P13).
 
-Row: `{ id, name, slug, kind, code, unit, moq, cover_price, base_price, availability: "available"|"coming_soon" }`; `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
+Row: `{ id, sku_unit_id, name, slug, kind, code, unit, conversion_factor, is_default, moq, cover_price, base_price, availability: "available"|"coming_soon" }`, one row per unit the product is sold in, the default first (V2 Task 13, D91); `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
+
+### `GET /api/store/price-list/export` (V2 Task 06)
+
+Same filters, `format=xlsx` (the only value, D83). An XLSX attachment `price-list-YYYY-MM-DD.xlsx`: every visible product of the selection by name, uncapped, with section, code, unit, MOQ, reference and wholesale price, availability. A guest of a store with `require_login_for_prices` gets `403 prices_hidden`. PDF is the page printed by the browser.
 
 ---
 
@@ -225,9 +243,9 @@ Address: `{ id, label, governorate, city, address_line, landmark, phone, is_defa
 | Method | Path                             | Body               | Notes                                                                                                 |
 | ------ | -------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
 | GET    | `/api/store/cart`                |                    | items with resolved prices, `removed_items[]` for now-inactive products (BR-P04), totals, `mov_check` |
-| POST   | `/api/store/cart/items`          | `sku_id, quantity` | upsert; validates integer, `≥ moq`, `≤ available`, product active                                     |
-| PATCH  | `/api/store/cart/items/{sku_id}` | `quantity`         |                                                                                                       |
-| DELETE | `/api/store/cart/items/{sku_id}` |                    |                                                                                                       |
+| POST   | `/api/store/cart/items`          | `sku_unit_id \| sku_id, quantity` | upsert; validates integer, `≥ moq`, `≤ available`, product active                                     |
+| PATCH  | `/api/store/cart/items/{sku_unit_id}` | `quantity`         |                                                                                                       |
+| DELETE | `/api/store/cart/items/{sku_unit_id}` |                    |                                                                                                       |
 | DELETE | `/api/store/cart`                |                    | clear                                                                                                 |
 
 Cart response:
@@ -257,7 +275,11 @@ Cart response:
 }
 ```
 
+V2 Task 10 (BR-O14, D88): `POST /cart/items` and `PATCH /cart/items/{sku_id}` take `kind: order | preorder` (default `order`), `DELETE /cart/items/{sku_id}?kind=` too; a pre-order line needs a Coming Soon product with pre-orders on and the MOQ, never stock (`cart_line_invalid` reason `preorder_unavailable`). The cart adds `preorders: { items: [...the line shape + expected_at, available 0], items_total }` (indicative prices, no MOV). A pre-order line whose product stops taking pre-orders is dropped as `removed_items[].reason = preorder_closed`.
+
 Delivered in Task 5: every cart write answers this same body. `quantity`, `moq` are in selling units, `available` in base units (D37). A line that cannot be ordered is `422 cart_line_invalid` with `items: [{ sku_id, reason: below_moq|insufficient_stock|product_inactive, moq?|available? }]` (`available` here in selling units). Unknown or another tenant's SKU, or a SKU not in the cart for PATCH/DELETE → `404`. `mov.enabled` is false when the setting is on without an amount. Guest `POST /cart/items`: `403 prices_hidden` when `require_login_for_prices` is on, else `401` (D53). Task 9 added `product_slug` (link back to the product page) and `conversion_factor` (so the storefront can cap the quantity at `available / conversion_factor`) to each line.
+
+V2 Task 13 (D91): a cart line is a SKU **unit**: `POST` takes `sku_unit_id` (or `sku_id` alone for the SKU's default unit), `PATCH`/`DELETE` address the line by its unit id, and every line carries `sku_unit_id`; a SKU may be in the cart in two units (two lines). The stock check counts the base units the cart already holds of the SKU in its other units. `cart_line_invalid` and `checkout_failed` items carry `sku_unit_id` next to `sku_id`, `available` in the line's unit; checkout sums a SKU's lines in base units (a line that does not fit is refused per line). An archived unit is `product_inactive` and drops out of the cart on refresh.
 
 ### Checkout (BR-PR06, section 12 of the domain model)
 
@@ -311,6 +333,14 @@ Order detail shape (shared with dashboard, dashboard adds customer + collections
 
 Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `cancelled_by`, and each item `sku_id`, `sku_name`, `conversion_factor`, `cover_price`, `discount_percent`, `tier_min_quantity`. The list leaves out `items` and `history`. `{number}` is the per-tenant order number; another customer's or another tenant's order is `404` (D57). In `checkout_failed`, `requested`/`available` are selling units; an empty cart is `422 cart_empty`; an address that is not the customer's active address is `422 validation_failed` on `address_id`; a customer who is not active gets `403` with the status as code. Cancel needs `reason` (≤ 300); `has_collections` (409) when money was collected. Orders routes need status `active` (like the cart). Audit: `order.created`, `order.cancelled`.
 
+V2 Task 02: `checkout_failed` adds `details.credit { limit, exposure, order_total }` when the order would pass the customer's credit limit (BR-C05, D78). `GET /api/store/account/statement` is described in §10.
+
+V2 Task 10 (BR-O14, D88): `POST /api/store/checkout/preorder` `{ address_id, customer_note? }` (`idempotent`) turns the cart's pre-order lines into a pre-order and answers `201 { order }` like checkout; the order lines stay in the cart (and checkout leaves the pre-order lines). Failures: `422 checkout_failed` with `items` `preorder_unavailable`, `below_moq`, `preorder_limit { requested, remaining }` and `details.credit`; `cart_empty`; `validation_failed` on `address_id`. No MOV, no stock. Every order (store and dashboard) adds `kind` (`order` | `preorder`), `preorder_state` (`open` | `converted` | `cancelled`, null for a normal order) and `converted_at`; every line `converted_quantity`; the details `converted_from` (the pre-order number, or null) and `conversions[] { number, status, order_total, placed_at }`. `GET /api/store/orders?kind=` keeps one kind. A customer cancels an open pre-order with the usual cancel (not once converted in full: `409 invalid_transition`).
+
+V2 Task 01: the order also carries `returned_total` and `net_total` (BR-O08), and the detail `returns[]`, the live returns without the merchant's reason (see §9 Returns).
+
+V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool }` turns the WhatsApp order status messages on or off (BR-N03); answers the customer profile, which now carries `order_notifications`. Needs a session only. Audit: `customer.preferences_changed` (only when the value changes).
+
 ---
 
 ## 4. Dashboard — Auth
@@ -319,7 +349,7 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | ------ | ---------------------------- | ----------------- | ------ |
 | POST   | `/api/dashboard/auth/login`  | `email, password` | `{ data: { id, name, email, role, status, last_login_at } }` |
 | POST   | `/api/dashboard/auth/logout` |                   | `204`  |
-| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, status, last_login_at }, tenant: { name, subdomain, status, vertical } } }` |
+| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, role_label, status, last_login_at }, tenant: { name, subdomain, status, vertical }, permissions: [...] } }` (V2: the role's permissions, BR-T06) |
 
 `login` errors: `422 invalid_credentials`, `403 user_disabled`, `429 rate_limited` after 5 failures per tenant+email+IP per minute, `400 stateful_request_required` without a SPA origin. Suspended tenant → `403 tenant_suspended`. The email is matched case-insensitively.
 
@@ -330,14 +360,14 @@ Delivered in Task 6: the order also carries `status_label`, `cancel_reason`, `ca
 | Method | Path                           | Notes                                       |
 | ------ | ------------------------------ | ------------------------------------------- |
 | GET    | `/api/dashboard/settings`      |                                             |
-| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default` |
+| PUT    | `/api/dashboard/settings`      | all fields of `tenant_settings`; audited. `invitation_message` (≤ 500, only the D72 placeholders, null/empty = default); the dashboard response adds `invitation_message` and `invitation_message_default`. V2 Task 03: `order_notify_statuses` (list of `confirmed|preparing|out_for_delivery|delivered|cancelled`, each once) and `order_status_messages` (object status → text ≤ 500 with the BR-N03 placeholders, `{سبب_الإلغاء}` only in `cancelled`; null/empty/default text = default); the dashboard response adds both plus `order_status_message_defaults`. V2 Task 04: `pending_expiry_hours` (null/empty = off, 1–720, never below `stale_pending_hours`, compared with the stored value when only one is sent; dashboard only). V2 Task 08: `max_discount_percent_sales` (null = sales cannot discount, else > 0 and < 100; dashboard only) and `discount` in `order_notify_statuses` / `order_status_messages` (D85) |
 | POST   | `/api/dashboard/settings/logo` | multipart; also `/favicon`                  |
 | GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
 | DELETE | `/api/dashboard/settings/whatsapp` | unlink (logout from the phone, then delete the session); audited (`whatsapp.unlinked`); adds `logged_out_on_phone` |
 | GET    | `/api/dashboard/users`         | tenant users                                |
-| POST   | `/api/dashboard/users`         | `name, email, password`; role fixed `owner` |
-| PATCH  | `/api/dashboard/users/{id}`    | `status`, `password`                        |
+| POST   | `/api/dashboard/users`         | `name, email, password, role?` (owner when left out; V2 D82) |
+| PATCH  | `/api/dashboard/users/{id}`    | `name`, `status`, `password`, `role`; `409 last_owner` when the last active owner would be demoted or disabled; a role change is audited `tenant_user.role_changed` |
 
 ---
 
@@ -408,14 +438,20 @@ Create/update body:
   },
   "sku": {
     "code": "ADW-SCI-P1-T1",
-    "selling_unit_id": 2,
     "base_unit_id": 1,
-    "conversion_factor": 20,
-    "cover_price": "120.00",
-    "base_price": "90.00",
-    "base_price_percent": null,
-    "moq": 5,
-    "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }]
+    "units": [
+      {
+        "id": 811,
+        "unit_id": 2,
+        "conversion_factor": 20,
+        "cover_price": "120.00",
+        "base_price": "90.00",
+        "base_price_percent": null,
+        "moq": 5,
+        "tiers": [{ "min_quantity": 10, "unit_price": "85.00" }],
+        "is_default": true
+      }
+    ]
   },
   "opening_stock": 100
 }
@@ -423,11 +459,40 @@ Create/update body:
 
 `base_price` **or** `base_price_percent` is required (BR-PR10); when percent is given, server computes the price and stores both (the percent wins if both are sent). Same for each tier (`unit_price` or `discount_percent`). On update, a body without `sku.tiers` keeps the tiers (D34). The detail response carries `sku.tiers: [{ min_quantity, unit_price, discount_percent }]`. Prices, MOQ and tiers are audited as `sku.price_changed` / `sku.moq_changed` / `sku.tiers_changed`, not inside `product.updated`. `opening_stock` is accepted only on create and writes an `opening` movement.
 
+V2 Task 13 (BR-U02, D91): `sku.units` (1–10, each `unit_id` once, at most one `is_default`, none = the first) replaces the flat `selling_unit_id, conversion_factor, cover_price, base_price, base_price_percent, moq, tiers`; each unit's price rules are the ones above, keyed `sku.units.{i}.…` in errors (`invalid_tiers` and `cover_price_required` too). A unit sent with its `id` (or the `unit_id` of a unit the SKU had) is updated and active again, a new one created, one left out archived. The dashboard product's `sku` carries `base_unit`, `units: [{ id, unit: {id, name}, conversion_factor, cover_price, base_price, base_price_percent, moq, is_default, tiers? }]` (active units, default first, tiers on the detail) and the default unit's `selling_unit, conversion_factor, cover_price, base_price, base_price_percent, moq` for the lists; the price sort uses the default unit. Price audits (`sku.price_changed`, …) are on the unit (`sku_units`); `product.updated` lists `sku.units` (unit, factor, default).
+
+V2 Task 14 (BR-P14, D92): a product with options sends `options: [{ id?, name, values: [{ id?, value, image_id? }] }]` (≤ 2 options, 1–20 values, names and values distinct when folded; `image_id` one of the product's images) and `skus: [{ id?, code, base_unit_id, status?: active|inactive, option_values: [value per option, in option order], units: […], opening_stock? }]` (1–400, codes distinct, combinations distinct, at least one active; `opening_stock` only for a SKU the call creates) instead of `sku`; without options `sku` stays (sending both, or `sku` with `options`, is `422`; `skus` without options holds one SKU). Errors are keyed `skus.{i}.…` and `options.{i}.…`; a variant code taken elsewhere is `409 duplicate_code` with `details.skus.{i}.code`. A SKU sent without `id` takes the place of the product's SKU with the same code, else the same combination. A SKU left out is deleted, or set `inactive` when it has history (D92 c); options and values left out are deleted. The dashboard product carries `skus` (every SKU, active and inactive, each like `sku` plus `label`, `status`, `sort_order`, `option_values`) and `options: [{ id, name, sort_order, values: [{ id, value, sort_order, image_id, image_url }] }]`; `sku` is the first active SKU. The audit of a product with variants lists `options` and `skus` (code, label, status, base unit, units) instead of the flat `sku.*` keys. Duplicating copies every variant. Inventory rows carry `variant`.
+
+V2 Task 10 (BR-O14, D88): both bodies take an optional `preorder { enabled, expected_at? (Y-m-d), limit? (1..10,000,000 selling units) }`; left out it is off on create and kept on update. Every dashboard product carries `preorder { enabled, expected_at, limit }` (audited as the product fields `preorder_enabled`, `expected_at`, `preorder_limit`). `PATCH …/status` answers `meta.preorder_demand { quantity, customers, preorders }` (the product's open pre-orders); going active converts nothing by itself. The storefront product adds `preorder`: null unless Coming Soon, then `{ enabled, expected_at, remaining }` (`remaining` under the cap in selling units, null = no cap).
+
+### Bundles (V2 Task 15, BR-P15, D93)
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| POST | `/api/dashboard/bundles` | `catalog.manage`; `{ name, category_id, description?, custom_fields?, code, unit_id, moq?, components: [{ sku_unit_id, quantity }] (1–50, each unit once), pricing: { mode: fixed \| percent_off_sum, value }, status?: active \| inactive }` → `201` dashboard product |
+| PUT | `/api/dashboard/bundles/{product}` | the same without `status`; a simple product is `404` |
+| POST | `/api/dashboard/bundles/generate` | `{ filter: { category?, f?, q? } }` (not empty) → `201` the draft (inactive) grade set |
+
+A component that is not a unit of an active SKU of an active simple product, or another bundle, is `422` on `components.{i}.sku_unit_id`; a code taken is `409 duplicate_code` on `code`. Every dashboard product carries `type` (`simple` \| `bundle`); a bundle's detail adds `bundle { pricing { mode, value }, components: [{ id, sku_unit_id, sku_id, product_id, product_name, sku_code, label, unit, conversion_factor, quantity, base_price, available, orderable }], components_total, availability }`. `PUT /products/{id}`, `POST /products/{id}/duplicate` and `PUT /products/{id}/units/{unit}/pricing` on a bundle are `409 is_bundle`. The storefront product carries `type`; a bundle adds `components: [{ product_name, slug, sku_code, label, unit, quantity, in_stock }]`, `availability` (bundles that can be made now; also the SKU's `available`) and, when prices are shown, `components_total` and `saving`. Cart lines and quote lines carry `is_bundle`. Order items (both surfaces) carry `is_bundle` and `parent_item_id`: a bundle line is followed by its component lines, which are out of the items total; partial delivery (`delivered_quantities`) names the bundle line in bundles; returns name component lines; edits and line discounts name the bundle line.
+
+### Catalog import / export (V2 Task 06, D83, D95)
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET | `/api/dashboard/products/export?format=xlsx\|csv&<list filter>` | the filter's products (every status) in the import format, streamed as `products-YYYY-MM-DD.xlsx\|csv`; above `catalog.export_sync_limit` (5,000) `202 { data: { id, download_url } }` and a job writes the file |
+| GET | `/api/dashboard/products/export/{uuid}?expires=&signature=` | the signed link of a queued export (24 h): the file, `409 export_not_ready` while it is written, `404` for a wrong link or a failed export |
+| GET | `/api/dashboard/products/import/template?format=` | the empty file with the store's custom field columns |
+| POST | `/api/dashboard/products/import/preview` | multipart `file` (.xlsx/.csv, ≤ 10 MB) → `{ token, file_name, total, create, update, skip, errors: [{ row, column, label, message }], errors_truncated }`; writes nothing; a file that cannot be read as a whole is `422` on `file` |
+| POST | `/api/dashboard/products/import` | `{ token }` → `202` the run; one run per token; `Idempotency-Key` honored; `422 import_expired` after 24 h |
+| GET | `/api/dashboard/imports/{id}` | the run: `{ id, file_name, status: queued\|running\|done\|failed, total, processed, created, updated, skipped, failed, errors, batch_id, started_at, finished_at, created_at }` |
+
+All need `catalog.manage`. File format v2 (V2 Task 13, D91): sheet `products_v2`, one row per SKU unit; columns `sku_code*, product_name*, category_path*, status, description, base_unit*, unit*, unit_is_default (نعم/لا), conversion_factor*, cover_price, base_price*, base_price_percent, moq, tier_N_min, tier_N_price, on_hand, field:<key>`; the consecutive rows of one code are its units, the product columns are read from the first; `total`, `processed`, `create/update/skip` count SKUs; rules D95. File format v1 (still read): sheet `products_v1`; columns `sku_code*, product_name*, category_path*, status, description, selling_unit*, base_unit*, conversion_factor*, cover_price, base_price*, base_price_percent, moq, tier_N_min, tier_N_price (N = 1…5, more when a SKU has more tiers), on_hand, field:<key>` (one per active custom field). The XLSX carries the Arabic labels with the keys in a thin second row; CSV has the keys only. Row rules: D95. Audit: one `batch_id` per import (`catalog.import_started`, the product/SKU/stock records, `catalog.imported` or `catalog.import_failed`).
+
 ### Pricing (BR-PR11)
 
 | Method | Path                                             | Body                                                                                         |
 | ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| PUT    | `/api/dashboard/products/{id}/pricing`           | `{ cover_price?, base_price                                                                  | base_price_percent, moq, tiers: [...] }` replaces tiers |
+| PUT    | `/api/dashboard/products/{id}/units/{sku_unit_id}/pricing` | `{ cover_price?, base_price                                                                  | base_price_percent, moq, tiers: [...] }` replaces the unit's tiers (V2 Task 13) |
 | POST   | `/api/dashboard/pricing/bulk`                    | `{ filter: {...}, base_price_percent, tiers: [ { min_quantity, discount_percent } ], moq? }` |
 | POST   | `/api/dashboard/pricing/bulk/preview`            | same body → `{ affected, skipped_no_cover_price: [...] }` without writing                    |
 | POST   | `/api/dashboard/products/{id}/pricing/recompute` | recompute prices from stored percentages after a cover-price change                          |
@@ -437,6 +502,22 @@ Delivered (Task 2):
 - `PUT …/pricing` and `…/recompute` return the SKU price set: `{ product_id, sku_id, code, cover_price, base_price, base_price_percent, discount_percent, moq, tiers: [{ min_quantity, unit_price, discount_percent }] }`. A missing `cover_price` keeps the current one (D34); `tiers` is required and replaces every tier (`[]` removes them). Errors: `422 invalid_tiers`, `422 cover_price_required`, `404` for another tenant's product.
 - `POST /pricing/bulk` returns `{ affected, skipped_no_cover_price: [{ product_id, sku_id, code, name }], batch_id }`; `…/bulk/preview` returns the same without `batch_id` and writes nothing. Bulk tiers are `{ min_quantity, discount_percent }` only. An empty filter is `422` on `filter`.
 - Audit: `sku.price_changed`, `sku.tiers_changed`, `sku.moq_changed` (per SKU, only what changed) and `pricing.bulk_applied` (one per bulk, same `batch_id`).
+- V2 Task 13 (D91): pricing is per SKU unit. `PUT …/units/{sku_unit_id}/pricing` answers that unit's set with `sku_unit_id, unit, conversion_factor` (a unit of another product, or archived, is `404`); `…/recompute` recomputes every active unit and answers the list. Bulk pricing prices every active unit of the selection off its own cover price, or only the units sold in `unit_id` when given; `affected` counts units and skipped rows carry `sku_unit_id, unit`. Audit records are on `sku_units`.
+
+### Promotions (V2 Task 12, BR-PR15, D90)
+
+| Method | Path | Body / Notes |
+| ------ | ---- | ------------ |
+| GET    | `/api/dashboard/promotions` | `?status=draft\|scheduled\|active\|ended\|cancelled`, paginated, latest start first, each with `skus_count` |
+| POST   | `/api/dashboard/promotions` | `{ name (≤ 100), discount_percent (> 0, < 90), starts_at, ends_at, filter: {...as bulk pricing...} \| sku_ids: [...] (≤ 1000), status?: draft\|scheduled }` → 201; `Idempotency-Key` honored |
+| POST   | `/api/dashboard/promotions/preview` | `{ filter \| sku_ids, discount_percent? }` → `{ skus_count, sample: [{ sku_id, code, product_name, base_price, promotion_price }] }` (10), writes nothing |
+| GET    | `/api/dashboard/promotions/{id}` | the promotion; an explicit list adds `skus: [{ sku_id, code, product_name }]` |
+| PATCH  | `/api/dashboard/promotions/{id}` | any create field; a draft or a promotion that has not started only (`409 promotion_locked` with `details.status`); the SKUs are selected again |
+| POST   | `/api/dashboard/promotions/{id}/cancel` | stops it at once; an ended or cancelled one → `409 promotion_locked` |
+
+All need `pricing.manage`. A promotion: `{ id, name, discount_percent, starts_at, ends_at, status (as of now), target: filter\|skus, filter, skus_count, cancelled_at, created_at }`. Times without an offset are Cairo wall time (D60); answers are ISO-8601 UTC. Validation (`422`): both or neither target, an empty filter (BR-P12), a selection without any SKU, an unknown or foreign SKU id, an end not after the start or already past. Audit: `promotion.created`, `promotion.updated`, `promotion.cancelled`. `php artisan pricing:promotions-tick` (every minute) moves scheduled → active → ended.
+
+Storefront (BR-PR15): the product list and page `sku`, the price-list row (and its Excel file) carry `promotion { id, name, discount_percent, ends_at }` when a live promotion sets the price (guests too, unless prices are hidden, D1); cart lines always carry `promotion` (null without one) and `price_source` may be `promotion`; `GET /api/store/products?on_offer=1` lists only the products on a live promotion. Order items snapshot `price_source = promotion` and `promotion_id`.
 
 ---
 
@@ -446,8 +527,10 @@ Delivered (Task 2):
 | ------ | -------------------------------------------- | ---------------------------------------------------------------- |
 | GET    | `/api/dashboard/inventory`                   | per SKU: on_hand, reserved, available; `?low_stock=1&q=`         |
 | GET    | `/api/dashboard/inventory/{skuId}/movements` | paginated                                                        |
-| POST   | `/api/dashboard/inventory/{skuId}/adjust`    | `{ "new_on_hand": 50, "reason": "جرد" }`                         |
-| POST   | `/api/dashboard/inventory/bulk-adjust`       | `[ { sku_id, new_on_hand, reason } ]` → `{ applied, skipped[] }` |
+| POST   | `/api/dashboard/inventory/{skuId}/adjust`    | `{ "new_on_hand": 50, "reason": "stocktake", "note": null }` (D97) |
+| POST   | `/api/dashboard/inventory/bulk-adjust`       | `[ { sku_id, new_on_hand, reason, note? } ]` → `{ applied, skipped[] }` |
+| POST   | `/api/dashboard/inventory/{skuId}/receive`   | V2 costing (BR-INV09): `{ quantity, unit_cost, sku_unit_id?, note? }` → the row |
+| PUT    | `/api/dashboard/inventory/{skuId}/cost`      | V2 costing (D96 d): `{ unit_cost, sku_unit_id? }` → the row      |
 
 Adjust below reserved (BR-INV08) → `422`:
 
@@ -475,10 +558,15 @@ Delivered (Task 3):
 - `GET /api/dashboard/inventory/{skuId}` exists (the adjust form needs it) and returns one row; `adjust` returns the same row after the change.
 - Row: `{ sku_id, product_id, code, name, status, on_hand, reserved, available, min_allowed, moq, conversion_factor, low_stock }`, all quantities in base units. `min_allowed` = `reserved`. `low_stock` is D36: `available ≤ moq × conversion_factor`.
 - List: every SKU of the tenant (any product status), Laravel pagination envelope; `q` searches like the product list (name, SKU code, option labels, D32); `low_stock=1`; `sort=code|-code|available|-available` (default `code`).
-- Movements: newest first, `{ id, type, type_label, quantity (signed), on_hand_after, reason, order_id, actor: { type, id }, created_at }`.
-- Adjust: `new_on_hand` integer 0..10,000,000, `reason` required (≤ 200). Setting the current value is a no-op (D35). Audit `stock.adjusted` (old/new `on_hand`, `reason`).
+- Movements: newest first, `{ id, type, type_label, quantity (signed), on_hand_after, reason, reason_code, order_id, actor: { type, id }, created_at }` (+ `unit_cost` for users who may see costs, D96 g).
+- Adjust: `new_on_hand` integer 0..10,000,000, `reason` one of `stocktake`, `damaged`, `expired`, `recording_error`, `found`, `other` (D97; `import` is refused), `note` ≤ 150, required for `other`, `expected_on_hand` optional (D99: On Hand then moves by `new_on_hand − expected_on_hand` from its current value; below zero is `409 count_outdated` with `{ expected_on_hand, counted, on_hand }`, a bulk item is skipped as `count_outdated`). Setting the current value is a no-op (D35). Audit `stock.adjusted` (old/new `on_hand`, `reason` code, `note`). Movements add `reason_code` (null before D97 and on other types).
 - Bulk adjust: body is a bare JSON array (≤ 500 items, each `sku_id` once; validation errors are keyed `items.N.field`). Response `{ applied: <count>, skipped: [{ sku_id, reason: below_reserved|not_found|unchanged, reserved?, min_allowed? }], batch_id }`. An id of another tenant is `not_found` and untouched (BR-T04). Audit: `stock.adjusted` per applied SKU plus one `inventory.bulk_adjusted`, same `batch_id`.
 - `422 insufficient_stock` (`items: [{ sku_id, reason, available }]`) is what `StockLedger::reserve` throws; Task 6 turns it into `checkout_failed`.
+- V2 costing (BR-INV09, D96), both `inventory.adjust`:
+  - Receive: `quantity` integer ≥ 1 in whole units of `sku_unit_id` (any unit of this SKU, archived too; left out = the base unit), at most 10,000,000 base units in all (`422` on `quantity`); `unit_cost` money ≥ 0 per that unit; `note` ≤ 200. Writes a `receive` movement at `unit_cost ÷ factor` (4 decimals) and moves `avg_cost`. `Idempotency-Key` honoured (D55). Audit `stock.received` (old/new `on_hand` and `avg_cost`, plus the input). A bundle is `409 is_bundle`; a unit of another SKU `422` on `sku_unit_id`.
+  - Cost: same `unit_cost` / `sku_unit_id`; replaces `avg_cost`, no movement; audit `stock.cost_set` (old/new `avg_cost`), none when unchanged.
+  - The row adds `avg_cost` (`"5.5000"` or null) and each movement `unit_cost`, both **only** for users with `inventory.adjust` or `reports.view` (the keys are absent for others, D96 g). The inventory report's `movements` add `receive`.
+- Product update (D99 c): changing a SKU's `base_unit_id` while it has anything on hand or reserved is `422 validation_failed` on `sku.base_unit_id` / `skus.{i}.base_unit_id`.
 - Product create: `opening_stock` (integer ≥ 0, default 0) writes an `opening` movement and appears in the `product.created` audit; the dashboard product detail carries `sku.inventory: { on_hand, reserved, available }`; `GET /api/dashboard/products?low_stock=1` uses D36.
 
 ---
@@ -496,6 +584,23 @@ Delivered (Task 3):
 | POST   | `/api/dashboard/customers/{id}/block`   | `reason`                                                 |
 | POST   | `/api/dashboard/customers/{id}/unblock` |                                                          |
 
+V2 Task 02: create and update take `credit_limit` (≥ 0, null = no limit) and `payment_terms_days` (0–365, null = due on delivery); not sent on create = the store defaults, not sent on update = unchanged; changes are audited `customer.credit_terms_changed`; the dashboard customer shows both.
+
+V2 Task 11 (BR-PR12..PR14, D89), all `pricing.customers`:
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET    | `/api/dashboard/customer-groups` | every group, active first, then `sort_order`, name; each with `customers_count` |
+| POST   | `/api/dashboard/customer-groups` | `name` (≤ 100, unique → `409 duplicate_name`), `discount_percent` (0–90), `sort_order?` → 201 |
+| PATCH  | `/api/dashboard/customer-groups/{id}` | any of the fields; `status: active` restores an archived group |
+| POST   | `/api/dashboard/customer-groups/{id}/archive` | members keep the group, the discount stops |
+| POST   | `/api/dashboard/customer-groups/{id}/assign` | `customer_ids[]` (≤ 500) or `filter {q, status, group}` (not empty) → `{ assigned }`; archived group → `409 group_archived` |
+| GET    | `/api/dashboard/customers/{id}/prices` | `?q=` product or SKU code; paginated `{ sku_id, sku_unit_id, sku_code, product_name, unit, conversion_factor, base_price, unit_price, note, updated_at }` (V2 Task 13: per unit) |
+| PUT    | `/api/dashboard/customers/{id}/prices/{sku_unit_id}` | `unit_price` (≥ 0.01), `note?` (≤ 300) → 201 new, 200 replaced |
+| DELETE | `/api/dashboard/customers/{id}/prices/{sku_unit_id}` | 204; no such price → 404 |
+
+The dashboard customer adds `group` (`{ id, name, discount_percent, status }` or null); the list takes `?group=`; create and update take `customer_group_id` (null = no group; needs `pricing.customers`, an archived group → `409 group_archived`, another store's → `422`). Storefront shapes are unchanged: a logged-in customer's `sku.base_price` / `tiers` and the price list's `base_price` are their own prices (BR-PR14), with `price_source` (`group` | `customer`) only then; cart lines, quote lines and order items always carry `price_source` (`base` | `tier` | `group` | `customer`).
+
 Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by Collections since Task 7: delivered orders only, D59), `created_by`, `approved_by`, `blocked_at`, `blocked_reason`; the detail page adds `addresses` (active) and `recent_orders` ([] until Orders, Task 6). `PUT` takes `addresses[]` as the full list (D54). `invite` answers `200 { sent_via, expires_at, sent_count }`; only `invited` customers. `approve` only from `pending_approval`; `block` from any other status (keeps it), `unblock` restores it. Invalid transitions → `409 invalid_transition` with `details.from`. Duplicate phone → `409 phone_taken`. Audit actions: `customer.created`, `customer.updated`, `customer.invited`, `customer.approved`, `customer.blocked`, `customer.unblocked`.
 
 ---
@@ -509,10 +614,82 @@ Delivered in Task 5: the dashboard customer adds `outstanding_amount` (filled by
 | POST   | `/api/dashboard/orders/{number}/transition`       | `{ "to": "confirmed                                                                                                  | preparing | out_for_delivery | delivered", "note"?, "collect_full_amount"?: true }` |
 | POST   | `/api/dashboard/orders/{number}/cancel`           | `{ "reason" }`; any non-terminal; `409` if `collected_amount > 0` (BR-O03)                                           |
 | PUT    | `/api/dashboard/orders/{number}/delivery-address` | allowed before `out_for_delivery` (D9); audited                                                                      |
+| PUT    | `/api/dashboard/orders/{number}/discount` | V2 Task 08: manual discounts while `pending`/`confirmed` (BR-PR08, D85); `orders.discount`, `idempotent`; audited |
 
 `transition` rules (BR-O01): target must be forward of current; `delivered` triggers inventory deduction and, with `collect_full_amount: true`, creates one collection for the remaining balance in the same transaction (BR-C04). Invalid → `409 invalid_transition` with `{ "details": { "from": "preparing", "to": "confirmed" } }`.
 
 Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer { id, name, phone }`, `confirmed_at`, `delivered_at`, `cancelled_at`, `is_stale` (pending past `stale_pending_hours`), history entries with `actor_id` and `note`, and on the detail `collections` (the collection shape of §10, newest first, voided ones included). `?from=&to=` are `Y-m-d` days of `placed_at`, both inclusive; `?q=` matches the order number (`#1024` too), customer name or phone, or recipient name; `?sort=placed_at|number|order_total` (default `-placed_at`). `delivery-address` takes `governorate, city, address_line, label?, landmark?, name?, phone?` (name/phone kept when omitted) → `409 address_locked` from `out_for_delivery` on. `collect_full_amount` is ignored for other targets (see §10 for what it records). Every write answers the dashboard order detail. Audit: `order.status_changed`, `order.cancelled`, `order.delivery_address_changed`.
+
+V2 Task 04: every dashboard order adds `expires_at` (when a pending order cancels itself; null when it is not pending or the store has no `pending_expiry_hours`), and `cancelled_by` can be `system` (D81).
+
+V2 Task 03: the detail adds `messages[]` — the WhatsApp messages sent about the order, oldest first: `{ purpose, purpose_label, channel, status, sent_at }` (fallback copies included). A transition to a status in `order_notify_statuses`, and a merchant cancel, send the customer a message after commit (BR-N03).
+
+### Manual discounts (V2 Task 08, BR-PR08, D85)
+
+`PUT /api/dashboard/orders/{number}/discount` with `{ items: [{ order_item_id, type, value }], order: { type, value, reason } | null }` is the whole discount state of the order: a line left out has none, `order: null` (or no type) removes the order discount. `type` is `amount` (EGP off per unit / off the order) or `percent` (> 0 and < 100); `value` > 0 with at most 2 decimals; a line once, ≤ 200 lines; `reason` (≤ 300) is required with an order discount. Answers the dashboard order detail.
+
+- `409 order_locked` from `preparing` on; `422 discount_too_large` when a unit or the order would go below 0.01 (`details.list_unit_price` / `details.items_total`); `409 below_collected` when the new total is under the collected amount (`details.collected_amount`, `details.order_total`); a line of another order → `422 validation_failed` on `items.N.order_item_id`.
+- A sales user: line discounts only, each ≤ `max_discount_percent_sales` % off the list price, else `403 discount_over_limit` (`details.max_percent`, null when the store set no cap). Removing a discount is always allowed.
+- Every order line (store and dashboard) adds `list_unit_price` and `manual_discount` (`{ type, value }` or null); `unit_price` and `line_total` are the charged prices. Every order adds `discount` (`{ type, value, amount }` or null; the dashboard adds `reason`); `order_total = items_total − discount.amount`.
+- The history gets a note «خصم»; audit `order.discount_changed` with the old and new values of the changed lines and the order totals. The customer gets the `discount` WhatsApp text only when `order_notify_statuses` holds `discount`.
+- `POST /api/dashboard/orders` (below) accepts `lines[].discount { type, value }` and `discount { type, value, reason }`, applied after the order is placed at list prices (same rules, one `order.discount_changed`, no `discount` message).
+- Returns: `returnable[].unit_price` and the return lines are priced at the line price less the order discount's share; the last return absorbs the rounding (D85).
+- Settings: `max_discount_percent_sales` (null or > 0 and < 100, 2 decimals; dashboard only); `order_notify_statuses` accepts `discount` and `order_status_messages` a `discount` text.
+
+### Order editing and partial delivery (V2 Task 09, BR-O12, BR-O13, D86, D87)
+
+| Method | Path                                    | Body / Notes |
+| ------ | --------------------------------------- | ------------ |
+| PUT    | `/api/dashboard/orders/{number}/lines`  | `{ lines: [{ order_item_id?, sku_unit_id, quantity }], note? }` (V2 Task 13: a line is a SKU unit; an existing line keeps its unit) → the dashboard order detail + `meta.below_mov`. `orders.edit` (owner, manager, sales), `idempotent` |
+
+- **Lines** are every line the order should have: an existing live line by `order_item_id` with its own `sku_id`, a new one without. 1..200, each SKU once, `quantity` 1..1,000,000 selling units; `note` ≤ 250 (history «تعديل الطلب: note»).
+- `409 order_locked` from `preparing` on (`details.status`); `409 below_collected`; `422 checkout_failed` with `items` for the added or changed lines (stock counts what the order holds), `details.credit` when a higher total passes the credit limit; `422 discount_too_large` when an EGP order discount no longer fits; `422 validation_failed` on `lines.N.order_item_id` (not a live line of the order), `lines.N.sku_id` (changed, or not this store's). `meta.below_mov` is `{ required, current }` when the new total is under the minimum order value (allowed), else null.
+- Audit `order.lines_changed` (old/new totals, the changes, the note). The customer gets the `edited` WhatsApp text when `order_notify_statuses` holds `edited` (default on, D87).
+- `POST …/transition` with `to: delivered` accepts `delivered_quantities: [{ order_item_id, quantity }]` (0..ordered, each line once, a line left out went out in full; ignored for other targets). `422 validation_failed` on `delivered_quantities.N.quantity` above the ordered quantity, `delivered_quantities.N.order_item_id` not a live line, or `delivered_quantities` when nothing at all is delivered; `409 below_collected`. `order.status_changed` adds `delivered_short [{ order_item_id, ordered, delivered }]` and `order_total`.
+- Every order line (store and dashboard) adds `delivered_quantity` (null until delivered) and `removed_at` (null unless removed); the details list every line, removed ones too, and `changes[]` `{ order_item_id, product_name, sku_code, change, old_quantity, new_quantity, unit_price_before, unit_price_after, at }` (the dashboard adds `actor_id`).
+- `POST /api/dashboard/orders/quote` accepts `order` (an order number of the customer) to quote an edit: what the order holds counts as available and its total is not counted twice against the credit limit; another customer's or store's order → `422 validation_failed` on `order`.
+- `returnable[]` adds `delivered`; `returnable = delivered − returned`.
+- Settings: `order_notify_statuses` accepts `edited` and `order_status_messages` an `edited` text.
+
+### Pre-orders (V2 Task 10, BR-O14, D88)
+
+| Method | Path | Body / Notes |
+| ------ | ---- | ------------ |
+| GET    | `/api/dashboard/preorders` | `?product_id=&status=open|converted|cancelled&page=&per_page=` → the pre-orders oldest first (the conversion order), in the dashboard order shape with `items`. `orders.view` |
+| GET    | `/api/dashboard/products/{id}/preorder-demand` | `{ product_id, status, preorder_enabled, expected_at, limit, remaining, quantity, customers, preorders }`: the open pre-ordered selling units not converted yet. `orders.view` |
+| POST   | `/api/dashboard/products/{id}/convert-preorders` | no body → `{ converted_orders: [{ number, preorder_number, quantity, order_total }], partially, untouched }`. `orders.manage`, `idempotent` |
+
+- Conversion: `409 product_not_active` (`details.status`) until the product is active; FIFO by `placed_at`; each pre-order gets what the locked stock allows of its lines of that product as a normal pending order placed by the user (`converted_from_id`, re-priced at today's tiers, reserved; no MOQ / MOV / credit check); the rest stays on the pre-order (`converted_quantity`, a `converted` line change); a pre-order with nothing left is closed (`converted_at`). Customers who can no longer order are untouched. History «تحويل إلى طلب #N» on the pre-order, audit `order.preorder_converted` (order number, lines, the pre-order's new total, `converted`), `order.created` adds `converted_from`. Each customer gets the `preorder_converted` WhatsApp text (whatever `order_notify_statuses` says; `order_status_messages.preorder_converted` words it).
+- A pre-order cannot be moved on (`409 invalid_transition`), edited or discounted (`409 order_locked`, `details.kind = preorder`), collected or credited (`409 is_preorder`); `GET /dashboard/orders?kind=` keeps one kind; a pre-order is never `is_stale` and has no `expires_at`. The quote's `order` must be a normal order. `new_preorder` notifications (`orders.manage`) tell the merchant about a customer's pre-order.
+
+### Merchant-placed orders (V2 Task 07, BR-O11, D84)
+
+| Method | Path                           | Body / Notes |
+| ------ | ------------------------------ | ------------ |
+| POST   | `/api/dashboard/orders/quote`  | `{ customer_id, lines: [{ sku_unit_id, quantity }] }` → the quote; nothing saved. `orders.create` |
+| POST   | `/api/dashboard/orders`        | `{ customer_id, address_id, lines: [{ sku_unit_id, quantity, discount? }], note?, notify_customer?, override_mov? }` → `201` the dashboard order detail. `orders.create`, `idempotent` |
+
+- `lines` 1..200, each SKU once, `quantity` 1..1,000,000 selling units; `note` ≤ 1000 (stored as the order's `customer_note`); `notify_customer` and `override_mov` default false.
+- **Quote** shape (V2 Task 13: lines are SKU units, `sku_unit_id` distinct; two units of one SKU allowed; an unknown unit is `422` on `lines.{i}.sku_unit_id`): `{ lines: [{ sku_id, sku_unit_id, product_name, sku_code, sku_name, unit, conversion_factor, quantity, moq, available, cover_price, unit_price, discount_percent, tier_min_quantity, line_total, tiers: [{ min_quantity, unit_price }], problem }], items_total, mov: { enabled, amount, satisfied }, credit }`. `available` is selling units now (not locked); `problem` is the `checkout_failed` entry without `sku_id`, or null; `credit` is `{ limit, exposure, order_total }` past the limit, else null.
+- **Place**: the same failures as checkout (`422 checkout_failed` with `items`, `details.mov` unless `override_mov`, `details.credit`); `override_mov: true` without `orders.override_mov` → `403 forbidden`; blocked customer → `409 customer_blocked`, invited / pending approval → `409 customer_not_active` (both `details.status`); a customer, address or SKU not of this store → `422 validation_failed` on `customer_id`, `address_id` or `lines.N.sku_id`. No `new_order` notification; `notify_customer: true` sends the `placed` WhatsApp message after commit (D84). Audit: `order.created` with `placed_by { type, id }` and `mov_overridden { required, current }` when the MOV was waived.
+- Every dashboard order adds `placed_by` (`customer` | `tenant_user`) and `placed_by_id`. `order_status_messages` in the settings accepts `placed` too (not in `order_notify_statuses`).
+
+### Returns (V2 Task 01, BR-R01..R06)
+
+| Method | Path                                          | Body / Notes                                                                 |
+| ------ | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| GET    | `/api/dashboard/orders/{number}/returns`      | the order's returns oldest first (voided included) + `returnable[]` per line |
+| POST   | `/api/dashboard/orders/{number}/returns`      | `{ reason, returned_at?, refund?, items: [{ order_item_id, quantity }] }`    |
+| POST   | `/api/dashboard/returns/{id}/void`            | `{ reason }`                                                                 |
+| GET    | `/api/dashboard/returns`                      | `?from=&to=&customer_id=&q=`, paginated, newest `returned_at` first          |
+
+- **Return** shape: `{ id, number, order { id, number, order_total, returned_total, net_total, collected_amount, collection_status }, customer { id, name }, total, refund_amount, reason, returned_at, recorded_by, is_voided, voided_at, void_reason, voided_by, items: [{ id, order_item_id, product_name, sku_code, unit, quantity, quantity_base, unit_price, line_total }], created_at }`. `order` (the balance after the change) is on the list and the writes, not on the order's own returns list or inside the order detail; `customer` is on the list only.
+- **Refund to credit** (V2 Task 02): `refund_to: "credit"` with `refund: true` keeps the over-collection as customer credit (BR-C07); the return's `refund_method` says how it went back (`cash` | `credit` | null).
+- **Refund methods** (V2 Task 20, D103): `refund_to` is `cash` (default), `instapay`, `wallet`, `bank_transfer` or `credit`; `refund_reference` (≤ 60) is the transaction number of a refund paid back, refused with `credit`; `refund_method` answers the same codes.
+- **Record**: answers `201`. Only a delivered order (`409 return_not_allowed`, `details.status`). Each line at most its returnable quantity (`422 return_exceeds_delivered`, `items: [{ order_item_id, requested, returnable }]`). `items` 1..200, each line once, `quantity ≥ 1`; `returned_at` defaults to now and cannot be in the future; `reason` ≤ 300. Priced at the line's snapshot price (D74). When the order was collected beyond its new net total: `422 refund_required` with `details.refund_amount`, unless `refund: true`, which records the cash refund. Honors `Idempotency-Key`. Audit: `order.returned` (+ `collection.refunded`).
+- **Void**: answers the return. `409 already_voided`; `409 return_has_refund` while its refund is live; `422 insufficient_stock` when the goods are gone again (D76). Honors `Idempotency-Key`. Audit: `order.return_voided`.
+- `returnable[]`: `{ order_item_id, product_name, sku_code, unit, unit_price, ordered, returned, returnable }` (`returned` = live returns).
+- The dashboard order adds `returned_total`, `net_total` and, on the detail, `returns[]` (every return, the shape above without `order`). The store order adds `returned_total`, `net_total` and, on the detail, `returns[]` of live returns `{ number, total, refund_amount, returned_at, items: [{ product_name, sku_code, unit, quantity, unit_price, line_total }] }` (no reason).
 
 ---
 
@@ -520,28 +697,48 @@ Delivered in Task 6: the dashboard order is the store shape plus `id`, `customer
 
 | Method | Path                                         | Body                                                                        |
 | ------ | -------------------------------------------- | --------------------------------------------------------------------------- |
-| GET    | `/api/dashboard/collections`                 | `?from=&to=&customer_id=&order=`                                            |
-| POST   | `/api/dashboard/orders/{number}/collections` | `{ amount, collected_at?, note? }`; `422 exceeds_balance` if over remaining |
+| GET    | `/api/dashboard/collections`                 | `?from=&to=&customer_id=&order=&method=` (`method`, D103 e)                 |
+| POST   | `/api/dashboard/orders/{number}/collections` | `{ amount, collected_at?, note?, method?, reference? }`; `422 exceeds_balance` if over remaining |
 | POST   | `/api/dashboard/collections/{id}/void`       | `{ reason }`                                                                |
-| GET    | `/api/dashboard/customers/{id}/statement`    | orders with totals, collected, outstanding (basis for V2 statements)        |
+| GET    | `/api/dashboard/customers/{id}/statement`    | V2: ledger `?from=&to=` (BR-C08)                                            |
+| GET    | `/api/dashboard/customers/{id}/credits`      | V2: customer credits (BR-C07)                                               |
+| POST   | `/api/dashboard/orders/{number}/apply-credit` | V2: `{ credit_id, amount }`                                                |
+| POST   | `/api/dashboard/credits/{id}/void`           | V2: `{ reason }`                                                            |
 
 Delivered in Task 7:
 
-- **Collection** shape (list, record, void, and `collections` on the dashboard order detail): `{ id, order { id, number, order_total, collected_amount, collection_status }, customer { id, name }, amount, method: "cash", method_label, collected_at, recorded_by, note, is_voided, voided_at, void_reason, voided_by, created_at }`. `order` carries the balance after the change. `customer` is only on the list, not on the order detail. `recorded_by`/`voided_by` are tenant user ids (`null` = system).
+- **Collection** shape (list, record, void, and `collections` on the dashboard order detail): `{ id, order { id, number, order_total, net_total, collected_amount, collection_status }, customer { id, name }, kind: "payment"|"refund", kind_label, order_return_id, amount, method: "cash"|"instapay"|"wallet"|"bank_transfer"|"credit", method_label, reference, collected_at, recorded_by, note, is_voided, voided_at, void_reason, voided_by, created_at }`. `order` carries the balance after the change. `customer` is only on the list, not on the order detail. `recorded_by`/`voided_by` are tenant user ids (`null` = system).
 - **List**: every collection, voided ones included, newest `collected_at` first. `from`/`to` are business days (D60) of `collected_at`, both inclusive. `order` is the order number.
-- **Record**: answers `201` with the collection. `amount` is `decimal:0,2`, `> 0`, ≤ 9 999 999 999.99. `collected_at` defaults to now and cannot be in the future. `note` is at most 300 characters. Allowed at any order status but cancelled (`409 order_cancelled`); a deposit before delivery is fine (BR-C04). More than the remaining balance is `422 exceeds_balance`. The order row is locked, so two concurrent collections cannot both fit one balance. Honors `Idempotency-Key`.
+- **Refunds** (V2 Task 01): a `refund` record is cash paid back for a return (`order_return_id`), created only by recording the return (BR-R04). It lowers `collected_amount`; voiding it raises it again. Voiding a payment that would leave more refunded than collected is `409 void_refund_first`.
+- **Record**: answers `201` with the collection. `amount` is `decimal:0,2`, `> 0`, ≤ 9 999 999 999.99. `collected_at` defaults to now and cannot be in the future. `note` is at most 300 characters. `method` is `cash` (default), `instapay`, `wallet` or `bank_transfer` (`credit` → 422, D103 a); `reference` is at most 60 characters. Allowed at any order status but cancelled (`409 order_cancelled`); a deposit before delivery is fine (BR-C04). More than the remaining balance (net total − collected) is `422 exceeds_balance`. The order row is locked, so two concurrent collections cannot both fit one balance. Honors `Idempotency-Key`.
 - **Void**: `reason` is at most 300 characters. Answers the collection; a second void is `409 already_voided`. Voiding everything makes the order cancellable again (BR-O03). Honors `Idempotency-Key`.
 - `orders.collected_amount` / `collection_status` are recomputed after every record or void (BR-C03).
 - **Shortcut**: `transition` to `delivered` with `collect_full_amount: true` records one collection for whatever is left, in the same transaction. Nothing is recorded when a deposit already covered the order; if the collection fails, the delivery rolls back.
-- **Statement**: `{ data: [ { number, status, status_label, placed_at, delivered_at, order_total, collected_amount, balance, collection_status } ], links, meta, customer { id, name, phone }, summary { orders_count, total, collected, outstanding } }`.
-  - Lists the customer's non-cancelled orders, newest first.
-  - `balance` = `order_total − collected_amount`.
-  - `summary.outstanding` counts delivered orders only (D59), the same figure as the customer list's `outstanding_amount`.
+- **Statement** (V2 Task 02, BR-C08): `GET /api/dashboard/customers/{id}/statement?from=&to=&page=&per_page=` answers `{ data: [ { date, type, type_label, order_number, return_number, debit, credit, balance } ], links, meta { …page, opening_balance, closing_balance }, customer { id, name, phone }, summary { orders_count, total, collected, outstanding, credit_limit, payment_terms_days, available_credit, credit_balance, overdue } }`.
+  - `type` is `order`, `return`, `payment`, `credit_applied`, `refund`, `refund_to_credit` or `credit_created` (info, 0/0). Each row has `method`, `method_label` and `reference` (V2 Task 20): set on payment and refund rows, null on the others. Voided rows are left out. Oldest first; `balance` runs across pages and starts from `opening_balance` (everything before `from`). `from`/`to` are Cairo days (D60).
+  - `summary.outstanding` counts delivered orders only (D59); `available_credit` = `credit_limit − exposure` (D77, null without a limit); `credit_balance` = unused customer credit; `overdue` per BR-C06.
+- **Customer credits** (BR-C07): `GET /api/dashboard/customers/{id}/credits` lists `{ id, customer_id, source_return_id, amount, remaining, note, created_by, created_at, is_voided, voided_at, void_reason, voided_by }`, newest first. `POST /api/dashboard/orders/{number}/apply-credit { credit_id, amount }` answers `201` with the `credit` collection (`422 exceeds_credit` with `details.remaining`, `422 exceeds_balance`, `409 credit_voided`, another customer's credit `404`). `POST /api/dashboard/credits/{id}/void { reason }` answers the credit (`409 credit_applied` with `details.applied`, `409 credit_voided`). Both writes honor `Idempotency-Key`. Audit: `customer_credit.created`, `customer_credit.applied`; a voided credit is audited through its refund's `collection.voided`.
+- **Store statement**: `GET /api/store/account/statement?from=&to=` — the signed-in customer's own ledger (the same rows), `meta.opening_balance/closing_balance`, `summary { outstanding, credit_limit, available_credit, credit_balance, overdue }`. Needs a session only (a blocked customer still sees what they owe).
 - Audit actions: `collection.recorded`, `collection.voided`.
 
 ---
 
-## 11. Dashboard — Reports (D5)
+## 10b. Dashboard — Expenses (V2 Task 19, D100)
+
+All `expenses.manage` (owner, manager, accountant).
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| GET    | `/api/dashboard/expenses` | `?from=&to=&category=&voided=` (business days, both inclusive; `voided` 1/0), newest `spent_on` first; `meta.total_amount` = the live total of the filter |
+| GET    | `/api/dashboard/expenses/categories` | `[ { code, label, needs_note } ]` in order |
+| POST   | `/api/dashboard/expenses` | `{ spent_on, amount, category, note? }` → 201 the expense; `Idempotency-Key` honoured; audit `expense.recorded` |
+| POST   | `/api/dashboard/expenses/{id}/void` | `{ reason }` (≤ 300) → the expense; a second void `409 already_voided`; another tenant's id 404; audit `expense.voided` |
+
+An expense: `{ id, spent_on, amount, category, category_label, note, created_by, created_at, voided_at, void_reason }`.
+
+---
+
+## 11. Dashboard — Reports (D5, V2 Task 16 D94)
 
 | Method | Path                                 | Returns                                                                                    |
 | ------ | ------------------------------------ | ------------------------------------------------------------------------------------------ | ---- | -------------------------- |
@@ -549,21 +746,40 @@ Delivered in Task 7:
 | GET    | `/api/dashboard/reports/sales`       | `?from=&to=&group=day                                                                      | week | month` → totals per bucket |
 | GET    | `/api/dashboard/reports/outstanding` | per customer: orders, total, collected, outstanding                                        |
 | GET    | `/api/dashboard/reports/low-stock`   | SKUs with `available ≤ moq` (threshold param optional)                                     |
+| GET    | `/api/dashboard/reports/bundles`     | V2 Task 15: `?from=&to=` → bundles sold and component consumption                           |
+| GET    | `/api/dashboard/reports/sales-analytics` | V2 Task 16: gross, discounts, returns, net per bucket; previous period; by section and customer group |
+| GET    | `/api/dashboard/reports/products`    | V2 Task 16: per SKU quantities, net revenue, return rate, customers (paginated, top 20 first) |
+| GET    | `/api/dashboard/reports/profit-and-loss` | V2 Task 19 (D100): net sales − cost of goods = gross profit; − stock losses − expenses = net profit, for the range and the one before |
+| GET    | `/api/dashboard/reports/customers`   | V2 Task 16: per customer revenue, order rhythm, dormant flag, outstanding/overdue (paginated) |
+| GET    | `/api/dashboard/reports/inventory`   | V2 Task 16: per SKU stock value, days of cover, dead stock, movements (paginated + summary) |
+| GET    | `/api/dashboard/reports/collections` | V2 Task 16: collected by method per bucket vs delivered, collection rate, aging |
+| GET    | `/api/dashboard/reports/{name}/export` | V2 Task 16: one of the five as XLSX/CSV (`format`) |
 
 Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 
 - **overview**:
-  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total }, stale_pending, outstanding_total, low_stock_count }`.
-  - `today` counts orders placed since local midnight; its total leaves cancelled orders out.
+  - Shape: `{ orders_by_status { pending, confirmed, preparing, out_for_delivery, delivered, cancelled }, today { orders, total, returns }, stale_pending, outstanding_total, overdue_total, overdue_customers, low_stock_count }` (`overdue_*` per BR-C06).
+  - `today` counts orders placed since local midnight; its total leaves cancelled orders out and takes off today's live returns (`returns`, BR-R05).
   - `outstanding_total` follows D59.
 - **sales**:
-  - Shape: `{ from, to, group, buckets: [ { period_start, orders, total } ], totals { orders, total } }`.
-  - It covers delivered orders by `delivered_at`.
+  - Shape: `{ from, to, group, buckets: [ { period_start, orders, gross, returns, net } ], totals { orders, gross, returns, net } }`.
+  - `gross` covers delivered orders by `delivered_at`, `returns` live returns by `returned_at`, `net` = gross − returns (BR-R05).
   - Every bucket of the range is listed, with empty ones as zero. Weeks start on Saturday (D58) and the first bucket starts on the Saturday on or before `from`.
   - Without `from`/`to`, it covers the last 30 days up to today; `group` defaults to `day`.
 - **outstanding**:
-  - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding }` rows, largest debt first.
-  - It covers delivered orders that are not fully collected (D59).
+  - Paginated `{ customer { id, name, phone }, orders, total, collected, outstanding, aging { current, 0_30, 31_60, 61_90, over_90 }, overdue }` rows, largest debt first. `aging` splits the outstanding by days past each order's due date (`current` = not due yet; BR-C06).
+  - It covers delivered orders that are not fully collected (D59); `total` and `outstanding` are net of returns.
+- **bundles** (V2 Task 15, D93):
+  - Shape: `{ from, to, bundles: [ { product_id, name, sku_code, quantity, total } ], components: [ { sku_id, sku_code, product_name, quantity_base } ] }`, most first.
+  - Delivered orders by `delivered_at` (Cairo days, default the last 30); bundles = delivered bundle lines, components = base units delivered inside bundles.
+- **Advanced reports** (V2 Task 16, D94). Every one takes `?from&to` (Cairo days, default the last 30) and, where it applies, `group=day|week|month`, `category_id` (with its sub-categories) and `customer_group_id` (the customer's current group); a filter that does not apply is ignored. Each is cached 10 minutes per tenant, filter set and page and says when it was computed (`generated_at`). Sales are delivered orders by `delivered_at`, returns live returns by `returned_at`; bundles count once at the bundle line (D93).
+  - `GET /api/dashboard/reports/sales-analytics` → `{ from, to, group, generated_at, buckets: [ { period_start, orders, gross, discounts, returns, net } ], totals { orders, gross, discounts, returns, net, average_order }, profit { cost, profit, margin, uncosted_lines } (V2 costing, D98: profit and margin null while any line went out without a cost), previous { from, to, totals, buckets: [ { period_start, net } ] }, by_section: [ { kind, label, orders, gross, discounts, returns, net } ], by_customer_group: [ { customer_group_id, name, … } ] }`. `gross` = list prices × what went out, `discounts` = line + order discounts, `net` = gross − discounts − returns; `previous` is the same number of days just before.
+  - `GET /api/dashboard/reports/profit-and-loss?from=&to=` (V2 Task 19, D100; only the range applies) → `{ from, to, generated_at, current, previous }`, each `{ from, to, net_sales, cost_of_goods, gross_profit, stock_losses, losses_by_reason: { <reason code or unspecified>: amount }, expenses, expenses_by_category: { <category>: amount }, net_profit, net_margin, uncosted_lines, uncosted_adjustments }`. Gross null while a sold line has no cost, losses null while an adjustment has none, net null when either is; a negative net is a loss. Export: one row per line of the statement, the range and the one before.
+  - `GET /api/dashboard/reports/products?sort=revenue|quantity|return_rate&page&per_page` (20 a page: the first is the top 20) → paginated `{ sku_id, product_id, product_name, sku_code, sku_name, is_bundle, quantity, quantity_base, bundle_quantity_base, revenue, returns, returned_base, return_rate, customers, last_sold_at, cost, profit, margin, uncosted_lines }` (the last four D98; a bundle's row carries its components' cost) plus `from, to, sort, generated_at`.
+  - `GET /api/dashboard/reports/customers?view=top|dormant&dormant_days=45` → paginated `{ customer, customer_group, orders, revenue, average_order, first_order_at, last_order_at, lifetime_orders, average_interval_days, days_since_last_order, dormant, outstanding, overdue }` plus `from, to, view, dormant_days, generated_at`.
+  - `GET /api/dashboard/reports/inventory?dead_days=60&dead_only=0|1` → paginated `{ sku_id, product_id, product_name, sku_code, sku_name, on_hand, available, stock_value, sold_base, days_of_cover, last_sold_at, dead, movements { opening, adjustment, sale, return } }` by stock value, plus `summary { skus, on_hand, stock_value, dead_count, dead_value, sold_base, movements }`, `from, to, dead_days, generated_at`. `stock_value` is at the base selling price (D94); `days_of_cover` null = ∞.
+  - `GET /api/dashboard/reports/collections` → `{ from, to, group, generated_at, buckets: [ { period_start, cash, credit, refunds, net, delivered } ], totals { cash, credit, refunds, net, delivered, collection_rate }, by_method: [ { method, label, amount } ], aging { current, 0_30, 31_60, 61_90, over_90, overdue, outstanding } }`. `by_method` (V2 Task 20, D103 e) lists the range's payments per method, every recordable method then `credit`, and adds up to `cash` + `credit`; `cash` counts every payment not drawn from credit and is deprecated for one release. Refunds are negative; `delivered` is the net sales of the bucket; `collection_rate` = net ÷ delivered in %.
+  - `GET /api/dashboard/reports/{sales-analytics|products|customers|inventory|collections}/export?format=xlsx|csv&<the same filters and options>` → the file (`report-<name>-<from>-<to>.<format>`), every row, Arabic headers; an unknown report is `404`.
 - **low-stock**:
   - Paginated `{ sku_id, product_id, product_name, code, name, available, moq, conversion_factor, threshold }`, ordered by code.
   - It covers SKUs of products that are not inactive.
@@ -579,7 +795,7 @@ Delivered in Task 7. All days are business days in Africa/Cairo (D60).
 | POST   | `/api/dashboard/notifications/read` | `{ ids: [] }` or `{ all: true }`                         |
 | GET    | `/api/dashboard/audit`              | `?entity_type=&entity_id=&actor_id=&from=&to=&batch_id=` |
 
-Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled, type_label, details: { order_number, customer_name, order_total, reason? }, read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`.
+Delivered in Task 6 (notifications): newest first, `{ id, type: new_order|customer_cancelled|whatsapp_dropped|order_expired, type_label, details: { order_number, customer_name, order_total, reason? } (whatsapp_dropped: { phone, reason }), read_at, created_at }` plus top-level `unread_count` next to `meta` (`details`, not `data`, so the item does not collide with the envelope). `read` answers `{ data: { marked } }`; ids of another tenant or already read are skipped; audited `notifications.read`. V2 Task 05: the list, `unread_count` and `read` cover only the notifications the user's role may see (D82).
 
 Delivered in Task 7 (audit):
 - The list is paginated newest first, as `{ id, actor { type, id }, action, entity { type, id }, old_values, new_values, batch_id, ip, created_at }`.
@@ -616,6 +832,8 @@ php artisan tenant:activate alnoor
 php artisan tenant:list
 php artisan api:openapi          # compile backend/openapi/openapi.yaml → backend/openapi.json (Task 8)
 php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-gateway, remove stray sessions (every 5 min)
+php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their store's pending_expiry_hours (every 15 min)
+php artisan pricing:promotions-tick # D90: move promotions scheduled → active → ended at their boundaries (every minute)
 ```
 
 ---
@@ -624,12 +842,12 @@ php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-g
 
 | Area           | Endpoints |
 | -------------- | --------: |
-| Store public   |         6 |
+| Store public   |         7 |
 | Store auth     |        10 |
-| Store customer |        13 |
-| Dashboard      |        71 |
+| Store customer |        16 |
+| Dashboard      |       115 |
 | Webhooks       |         2 |
-| **Total**      |   **102** |
+| **Total**      |   **150** |
 
 ---
 

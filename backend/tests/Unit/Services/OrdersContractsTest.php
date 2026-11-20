@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 use App\Modules\Collections\Services\OrderCollectionRecords;
 use App\Modules\Collections\Services\RemainingBalanceCollector;
+use App\Modules\Collections\Services\ReturnRefunds;
 use App\Modules\Customers\Contracts\RecentOrders;
 use App\Modules\Inventory\Contracts\ReservationHolders;
 use App\Modules\Orders\Contracts\CollectsPayments;
 use App\Modules\Orders\Contracts\OrderCollections;
+use App\Modules\Orders\Contracts\RefundsPayments;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\CustomerRecentOrders;
 use App\Modules\Orders\Services\NullCollectsPayments;
 use App\Modules\Orders\Services\NullOrderCollections;
+use App\Modules\Orders\Services\NullRefundsPayments;
 use App\Modules\Orders\Services\OrdersHoldingSku;
 use App\Modules\Tenancy\TenantContext;
 
@@ -25,7 +28,8 @@ test('Orders fills the contracts of Inventory and Customers, and Collections fil
     expect(app(ReservationHolders::class))->toBeInstanceOf(OrdersHoldingSku::class)
         ->and(app(RecentOrders::class))->toBeInstanceOf(CustomerRecentOrders::class)
         ->and(app(CollectsPayments::class))->toBeInstanceOf(RemainingBalanceCollector::class)
-        ->and(app(OrderCollections::class))->toBeInstanceOf(OrderCollectionRecords::class);
+        ->and(app(OrderCollections::class))->toBeInstanceOf(OrderCollectionRecords::class)
+        ->and(app(RefundsPayments::class))->toBeInstanceOf(ReturnRefunds::class);
 });
 
 test('BR-INV08 the orders holding a sku are its open orders, oldest first, with the base units each holds', function (): void {
@@ -48,6 +52,14 @@ test('BR-INV08 delivered and cancelled orders hold nothing, nor do orders of oth
 
     expect(app(OrdersHoldingSku::class)->ordersHolding($this->sku))->toBe([]);
 })->with(['delivered' => [OrderStatus::Delivered], 'cancelled' => [OrderStatus::Cancelled]]);
+
+test('BR-O12 BR-INV08 a removed line holds nothing', function (): void {
+    $order = $this->placeOrder($this->customer, [$this->sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+    App\Modules\Orders\Models\OrderItem::query()->where('order_id', $order->id)->update(['removed_at' => now()]);
+
+    expect(app(OrdersHoldingSku::class)->ordersHolding($this->sku))->toBe([]);
+});
 
 test('the recent orders of a customer are the latest five, newest first, in the contract shape', function (): void {
     app(TenantContext::class)->set($this->tenant);
@@ -86,4 +98,22 @@ test('without collections an order lists no collections', function (): void {
     app(TenantContext::class)->set($this->tenant);
 
     expect(new NullOrderCollections()->forOrder(Order::factory()->create()))->toBe([]);
+});
+
+test('BR-R04 without collections a return refunds nothing and has no live refund', function (): void {
+    app(TenantContext::class)->set($this->tenant);
+    $order = Order::factory()->delivered()->create();
+
+    new NullRefundsPayments()->refund($order, 1, '10.00', null);
+
+    expect($order->refresh()->collected_amount)->toBe('0.00')
+        ->and(new NullRefundsPayments()->hasLiveRefund(1))->toBeFalse();
+});
+
+test('BR-O14 a pre-order holds no reservation of the sku', function (): void {
+    $sku = $this->preorderableSku();
+    $this->placePreorder($this->customer, [$sku->id => 6]);
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(app(OrdersHoldingSku::class)->ordersHolding($sku))->toBe([]);
 });

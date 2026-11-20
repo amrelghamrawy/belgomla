@@ -17,31 +17,49 @@ beforeEach(function (): void {
 
 test('the dashboard product resource key set without detail relations', function (): void {
     $product = Product::factory()->withSku(['cover_price' => '120', 'base_price' => '90'])->create(['custom_fields' => ['brand' => 'Bic']])
-        ->refresh()->load(['category', 'sku.sellingUnit', 'sku.baseUnit', 'mainImage']);
+        ->refresh()->load(['category', 'skus.activeUnits.unit', 'skus.baseUnit', 'mainImage']);
 
     $data = rendered(new DashboardProductResource($product), dashboardRequest());
 
     expect(array_keys($data))->toBe([
-        'id', 'name', 'slug', 'description', 'status', 'category', 'custom_fields', 'sku', 'main_image_url', 'created_at', 'updated_at',
+        'id', 'name', 'slug', 'description', 'status', 'type', 'category', 'custom_fields', 'preorder', 'sku', 'skus', 'options', 'main_image_url', 'created_at', 'updated_at',
     ])
+        ->and($data['preorder'])->toBe(['enabled' => false, 'expected_at' => null, 'limit' => null])
         ->and(array_keys($data['sku']))->toBe([
-            'id', 'code', 'selling_unit', 'base_unit', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq',
+            'id', 'code', 'base_unit', 'selling_unit', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'units', 'label', 'status', 'sort_order', 'option_values',
         ])
         ->and($data['sku']['cover_price'])->toBe('120.00')
         ->and($data['sku']['base_price'])->toBe('90.00')
+        ->and($data['sku']['selling_unit'])->toBe(['id' => $product->skus->first()?->activeUnits->sole()->unit_id, 'name' => $product->skus->first()?->activeUnits->sole()->unit->name])
+        ->and(array_keys($data['sku']['units'][0]))->toBe(['id', 'unit', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default'])
         ->and($data['custom_fields'])->toBe(['brand' => 'Bic'])
         ->and($data['category'])->toBe(['id' => $product->category->id, 'name' => $product->category->name, 'kind' => 'general'])
         ->and($data['created_at'])->toBe($product->created_at->toIso8601String());
 });
 
-test('the dashboard sku lists its tiers with the percent each was entered as once they are loaded', function (): void {
-    $product = Product::factory()->withSku()->create()->load('sku');
-    App\Modules\Pricing\Models\SkuPriceTier::factory()->for($product->sku)->create(['min_quantity' => 10, 'unit_price' => '90.00']);
-    $product->load('sku.tiers');
+test('D91 the dashboard sku lists its active units, the default first, each with its tiers once they are loaded', function (): void {
+    $product = Product::factory()->withSku(['base_price' => '9.00'])->create();
+    $sku = $product->skus()->sole();
+    App\Modules\Pricing\Models\SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => 10, 'unit_price' => '8.00']);
+    $carton = $this->addUnit($sku, ['cover_price' => '120.00', 'base_price' => '100.00', 'base_price_percent' => '20.00', 'moq' => 2], [5 => '95.00']);
+    App\Modules\Catalog\Models\SkuUnit::factory()->archived()->create(['sku_id' => $sku->id]);
+    $product->load('skus.activeUnits.unit', 'skus.activeUnits.tiers');
 
-    $sku = rendered(new DashboardProductResource($product), dashboardRequest())['sku'];
+    $units = rendered(new DashboardProductResource($product), dashboardRequest())['sku']['units'];
 
-    expect($sku['tiers'])->toBe([['min_quantity' => 10, 'unit_price' => '90.00', 'discount_percent' => null]]);
+    expect($units)->toHaveCount(2)
+        ->and($units[0]['tiers'])->toBe([['min_quantity' => 10, 'unit_price' => '8.00', 'discount_percent' => null]])
+        ->and($units[1])->toBe([
+            'id' => $carton->id,
+            'unit' => ['id' => $carton->unit_id, 'name' => $carton->unit->name],
+            'conversion_factor' => 12,
+            'cover_price' => '120.00',
+            'base_price' => '100.00',
+            'base_price_percent' => '20.00',
+            'moq' => 2,
+            'is_default' => false,
+            'tiers' => [['min_quantity' => 5, 'unit_price' => '95.00', 'discount_percent' => null]],
+        ]);
 });
 
 test('the dashboard product resource never lazy-loads: unloaded relations render as null', function (): void {
@@ -54,13 +72,15 @@ test('the dashboard product resource never lazy-loads: unloaded relations render
         ->and($data['main_image_url'])->toBeNull();
 });
 
-test('a sku with unloaded units renders null units', function (): void {
-    $product = Product::factory()->withSku()->create()->refresh()->load('sku');
+test('a sku with unloaded units renders null units, null default-unit fields and no units list', function (): void {
+    $product = Product::factory()->withSku()->create()->refresh()->load('skus');
 
     $data = rendered(new DashboardProductResource($product), dashboardRequest());
 
     expect($data['sku']['selling_unit'])->toBeNull()
-        ->and($data['sku']['base_unit'])->toBeNull();
+        ->and($data['sku']['base_unit'])->toBeNull()
+        ->and($data['sku']['base_price'])->toBeNull()
+        ->and($data['sku'])->not->toHaveKey('units');
 });
 
 test('empty custom fields render as a json object', function (): void {

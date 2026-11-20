@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, FilterIcon } from "lucide-react";
 import { type FormEvent, Fragment, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -97,7 +97,7 @@ export function AuditPage() {
       {audit.data?.data.length === 0 && <EmptyBlock>{copy.empty}</EmptyBlock>}
       {audit.data !== undefined && audit.data.data.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table stack>
             <TableHeader>
               <TableRow>
                 <TableHead>{copy.when}</TableHead>
@@ -139,6 +139,7 @@ export function AuditPage() {
                             setQuery({ batch_id: entry.batch_id });
                           }}
                         >
+                          <FilterIcon aria-hidden />
                           {copy.batchFilter}
                         </Button>
                       )}
@@ -194,7 +195,7 @@ export function AuditDiff({ entry }: { entry: AuditLog }) {
         {rows.map((row) => (
           <TableRow
             key={row.field}
-            className={cn(row.changed && "bg-amber-50 hover:bg-amber-100/70")}
+            className={cn(row.changed && "bg-warn-soft/60 hover:bg-warn-soft")}
             data-changed={row.changed}
           >
             <TableCell className="font-medium">

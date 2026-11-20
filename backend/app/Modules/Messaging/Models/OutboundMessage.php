@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $error_code
  * @property string|null $body
  * @property int|null $fallback_of_id
+ * @property int|null $order_id the order an order status message is about (BR-N03)
  * @property string|null $cost
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -86,6 +87,7 @@ final class OutboundMessage extends Model
             'status' => MessageStatus::class,
             'body' => 'encrypted',
             'cost' => 'decimal:4',
+            'order_id' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

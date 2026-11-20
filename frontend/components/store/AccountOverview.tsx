@@ -1,19 +1,24 @@
 "use client";
 
-import { ChevronRightIcon, LogOutIcon, MapPinIcon, PackageIcon } from "lucide-react";
+import { ChevronRightIcon, LogOutIcon, MapPinIcon, PackageIcon, ReceiptTextIcon } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useLogout, useRequiredCustomer } from "@/lib/auth/session";
-import { ar } from "@/lib/copy/ar";
+import { ar, messageFor } from "@/lib/copy/ar";
 import { formatDate } from "@/lib/format/date";
 import { formatPhone } from "@/lib/format/phone";
+import { useUpdatePreferences } from "@/lib/store/preferences";
 
-/** `/account`: who is logged in, links to orders and addresses, logout. The profile is read-only in V1 (D63). */
+/** `/account`: who is logged in, the order-message switch (BR-N03), links to orders, the statement and addresses, logout. The profile is read-only (D63). */
 export function AccountOverview() {
   const { data: customer } = useRequiredCustomer();
   const logout = useLogout("store");
+  const preferences = useUpdatePreferences();
 
   if (!customer) {
     return null;
@@ -21,6 +26,7 @@ export function AccountOverview() {
 
   const links = [
     { href: "/account/orders", label: ar.account.orders, icon: PackageIcon },
+    { href: "/account/statement", label: ar.account.statement, icon: ReceiptTextIcon },
     { href: "/account/addresses", label: ar.account.addresses, icon: MapPinIcon },
   ];
 
@@ -37,6 +43,26 @@ export function AccountOverview() {
           {ar.account.memberSince} {formatDate(customer.created_at)}
         </p>
         <p className="text-muted-foreground text-xs">{ar.account.profileReadOnly}</p>
+      </section>
+      <section className="flex items-start gap-3 rounded-xl border p-4">
+        <div className="flex flex-1 flex-col gap-1">
+          <Label htmlFor="account-order-notifications">{ar.account.orderNotifications}</Label>
+          <p className="text-muted-foreground text-xs">{ar.account.orderNotificationsHint}</p>
+        </div>
+        <Switch
+          id="account-order-notifications"
+          checked={customer.order_notifications}
+          disabled={preferences.isPending}
+          onCheckedChange={(checked) =>
+            preferences.mutate(
+              { order_notifications: checked },
+              {
+                onSuccess: () => toast.success(ar.account.preferencesSaved),
+                onError: (failure) => toast.error(messageFor(failure)),
+              },
+            )
+          }
+        />
       </section>
       {customer.status !== "active" && (
         <Alert>

@@ -1,23 +1,19 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronRightIcon, PencilIcon, TrashIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { TextField } from "@/components/shared/TextField";
+import { LedgerTable } from "@/components/shared/LedgerTable";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FieldError, FieldLabel } from "@/components/ui/field";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardCustomer } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
@@ -26,20 +22,27 @@ import {
   useCustomer,
   useCustomerAction,
   useInviteCustomer,
+  STATEMENT_KEYS,
+  useCustomerCredits,
   useStatement,
   useUpdateCustomer,
+  useVoidCredit,
 } from "@/lib/dashboard/customers";
+import { useCustomerGroups } from "@/lib/dashboard/customer-pricing";
 import { pageOf } from "@/lib/dashboard/list-query";
+import { toPiasters } from "@/lib/dashboard/price-math";
 import { useListQuery } from "@/lib/dashboard/use-list-query";
-import { addressSchema, type AddressFormValues } from "@/lib/forms/address";
-import { formatDate, formatDateTime } from "@/lib/format/date";
-import { formatMoney } from "@/lib/format/money";
+import { formatDateTime } from "@/lib/format/date";
+import { formatMoney, formatPercent } from "@/lib/format/money";
 import { formatPhone } from "@/lib/format/phone";
 import { useRouteParam } from "@/lib/store/route";
+import { useCan } from "@/lib/dashboard/permissions";
 
 import { Pager } from "../common/Pager";
 import { ReasonDialog } from "../common/ReasonDialog";
 import { EmptyBlock, ErrorBlock, LoadingBlock, PageHeader } from "../common/States";
+import { AddressDialog, addressInput } from "./AddressDialog";
+import { CustomerPricesTab } from "./CustomerPricesTab";
 import { CustomerStatusBadge, inviteMessage } from "./CustomerStatusBadge";
 
 const copy = ar.dashboard.customers;
@@ -62,6 +65,7 @@ export function CustomerDetailPage() {
 export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
   const [query, setQuery] = useListQuery(["tab"]);
   const tab = query.tab ?? "profile";
+  const allowed = useCan();
 
   return (
     <>
@@ -77,6 +81,20 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
           <span className="flex flex-wrap items-center gap-2">
             <bdi>{formatPhone(customer.phone)}</bdi>
             <CustomerStatusBadge status={customer.status} />
+            {customer.group !== null && (
+              <Badge variant="outline" data-testid="customer-group">
+                {copy.group}: {copy.groupBadge(customer.group.name, formatPercent(customer.group.discount_percent))}
+                {customer.group.status === "archived" && ` · ${copy.groupArchived}`}
+              </Badge>
+            )}
+            {customer.credit_limit !== null && (
+              <Badge variant="outline">
+                {copy.creditLimit}: {formatMoney(customer.credit_limit)}
+              </Badge>
+            )}
+            {customer.payment_terms_days !== null && (
+              <Badge variant="outline">{copy.termsDays(customer.payment_terms_days)}</Badge>
+            )}
             {customer.outstanding_amount !== "0.00" && (
               <Badge variant="outline">
                 {copy.outstanding}: {formatMoney(customer.outstanding_amount)}
@@ -84,7 +102,16 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
             )}
           </span>
         }
-        actions={<CustomerActions customer={customer} />}
+        actions={
+          <>
+            {allowed("orders.create") && customer.status === "active" && (
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/orders/new?customer=${customer.id}`}>{copy.newOrderFor}</Link>
+              </Button>
+            )}
+            {allowed("customers.manage") && <CustomerActions customer={customer} />}
+          </>
+        }
       />
       {customer.status === "blocked" && customer.blocked_reason !== null && (
         <Alert variant="destructive">
@@ -96,11 +123,12 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
           <TabsTrigger value="profile">{copy.tabs.profile}</TabsTrigger>
           <TabsTrigger value="orders">{copy.tabs.orders}</TabsTrigger>
           <TabsTrigger value="statement">{copy.tabs.statement}</TabsTrigger>
+          {allowed("pricing.customers") && <TabsTrigger value="prices">{copy.tabs.prices}</TabsTrigger>}
         </TabsList>
         <TabsContent value="profile" className="pt-4">
           {/* Remount with the server's list after a save, so new rows get their ids and are not created twice. */}
           <ProfileForm
-            key={`${customer.id}-${customer.name}-${(customer.addresses ?? []).map((address) => address.id).join(",")}`}
+            key={`${customer.id}-${customer.name}-${customer.credit_limit}-${customer.payment_terms_days}-${customer.group?.id ?? ""}-${(customer.addresses ?? []).map((address) => address.id).join(",")}`}
             customer={customer}
           />
         </TabsContent>
@@ -110,6 +138,11 @@ export function CustomerDetail({ customer }: { customer: DashboardCustomer }) {
         <TabsContent value="statement" className="pt-4">
           <Statement customerId={customer.id} />
         </TabsContent>
+        {allowed("pricing.customers") && (
+          <TabsContent value="prices" className="pt-4">
+            <CustomerPricesTab customerId={customer.id} />
+          </TabsContent>
+        )}
       </Tabs>
     </>
   );
@@ -167,36 +200,69 @@ function CustomerActions({ customer }: { customer: DashboardCustomer }) {
   );
 }
 
-function addressInput(address: NonNullable<DashboardCustomer["addresses"]>[number]): CustomerAddressInput {
+/** BR-C05, BR-C06: the typed limit and terms as the request sends them (blank = none), or null when not valid. */
+export function creditTerms(
+  limit: string,
+  terms: string,
+): { credit_limit: string | null; payment_terms_days: number | null } | null {
+  const cleanLimit = limit.trim();
+  const cleanTerms = terms.trim();
+
+  if (
+    (cleanLimit !== "" && toPiasters(cleanLimit) === null) ||
+    (cleanTerms !== "" && !/^\d{1,3}$/.test(cleanTerms)) ||
+    Number(cleanTerms) > 365
+  ) {
+    return null;
+  }
+
   return {
-    id: address.id,
-    label: address.label,
-    governorate: address.governorate,
-    city: address.city,
-    address_line: address.address_line,
-    landmark: address.landmark,
-    phone: address.phone,
-    is_default: address.is_default,
+    credit_limit: cleanLimit === "" ? null : cleanLimit,
+    payment_terms_days: cleanTerms === "" ? null : Number(cleanTerms),
   };
 }
 
-/** Name and the address list, saved together: the PUT replaces the whole list (D54). The phone is fixed. */
+/**
+ * Name and the address list, saved together: the PUT replaces the whole list (D54). The phone is fixed. D82: the name
+ * and addresses need `customers.manage`, the credit terms `customers.credit`, the group `pricing.customers` (BR-PR12,
+ * V2 Task 11; sent only when changed); what the role may not change is shown read-only and left out of the PUT.
+ */
 function ProfileForm({ customer }: { customer: DashboardCustomer }) {
   const update = useUpdateCustomer(customer.id);
+  const allowed = useCan();
+  const editsProfile = allowed("customers.manage");
+  const editsCredit = allowed("customers.credit");
+  const editsGroup = allowed("pricing.customers");
+  const groups = useCustomerGroups(editsGroup);
+  const [groupId, setGroupId] = useState(customer.group === null ? "" : String(customer.group.id));
   const [name, setName] = useState(customer.name);
   const [addresses, setAddresses] = useState<CustomerAddressInput[]>((customer.addresses ?? []).map(addressInput));
+  const [creditLimit, setCreditLimit] = useState(customer.credit_limit ?? "");
+  const [terms, setTerms] = useState(customer.payment_terms_days === null ? "" : String(customer.payment_terms_days));
   const [editing, setEditing] = useState<number | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const save = () => {
-    if (name.trim() === "") {
+    if (editsProfile && name.trim() === "") {
       setError(ar.validation.required);
       return;
     }
 
+    const termsBody = editsCredit ? creditTerms(creditLimit, terms) : {};
+
+    if (termsBody === null) {
+      setError(ar.dashboard.productForm.invalidMoney);
+      return;
+    }
+
+    const nextGroup = groupId === "" ? null : Number(groupId);
+    const groupBody = editsGroup && nextGroup !== (customer.group?.id ?? null) ? { customer_group_id: nextGroup } : {};
+
     setError(null);
     update.mutate(
-      { name: name.trim(), addresses },
+      editsProfile
+        ? { name: name.trim(), addresses, ...termsBody, ...groupBody }
+        : { name: customer.name, ...termsBody, ...groupBody },
       { onSuccess: () => toast.success(copy.profileSaved), onError: (failure) => setError(messageFor(failure)) },
     );
   };
@@ -206,7 +272,13 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="profile-name">{copy.name}</Label>
-          <Input id="profile-name" maxLength={150} value={name} onChange={(event) => setName(event.target.value)} />
+          <Input
+            id="profile-name"
+            maxLength={150}
+            value={name}
+            disabled={!editsProfile}
+            onChange={(event) => setName(event.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <Label htmlFor="profile-phone">{copy.phone}</Label>
@@ -214,11 +286,57 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
           <p className="text-muted-foreground text-xs">{copy.phoneFixed}</p>
         </div>
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="profile-credit-limit">{copy.creditLimit}</Label>
+          <Input
+            id="profile-credit-limit"
+            dir="ltr"
+            inputMode="decimal"
+            className="text-start"
+            value={creditLimit}
+            disabled={!editsCredit}
+            onChange={(event) => setCreditLimit(event.target.value)}
+          />
+          <p className="text-muted-foreground text-xs">{copy.creditLimitHint}</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="profile-terms">{copy.paymentTerms}</Label>
+          <Input
+            id="profile-terms"
+            dir="ltr"
+            inputMode="numeric"
+            className="text-start"
+            value={terms}
+            disabled={!editsCredit}
+            onChange={(event) => setTerms(event.target.value)}
+          />
+          <p className="text-muted-foreground text-xs">{copy.paymentTermsHint}</p>
+        </div>
+      </div>
+      {editsGroup && (
+        <div className="flex max-w-sm flex-col gap-1">
+          <Label htmlFor="profile-group">{copy.group}</Label>
+          <NativeSelect id="profile-group" value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+            <option value="">{copy.noGroup}</option>
+            {groups.data
+              ?.filter((group) => group.status === "active" || group.id === customer.group?.id)
+              .map((group) => (
+                <option key={group.id} value={group.id}>
+                  {copy.groupBadge(group.name, formatPercent(group.discount_percent))}
+                </option>
+              ))}
+          </NativeSelect>
+          <p className="text-muted-foreground text-xs">{copy.groupHint}</p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="font-medium">{copy.addresses}</h2>
-        <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
-          {copy.addAddress}
-        </Button>
+        {editsProfile && (
+          <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
+            {copy.addAddress}
+          </Button>
+        )}
       </div>
       {addresses.length === 0 ? (
         <EmptyBlock>{copy.noAddresses}</EmptyBlock>
@@ -242,7 +360,7 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
                   {[address.address_line, address.city, address.governorate].join("، ")}
                 </span>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 gap-1" hidden={!editsProfile}>
                 <Button variant="ghost" size="icon" aria-label={ar.addresses.edit} onClick={() => setEditing(index)}>
                   <PencilIcon />
                 </Button>
@@ -260,9 +378,11 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
         </ul>
       )}
       {error !== null && <FieldError role="alert">{error}</FieldError>}
-      <Button className="self-start" disabled={update.isPending} onClick={save}>
-        {update.isPending ? ar.saving : copy.saveProfile}
-      </Button>
+      {(editsProfile || editsCredit || editsGroup) && (
+        <Button className="self-start" disabled={update.isPending} onClick={save}>
+          {update.isPending ? ar.saving : copy.saveProfile}
+        </Button>
+      )}
       {editing !== null && (
         <AddressDialog
           address={editing === "new" ? null : (addresses[editing] ?? null)}
@@ -278,109 +398,6 @@ function ProfileForm({ customer }: { customer: DashboardCustomer }) {
         />
       )}
     </div>
-  );
-}
-
-function AddressDialog({
-  address,
-  onClose,
-  onSave,
-}: {
-  address: CustomerAddressInput | null;
-  onClose: () => void;
-  onSave: (address: CustomerAddressInput) => void;
-}) {
-  const form = useForm<AddressFormValues>({
-    resolver: zodResolver(addressSchema),
-    defaultValues: {
-      label: address?.label ?? "",
-      governorate: address?.governorate ?? "",
-      city: address?.city ?? "",
-      address_line: address?.address_line ?? "",
-      landmark: address?.landmark ?? "",
-      phone: "",
-      is_default: address?.is_default ?? false,
-    },
-  });
-  const errors = form.formState.errors;
-
-  const submit = form.handleSubmit((values) =>
-    onSave({
-      id: address?.id,
-      ...values,
-      landmark: values.landmark === "" ? null : values.landmark,
-      phone: values.phone === "" ? (address?.phone ?? null) : values.phone,
-    }),
-  );
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{address === null ? ar.addresses.add : ar.addresses.edit}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-          <TextField
-            id="address-label"
-            label={ar.addresses.label}
-            registration={form.register("label")}
-            error={errors.label}
-          />
-          <TextField
-            id="address-governorate"
-            label={ar.addresses.governorate}
-            registration={form.register("governorate")}
-            error={errors.governorate}
-          />
-          <TextField
-            id="address-city"
-            label={ar.addresses.city}
-            registration={form.register("city")}
-            error={errors.city}
-          />
-          <TextField
-            id="address-line"
-            label={ar.addresses.addressLine}
-            registration={form.register("address_line")}
-            error={errors.address_line}
-          />
-          <TextField
-            id="address-landmark"
-            label={ar.addresses.landmark}
-            registration={form.register("landmark")}
-            error={errors.landmark}
-          />
-          <TextField
-            id="address-phone"
-            label={ar.addresses.phone}
-            dir="ltr"
-            inputMode="tel"
-            registration={form.register("phone")}
-            error={errors.phone}
-          />
-          <Controller
-            control={form.control}
-            name="is_default"
-            render={({ field }) => (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="address-default"
-                  checked={field.value}
-                  onCheckedChange={(checked) => field.onChange(checked === true)}
-                />
-                <FieldLabel htmlFor="address-default">{ar.addresses.makeDefault}</FieldLabel>
-              </div>
-            )}
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              {ar.cancel}
-            </Button>
-            <Button type="submit">{ar.dashboard.confirm}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -405,7 +422,7 @@ function RecentOrders({ customer }: { customer: DashboardCustomer }) {
             {orders.map((order) => (
               <li key={order.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                 <Link href={`/dashboard/orders/${order.number}`} className="font-medium hover:underline">
-                  <bdi>#{order.number}</bdi>
+                  <bdi className="text-primary font-bold tabular-nums">#{order.number}</bdi>
                 </Link>
                 <span>{ar.orders.statuses[order.status]}</span>
                 <span className="text-muted-foreground">{formatDateTime(order.placed_at)}</span>
@@ -419,10 +436,13 @@ function RecentOrders({ customer }: { customer: DashboardCustomer }) {
   );
 }
 
-/** The statement (08 §10): summary cards and the orders with what is left to collect. */
+/**
+ * The account statement (BR-C08): the credit picture (limit, what is left under it, unused credit, overdue), a date
+ * range in the URL, the ledger with its opening and closing balance, a print view, and the customer's credits.
+ */
 function Statement({ customerId }: { customerId: number }) {
-  const [query, setQuery] = useListQuery(["tab"]);
-  const statement = useStatement(customerId, pageOf(query));
+  const [query, setQuery] = useListQuery(STATEMENT_KEYS);
+  const statement = useStatement(customerId, { from: query.from, to: query.to, page: pageOf(query) });
   const labels = copy.statement;
 
   if (statement.isError) {
@@ -433,65 +453,121 @@ function Statement({ customerId }: { customerId: number }) {
     return <LoadingBlock rows={4} />;
   }
 
-  const { summary } = statement.data;
+  const { summary, meta } = statement.data;
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="statement-summary">
+      <dl className="grid grid-cols-2 gap-3 md:grid-cols-5" data-testid="statement-summary">
         {(
           [
-            [labels.ordersCount, String(summary.orders_count)],
-            [labels.total, formatMoney(summary.total)],
-            [labels.collected, formatMoney(summary.collected)],
             [labels.outstanding, formatMoney(summary.outstanding)],
+            [labels.creditLimit, summary.credit_limit === null ? copy.noLimit : formatMoney(summary.credit_limit)],
+            [
+              labels.availableCredit,
+              summary.available_credit === null ? copy.noLimit : formatMoney(summary.available_credit),
+            ],
+            [labels.creditBalance, formatMoney(summary.credit_balance)],
+            [labels.overdue, formatMoney(summary.overdue)],
           ] as const
         ).map(([label, value]) => (
           <div key={label} className="rounded-md border p-3">
             <dt className="text-muted-foreground text-xs">{label}</dt>
-            <dd className="text-lg font-bold">{value}</dd>
+            <dd
+              className={
+                label === labels.overdue && summary.overdue !== "0.00"
+                  ? "text-destructive text-lg font-bold"
+                  : "text-lg font-bold"
+              }
+            >
+              {value}
+            </dd>
           </div>
         ))}
       </dl>
-      {statement.data.data.length === 0 ? (
+      <div className="flex flex-wrap items-end gap-2 print:hidden">
+        <label className="flex flex-col gap-1 text-xs">
+          {labels.from}
+          <Input type="date" value={query.from ?? ""} onChange={(event) => setQuery({ from: event.target.value })} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs">
+          {labels.to}
+          <Input type="date" value={query.to ?? ""} onChange={(event) => setQuery({ to: event.target.value })} />
+        </label>
+        <Button variant="outline" onClick={() => window.print()}>
+          {labels.print}
+        </Button>
+      </div>
+      {statement.data.data.length === 0 && meta.opening_balance === "0.00" ? (
         <EmptyBlock>{labels.empty}</EmptyBlock>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{labels.order}</TableHead>
-                <TableHead>{labels.placedAt}</TableHead>
-                <TableHead>{labels.deliveredAt}</TableHead>
-                <TableHead>{labels.orderTotal}</TableHead>
-                <TableHead>{labels.collected}</TableHead>
-                <TableHead>{labels.balance}</TableHead>
-                <TableHead>{labels.collection}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {statement.data.data.map((order) => (
-                <TableRow key={order.number}>
-                  <TableCell>
-                    <Link href={`/dashboard/orders/${order.number}`} className="font-medium hover:underline">
-                      <bdi>#{order.number}</bdi>
-                    </Link>{" "}
-                    <span className="text-muted-foreground text-xs">{order.status_label}</span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{formatDate(order.placed_at)}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {order.delivered_at === null ? ar.dashboard.none : formatDate(order.delivered_at)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{formatMoney(order.order_total)}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatMoney(order.collected_amount)}</TableCell>
-                  <TableCell className="font-medium whitespace-nowrap">{formatMoney(order.balance)}</TableCell>
-                  <TableCell>{ar.dashboard.collectionStatuses[order.collection_status]}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <LedgerTable
+          rows={statement.data.data}
+          opening={meta.opening_balance}
+          closing={meta.closing_balance}
+          orderHref={(number) => `/dashboard/orders/${number}`}
+        />
       )}
-      <Pager meta={statement.data.meta} onPage={(page) => setQuery({ page })} />
+      <div className="print:hidden">
+        <Pager meta={meta} onPage={(page) => setQuery({ page })} />
+      </div>
+      <Credits customerId={customerId} />
     </div>
+  );
+}
+
+/** BR-C07: the customer's credits with what is left, each unused one voidable with a reason. */
+function Credits({ customerId }: { customerId: number }) {
+  const credits = useCustomerCredits(customerId);
+  const voidCredit = useVoidCredit();
+  const labels = copy.credits;
+
+  if (credits.data === undefined || credits.data.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="print:hidden">
+      <CardHeader>
+        <CardTitle>{labels.title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col divide-y" data-testid="customer-credits">
+          {credits.data.map((credit) => (
+            <li key={credit.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+              <span className="flex flex-col">
+                <span className={credit.is_voided ? "text-muted-foreground line-through" : "font-medium"}>
+                  {labels.remaining}: {formatMoney(credit.remaining)} · {labels.amount}: {formatMoney(credit.amount)}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {formatDateTime(credit.created_at)}
+                  {credit.source_return_id !== null && ` · ${labels.fromReturn}`}
+                </span>
+              </span>
+              {credit.is_voided ? (
+                <Badge variant="secondary">{labels.voidedBadge}</Badge>
+              ) : (
+                credit.remaining === credit.amount && (
+                  <ReasonDialog
+                    trigger={(open) => (
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={open}>
+                        {labels.void}
+                      </Button>
+                    )}
+                    title={labels.voidTitle}
+                    description={labels.voidBody}
+                    confirmLabel={labels.void}
+                    destructive
+                    onSubmit={async (reason) => {
+                      await voidCredit.mutateAsync({ id: credit.id, reason });
+                      toast.success(labels.voided);
+                    }}
+                  />
+                )
+              )}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

@@ -6,7 +6,7 @@ namespace App\Modules\Catalog\Queries;
 
 use App\Modules\Catalog\Data\ProductFilterData;
 use App\Modules\Catalog\Models\Product;
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Inventory\Queries\LowStockQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,7 +28,7 @@ final readonly class DashboardProductListQuery
      */
     public function paginate(ProductFilterData $filter, ?array $sort, int $perPage, bool $lowStock = false): LengthAwarePaginator
     {
-        $query = $this->filtered->builder($filter)->with(['category', 'sku.sellingUnit', 'sku.baseUnit', 'mainImage']);
+        $query = $this->filtered->builder($filter)->with(['category', 'skus.activeUnits.unit', 'skus.baseUnit', 'skus.optionValues', 'options.values.image', 'mainImage']);
 
         if ($lowStock) {
             $query->whereHas('skus', fn (Builder $skus): Builder => $this->lowStock->constrain($skus));
@@ -40,7 +40,8 @@ final readonly class DashboardProductListQuery
     }
 
     /**
-     * Shared with the store list: name, created_at or the SKU base price, then id for stable pages.
+     * Shared with the store list: name, created_at or the lowest default-unit base price over the active SKUs (D91, BR-P14),
+     * then id for stable pages.
      *
      * @param  Builder<Product>  $query
      * @param  array{0: string, 1: 'asc'|'desc'}  $sort
@@ -51,7 +52,7 @@ final readonly class DashboardProductListQuery
 
         match ($column) {
             'price' => $query->orderBy(
-                Sku::query()->select('base_price')->whereColumn('skus.product_id', 'products.id')->orderBy('skus.id')->limit(1),
+                SkuUnit::query()->selectRaw('min(sku_units.base_price)')->join('skus', 'skus.id', '=', 'sku_units.sku_id')->whereColumn('skus.product_id', 'products.id')->where('skus.status', 'active')->where('sku_units.is_default', true),
                 $direction,
             ),
             'name' => $query->orderBy('products.name', $direction),

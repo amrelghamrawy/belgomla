@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { BulkPricingRequest, BulkPricingResult, ProductFilter } from "@/lib/api/types";
 import { ar, messageFor } from "@/lib/copy/ar";
 import { toBasisPoints } from "@/lib/dashboard/price-math";
+import { useUnits } from "@/lib/dashboard/catalog";
 import { useBulkPricing, useBulkPricingPreview } from "@/lib/dashboard/pricing";
 
 const copy = ar.dashboard.products;
@@ -32,6 +34,7 @@ export function bulkPricingBody(
   percent: string,
   tiers: readonly TierRow[],
   moq: string,
+  unitId = "",
 ): BulkPricingRequest | string {
   if (toBasisPoints(percent) === null) {
     return formCopy.invalidPercent;
@@ -67,6 +70,7 @@ export function bulkPricingBody(
       discount_percent: tier.discount_percent.trim(),
     })),
     ...(moq === "" ? {} : { moq: Number(moq) }),
+    ...(unitId === "" ? {} : { unit_id: Number(unitId) }),
   };
 }
 
@@ -81,10 +85,13 @@ export function BulkPricingDialog({ filter }: { filter: ProductFilter }) {
   const [open, setOpen] = useState(false);
   const [percent, setPercent] = useState("");
   const [moq, setMoq] = useState("");
+  // V2 Task 13 (D91): every unit of the SKUs, or only those sold in one store unit.
+  const [unitId, setUnitId] = useState("");
+  const units = useUnits();
   const [tiers, setTiers] = useState<TierRow[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<{ body: string; data: BulkPricingResult } | null>(null);
-  const body = bulkPricingBody(filter, percent, tiers, moq);
+  const body = bulkPricingBody(filter, percent, tiers, moq, unitId);
   const previewed = typeof body !== "string" && result !== null && result.body === JSON.stringify(body);
 
   const reset = () => {
@@ -159,6 +166,26 @@ export function BulkPricingDialog({ filter }: { filter: ProductFilter }) {
               }}
             />
           </Field>
+          <Field>
+            <FieldLabel htmlFor="bulk-unit">{copy.bulkUnit}</FieldLabel>
+            <NativeSelect
+              id="bulk-unit"
+              value={unitId}
+              onChange={(event) => {
+                setUnitId(event.target.value);
+                reset();
+              }}
+            >
+              <option value="">{copy.bulkAllUnits}</option>
+              {(units.data ?? [])
+                .filter((unit) => unit.status === "active")
+                .map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.name}
+                  </option>
+                ))}
+            </NativeSelect>
+          </Field>
         </div>
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-medium">{formCopy.tiers}</legend>
@@ -227,8 +254,8 @@ export function BulkPricingDialog({ filter }: { filter: ProductFilter }) {
                   <span>{copy.skippedNoCover(result.data.skipped_no_cover_price.length)}</span>
                   <ul className="list-disc ps-5">
                     {result.data.skipped_no_cover_price.map((skipped) => (
-                      <li key={skipped.sku_id}>
-                        {skipped.name} (<bdi>{skipped.code}</bdi>)
+                      <li key={skipped.sku_unit_id}>
+                        {skipped.name} (<bdi>{skipped.code}</bdi>) · {skipped.unit}
                       </li>
                     ))}
                   </ul>

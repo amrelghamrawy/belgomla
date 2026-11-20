@@ -8,10 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * BR-PR11 bulk result: `{ affected, skipped_no_cover_price: [{ product_id, sku_id, code, name }] }`, plus
+ * BR-PR11 bulk result: `{ affected, skipped_no_cover_price: [{ product_id, sku_id, sku_unit_id, code, name, unit }] }`
+ * (`affected` counts SKU units, D91), plus
  * `batch_id` once applied (a preview writes nothing, so it has none).
  *
- * @property-read array{affected: int, skipped_no_cover_price: list<array{product_id: int, sku_id: int, code: string, name: string}>, batch_id: string|null} $resource
+ * @property-read array{affected: int, skipped_no_cover_price: list<array{product_id: int, sku_id: int, sku_unit_id: int, code: string, name: string, unit: string}>, batch_id: string|null} $resource
  */
 final class BulkPricingResultResource extends JsonResource
 {

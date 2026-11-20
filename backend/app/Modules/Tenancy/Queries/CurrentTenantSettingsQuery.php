@@ -38,6 +38,41 @@ final readonly class CurrentTenantSettingsQuery
     }
 
     /**
+     * BR-C05, BR-C06: the credit limit and payment terms a new customer starts with (null = none). Used by Customers.
+     *
+     * @return array{credit_limit: string|null, payment_terms_days: int|null}
+     */
+    public function creditDefaults(): array
+    {
+        $settings = $this->get();
+
+        return ['credit_limit' => $settings->default_credit_limit, 'payment_terms_days' => $settings->default_payment_terms_days];
+    }
+
+    /**
+     * BR-N03: the statuses the store tells customers about, its own wording per status (a missing entry = the
+     * default) and its name for the `{اسم_المتجر}` placeholder. Used by Orders.
+     *
+     * @return array{statuses: list<string>, messages: array<string, string|null>, store: string}
+     */
+    public function orderNotifications(): array
+    {
+        $settings = $this->get();
+
+        return [
+            'statuses' => $settings->order_notify_statuses,
+            'messages' => $settings->order_status_messages ?? [],
+            'store' => $settings->tenant->name,
+        ];
+    }
+
+    /** D85: the most a sales user may take off an order line, in % ("10.00"); null = sales users cannot discount. Used by Orders. */
+    public function maxDiscountPercentSales(): ?string
+    {
+        return $this->get()->max_discount_percent_sales;
+    }
+
+    /**
      * BR-MOV01: the minimum order value. Enabled without an amount counts as disabled.
      *
      * @return array{enabled: bool, amount: string|null}

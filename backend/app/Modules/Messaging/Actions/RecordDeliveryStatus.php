@@ -77,6 +77,7 @@ final readonly class RecordDeliveryStatus
             'status' => MessageStatus::Queued,
             'body' => $failed->body,
             'fallback_of_id' => $failed->id,
+            'order_id' => $failed->order_id,
         ]);
 
         SendMessage::dispatch($copy->id)->afterCommit();

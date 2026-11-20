@@ -22,7 +22,7 @@ export function UserMenu({ user }: { user: TenantUser }) {
   return (
     <DropdownMenu dir="rtl">
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-11" aria-label={ar.dashboard.userMenu}>
+        <Button size="icon" className="bg-primary text-primary-foreground hover:bg-primary-hover size-10 rounded-full" aria-label={ar.dashboard.userMenu}>
           <UserIcon />
         </Button>
       </DropdownMenuTrigger>

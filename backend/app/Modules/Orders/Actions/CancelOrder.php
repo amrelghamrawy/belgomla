@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\DB;
  * POST /api/store|dashboard/orders/{number}/cancel (BR-O02): the customer cancels a pending order, the merchant
  * any order not delivered or cancelled yet; never while money is collected on it (BR-O03, D7). Owns its
  * transaction: locks the order, releases the reservation (BR-INV04), stores reason and canceller, appends the
- * history, tells the merchant when the customer cancelled (BR-N02) and audits `order.cancelled`.
+ * history, tells the merchant when the customer cancelled (BR-N02) or the customer when anyone else did (BR-N03), and
+ * audits `order.cancelled`.
  */
 final readonly class CancelOrder
 {
@@ -28,6 +29,7 @@ final readonly class CancelOrder
         private OrderStateMachine $machine,
         private ApplyTransition $apply,
         private NotifyMerchants $notify,
+        private NotifyCustomerOfStatus $notifyCustomer,
         private AuditLogger $audit,
     ) {}
 
@@ -44,7 +46,9 @@ final readonly class CancelOrder
             ]);
 
             if ($by === CancelledBy::Customer) {
-                $this->notify->handle(NotificationType::CustomerCancelled, $order);
+                $this->notify->forOrder(NotificationType::CustomerCancelled, $order);
+            } else {
+                $this->notifyCustomer->handle($order, OrderStatus::Cancelled);
             }
 
             $this->audit->log('order.cancelled', $order, ['status' => $plan->from->value], [

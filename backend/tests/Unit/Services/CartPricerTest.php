@@ -8,6 +8,8 @@ use App\Modules\Customers\Models\Cart;
 use App\Modules\Customers\Models\CartItem;
 use App\Modules\Customers\Queries\CartQuery;
 use App\Modules\Customers\Services\CartPricer;
+use App\Modules\Pricing\Data\PricingContext;
+use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Models\SkuPriceTier;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
@@ -20,7 +22,7 @@ beforeEach(function (): void {
 
 function pricedSku(string $basePrice = '100.00', array $tiers = [], int $onHand = 1000): Sku
 {
-    $sku = Product::factory()->withSku(['base_price' => $basePrice, 'moq' => 1], onHand: $onHand)->create(['name' => 'منتج'])->sku()->sole();
+    $sku = Product::factory()->withSku(['base_price' => $basePrice, 'moq' => 1], onHand: $onHand)->create(['name' => 'منتج'])->skus()->sole();
 
     foreach ($tiers as $min => $price) {
         SkuPriceTier::factory()->create(['sku_id' => $sku->id, 'min_quantity' => $min, 'unit_price' => $price]);
@@ -86,18 +88,32 @@ test('an empty cart totals zero and satisfies no mov', function (): void {
     expect([$cart->lines, $cart->itemsTotal, $cart->movSatisfied])->toBe([[], '0.00', false]);
 });
 
-test('a line carries the product name, selling unit, moq and stock in base units', function (): void {
+test('a line carries the product name, its unit, moq and stock in base units', function (): void {
     $sku = pricedSku('50.00', onHand: 37);
     CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'quantity' => 2]);
 
     $line = priceCart($this->customer)->lines[0];
 
-    expect([$line->skuId, $line->productName, $line->unit, $line->quantity, $line->moq, $line->available])
-        ->toBe([$sku->id, 'منتج', $sku->sellingUnit->name, 2, 1, 37]);
+    expect([$line->skuId, $line->skuUnitId, $line->productName, $line->unit, $line->conversionFactor, $line->quantity, $line->moq, $line->available])
+        ->toBe([$sku->id, $this->defaultUnitId($sku), 'منتج', App\Modules\Catalog\Models\SkuUnit::query()->with('unit')->findOrFail($this->defaultUnitId($sku))->unit->name, 1, 2, 1, 37]);
+});
+
+test('D91 BR-PR02 each unit of a sku is priced on its own tiers, its MOQ and factor on its line', function (): void {
+    $sku = pricedSku('10.00', [10 => '9.00']);
+    $box = $this->addUnit($sku, ['conversion_factor' => 12, 'base_price' => '100.00', 'moq' => 2], [5 => '95.00']);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'quantity' => 10]);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'sku_unit_id' => $box->id, 'quantity' => 5]);
+
+    $cart = priceCart($this->customer);
+
+    expect(array_map(fn (App\Modules\Customers\Data\PricedCartLine $line): array => [$line->skuUnitId, $line->conversionFactor, $line->moq, $line->price->unitPrice, $line->price->lineTotal], $cart->lines))->toBe([
+        [$this->defaultUnitId($sku), 1, 1, '9.00', '90.00'],
+        [$box->id, 12, 2, '95.00', '475.00'],
+    ])->and($cart->itemsTotal)->toBe('565.00');
 });
 
 test('a sku without a stock row shows nothing available', function (): void {
-    $sku = Product::factory()->withSku()->create()->sku()->sole();
+    $sku = Product::factory()->withSku()->create()->skus()->sole();
     CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'quantity' => 1]);
 
     expect(priceCart($this->customer)->lines[0]->available)->toBe(0);
@@ -105,4 +121,29 @@ test('a sku without a stock row shows nothing available', function (): void {
 
 test('BR-P04 the removed lines are passed through for the message', function (): void {
     expect(priceCart($this->customer, [['product_name' => 'قديم', 'reason' => 'inactive']])->removed)->toBe([['product_name' => 'قديم', 'reason' => 'inactive']]);
+});
+
+test('BR-PR14 the cart prices each line at the customer\'s context, with its source', function (): void {
+    $negotiated = pricedSku('100.00', [10 => '90.00']);
+    $grouped = pricedSku('100.00', [10 => '90.00']);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $negotiated->id, 'quantity' => 10]);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $grouped->id, 'quantity' => 1]);
+
+    $cart = app(CartPricer::class)->price(app(CartQuery::class)->linesOf($this->customer), pricing: new PricingContext('15.00', [$this->defaultUnitId($negotiated) => '95.00']));
+
+    expect(array_map(fn (App\Modules\Customers\Data\PricedCartLine $line): array => [$line->price->unitPrice, $line->price->source], $cart->lines))->toBe([
+        ['95.00', PriceSource::Customer],
+        ['85.00', PriceSource::Group],
+    ])
+        ->and($cart->itemsTotal)->toBe('1035.00');
+});
+
+test('BR-PR15 the cart prices a line at a promotion in the context, with the promotion', function (): void {
+    $sku = pricedSku('100.00', [10 => '90.00']);
+    CartItem::factory()->create(['cart_id' => $this->cart->id, 'sku_id' => $sku->id, 'quantity' => 2]);
+    $promotion = new App\Modules\Pricing\Data\PromotionPrice(4, 'عرض', '25.00', Carbon\CarbonImmutable::parse('2026-12-01'));
+
+    $line = app(CartPricer::class)->price(app(CartQuery::class)->linesOf($this->customer), pricing: new PricingContext(promotions: [$sku->id => $promotion]))->lines[0];
+
+    expect([$line->price->unitPrice, $line->price->source, $line->price->promotion])->toBe(['75.00', PriceSource::Promotion, $promotion]);
 });

@@ -21,7 +21,7 @@ APP_USER="${APP_USER:-belgomla}"
 APP_DIR="${APP_DIR:-/srv/belgomla}"
 BASE_DOMAIN="${BASE_DOMAIN:-gomalecommerce.app}"
 PHP_VERSION="${PHP_VERSION:-8.5}"          # D66: same PHP as the test suite
-NODE_MAJOR="${NODE_MAJOR:-24}"             # frontend/package.json engines
+NODE_MAJOR="${NODE_MAJOR:-24}"             # frontend/package.json engines; wa-gateway needs >= 22
 DB_NAME="${PGDATABASE:-belgomla}"
 DB_USER="${PGUSER:-belgomla}"
 DNS_PLUGIN="${DNS_PLUGIN:-cloudflare}"     # certbot-dns-<plugin> snap; D44 decides the DNS provider
@@ -125,7 +125,7 @@ step "App user ${APP_USER}, ${APP_DIR}, /etc/belgomla"
 id "${APP_USER}" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/home/${APP_USER}" --shell /bin/bash "${APP_USER}"
 install -d -o "${APP_USER}" -g "${APP_USER}" -m 755 "${APP_DIR}"
 install -d -o root -g "${APP_USER}" -m 750 /etc/belgomla
-for example in backend.env frontend.env ops.env; do
+for example in backend.env frontend.env ops.env wa-gateway.env; do
     [[ -f "/etc/belgomla/${example}" ]] || install -o root -g "${APP_USER}" -m 640 "${DEPLOY_SRC}/env/${example}.example" "/etc/belgomla/${example}"
 done
 if [[ ! -d "${APP_DIR}/.git" ]]; then
@@ -141,7 +141,7 @@ if [[ -n "${DB_PASSWORD}" ]]; then
 fi
 # deploy.sh runs as the app user and restarts only BelGomla's own services.
 cat > /etc/sudoers.d/belgomla <<EOF
-${APP_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl restart belgomla-queue@1 belgomla-queue@2 belgomla-next, /usr/bin/systemctl reload php${PHP_VERSION}-fpm, /usr/bin/systemctl reload nginx
+${APP_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl restart belgomla-queue@1 belgomla-queue@2 belgomla-next, /usr/bin/systemctl restart belgomla-wa-gateway, /usr/bin/systemctl reload php${PHP_VERSION}-fpm, /usr/bin/systemctl reload nginx
 EOF
 chmod 440 /etc/sudoers.d/belgomla
 visudo -cf /etc/sudoers.d/belgomla
@@ -197,13 +197,14 @@ for unit in "${DEPLOY_SRC}"/systemd/*; do
         > "/etc/systemd/system/$(basename "${unit}")"
 done
 systemctl daemon-reload
-systemctl enable belgomla-queue@1 belgomla-queue@2 belgomla-next
+systemctl enable belgomla-queue@1 belgomla-queue@2 belgomla-next belgomla-wa-gateway
 systemctl enable --now belgomla-scheduler.timer belgomla-monitor.timer belgomla-backup.timer
 
 cat <<EOF
 
 Provisioning done. Next (deploy/README.md, "First install"):
-  1. Fill /etc/belgomla/backend.env (APP_KEY, DB_PASSWORD, Hypersender, MONITOR_*), frontend.env, ops.env.
+  1. Fill /etc/belgomla/backend.env (APP_KEY, DB_PASSWORD, Hypersender, WA_GATEWAY_*, MONITOR_*), frontend.env, ops.env,
+     wa-gateway.env (same token and webhook secret as backend.env).
   2. Configure the backup remote: sudo -u ${APP_USER} rclone config   (remote name = BACKUP_REMOTE prefix)
   3. sudo -u ${APP_USER} ${APP_DIR}/deploy/deploy.sh
 EOF

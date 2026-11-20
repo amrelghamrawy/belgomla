@@ -32,4 +32,15 @@ final class CannotCancel extends ApiException
             ['from' => $status->value, 'to' => OrderStatus::Cancelled->value],
         );
     }
+
+    /** D88: a pre-order converted in full has nothing left to cancel; its normal orders are cancelled on their own. */
+    public static function converted(): self
+    {
+        return new self(
+            409,
+            'invalid_transition',
+            'تم تحويل هذا الحجز بالكامل إلى طلبات، ألغِ الطلب نفسه إن لزم',
+            ['from' => OrderStatus::Pending->value, 'to' => OrderStatus::Cancelled->value],
+        );
+    }
 }

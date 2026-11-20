@@ -16,7 +16,8 @@ final class DatabaseSeeder extends Seeder
      * Local development seed: one tenant created as school-books (its template is applied at creation) with a demo
      * catalog of books, school supplies and toys (StorefrontDemoSeeder, which adds the stationery template and a
      * toys field) and two months of customers, orders and collections (DemoActivitySeeder).
-     * Dashboard: owner@alnoor.test / password
+     * Dashboard: owner@alnoor.test / password, and one user per staff role (manager@, sales@, warehouse@,
+     * accountant@alnoor.test) with the same password.
      */
     public function run(CreateTenant $createTenant): void
     {
@@ -30,6 +31,7 @@ final class DatabaseSeeder extends Seeder
             ));
         }
 
-        $this->call([StorefrontDemoSeeder::class, DemoActivitySeeder::class]);
+        $this->call(StorefrontDemoSeeder::class);
+        $this->call(DemoActivitySeeder::class, parameters: ['staffPassword' => 'password']);
     }
 }

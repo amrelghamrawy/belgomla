@@ -10,10 +10,12 @@ use App\Support\Money;
 use RuntimeException;
 
 /**
- * BR-C03: stores the order's collected amount (Σ non-voided collections, summed by Collections) and the collection
- * status derived from it. A step of RecordCollection / VoidCollection: it joins their transaction, with the order
- * row already locked. Collections rejects over-collection first (`exceeds_balance`), so more than the total here
- * is a bug, not a user error.
+ * BR-C03: stores the order's collected amount (Σ live payments − Σ live refunds, summed by Collections) and the
+ * collection status derived from it against the **net** total (order_total − returned_total, BR-O08). A step of
+ * RecordCollection / VoidCollection / RecordReturn / VoidReturn: it joins their transaction, with the order row
+ * already locked. Collections rejects over-collection first (`exceeds_balance`); the one way above the net total is
+ * voiding a return's refund before the return itself (BR-R06), so only a negative amount or one above the gross
+ * total is a bug here, not a user error.
  */
 final readonly class ApplyCollectedAmount
 {
@@ -25,7 +27,7 @@ final readonly class ApplyCollectedAmount
 
         $order->forceFill([
             'collected_amount' => $collected,
-            'collection_status' => CollectionStatus::for($collected, $order->order_total),
+            'collection_status' => CollectionStatus::for($collected, $order->netTotal()),
         ])->save();
     }
 }

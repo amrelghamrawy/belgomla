@@ -2,10 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 
 import { StatusPage } from "@/components/shared/StatusPage";
-import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -21,11 +20,11 @@ import type { TenantSettings } from "@/lib/api/types";
 import { useRequiredDashboardUser } from "@/lib/auth/session";
 import { useTenant } from "@/lib/auth/tenant";
 import { ar, messageFor } from "@/lib/copy/ar";
-import { cn } from "@/lib/utils";
 
 import { StoreWhatsAppBanner } from "../admin/StoreWhatsAppCard";
-import { DashboardNav } from "./DashboardNav";
+import { DashboardBreadcrumb, DashboardNav, DashboardTitle } from "./DashboardNav";
 import { NotificationsBell } from "./NotificationsBell";
+import { OrderSearch } from "./OrderSearch";
 import { UserMenu } from "./UserMenu";
 
 const copy = ar.dashboard.nav;
@@ -62,34 +61,53 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
-      <Sidebar side="start" collapsible="icon" label={copy.label}>
-        <SidebarHeader className="h-14 justify-center border-b">
+    <SidebarProvider defaultOpen={defaultOpen} style={{ "--sidebar-width": "17.5rem" } as CSSProperties}>
+      <DashboardTitle storeName={me.tenant.name} />
+      <Sidebar side="start" collapsible="icon" label={copy.label} className="print:hidden">
+        <SidebarHeader className="border-sidebar-border gap-4 border-b px-5 pt-7 pb-5 group-data-[collapsible=icon]:px-2">
+          <PlatformMark />
           <DesktopBrand name={me.tenant.name} />
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="pt-2">
           <DashboardNav />
         </SidebarContent>
         {/* A drag-edge for the mouse; keyboard and screen-reader users have the trigger in the top bar. */}
         <SidebarRail aria-hidden />
       </Sidebar>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="bg-background/95 sticky top-0 z-40 flex h-14 items-center gap-2 border-b px-2 backdrop-blur sm:px-4">
+        {/* D104: the reference design's floating bar: the breadcrumb at the start, a white pill of tools at the end. */}
+        <header className="bg-background/80 sticky top-0 z-40 flex min-h-16 items-center gap-2 px-3 pt-3 pb-2 backdrop-blur-xl sm:px-5 md:px-7 print:hidden">
           <Tooltip>
             <TooltipTrigger asChild>
-              <SidebarTrigger aria-label={copy.toggle} className="size-11 md:size-9" />
+              <SidebarTrigger aria-label={copy.toggle} className="bg-card size-11 rounded-full shadow-panel md:size-10" />
             </TooltipTrigger>
             <TooltipContent side="bottom">{copy.toggleHint}</TooltipContent>
           </Tooltip>
-          <Separator orientation="vertical" className="hidden h-5! self-center md:block" />
           <MobileBrand name={me.tenant.name} />
-          <NotificationsBell />
-          <UserMenu user={me.user} />
+          <div className="bg-card shadow-panel flex items-center gap-1 rounded-full p-1.5 md:gap-2 md:p-2">
+            <OrderSearch />
+            <NotificationsBell />
+            <UserMenu user={me.user} />
+          </div>
         </header>
         <StoreWhatsAppBanner />
-        <main className="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
+        <main className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-1 flex-col gap-6 px-4 pt-3 pb-8 md:px-7 print:p-0">
+          {children}
+        </main>
       </div>
     </SidebarProvider>
+  );
+}
+
+/** D104: BelGomla's wordmark heads the sidebar, as the product name heads the reference design's. */
+function PlatformMark() {
+  return (
+    <Link
+      href="/dashboard"
+      className="font-heading text-sidebar-accent-foreground text-center text-[1.65rem] leading-none font-bold group-data-[collapsible=icon]:hidden"
+    >
+      {ar.appName}
+    </Link>
   );
 }
 
@@ -97,38 +115,41 @@ type BrandProps = {
   name: string;
   tenant: TenantSettings | undefined;
   className: string;
-  nameClassName?: string;
   /** Only one copy on the page carries the test id: the drawer copy on phones stays unmarked. */
   testId?: string;
 };
 
-function Brand({ name, tenant, className, nameClassName, testId }: BrandProps) {
+/** D104: the store's logo (or initial) and name inside BelGomla's frame; the store's colours stay on the storefront. */
+function Brand({ name, tenant, className, testId }: BrandProps) {
   return (
     <Link href="/dashboard" className={className}>
       {tenant?.logo_url ? (
         <Image
           src={tenant.logo_url}
           alt=""
-          width={32}
-          height={32}
-          className="size-8 shrink-0 rounded-md object-contain"
+          width={40}
+          height={40}
+          className="bg-card size-10 shrink-0 rounded-full object-contain p-0.5"
         />
       ) : (
         <span
           aria-hidden
-          className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-md text-sm font-bold"
+          className="bg-primary-soft text-primary font-heading flex size-10 shrink-0 items-center justify-center rounded-full text-base font-bold"
         >
           {name.slice(0, 1)}
         </span>
       )}
-      <span data-testid={testId} className={cn("text-primary truncate font-bold", nameClassName)}>
-        {name}
+      <span className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+        <span data-testid={testId} className="font-heading text-foreground truncate leading-tight font-bold">
+          {name}
+        </span>
+        <span className="text-muted-foreground text-xs">{copy.platform}</span>
       </span>
     </Link>
   );
 }
 
-/** The tenant at the top of the sidebar (and of the phone drawer); only the logo shows when it is collapsed. */
+/** The tenant under the wordmark (and in the phone drawer); only the logo shows when the sidebar is collapsed. */
 function DesktopBrand({ name }: { name: string }) {
   const { isMobile } = useSidebar();
   const { data: tenant } = useTenant();
@@ -138,13 +159,12 @@ function DesktopBrand({ name }: { name: string }) {
       name={name}
       tenant={tenant}
       testId={isMobile ? undefined : "tenant-name"}
-      className="flex min-w-0 items-center gap-2 px-1 group-data-[collapsible=icon]:px-0"
-      nameClassName="group-data-[collapsible=icon]:hidden"
+      className="bg-muted flex min-w-0 items-center gap-3 rounded-2xl p-2.5 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
     />
   );
 }
 
-/** On phones the sidebar is a closed drawer, so the tenant sits in the top bar. Rendered once, never twice. */
+/** On phones the sidebar is a closed drawer, so the tenant sits in the top bar; on wide screens, the breadcrumb. */
 function MobileBrand({ name }: { name: string }) {
   const { isMobile } = useSidebar();
   const { data: tenant } = useTenant();
@@ -152,7 +172,9 @@ function MobileBrand({ name }: { name: string }) {
   return isMobile ? (
     <Brand name={name} tenant={tenant} testId="tenant-name" className="flex min-w-0 flex-1 items-center gap-2" />
   ) : (
-    <span className="flex-1" />
+    <div className="flex min-w-0 flex-1 items-center">
+      <DashboardBreadcrumb />
+    </div>
   );
 }
 

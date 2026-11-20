@@ -87,6 +87,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/account/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Turns WhatsApp messages about the customer's orders on or off (BR-N03) */
+        patch: operations["storeUpdatePreferences"];
+        trace?: never;
+    };
     "/api/store/categories": {
         parameters: {
             query?: never;
@@ -164,6 +181,26 @@ export interface paths {
         };
         /** Printable price list for a facet selection (BR-P13) */
         get: operations["storePriceList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/price-list/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The price list of a facet selection as an Excel file, uncapped (BR-P13, D83)
+         * @description A guest of a store that hides prices (`require_login_for_prices`) gets `403 prices_hidden`.
+         */
+        get: operations["storePriceListExport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -337,7 +374,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Adds a SKU (or adds to its quantity); guests get 403 prices_hidden or 401 (D53) */
+        /** Puts a SKU unit in the cart with this quantity; guests get 403 prices_hidden or 401 (D53) */
         post: operations["storeAddCartItem"];
         delete?: never;
         options?: never;
@@ -345,12 +382,13 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/store/cart/items/{sku}": {
+    "/api/store/cart/items/{skuUnit}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                sku: number;
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -380,6 +418,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/store/checkout/preorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Places a pre-order from the cart's pre-order lines (BR-O14, D88); no stock held, no minimum order value; retry-safe with Idempotency-Key */
+        post: operations["storePreorderCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/store/orders": {
         parameters: {
             query?: never;
@@ -387,7 +442,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The customer's orders, newest first (D6) */
+        /** The customer's orders, newest first (D6); `kind` keeps orders or pre-orders only (BR-O14) */
         get: operations["storeOrders"];
         put?: never;
         post?: never;
@@ -430,6 +485,23 @@ export interface paths {
         put?: never;
         /** Cancels a pending order with a reason (BR-O02) */
         post: operations["storeCancelOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/store/account/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in customer's own ledger (BR-C08), the same rows as the merchant's */
+        get: operations["storeAccountStatement"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -858,6 +930,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a bundle product (BR-P15, D93): its SKU sold in one unit, its components and pricing */
+        post: operations["dashboardCreateBundle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/bundles/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes a draft (inactive) grade set from a product filter: every matching active simple product, quantity 1 (D93) */
+        post: operations["dashboardGenerateBundle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/bundles/{product}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Replaces a bundle's fields, components and pricing (not its status); a simple product is 404 */
+        put: operations["dashboardUpdateBundle"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/products/bulk/status": {
         parameters: {
             query?: never;
@@ -869,6 +994,112 @@ export interface paths {
         put?: never;
         /** Sets the status of every product matching a non-empty filter (BR-P12, D29) */
         post: operations["dashboardBulkProductStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The filtered catalog in the import format (V2 Task 06); streamed, or 202 with a signed link above catalog.export_sync_limit */
+        get: operations["dashboardExportProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/export/{export}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export: string;
+            };
+            cookie?: never;
+        };
+        /** The temporary signed link of a queued export (expires and signature query parameters) */
+        get: operations["dashboardDownloadExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/import/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The empty import file with the custom field columns of the store */
+        get: operations["dashboardImportTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dry-runs an uploaded catalog file (xlsx or csv) and keeps it for 24 h; writes nothing */
+        post: operations["dashboardPreviewImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues the import of a previewed file; one run per token */
+        post: operations["dashboardRunImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/imports/{import}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import: number;
+            };
+            cookie?: never;
+        };
+        /** Progress, counts and row errors of an import run */
+        get: operations["dashboardImport"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -910,6 +1141,61 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["dashboardSetProductStatus"];
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/preorder-demand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        /** What customers pre-ordered of the product and did not receive yet (BR-O14), for purchase planning */
+        get: operations["dashboardPreorderDemand"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/products/{product}/convert-preorders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Converts the product's open pre-orders into normal orders, oldest first, as far as the stock goes (BR-O14, D88); orders.manage, retry-safe with Idempotency-Key */
+        post: operations["dashboardConvertPreorders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/preorders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pre-orders, oldest first (the conversion order), with their lines (BR-O14) */
+        get: operations["dashboardPreorders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/dashboard/products/{product}/duplicate": {
@@ -1023,17 +1309,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dashboard/products/{product}/pricing": {
+    "/api/dashboard/products/{product}/units/{skuUnit}/pricing": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 product: components["parameters"]["ProductId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
         get?: never;
-        /** Replaces the SKU's price set; tiers is required and replaces all tiers */
+        /** Replaces the price set of one active unit of the product's SKU (D91); tiers is required and replaces all its tiers */
         put: operations["dashboardUpdatePricing"];
         post?: never;
         delete?: never;
@@ -1053,7 +1341,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Recomputes percentage-based prices from the current cover price (BR-PR10, audited) */
+        /** Recomputes percentage-based prices from the current cover price of every unit (BR-PR10, D91, audited) */
         post: operations["dashboardRecomputePricing"];
         delete?: never;
         options?: never;
@@ -1165,6 +1453,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/inventory/{sku}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive goods the merchant bought at the price paid (BR-INV09, D96 b); moves the average cost */
+        post: operations["dashboardReceiveStock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/inventory/{sku}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the average cost by hand (D96 d); no movement */
+        put: operations["dashboardSetStockCost"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/inventory/{sku}/movements": {
         parameters: {
             query?: never;
@@ -1214,6 +1540,195 @@ export interface paths {
         put: operations["dashboardUpdateCustomer"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Promotions (BR-PR15, V2 Task 12), latest start first, with how many SKUs each covers */
+        get: operations["dashboardPromotions"];
+        put?: never;
+        /** Creates a promotion, scheduled or a draft; its SKUs are selected now (D90 d). Idempotency-Key honored */
+        post: operations["dashboardCreatePromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/promotions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** How many SKUs a promotion would cover and the first ten, priced when a % is sent; writes nothing */
+        post: operations["dashboardPreviewPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/promotions/{promotion}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        /** One promotion; an explicit SKU list comes with its SKUs */
+        get: operations["dashboardPromotion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Any of the fields of a draft or a promotion that has not started (409 promotion_locked otherwise); the SKUs are selected again */
+        patch: operations["dashboardUpdatePromotion"];
+        trace?: never;
+    };
+    "/api/dashboard/promotions/{promotion}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops a promotion that has not ended, at once (D90 f) */
+        post: operations["dashboardCancelPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer groups (BR-PR12, V2 Task 11): active first, then sort_order and name, with their customer count */
+        get: operations["dashboardCustomerGroups"];
+        put?: never;
+        post: operations["dashboardCreateCustomerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups/{group}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Any of the fields; a field left out stays; status active brings an archived group back */
+        patch: operations["dashboardUpdateCustomerGroup"];
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups/{group}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops the group discount at once; its customers keep the group (D89) */
+        post: operations["dashboardArchiveCustomerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customer-groups/{group}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves customers into the group: the ticked ids, or every customer of the list filter (not empty) */
+        post: operations["dashboardAssignCustomerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /** The prices negotiated with the customer (BR-PR13, V2 Task 11), newest first */
+        get: operations["dashboardCustomerPrices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/prices/{skuUnit}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets (201) or replaces (200) the unit price negotiated with the customer for the SKU unit (D91); it may be above the normal price (D89) */
+        put: operations["dashboardSetCustomerPrice"];
+        post?: never;
+        /** Back to the normal price; no such price is 404 */
+        delete: operations["dashboardRemoveCustomerPrice"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1301,9 +1816,74 @@ export interface paths {
             };
             cookie?: never;
         };
+        /** The customer's ledger (BR-C08) in Cairo days (D60), oldest first, with running balance */
         get: operations["dashboardCustomerStatement"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/customers/{customer}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /** Every credit of the customer (BR-C07), voided included, newest first */
+        get: operations["dashboardCustomerCredits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/apply-credit": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pays part of the order from a credit of the same customer (BR-C07), as a credit collection */
+        post: operations["dashboardApplyCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/credits/{customerCredit}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerCredit: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Voids a credit nothing was applied from, with the refund that created it (BR-C07) */
+        post: operations["dashboardVoidCredit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1319,7 +1899,25 @@ export interface paths {
         };
         get: operations["dashboardOrders"];
         put?: never;
-        post?: never;
+        /** Places an order for an active customer with the checkout checks (BR-O11); retry-safe with Idempotency-Key (D55) */
+        post: operations["dashboardPlaceOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prices and checks the merchant's order form like checkout, without saving anything (BR-O11) */
+        post: operations["dashboardQuoteOrder"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1360,7 +1958,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04) */
+        /** Moves the order forward (BR-O01); to=delivered with collect_full_amount records the balance (BR-C04), with delivered_quantities a partial delivery (BR-O13) */
         post: operations["dashboardTransitionOrder"];
         delete?: never;
         options?: never;
@@ -1405,6 +2003,117 @@ export interface paths {
         /** Edits the address snapshot before out for delivery (D9) */
         put: operations["dashboardUpdateDeliveryAddress"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/discount": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sets the manual discounts of a pending or confirmed order, per line and on the whole order (BR-PR08, D85)
+         * @description The body is the whole discount state: a line left out of `items`, or a null `order`, has no discount. Owners and managers give any discount; a sales user gives line discounts only, each at most `max_discount_percent_sales` % off the list price (null = none). The history gets the note «خصم»; `order.discount_changed` is audited.
+         */
+        put: operations["dashboardApplyOrderDiscount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/lines": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Changes the lines of a pending or confirmed order (BR-O12, D87)
+         * @description The body is every line the order should have: an existing line by its `order_item_id` (same SKU), a new one without. A live line left out is removed (kept for history), a quantity change re-prices the line at the current tiers keeping its manual discount, a new line is priced like checkout; unchanged lines keep their snapshot. Stock is checked like checkout with what the order holds counted as available. The history gets «تعديل الطلب», `order.lines_changed` is audited and the customer gets the `edited` text when the store notifies it.
+         */
+        put: operations["dashboardEditOrderLines"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/orders/{order}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        /** The order's returns oldest first, voided included, plus what each line can still take back (BR-R02) */
+        get: operations["dashboardOrderReturns"];
+        put?: never;
+        /** Records goods brought back after delivery (BR-R01..R04); priced at the line's snapshot price (D74) */
+        post: operations["dashboardRecordReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/returns/{orderReturn}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderReturn: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Voids a return (BR-R06); its live refund must be voided first; sold-again stock refuses (D76) */
+        post: operations["dashboardVoidReturn"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1459,6 +2168,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expenses, newest day first, voided included; meta.total_amount is the live total of the filter */
+        get: operations["dashboardExpenses"];
+        put?: never;
+        post: operations["dashboardRecordExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/expenses/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboardExpenseCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/expenses/{expense}/void": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                expense: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dashboardVoidExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/orders/{order}/collections": {
         parameters: {
             query?: never;
@@ -1474,7 +2237,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Records a cash collection on any non-cancelled order */
+        /** Records a payment on any non-cancelled order, in cash, by InstaPay, to a wallet or by bank transfer (BR-C10) */
         post: operations["dashboardRecordCollection"];
         delete?: never;
         options?: never;
@@ -1536,6 +2299,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/reports/bundles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bundles sold and the component units they consumed, over orders delivered in the range (Africa/Cairo days, D60; default the last 30 days); BR-P15, D93 */
+        get: operations["dashboardReportBundles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/reports/outstanding": {
         parameters: {
             query?: never;
@@ -1570,6 +2350,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/reports/sales-analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: gross, discounts, returns and net per bucket (Africa/Cairo days, D60; Saturday weeks, D58), the previous period of the same length, the split by section (D68) and customer group; cached 10 minutes (D94) */
+        get: operations["dashboardReportSalesAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: per SKU sold or returned in the range, quantities, net revenue, return rate, customers; the first page of 20 is the top 20; cached 10 minutes (D94) */
+        get: operations["dashboardReportProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: per customer, the range's orders and net revenue, the order rhythm, dormant flag, outstanding and overdue; view top or dormant; cached 10 minutes (D94) */
+        get: operations["dashboardReportCustomers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: per SKU, stock and its value at the base price (D94), units sold, days of cover, dead stock, movements by type; with a summary; cached 10 minutes */
+        get: operations["dashboardReportInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: money collected per bucket (refunds negative) next to the net sales delivered, the collection rate, the payments per method (D103) and the aging now; cached 10 minutes (D94) */
+        get: operations["dashboardReportCollections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/profit-and-loss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 19 (D100): net sales − cost of goods = gross profit; − stock losses − expenses = net profit, for the range and the one before; only the range applies; cached 10 minutes (D94) */
+        get: operations["dashboardReportProfitAndLoss"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/reports/{report}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** V2 Task 16: an advanced report as an XLSX (default) or CSV file, with the same filters and options; every row, not one page */
+        get: operations["dashboardReportExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/audit": {
         parameters: {
             query?: never;
@@ -1596,7 +2495,7 @@ export interface components {
          * @description Every `error.code` the API emits (08 §0). A customer who is not active gets its status as the code.
          * @enum {string}
          */
-        ErrorCode: "address_locked" | "already_voided" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "cover_price_required" | "csrf_token_mismatch" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "field_type_locked" | "forbidden" | "gallery_full" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "last_active_user" | "not_found" | "order_cancelled" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "rate_limited" | "reserved_subdomain" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
+        ErrorCode: "address_locked" | "already_voided" | "below_collected" | "blocked" | "cannot_disable_self" | "cart_empty" | "cart_line_invalid" | "category_cycle" | "checkout_failed" | "count_outdated" | "cover_price_required" | "credit_applied" | "credit_voided" | "csrf_token_mismatch" | "customer_blocked" | "customer_not_active" | "discount_over_limit" | "discount_too_large" | "duplicate_code" | "duplicate_key" | "duplicate_label" | "duplicate_name" | "duplicate_relation" | "email_taken" | "exceeds_balance" | "exceeds_credit" | "export_not_ready" | "field_type_locked" | "forbidden" | "gallery_full" | "group_archived" | "has_collections" | "http_error" | "idempotency_in_progress" | "idempotency_key_reused" | "import_expired" | "in_use" | "insufficient_stock" | "invalid_credentials" | "invalid_idempotency_key" | "invalid_phone" | "invalid_subdomain" | "invalid_tiers" | "invalid_transition" | "invalid_vertical" | "inventory_below_reserved" | "invited" | "is_bundle" | "is_preorder" | "last_active_user" | "last_owner" | "not_found" | "order_cancelled" | "order_locked" | "otp_attempts_exceeded" | "otp_expired" | "otp_invalid" | "pending_approval" | "pending_verification" | "phone_not_verified" | "phone_taken" | "prices_hidden" | "product_not_active" | "promotion_locked" | "rate_limited" | "refund_required" | "reserved_subdomain" | "return_exceeds_delivered" | "return_has_refund" | "return_not_allowed" | "server_error" | "stateful_request_required" | "store_unavailable" | "subdomain_taken" | "tenant_suspended" | "unauthenticated" | "use_invitation" | "user_disabled" | "validation_failed" | "void_refund_first" | "wa_gateway_capacity" | "wa_gateway_unavailable" | "whatsapp_already_connected";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1658,6 +2557,8 @@ export interface components {
              * @example +201012345678
              */
             phone: string;
+            /** @description BR-N03: false when the customer turned order messages off */
+            order_notifications: boolean;
             /** @enum {string} */
             status: "pending_verification" | "invited" | "pending_approval" | "active" | "blocked";
             status_label: string;
@@ -1710,7 +2611,7 @@ export interface components {
             children: components["schemas"]["Category"][];
         };
         FacetOption: {
-            /** @description Select option id, or "true"/"false" for a boolean field; sent back as `f[<key>]=<id>`. */
+            /** @description Select option id, "true"/"false" for a boolean field, or the folded value of a variant option (type `option`); sent back as `f[<key>]=<id>`. */
             id: number | string;
             label: string;
             count: number;
@@ -1718,8 +2619,11 @@ export interface components {
         Facet: {
             key: string;
             label: string;
-            /** @enum {string} */
-            type: "select" | "boolean";
+            /**
+             * @description `option` = a variant option (BR-P14) whose key is `o:<folded name>`; select and boolean are custom fields
+             * @enum {string}
+             */
+            type: "select" | "boolean" | "option";
             options: components["schemas"]["FacetOption"][];
         };
         CustomFieldValue: {
@@ -1727,11 +2631,29 @@ export interface components {
             label: string;
             value: string;
         };
+        /**
+         * @description Where a unit price came from (BR-PR14, D89, D90): the base price, a quantity tier, the customer's group, their negotiated price or a live promotion (V2 Task 12)
+         * @enum {string}
+         */
+        PriceSource: "base" | "tier" | "group" | "customer" | "promotion";
+        /** @description The live promotion that set a price (BR-PR15, V2 Task 12): the offer badge's % and «ينتهي خلال …» */
+        PromotionSummary: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            /** Format: date-time */
+            ends_at: string;
+        };
+        /**
+         * @description Present only when the price is the shopper's own (their group or negotiated price), for the «سعرك الخاص» badge
+         * @enum {string}
+         */
+        CustomerPriceSource: "group" | "customer";
         PriceTier: {
             min_quantity: number;
             unit_price: components["schemas"]["Money"] | null;
         };
-        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). */
+        /** @description Quantities and MOQ are in the selling unit; `available` is in base units (D37). Price keys are left out when prices are hidden (D1); `available` is left out and `coming_soon` is true for a coming-soon product (D21). Prices are the shopper's own (BR-PR14): `price_source` is present only when it is their group or negotiated price, `promotion` only when a live promotion sets the price (BR-PR15, guests too). */
         StoreSku: {
             id: number;
             code: string;
@@ -1742,10 +2664,58 @@ export interface components {
             base_price?: components["schemas"]["Money"];
             discount_percent?: components["schemas"]["Money"] | null;
             tiers?: components["schemas"]["PriceTier"][];
+            price_source?: components["schemas"]["CustomerPriceSource"];
+            promotion?: components["schemas"]["PromotionSummary"];
+            /** @description Every unit the SKU is sold in, the default first (V2 Task 13, D91); the flat unit, factor, MOQ and prices above are the default unit's */
+            units: components["schemas"]["StoreSkuUnit"][];
             available?: number;
+            /** @description At least one unit can be ordered */
             in_stock: boolean;
             /** @constant */
             coming_soon?: true;
+            /** @description The variant label, the SKU's option values in option order joined by " / " («أزرق / M»); null for a product without options (BR-P14) */
+            label?: string | null;
+            /** @description The SKU's option value ids in option order (one per option of the product; empty without options) */
+            option_value_ids?: number[];
+        };
+        /** @description A variant option (BR-P14, D92) with the values at least one active SKU uses, in the merchant's order */
+        StoreProductOption: {
+            id: number;
+            name: string;
+            values: {
+                id: number;
+                value: string;
+                /** @description The swatch: one product image chosen for the value */
+                image_url: string | null;
+            }[];
+        };
+        /** @description The lowest and highest default-unit price over the active SKUs, at the shopper's prices («من … إلى …») */
+        PriceRange: {
+            min: components["schemas"]["Money"];
+            max: components["schemas"]["Money"];
+        };
+        /** @description One unit of a SKU (D91), priced on its own at the shopper's prices; price keys follow the SKU's rules */
+        StoreSkuUnit: {
+            id: number;
+            unit: string | null;
+            conversion_factor: number;
+            moq: number;
+            cover_price?: components["schemas"]["Money"] | null;
+            base_price?: components["schemas"]["Money"];
+            discount_percent?: components["schemas"]["Money"] | null;
+            tiers?: components["schemas"]["PriceTier"][];
+            price_source?: components["schemas"]["CustomerPriceSource"];
+            promotion?: components["schemas"]["PromotionSummary"];
+            is_default: boolean;
+            /** @description The product is active and at least one of this unit can be ordered */
+            in_stock: boolean;
+        };
+        /** @description A Coming Soon product's pre-order offer (BR-O14, D88); `remaining` is what is left under the merchant's cap in selling units, null = no cap */
+        StorePreorder: {
+            enabled: boolean;
+            /** Format: date */
+            expected_at: string | null;
+            remaining: number | null;
         };
         StoreProduct: {
             id: number;
@@ -1754,10 +2724,28 @@ export interface components {
             description: string | null;
             /** @enum {string} */
             status: "active" | "coming_soon";
+            type: components["schemas"]["ProductType"];
             main_image_url: string | null;
+            /** @description A bundle's components (BR-P15, D93); left out for a simple product */
+            components?: components["schemas"]["StoreBundleComponent"][];
+            /** @description Bundles the components allow now (D93); left out for a simple product */
+            availability?: number;
+            /** @description The components bought on their own at the shopper's prices; bundles only, left out when prices are hidden */
+            components_total?: components["schemas"]["Money"] | null;
+            /** @description components_total less the bundle's price, never below 0 («وفّر»); bundles only, left out when prices are hidden */
+            saving?: components["schemas"]["Money"] | null;
+            /** @description Null unless the product is Coming Soon */
+            preorder: components["schemas"]["StorePreorder"] | null;
             category: components["schemas"]["CategoryRef"] | null;
             custom_fields: components["schemas"]["CustomFieldValue"][];
+            /** @description The SKU standing for the product on cards and lists: the first active SKU that is in stock, else the first active one (V2 Task 14); null when no SKU is active */
             sku: components["schemas"]["StoreSku"] | null;
+            /** @description Every active SKU (variant) in the merchant's order, each priced like `sku` (BR-P14); one entry for a product without options */
+            skus: components["schemas"]["StoreSku"][];
+            /** @description The variant options (at most 2, D92); empty for a product without options */
+            options: components["schemas"]["StoreProductOption"][];
+            /** @description Left out when prices are hidden (D1); null when no SKU is active */
+            price_range?: components["schemas"]["PriceRange"] | null;
             /**
              * @description Present (true) only when the tenant hides prices from guests (BR-CU04).
              * @constant
@@ -1781,8 +2769,16 @@ export interface components {
             gallery: components["schemas"]["ProductImage"][];
             related: components["schemas"]["RelatedProduct"][];
         };
+        /** @description One row per unit of every active SKU (variant) of the product, SKUs in the merchant's order, the default unit first (D91, BR-P14) */
         PriceListRow: {
+            /** @description The product */
             id: number;
+            sku_id: number | null;
+            /** @description The variant label («أزرق / M»), null without options */
+            variant: string | null;
+            sku_unit_id: number | null;
+            conversion_factor: number | null;
+            is_default: boolean;
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"] | null;
@@ -1791,6 +2787,8 @@ export interface components {
             moq: number | null;
             cover_price?: components["schemas"]["Money"] | null;
             base_price?: components["schemas"]["Money"] | null;
+            price_source?: components["schemas"]["CustomerPriceSource"];
+            promotion?: components["schemas"]["PromotionSummary"];
             /** @enum {string} */
             availability: "available" | "coming_soon";
         };
@@ -1855,7 +2853,13 @@ export interface components {
         };
         CartItem: {
             sku_id: number;
+            /** @description The unit of the line (D91); a SKU may be in the cart in two units */
+            sku_unit_id: number;
             product_name: string;
+            /** @description The variant label («أزرق / M», BR-P14), null without options */
+            variant: string | null;
+            /** @description A bundle (D93): available is then the bundles its components allow */
+            is_bundle: boolean;
             product_slug: string;
             unit: string;
             conversion_factor: number;
@@ -1863,15 +2867,30 @@ export interface components {
             quantity: number;
             unit_price: components["schemas"]["Money"];
             tier_min_quantity: number | null;
+            price_source: components["schemas"]["PriceSource"];
+            /** @description The promotion that set the price (price_source promotion), else null */
+            promotion: components["schemas"]["PromotionSummary"] | null;
             line_total: components["schemas"]["Money"];
             moq: number;
             /** @description Base units (D37) */
             available: number;
         };
+        PreorderCartItem: components["schemas"]["CartItem"] & {
+            /** Format: date */
+            expected_at: string | null;
+        };
+        /**
+         * @description A cart line to order now, or to pre-order (BR-O14); order by default
+         * @enum {string}
+         */
+        CartLineKind: "order" | "preorder";
         RemovedCartItem: {
             product_name: string;
-            /** @constant */
-            reason: "inactive";
+            /**
+             * @description inactive = the product can no longer be ordered (BR-P04); preorder_closed = it no longer takes pre-orders (BR-O14)
+             * @enum {string}
+             */
+            reason: "inactive" | "preorder_closed";
         };
         Cart: {
             items: components["schemas"]["CartItem"][];
@@ -1883,20 +2902,33 @@ export interface components {
                 amount: components["schemas"]["Money"] | null;
                 satisfied: boolean;
             };
+            /** @description The pre-order lines (BR-O14), confirmed apart; prices are indicative and the minimum order value does not apply (D88) */
+            preorders: {
+                items: components["schemas"]["PreorderCartItem"][];
+                items_total: components["schemas"]["Money"];
+            };
         };
         /** @description One entry of `error.items` on checkout_failed and cart_line_invalid; quantities in selling units. */
         LineProblem: {
             sku_id: number;
+            /** @description The line's SKU unit (D91) */
+            sku_unit_id: number;
             /** @enum {string} */
-            reason: "insufficient_stock" | "below_moq" | "product_inactive";
+            reason: "insufficient_stock" | "below_moq" | "product_inactive" | "preorder_unavailable" | "preorder_limit";
             requested?: number;
             available?: number;
+            /** @description preorder_limit: what is left under the merchant's cap (BR-O14) */
+            remaining?: number;
             moq?: number;
         };
         /** @enum {string} */
         OrderStatus: "pending" | "confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
         OrderItem: {
+            /** @description The order line, as PUT …/discount names it (D85) */
+            id: number;
             sku_id: number;
+            /** @description The unit the line was ordered in (D91) */
+            sku_unit_id: number | null;
             product_name: string;
             sku_code: string;
             sku_name: string;
@@ -1904,10 +2936,60 @@ export interface components {
             conversion_factor: number;
             quantity: number;
             cover_price: components["schemas"]["Money"] | null;
+            /** @description The price before the manual discount (D85) */
+            list_unit_price: components["schemas"]["Money"];
+            /** @description The merchant's discount per unit (D85), null for none */
+            manual_discount: components["schemas"]["DiscountValue"] | null;
+            /** @description The price charged per unit, after the manual discount */
             unit_price: components["schemas"]["Money"];
+            /** @description Display only: the tier margin off the cover price (BR-PR10) */
             discount_percent: components["schemas"]["Money"] | null;
             tier_min_quantity: number | null;
+            price_source: components["schemas"]["PriceSource"];
+            /** @description unit_price × the quantity charged: delivered_quantity once delivered, else quantity */
             line_total: components["schemas"]["Money"];
+            /** @description Selling units that went out, set on delivery; less than quantity when delivered short (BR-O13) */
+            delivered_quantity: number | null;
+            /**
+             * Format: date-time
+             * @description The merchant removed the line (BR-O12): kept for history, out of every total
+             */
+            removed_at: string | null;
+            /** @description Selling units of a pre-order line already converted into a normal order (BR-O14); line_total charges the rest. 0 on a normal order */
+            converted_quantity: number;
+            /** @description The line of a bundle (D93): priced, holding no stock; its components follow it */
+            is_bundle: boolean;
+            /** @description The bundle line a component line belongs to (D93); out of the items total */
+            parent_item_id: number | null;
+        };
+        /**
+         * @description D85: EGP off, or % off (below 100)
+         * @enum {string}
+         */
+        DiscountType: "amount" | "percent";
+        DiscountValue: {
+            type: components["schemas"]["DiscountType"];
+            value: components["schemas"]["Money"];
+        };
+        /** @description The order discount (D85): what was given and the amount it takes off items_total */
+        OrderDiscount: components["schemas"]["DiscountValue"] & {
+            amount: components["schemas"]["Money"];
+        };
+        /** @description D85: null or a missing type = no discount */
+        DiscountInput: {
+            type?: components["schemas"]["DiscountType"] | null;
+            /** @description Above 0, two decimals at most; a percent below 100 */
+            value?: string | number | null;
+        };
+        OrderDiscountRequest: {
+            /** @description Each line of the order once; a line left out has no discount */
+            items: (components["schemas"]["DiscountInput"] & {
+                order_item_id: number;
+            })[];
+            /** @description The discount on the whole order; a reason is required with one */
+            order?: (components["schemas"]["DiscountInput"] & {
+                reason?: string | null;
+            }) | null;
         };
         OrderHistoryEntry: {
             from: components["schemas"]["OrderStatus"] | null;
@@ -1919,12 +3001,27 @@ export interface components {
         };
         Order: {
             number: number;
+            kind: components["schemas"]["OrderKind"];
+            /** @description Where a pre-order stands (D88); null for a normal order */
+            preorder_state: components["schemas"]["PreorderState"] | null;
+            /**
+             * Format: date-time
+             * @description A pre-order converted in full (D88)
+             */
+            converted_at: string | null;
             status: components["schemas"]["OrderStatus"];
             status_label: string;
             /** Format: date-time */
             placed_at: string;
             items_total: components["schemas"]["Money"];
+            /** @description The order discount (D85), null for none; the dashboard adds the reason */
+            discount: components["schemas"]["OrderDiscount"] | null;
+            /** @description items_total − the order discount (BR-O08) */
             order_total: components["schemas"]["Money"];
+            /** @description Σ live returns (BR-R05) */
+            returned_total: components["schemas"]["Money"];
+            /** @description order_total − returned_total (BR-O08) */
+            net_total: components["schemas"]["Money"];
             /** @enum {string} */
             collection_status: "unpaid" | "partially_collected" | "collected";
             collected_amount: components["schemas"]["Money"];
@@ -1941,12 +3038,39 @@ export interface components {
             };
             customer_note: string | null;
             cancel_reason: string | null;
-            /** @enum {string|null} */
-            cancelled_by: "customer" | "tenant_user" | null;
+            /**
+             * @description system = cancelled because nobody confirmed it in time (BR-INV07, D81)
+             * @enum {string|null}
+             */
+            cancelled_by: "customer" | "tenant_user" | "system" | null;
+        };
+        /**
+         * @description A normal order, or a pre-order of a Coming Soon product that holds no stock (BR-O14, D88)
+         * @enum {string}
+         */
+        OrderKind: "order" | "preorder";
+        /**
+         * @description open = something left to convert (partly converted too), converted = everything went into normal orders (D88)
+         * @enum {string}
+         */
+        PreorderState: "open" | "converted" | "cancelled";
+        OrderConversion: {
+            number: number;
+            status: components["schemas"]["OrderStatus"];
+            order_total: components["schemas"]["Money"];
+            /** Format: date-time */
+            placed_at: string;
         };
         OrderDetail: components["schemas"]["Order"] & {
+            /** @description The pre-order number this order was converted from (BR-O14) */
+            converted_from: number | null;
+            /** @description The normal orders a pre-order was converted into, oldest first (empty for a normal order) */
+            conversions: components["schemas"]["OrderConversion"][];
+            /** @description Every line, removed ones too (removed_at) */
             items: components["schemas"]["OrderItem"][];
+            changes: components["schemas"]["OrderItemChange"][];
             history: components["schemas"]["OrderHistoryEntry"][];
+            returns: components["schemas"]["StoreOrderReturn"][];
         };
         DashboardLoginRequest: {
             /** Format: email */
@@ -1958,7 +3082,8 @@ export interface components {
             name: string;
             email: string;
             /** @enum {string} */
-            role: "owner";
+            role: "owner" | "manager" | "sales" | "warehouse" | "accountant";
+            role_label: string;
             /** @enum {string} */
             status: "active" | "disabled";
             /** Format: date-time */
@@ -1975,10 +3100,31 @@ export interface components {
         DashboardMe: {
             user: components["schemas"]["TenantUser"];
             tenant: components["schemas"]["Tenant"];
+            /** @description BR-T06, D82: what the role may do; every other dashboard endpoint answers 403 forbidden */
+            permissions: components["schemas"]["Permission"][];
         };
+        /** @enum {string} */
+        Permission: "catalog.manage" | "pricing.manage" | "pricing.customers" | "inventory.adjust" | "orders.view" | "orders.manage" | "orders.create" | "orders.override_mov" | "orders.edit" | "orders.discount" | "orders.returns" | "customers.manage" | "customers.credit" | "collections.manage" | "expenses.manage" | "reports.view" | "settings.manage" | "users.manage" | "audit.view";
         DashboardSettings: components["schemas"]["TenantSettings"] & {
+            /** @description BR-N03 the statuses customers are told about, plus `discount` (D85) and `edited` (D87, on by default) */
+            order_notify_statuses: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount" | "edited")[];
+            /** @description BR-N03 status => the store wording; a missing status uses order_status_message_defaults */
+            order_status_messages: {
+                [key: string]: string;
+            };
+            order_status_message_defaults: {
+                [key: string]: string;
+            };
+            /** @description BR-C06 terms a new customer starts with */
+            default_payment_terms_days: number | null;
+            /** @description BR-C05 limit a new customer starts with */
+            default_credit_limit: components["schemas"]["Money"] | null;
             /** @description Hours before a pending order is stale (D10) */
             stale_pending_hours: number;
+            /** @description BR-INV07 hours before an unconfirmed order cancels itself; null = off (D81) */
+            pending_expiry_hours: number | null;
+            /** @description D85 the most a sales user may take off an order line, in %; null = sales users cannot discount */
+            max_discount_percent_sales: components["schemas"]["Money"] | null;
             /** @description BR-CU08 the store invitation text; null = invitation_message_default. Placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; the link is appended on its own line */
             invitation_message: string | null;
             invitation_message_default: string;
@@ -2016,8 +3162,19 @@ export interface components {
             require_login_for_prices?: boolean;
             require_customer_approval?: boolean;
             stale_pending_hours?: number;
+            /** @description null or empty = off; never below stale_pending_hours (BR-INV07, D81) */
+            pending_expiry_hours?: number | null;
             /** @description Only the placeholders {اسم_العميل} {اسم_المتجر} {عدد_الأيام}; null or empty = the default */
             invitation_message?: string | null;
+            default_payment_terms_days?: number | null;
+            default_credit_limit?: string | null;
+            order_notify_statuses?: ("confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled" | "discount" | "edited")[];
+            /** @description D85 above 0 and below 100, two decimals at most; null = sales users cannot discount */
+            max_discount_percent_sales?: string | number | null;
+            /** @description status => text (≤ 500, placeholders {اسم_العميل} {اسم_المتجر} {رقم_الطلب} {حالة_الطلب} {الإجمالي}, plus {سبب_الإلغاء} for cancelled); `placed` words the message of an order a merchant places for the customer (BR-O11); null or the default text = the default */
+            order_status_messages?: {
+                [key: string]: string | null;
+            };
         };
         IdName: {
             id: number;
@@ -2089,18 +3246,55 @@ export interface components {
             reserved: number;
             available: number;
         };
-        DashboardSku: {
+        /** @description One active unit of a SKU (D91), the default first; tiers on the detail only */
+        DashboardSkuUnit: {
             id: number;
-            code: string;
-            selling_unit: components["schemas"]["IdName"] | null;
-            base_unit: components["schemas"]["IdName"] | null;
+            unit: components["schemas"]["IdName"] | null;
             conversion_factor: number;
             cover_price: components["schemas"]["Money"] | null;
             base_price: components["schemas"]["Money"];
             base_price_percent: components["schemas"]["Money"] | null;
             moq: number;
+            is_default: boolean;
             tiers?: components["schemas"]["DashboardTier"][];
+        };
+        /** @description selling_unit, conversion_factor, prices and moq are the default unit's (for lists); units lists them all (D91) */
+        DashboardSku: {
+            id: number;
+            code: string;
+            selling_unit: components["schemas"]["IdName"] | null;
+            base_unit: components["schemas"]["IdName"] | null;
+            conversion_factor: number | null;
+            cover_price: components["schemas"]["Money"] | null;
+            base_price: components["schemas"]["Money"] | null;
+            base_price_percent: components["schemas"]["Money"] | null;
+            moq: number | null;
+            units?: components["schemas"]["DashboardSkuUnit"][];
             inventory?: components["schemas"]["StockLevels"];
+            /** @description The variant label («أزرق / M»), null without options (BR-P14) */
+            label?: string | null;
+            status?: components["schemas"]["SkuStatus"];
+            sort_order?: number;
+            /** @description The SKU's option values in option order, as sent in `skus[].option_values`; empty without options */
+            option_values?: string[];
+        };
+        /**
+         * @description An inactive SKU (variant) is hidden from the storefront and cannot be ordered (BR-P14)
+         * @enum {string}
+         */
+        SkuStatus: "active" | "inactive";
+        /** @description A variant option (BR-P14, D92) with every value, in the merchant's order */
+        DashboardProductOption: {
+            id: number;
+            name: string;
+            sort_order: number;
+            values: {
+                id: number;
+                value: string;
+                sort_order: number;
+                image_id: number | null;
+                image_url: string | null;
+            }[];
         };
         DashboardProduct: {
             id: number;
@@ -2108,12 +3302,21 @@ export interface components {
             slug: string;
             description: string | null;
             status: components["schemas"]["ProductStatus"];
+            type: components["schemas"]["ProductType"];
             category: components["schemas"]["CategoryRef"] | null;
             /** @description Field key → option id (select), number, boolean or text */
             custom_fields: {
                 [key: string]: string | number | boolean;
             };
+            preorder: components["schemas"]["ProductPreorder"];
+            /** @description A bundle's pricing and components (BR-P15, D93); detail responses of a bundle only */
+            bundle?: components["schemas"]["DashboardBundle"] | null;
+            /** @description The SKU standing for the product in lists: the first active SKU, else the first (V2 Task 14) */
             sku: components["schemas"]["DashboardSku"] | null;
+            /** @description Every SKU (variant), active and inactive, in the merchant's order (BR-P14); one for a product without options */
+            skus: components["schemas"]["DashboardSku"][];
+            /** @description The variant options (at most 2, D92); empty without options */
+            options: components["schemas"]["DashboardProductOption"][];
             main_image_url: string | null;
             /** @description Detail responses only */
             images?: components["schemas"]["ProductImage"][];
@@ -2151,21 +3354,197 @@ export interface components {
             moq?: number;
             tiers?: components["schemas"]["TierRequest"][];
         };
+        /** @description Pre-orders while Coming Soon (BR-O14, D88): on/off, the expected day, and the cap on every open pre-order in selling units (null = none) */
+        ProductPreorder: {
+            enabled: boolean;
+            /** Format: date */
+            expected_at: string | null;
+            limit: number | null;
+        };
+        PreorderDemandCounts: {
+            /** @description Open pre-ordered units (in the units ordered), not yet converted */
+            quantity: number;
+            /** @description The same in base units (D91) */
+            quantity_base: number;
+            customers: number;
+            preorders: number;
+        };
+        PreorderDemand: components["schemas"]["PreorderDemandCounts"] & {
+            product_id: number;
+            status: components["schemas"]["ProductStatus"];
+            preorder_enabled: boolean;
+            /** Format: date */
+            expected_at: string | null;
+            limit: number | null;
+            /** @description What is left under the cap; null = no cap */
+            remaining: number | null;
+        };
+        PreorderConversion: {
+            converted_orders: {
+                /** @description The new normal order */
+                number: number;
+                preorder_number: number;
+                /** @description Selling units converted */
+                quantity: number;
+                order_total: components["schemas"]["Money"];
+            }[];
+            /** @description Pre-orders that got only part of what they asked for; the rest stays pre-ordered */
+            partially: number;
+            /** @description Open pre-orders that got nothing (no stock left, or the customer cannot order) */
+            untouched: number;
+        };
+        /** @description Send either `sku` (a product without options: its one SKU, the V1 shape) or `skus` (BR-P14, V2 Task 14). With `options`, `skus` is required: one SKU per combination sold, each naming one value of every option in `option_values` (in option order); a combination at most once; at least one SKU active. A SKU left out of `skus` is deleted when nothing points at it (no orders, stock movements, negotiated prices or promotions), otherwise it is set inactive (BR-P05). An option or value left out is deleted. A SKU sent without `id` takes the place of the product's SKU with the same code, else with the same combination, else it is created. */
         ProductRequest: {
+            /** @description At most two options with up to 20 values each (D92); names distinct, values distinct within an option */
+            options?: components["schemas"]["ProductOptionRequest"][];
+            skus?: components["schemas"]["SkuRequest"][];
             name: string;
             category_id: number;
             description?: string | null;
+            /** @description Optional: left out = off on create, kept on update (D88) */
+            preorder?: {
+                enabled: boolean;
+                /** Format: date */
+                expected_at?: string | null;
+                limit?: number | null;
+            };
             custom_fields?: {
                 [key: string]: string | number | boolean | null;
             };
-            sku: components["schemas"]["PriceSetRequest"] & {
+            sku?: {
                 code: string;
-                selling_unit_id: number;
                 base_unit_id: number;
-                conversion_factor: number;
+                /** @description The units the SKU is sold in (D91), each unit_id once; at most one is_default (none = the first). A unit left out is archived; sending its unit_id again restores it. */
+                units: components["schemas"]["SkuUnitRequest"][];
             };
         };
+        ProductOptionRequest: {
+            /** @description An existing option of the product; omitted for a new one (matched by name then) */
+            id?: number | null;
+            name: string;
+            values: {
+                id?: number | null;
+                value: string;
+                /** @description One of the product's images, shown as the swatch */
+                image_id?: number | null;
+            }[];
+        };
+        SkuRequest: {
+            /** @description An existing SKU of the product */
+            id?: number | null;
+            code: string;
+            base_unit_id: number;
+            status?: components["schemas"]["SkuStatus"];
+            /** @description One value of every option, in option order (the value text); empty or left out without options */
+            option_values?: string[];
+            /** @description Base units; applied only to a SKU this call creates */
+            opening_stock?: number;
+            units: components["schemas"]["SkuUnitRequest"][];
+        };
+        SkuUnitRequest: components["schemas"]["PriceSetRequest"] & {
+            /** @description An existing unit of the SKU; omitted for a new one */
+            id?: number | null;
+            unit_id: number;
+            conversion_factor: number;
+            is_default?: boolean;
+        };
         PricingRequest: components["schemas"]["PriceSetRequest"] & Record<string, never>;
+        BundleReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description One row per bundle delivered in the range, most sold first */
+            bundles: {
+                product_id: number;
+                /** @description The bundle name as snapshotted on its latest line */
+                name: string;
+                sku_code: string;
+                /** @description Bundles delivered (less returns are not taken off) */
+                quantity: number;
+                /** @description Σ line_total of the bundle lines */
+                total: components["schemas"]["Money"];
+            }[];
+            /** @description One row per component SKU the delivered bundles consumed, most first */
+            components: {
+                sku_id: number;
+                sku_code: string;
+                product_name: string;
+                /** @description Base units delivered inside bundles */
+                quantity_base: number;
+            }[];
+        };
+        /**
+         * @description A bundle (BR-P15, D93) is one SKU made of component SKU units, with no stock of its own
+         * @enum {string}
+         */
+        ProductType: "simple" | "bundle";
+        BundlePricing: {
+            /** @enum {string} */
+            mode: "fixed" | "percent_off_sum";
+            /** @description The price (fixed, at least 0.01) or the % off the components' sum (0 ≤ % < 100) */
+            value: components["schemas"]["Money"];
+        };
+        BundleRequest: {
+            name: string;
+            category_id: number;
+            description?: string | null;
+            /** @description Optional for a bundle (none is required) */
+            custom_fields?: {
+                [key: string]: string | number | boolean | null;
+            };
+            code: string;
+            /** @description The store unit the bundle is sold in (factor 1) */
+            unit_id: number;
+            moq?: number;
+            components: {
+                /** @description A unit of an active SKU of an active simple product, once per bundle */
+                sku_unit_id: number;
+                quantity: number;
+            }[];
+            pricing: {
+                /** @enum {string} */
+                mode: "fixed" | "percent_off_sum";
+                value: string | number;
+            };
+        };
+        DashboardBundle: {
+            pricing: components["schemas"]["BundlePricing"] | null;
+            components: components["schemas"]["DashboardBundleComponent"][];
+            /** @description Σ component base price × quantity */
+            components_total: components["schemas"]["Money"];
+            /** @description Bundles the components allow now */
+            availability: number;
+        };
+        DashboardBundleComponent: {
+            id: number;
+            sku_unit_id: number;
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            sku_code: string;
+            /** @description The variant label, null without options */
+            label: string | null;
+            unit: string;
+            conversion_factor: number;
+            /** @description Units of the component in one bundle */
+            quantity: number;
+            base_price: components["schemas"]["Money"];
+            /** @description Base units of the component in stock */
+            available: number;
+            /** @description The component can still be ordered (product active, SKU active, unit sold) */
+            orderable: boolean;
+        };
+        StoreBundleComponent: {
+            product_name: string;
+            slug: string;
+            sku_code: string;
+            label: string | null;
+            unit: string;
+            quantity: number;
+            /** @description The component allows at least one bundle now; false names what is missing */
+            in_stock: boolean;
+        };
         /** @description Must not be empty (BR-P12) */
         ProductFilter: {
             category?: number;
@@ -2182,10 +3561,68 @@ export interface components {
             /** Format: uuid */
             batch_id: string;
         };
+        /** @description One problem of a catalog file row (V2 Task 06); row 0 is the whole file. */
+        ImportRowError: {
+            /** @description The spreadsheet row number */
+            row: number;
+            /** @description The column key (sku_code, base_price, tier_2_min, field:grade, tiers, row, file) */
+            column: string;
+            /** @description The Arabic header of that column */
+            label: string;
+            message: string;
+        };
+        ImportPreview: {
+            /** Format: uuid */
+            token: string;
+            file_name: string;
+            total: number;
+            create: number;
+            update: number;
+            /** @description Rows with errors, not imported */
+            skip: number;
+            errors: components["schemas"]["ImportRowError"][];
+            errors_truncated: boolean;
+        };
+        /** @enum {string} */
+        ImportStatus: "queued" | "running" | "done" | "failed";
+        CatalogImport: {
+            id: number;
+            file_name: string;
+            status: components["schemas"]["ImportStatus"];
+            total: number;
+            processed: number;
+            created: number;
+            updated: number;
+            /** @description Rows with errors, not written */
+            skipped: number;
+            /** @description Rows the database refused unexpectedly */
+            failed: number;
+            errors: components["schemas"]["ImportRowError"][];
+            /**
+             * Format: uuid
+             * @description The audit batch of every change of the run
+             */
+            batch_id: string;
+            /** Format: date-time */
+            started_at: string | null;
+            /** Format: date-time */
+            finished_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        QueuedExport: {
+            /** Format: uuid */
+            id: string;
+            /** @description Host-relative signed link; 409 export_not_ready until the file is written */
+            download_url: string;
+        };
         SkuPricing: {
             product_id: number;
             sku_id: number;
+            sku_unit_id: number;
             code: string;
+            unit: string;
+            conversion_factor: number;
             cover_price: components["schemas"]["Money"] | null;
             base_price: components["schemas"]["Money"];
             base_price_percent: components["schemas"]["Money"] | null;
@@ -2202,12 +3639,16 @@ export interface components {
                 discount_percent: string;
             }[];
             moq?: number;
+            /** @description Only the SKU units sold in this store unit (D91); left out = every unit */
+            unit_id?: number | null;
         };
         SkippedNoCoverPrice: {
             product_id: number;
             sku_id: number;
+            sku_unit_id: number;
             code: string;
             name: string;
+            unit: string;
         };
         BulkPricingResult: {
             affected: number;
@@ -2223,6 +3664,8 @@ export interface components {
             product_id: number;
             code: string;
             name: string | null;
+            /** @description The variant label («أزرق / M»), null without options (BR-P14) */
+            variant: string | null;
             status: components["schemas"]["ProductStatus"] | null;
             on_hand: number;
             reserved: number;
@@ -2232,7 +3675,15 @@ export interface components {
             moq: number;
             conversion_factor: number;
             low_stock: boolean;
+            /** @description The average cost per base unit (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g) */
+            avg_cost?: components["schemas"]["UnitCostOrNull"];
         };
+        /**
+         * @description A cost per base unit, 4 decimals (D96 a), e.g. "5.5000"
+         * @example 5.5000
+         */
+        UnitCost: string;
+        UnitCostOrNull: components["schemas"]["UnitCost"] | null;
         /** @description The details of 422 inventory_below_reserved (BR-INV08) */
         BelowReservedDetails: {
             reserved: number;
@@ -2252,12 +3703,17 @@ export interface components {
         StockMovement: {
             id: number;
             /** @enum {string} */
-            type: "opening" | "adjustment" | "sale" | "return";
+            type: "opening" | "adjustment" | "sale" | "return" | "receive";
             type_label: string;
             /** @description Signed change in base units */
             quantity: number;
             on_hand_after: number;
+            /** @description The reason of an adjustment as text (its label, then the note), the note of a receive */
             reason: string | null;
+            /** @description An adjustment's reason from the list (D97); null on adjustments made before it and on other types */
+            reason_code: components["schemas"]["AdjustmentReason"] | null;
+            /** @description The cost per base unit it moved at (BR-INV09); present only for users with inventory.adjust or reports.view (D96 g) */
+            unit_cost?: components["schemas"]["UnitCostOrNull"];
             order_id: number | null;
             actor: components["schemas"]["Actor"];
             /** Format: date-time */
@@ -2266,12 +3722,26 @@ export interface components {
         BulkAdjustItem: {
             sku_id: number;
             new_on_hand: number;
-            reason: string;
+            reason: components["schemas"]["MerchantAdjustmentReason"];
+            /** @description Required when reason is other (D97) */
+            note?: string | null;
+            /** @description D99 a */
+            expected_on_hand?: number | null;
         };
+        /**
+         * @description Why On Hand was changed by hand (D97): جرد، كسر أو تلف، انتهاء صلاحية، تصحيح خطأ تسجيل، بضاعة وُجدت، أخرى; import is written by the catalog import only
+         * @enum {string}
+         */
+        AdjustmentReason: "stocktake" | "damaged" | "expired" | "recording_error" | "found" | "other" | "import";
+        /**
+         * @description The reasons a merchant may choose (D97): every AdjustmentReason but import
+         * @enum {string}
+         */
+        MerchantAdjustmentReason: "stocktake" | "damaged" | "expired" | "recording_error" | "found" | "other";
         BulkAdjustSkipped: {
             sku_id: number;
             /** @enum {string} */
-            reason: "below_reserved" | "not_found" | "unchanged";
+            reason: "below_reserved" | "not_found" | "unchanged" | "count_outdated";
             reserved?: number;
             min_allowed?: number;
         };
@@ -2298,6 +3768,12 @@ export interface components {
         };
         DashboardCustomer: components["schemas"]["Customer"] & {
             outstanding_amount: components["schemas"]["Money"];
+            /** @description BR-PR12; null = no group. An archived group no longer lowers prices */
+            group: components["schemas"]["CustomerGroupRef"] | null;
+            /** @description BR-C05; null = no limit */
+            credit_limit: components["schemas"]["Money"] | null;
+            /** @description BR-C06; null = due on delivery */
+            payment_terms_days: number | null;
             created_by: number | null;
             approved_by: number | null;
             /** Format: date-time */
@@ -2307,6 +3783,101 @@ export interface components {
             addresses?: components["schemas"]["Address"][];
             /** @description GET customers/{customer} only, the 5 newest */
             recent_orders?: components["schemas"]["RecentOrder"][];
+        };
+        /** @enum {string} */
+        CustomerGroupStatus: "active" | "archived";
+        CustomerGroupRef: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            status: components["schemas"]["CustomerGroupStatus"];
+        };
+        /** @description A wholesale level with one % off the base price (BR-PR12, D89) */
+        CustomerGroup: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            status: components["schemas"]["CustomerGroupStatus"];
+            sort_order: number;
+            customers_count: number;
+        };
+        /** @enum {string} */
+        PromotionStatus: "draft" | "scheduled" | "active" | "ended" | "cancelled";
+        /** @description A time-boxed % off the base price of the SKUs it covers (BR-PR15, D90); `status` is as of now */
+        Promotion: {
+            id: number;
+            name: string;
+            discount_percent: components["schemas"]["Money"];
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            status: components["schemas"]["PromotionStatus"];
+            /** @enum {string} */
+            target: "filter" | "skus";
+            /** @description The stored product filter {category, f, q, status}; null for an explicit SKU list */
+            filter: {
+                [key: string]: unknown;
+            } | null;
+            skus_count: number;
+            /** @description The explicit SKU list (detail only) */
+            skus?: {
+                sku_id: number;
+                code: string;
+                product_name: string;
+            }[];
+            /** Format: date-time */
+            cancelled_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** @description Times without an offset are Cairo time (D60); the target is filter or sku_ids, never both */
+        PromotionRequest: {
+            name: string;
+            /** @description More than 0, below 90 */
+            discount_percent: string | number;
+            starts_at: string;
+            ends_at: string;
+            filter?: components["schemas"]["ProductFilter"];
+            sku_ids?: number[];
+            /** @enum {string} */
+            status?: "draft" | "scheduled";
+        };
+        PromotionPatch: {
+            name?: string;
+            discount_percent?: string | number;
+            starts_at?: string;
+            ends_at?: string;
+            filter?: components["schemas"]["ProductFilter"];
+            sku_ids?: number[];
+            /** @enum {string} */
+            status?: "draft" | "scheduled";
+        };
+        PromotionPreview: {
+            skus_count: number;
+            sample: {
+                sku_id: number;
+                code: string;
+                product_name: string;
+                base_price: components["schemas"]["Money"];
+                promotion_price: components["schemas"]["Money"] | null;
+            }[];
+        };
+        /** @description A price negotiated with one customer for one SKU (BR-PR13, D89) */
+        CustomerSkuPrice: {
+            sku_id: number;
+            /** @description Negotiated per unit (D91) */
+            sku_unit_id: number;
+            sku_code: string;
+            product_name: string;
+            unit: string;
+            conversion_factor: number;
+            /** @description The unit's own base price, to compare */
+            base_price: components["schemas"]["Money"];
+            unit_price: components["schemas"]["Money"];
+            note: string | null;
+            /** Format: date-time */
+            updated_at: string;
         };
         InviteResult: {
             /** @enum {string} */
@@ -2319,6 +3890,17 @@ export interface components {
         CollectionStatus: "unpaid" | "partially_collected" | "collected";
         DashboardOrderFields: {
             id: number;
+            /** @description The order discount with the merchant's reason (D85), null for none */
+            discount: (components["schemas"]["OrderDiscount"] & {
+                reason: string;
+            }) | null;
+            /**
+             * @description BR-O11 who placed the order: the customer at checkout, or a dashboard user on their behalf
+             * @enum {string}
+             */
+            placed_by: "customer" | "tenant_user";
+            /** @description The customer or dashboard user id, by placed_by */
+            placed_by_id: number | null;
             customer?: {
                 id: number;
                 name: string;
@@ -2332,8 +3914,120 @@ export interface components {
             cancelled_at: string | null;
             /** @description Pending for longer than stale_pending_hours (D10) */
             is_stale: boolean;
+            /**
+             * Format: date-time
+             * @description When a pending order cancels itself; null when not pending or expiry is off (D81)
+             */
+            expires_at: string | null;
+        };
+        OrderLinesRequest: {
+            /** @description Every line the order should have; each SKU unit once (D91), quantity in that unit */
+            lines: {
+                /** @description An existing live line; omitted or null for a new one */
+                order_item_id?: number | null;
+                sku_unit_id: number;
+                quantity: number;
+            }[];
+            /** @description Goes to the history after «تعديل الطلب» */
+            note?: string | null;
+        };
+        /** @description A line change after placement (BR-O12, BR-O13): added (new only), removed (old only), quantity (both), delivered_short (ordered → delivered) */
+        OrderItemChange: {
+            order_item_id: number | null;
+            product_name: string | null;
+            sku_code: string | null;
+            /** @enum {string} */
+            change: "added" | "removed" | "quantity" | "delivered_short" | "converted";
+            old_quantity: number | null;
+            new_quantity: number | null;
+            unit_price_before: components["schemas"]["Money"] | null;
+            unit_price_after: components["schemas"]["Money"] | null;
+            /** Format: date-time */
+            at: string;
+        };
+        DashboardOrderItemChange: components["schemas"]["OrderItemChange"] & {
+            /** @description The dashboard user; null = system */
+            actor_id: number | null;
+        };
+        OrderQuoteRequest: {
+            customer_id: number;
+            /** @description BR-O12: quote an edit of this order of the customer (its number): what it holds counts as available and its total is not counted twice against the credit limit */
+            order?: number | null;
+            /** @description Each SKU unit once (D91; one SKU may come in two units); quantity in that unit */
+            lines: {
+                sku_unit_id: number;
+                quantity: number;
+            }[];
+        };
+        MerchantOrderRequest: components["schemas"]["OrderQuoteRequest"] & {
+            /** @description One of the customer's active addresses */
+            address_id: number;
+            /** @description Kept as the order note; the customer sees it */
+            note?: string | null;
+            /** @description Send the `placed` WhatsApp message (default false) */
+            notify_customer?: boolean;
+            /** @description D84 waive the minimum order value for this order; needs orders.override_mov */
+            override_mov?: boolean;
+            /** @description As in the quote, plus an optional discount per line (D85; needs orders.discount) */
+            lines?: {
+                discount?: components["schemas"]["DiscountInput"] | null;
+            }[];
+            /** @description D85 the order discount, applied after the checks at list prices; needs orders.discount and a reason */
+            discount?: (components["schemas"]["DiscountInput"] & {
+                reason?: string | null;
+            }) | null;
+        };
+        OrderQuoteLine: {
+            sku_id: number;
+            sku_unit_id: number;
+            product_name: string;
+            sku_code: string;
+            sku_name: string;
+            unit: string;
+            conversion_factor: number;
+            quantity: number;
+            moq: number;
+            /** @description Selling units left now (not locked); for a bundle the bundles its components allow (D93) */
+            available: number;
+            is_bundle: boolean;
+            cover_price: components["schemas"]["Money"] | null;
+            unit_price: components["schemas"]["Money"];
+            discount_percent: string | null;
+            tier_min_quantity: number | null;
+            price_source: components["schemas"]["PriceSource"];
+            line_total: components["schemas"]["Money"];
+            tiers: {
+                min_quantity: number;
+                unit_price: components["schemas"]["Money"] | null;
+            }[];
+            /** @description The checkout_failed entry of this line without sku_id and sku_unit_id, or null */
+            problem: {
+                /** @enum {string} */
+                reason: "insufficient_stock" | "below_moq" | "product_inactive";
+                requested?: number;
+                available?: number;
+                moq?: number;
+            } | null;
+        };
+        OrderQuote: {
+            lines: components["schemas"]["OrderQuoteLine"][];
+            items_total: components["schemas"]["Money"];
+            mov: {
+                enabled: boolean;
+                amount: components["schemas"]["Money"] | null;
+                satisfied: boolean;
+            };
+            /** @description BR-C05 set when the order would pass the credit limit */
+            credit: {
+                limit: components["schemas"]["Money"];
+                exposure: components["schemas"]["Money"];
+                order_total: components["schemas"]["Money"];
+            } | null;
         };
         DashboardOrder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"];
+        DashboardPreorder: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"] & {
+            items: components["schemas"]["OrderItem"][];
+        };
         DashboardOrderHistoryEntry: {
             from: components["schemas"]["OrderStatus"] | null;
             to: components["schemas"]["OrderStatus"];
@@ -2344,21 +4038,122 @@ export interface components {
             note: string | null;
         };
         DashboardOrderDetail: components["schemas"]["Order"] & components["schemas"]["DashboardOrderFields"] & {
+            /** @description The pre-order number this order was converted from (BR-O14) */
+            converted_from: number | null;
+            /** @description The normal orders a pre-order was converted into, oldest first */
+            conversions: components["schemas"]["OrderConversion"][];
+            /** @description Every line, removed ones too (removed_at) */
             items: components["schemas"]["OrderItem"][];
+            changes: components["schemas"]["DashboardOrderItemChange"][];
             history: components["schemas"]["DashboardOrderHistoryEntry"][];
             collections: components["schemas"]["Collection"][];
+            /** @description Every return, voided included, without `order` (BR-R06) */
+            returns: components["schemas"]["OrderReturn"][];
+            messages: components["schemas"]["OrderMessage"][];
+        };
+        OrderReturnLine: {
+            id: number;
+            order_item_id: number;
+            product_name: string;
+            sku_code: string;
+            unit: string;
+            quantity: number;
+            quantity_base: number;
+            unit_price: components["schemas"]["Money"];
+            line_total: components["schemas"]["Money"];
+        };
+        /** @description A return (BR-R01..R06). `order` (the balance after the change) is on the list and the writes, not inside the order detail; `customer` on the list only. */
+        OrderReturn: {
+            id: number;
+            number: number;
+            order?: {
+                id: number;
+                number: number;
+                order_total: components["schemas"]["Money"];
+                returned_total: components["schemas"]["Money"];
+                net_total: components["schemas"]["Money"];
+                collected_amount: components["schemas"]["Money"];
+                collection_status: components["schemas"]["CollectionStatus"];
+            };
+            customer?: components["schemas"]["IdName"];
+            total: components["schemas"]["Money"];
+            refund_amount: components["schemas"]["Money"];
+            /**
+             * @description How refund_amount went back (BR-C07, BR-C10)
+             * @enum {string|null}
+             */
+            refund_method: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit" | null;
+            reason: string;
+            /** Format: date-time */
+            returned_at: string;
+            recorded_by: number | null;
+            is_voided: boolean;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
+            voided_by: number | null;
+            items: components["schemas"]["OrderReturnLine"][];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ReturnableLine: {
+            order_item_id: number;
+            product_name: string;
+            sku_code: string;
+            unit: string;
+            /** @description What one unit returns at: the line price less the order discount share (D85) */
+            unit_price: components["schemas"]["Money"];
+            ordered: number;
+            /** @description What went out (BR-O13); returnable = delivered − returned */
+            delivered: number;
+            /** @description Brought back by live returns */
+            returned: number;
+            returnable: number;
+        };
+        /** @description A live return as the customer sees it (BR-R05), without the merchant's reason */
+        StoreOrderReturn: {
+            number: number;
+            total: components["schemas"]["Money"];
+            refund_amount: components["schemas"]["Money"];
+            /** @enum {string|null} */
+            refund_method: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit" | null;
+            /** Format: date-time */
+            returned_at: string;
+            items: {
+                product_name: string;
+                sku_code: string;
+                unit: string;
+                quantity: number;
+                unit_price: components["schemas"]["Money"];
+                line_total: components["schemas"]["Money"];
+            }[];
+        };
+        /** @description A WhatsApp/SMS message sent about the order (BR-N03), fallbacks included, oldest first */
+        OrderMessage: {
+            /** @enum {string} */
+            purpose: "otp" | "invitation" | "system_alert" | "order_status";
+            purpose_label: string;
+            /** @enum {string} */
+            channel: "whatsapp" | "sms";
+            /** @enum {string} */
+            status: "queued" | "sent" | "delivered" | "failed" | "fell_back";
+            /** Format: date-time */
+            sent_at: string;
         };
         MerchantNotification: {
             id: number;
             /** @enum {string} */
-            type: "new_order" | "customer_cancelled";
+            type: "new_order" | "customer_cancelled" | "whatsapp_dropped" | "order_expired" | "new_preorder";
             type_label: string;
+            /** @description Orders: order_number, customer_name, order_total (+ reason when customer_cancelled); whatsapp_dropped: phone, reason */
             details: {
-                order_number: number;
-                customer_name: string;
-                order_total: components["schemas"]["Money"];
-                /** @description customer_cancelled only */
+                order_number?: number;
+                customer_name?: string;
+                order_total?: components["schemas"]["Money"];
+                /** @description customer_cancelled and whatsapp_dropped */
                 reason?: string | null;
+                /** @description whatsapp_dropped only */
+                phone?: string | null;
             };
             /** Format: date-time */
             read_at: string | null;
@@ -2371,14 +4166,26 @@ export interface components {
                 id: number;
                 number: number;
                 order_total: components["schemas"]["Money"];
+                net_total: components["schemas"]["Money"];
                 collected_amount: components["schemas"]["Money"];
                 collection_status: components["schemas"]["CollectionStatus"];
             };
             customer?: components["schemas"]["IdName"];
+            /**
+             * @description A refund pays back part of a return (BR-R04) and lowers the collected amount
+             * @enum {string}
+             */
+            kind: "payment" | "refund";
+            kind_label: string;
+            /** @description The return a refund belongs to */
+            order_return_id: number | null;
+            /** @description BR-C07: the credit a credit collection draws from (payment) or creates (refund) */
+            customer_credit_id: number | null;
             amount: components["schemas"]["Money"];
-            /** @enum {string} */
-            method: "cash";
+            method: components["schemas"]["CollectionMethod"];
             method_label: string;
+            /** @description The transfer or wallet transaction number (BR-C10) */
+            reference: string | null;
             /** Format: date-time */
             collected_at: string;
             recorded_by: number | null;
@@ -2391,24 +4198,69 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
-        StatementOrder: {
-            number: number;
-            status: components["schemas"]["OrderStatus"];
-            status_label: string;
+        /** @description One statement row (BR-C08). Positive balance = the customer owes the store. */
+        LedgerRow: {
             /** Format: date-time */
-            placed_at: string;
-            /** Format: date-time */
-            delivered_at: string | null;
-            order_total: components["schemas"]["Money"];
-            collected_amount: components["schemas"]["Money"];
+            date: string;
+            /** @enum {string} */
+            type: "order" | "return" | "payment" | "credit_applied" | "refund" | "refund_to_credit" | "credit_created";
+            type_label: string;
+            order_number: number | null;
+            return_number: number | null;
+            debit: components["schemas"]["Money"];
+            credit: components["schemas"]["Money"];
             balance: components["schemas"]["Money"];
-            collection_status: components["schemas"]["CollectionStatus"];
+            /** @description How a payment or refund moved (BR-C10); null on the other rows */
+            method: components["schemas"]["CollectionMethod"] | null;
+            method_label: string | null;
+            reference: string | null;
+        };
+        /**
+         * @description BR-C10 (D103): cash, instapay, wallet and bank_transfer are recorded by the merchant; credit is drawn from or kept as customer credit (BR-C07)
+         * @enum {string}
+         */
+        CollectionMethod: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit";
+        LedgerMeta: components["schemas"]["PaginationMeta"] & {
+            /** @description Everything before `from` */
+            opening_balance: components["schemas"]["Money"];
+            /** @description Everything up to `to` */
+            closing_balance: components["schemas"]["Money"];
+        };
+        StoreStatementSummary: {
+            outstanding: components["schemas"]["Money"];
+            credit_limit: components["schemas"]["Money"] | null;
+            available_credit: components["schemas"]["Money"] | null;
+            /** @description Unused customer credit (BR-C07) */
+            credit_balance: components["schemas"]["Money"];
+            overdue: components["schemas"]["Money"];
+        };
+        CustomerCredit: {
+            id: number;
+            customer_id: number;
+            source_return_id: number | null;
+            amount: components["schemas"]["Money"];
+            remaining: components["schemas"]["Money"];
+            note: string | null;
+            created_by: number | null;
+            /** Format: date-time */
+            created_at: string;
+            is_voided: boolean;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
+            voided_by: number | null;
         };
         StatementSummary: {
             orders_count: number;
             total: components["schemas"]["Money"];
             collected: components["schemas"]["Money"];
             outstanding: components["schemas"]["Money"];
+            credit_limit: components["schemas"]["Money"] | null;
+            payment_terms_days: number | null;
+            /** @description credit_limit − exposure (D77); null without a limit */
+            available_credit: components["schemas"]["Money"] | null;
+            credit_balance: components["schemas"]["Money"];
+            overdue: components["schemas"]["Money"];
         };
         OverviewReport: {
             orders_by_status: {
@@ -2421,10 +4273,15 @@ export interface components {
             };
             today: {
                 orders: number;
+                /** @description Placed today, not cancelled, minus today's live returns (BR-R05) */
                 total: components["schemas"]["Money"];
+                returns: components["schemas"]["Money"];
             };
             stale_pending: number;
             outstanding_total: components["schemas"]["Money"];
+            /** @description BR-C06 */
+            overdue_total: components["schemas"]["Money"];
+            overdue_customers: number;
             low_stock_count: number;
         };
         /** @enum {string} */
@@ -2439,11 +4296,17 @@ export interface components {
                 /** Format: date */
                 period_start: string;
                 orders: number;
-                total: components["schemas"]["Money"];
+                /** @description Delivered orders by delivered_at */
+                gross: components["schemas"]["Money"];
+                /** @description Live returns by returned_at (BR-R05) */
+                returns: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
             }[];
             totals: {
                 orders: number;
-                total: components["schemas"]["Money"];
+                gross: components["schemas"]["Money"];
+                returns: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
             };
         };
         OutstandingCustomer: {
@@ -2452,6 +4315,293 @@ export interface components {
             total: components["schemas"]["Money"];
             collected: components["schemas"]["Money"];
             outstanding: components["schemas"]["Money"];
+            /** @description The outstanding by days past due (BR-C06): not due yet, 1–30, 31–60, 61–90, over 90 */
+            aging: {
+                current: components["schemas"]["Money"];
+                "0_30": components["schemas"]["Money"];
+                "31_60": components["schemas"]["Money"];
+                "61_90": components["schemas"]["Money"];
+                over_90: components["schemas"]["Money"];
+            };
+            overdue: components["schemas"]["Money"];
+        };
+        /**
+         * @description The advanced reports of V2 Task 16
+         * @enum {string}
+         */
+        ReportName: "sales-analytics" | "products" | "customers" | "inventory" | "collections" | "profit-and-loss";
+        /** @enum {string} */
+        ProductReportSort: "revenue" | "quantity" | "return_rate";
+        /** @enum {string} */
+        CustomerReportView: "top" | "dormant";
+        SalesFigures: {
+            /** @description Orders delivered (with a line of the filter) */
+            orders: number;
+            /** @description List prices × what went out, before manual discounts */
+            gross: components["schemas"]["Money"];
+            /** @description Line discounts and the order discounts (shared over the lines, D85) */
+            discounts: components["schemas"]["Money"];
+            /** @description Live returns by returned_at (BR-R05) */
+            returns: components["schemas"]["Money"];
+            /** @description gross − discounts − returns */
+            net: components["schemas"]["Money"];
+        };
+        SalesTotals: components["schemas"]["SalesFigures"] & {
+            /** @description (gross − discounts) ÷ orders; null without orders */
+            average_order: components["schemas"]["Money"] | null;
+        };
+        /**
+         * @description D100 b: إيجار، رواتب وأجور، نقل وشحن، كهرباء ومياه وإنترنت، صيانة، تغليف ومستلزمات، دعاية وتسويق، رسوم وضرائب، أخرى
+         * @enum {string}
+         */
+        ExpenseCategory: "rent" | "salaries" | "transport" | "utilities" | "maintenance" | "packaging" | "marketing" | "fees" | "other";
+        ExpenseCategoryOption: {
+            code: components["schemas"]["ExpenseCategory"];
+            label: string;
+            needs_note: boolean;
+        };
+        Expense: {
+            id: number;
+            /** Format: date */
+            spent_on: string;
+            amount: components["schemas"]["Money"];
+            category: components["schemas"]["ExpenseCategory"];
+            category_label: string;
+            note: string | null;
+            created_by: number | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            voided_at: string | null;
+            void_reason: string | null;
+        };
+        /** @description D98: cost of what went out less what came back at the costs frozen on the lines; profit and margin null while any line went out without a cost */
+        ReportProfit: {
+            cost: components["schemas"]["Money"];
+            profit: components["schemas"]["Money"] | null;
+            /** @description profit ÷ net, % */
+            margin: components["schemas"]["Money"] | null;
+            /** @description Lines that went out without a cost (D96 f) */
+            uncosted_lines: number;
+        };
+        SalesAnalyticsReport: {
+            profit: components["schemas"]["ReportProfit"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            group: components["schemas"]["SalesGrouping"];
+            /**
+             * Format: date-time
+             * @description When the cached figures were computed (D94)
+             */
+            generated_at: string;
+            buckets: (components["schemas"]["SalesFigures"] & {
+                /** Format: date */
+                period_start: string;
+            })[];
+            totals: components["schemas"]["SalesTotals"];
+            /** @description The period of the same number of days just before */
+            previous: {
+                /** Format: date */
+                from: string;
+                /** Format: date */
+                to: string;
+                totals: components["schemas"]["SalesTotals"];
+                buckets: {
+                    /** Format: date */
+                    period_start: string;
+                    net: components["schemas"]["Money"];
+                }[];
+            };
+            /** @description Per section kind (D68), most net first */
+            by_section: (components["schemas"]["SalesFigures"] & {
+                kind: components["schemas"]["CategoryKind"];
+                label: string;
+            })[];
+            /** @description Per current customer group (null = no group), most net first */
+            by_customer_group: (components["schemas"]["SalesFigures"] & {
+                customer_group_id: number | null;
+                name: string | null;
+            })[];
+        };
+        ProductPerformanceRow: {
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            sku_code: string;
+            /** @description The variant label (BR-P14) */
+            sku_name: string | null;
+            is_bundle: boolean;
+            /** @description Selling units that went out on its own lines */
+            quantity: number;
+            /** @description Base units that went out, its own lines and inside bundles */
+            quantity_base: number;
+            /** @description Of which inside bundles (D93: a component is flagged, its revenue stays with the bundle) */
+            bundle_quantity_base: number;
+            /** @description Net: own line totals less the order discount share less the returns of them */
+            revenue: components["schemas"]["Money"];
+            returns: components["schemas"]["Money"];
+            returned_base: number;
+            /** @description returned_base ÷ quantity_base, %; null when nothing went out */
+            return_rate: components["schemas"]["Money"] | null;
+            customers: number;
+            /** Format: date-time */
+            last_sold_at: string | null;
+            /** @description D98: its goods at their frozen costs, less what came back; a bundle carries its components */
+            cost: components["schemas"]["Money"];
+            /** @description revenue − cost; null while uncosted_lines > 0 */
+            profit: components["schemas"]["Money"] | null;
+            /** @description profit ÷ revenue, % */
+            margin: components["schemas"]["Money"] | null;
+            uncosted_lines: number;
+        };
+        CustomerPatternRow: {
+            customer: components["schemas"]["CustomerRef"];
+            customer_group: null | {
+                id: number;
+                name: string;
+            };
+            /** @description Orders delivered in the range */
+            orders: number;
+            /** @description Their totals less the returns recorded in the range */
+            revenue: components["schemas"]["Money"];
+            average_order: components["schemas"]["Money"] | null;
+            /** Format: date-time */
+            first_order_at: string;
+            /** Format: date-time */
+            last_order_at: string;
+            /** @description Orders ever placed, not cancelled */
+            lifetime_orders: number;
+            /** @description null with a single order */
+            average_interval_days: number | null;
+            /** @description Cairo days (D60) */
+            days_since_last_order: number;
+            dormant: boolean;
+            /** @description D59 */
+            outstanding: components["schemas"]["Money"];
+            /** @description BR-C06 */
+            overdue: components["schemas"]["Money"];
+        };
+        ReportMovements: {
+            opening: number;
+            adjustment: number;
+            sale: number;
+            return: number;
+            /** @description Goods the merchant received (BR-INV09) */
+            receive: number;
+        };
+        InventoryAnalyticsRow: {
+            sku_id: number;
+            product_id: number;
+            product_name: string;
+            sku_code: string;
+            sku_name: string | null;
+            on_hand: number;
+            available: number;
+            /** @description At the default unit's base price per base unit («قيمة المخزون بسعر البيع», D94) */
+            stock_value: components["schemas"]["Money"];
+            /** @description Base units delivered in the range, inside bundles too */
+            sold_base: number;
+            /** @description available ÷ average daily sales; null (∞) without sales */
+            days_of_cover: number | null;
+            /** Format: date-time */
+            last_sold_at: string | null;
+            /** @description Stock on hand and no sale for more than dead_days */
+            dead: boolean;
+            movements: components["schemas"]["ReportMovements"];
+        };
+        InventorySummary: {
+            skus: number;
+            on_hand: number;
+            stock_value: components["schemas"]["Money"];
+            dead_count: number;
+            dead_value: components["schemas"]["Money"];
+            sold_base: number;
+            movements: components["schemas"]["ReportMovements"];
+        };
+        ReportAging: {
+            current: components["schemas"]["Money"];
+            "0_30": components["schemas"]["Money"];
+            "31_60": components["schemas"]["Money"];
+            "61_90": components["schemas"]["Money"];
+            over_90: components["schemas"]["Money"];
+            overdue: components["schemas"]["Money"];
+            outstanding: components["schemas"]["Money"];
+        };
+        /** @description D100 h; a null figure is unknown: gross while a sold line has no cost, losses while an adjustment has none, net when either is */
+        ProfitAndLossFigures: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            net_sales: components["schemas"]["Money"];
+            cost_of_goods: components["schemas"]["Money"];
+            gross_profit: components["schemas"]["Money"] | null;
+            stock_losses: components["schemas"]["Money"] | null;
+            /** @description By adjustment reason code (D97; `unspecified` before reason codes), a negative amount gave stock back */
+            losses_by_reason: {
+                [key: string]: components["schemas"]["Money"];
+            };
+            expenses: components["schemas"]["Money"];
+            /** @description By expense category code (D100 b), live expenses only */
+            expenses_by_category: {
+                [key: string]: components["schemas"]["Money"];
+            };
+            /** @description Negative = a loss */
+            net_profit: components["schemas"]["Money"] | null;
+            /** @description net_profit ÷ net_sales, % */
+            net_margin: components["schemas"]["Money"] | null;
+            uncosted_lines: number;
+            uncosted_adjustments: number;
+        };
+        ProfitAndLossReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: date-time */
+            generated_at: string;
+            current: components["schemas"]["ProfitAndLossFigures"];
+            previous: components["schemas"]["ProfitAndLossFigures"];
+        };
+        CollectionsReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            group: components["schemas"]["SalesGrouping"];
+            /** Format: date-time */
+            generated_at: string;
+            buckets: {
+                /** Format: date */
+                period_start: string;
+                /** @description Payments not drawn from credit, every method (deprecated: use by_method, D103 e) */
+                cash: components["schemas"]["Money"];
+                /** @description Payments drawn from customer credit (BR-C07) */
+                credit: components["schemas"]["Money"];
+                /** @description Negative (BR-R04) */
+                refunds: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
+                /** @description Net sales delivered in the bucket */
+                delivered: components["schemas"]["Money"];
+            }[];
+            totals: {
+                cash: components["schemas"]["Money"];
+                credit: components["schemas"]["Money"];
+                refunds: components["schemas"]["Money"];
+                net: components["schemas"]["Money"];
+                delivered: components["schemas"]["Money"];
+                /** @description net ÷ delivered, % */
+                collection_rate: components["schemas"]["Money"] | null;
+            };
+            /** @description D103 e: the range's payments per method, every recordable method (0.00 when unused) then credit; adds up to totals.cash + totals.credit */
+            by_method: {
+                method: components["schemas"]["CollectionMethod"];
+                label: string;
+                amount: components["schemas"]["Money"];
+            }[];
+            aging: components["schemas"]["ReportAging"];
         };
         LowStockSku: {
             sku_id: number;
@@ -2651,6 +4801,28 @@ export interface components {
                 };
             };
         };
+        /** @description The customer group */
+        CustomerGroup: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["CustomerGroup"];
+                };
+            };
+        };
+        /** @description The promotion */
+        Promotion: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["Promotion"];
+                };
+            };
+        };
         /** @description The customer */
         DashboardCustomer: {
             headers: {
@@ -2673,6 +4845,17 @@ export interface components {
                 };
             };
         };
+        /** @description The return */
+        OrderReturn: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["OrderReturn"];
+                };
+            };
+        };
         /** @description The collection */
         Collection: {
             headers: {
@@ -2688,7 +4871,7 @@ export interface components {
     parameters: {
         /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
         Category: string;
-        /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+        /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
         Facets: {
             [key: string]: string;
         };
@@ -2700,10 +4883,19 @@ export interface components {
         OrderNumber: number;
         /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
         IdempotencyKey: string;
+        /** @description xlsx (default) or csv (V2 Task 06) */
+        SpreadsheetFormat: "xlsx" | "csv";
         /** @description Category id; its descendants are included */
         CategoryIdFilter: number;
         /** @description Only SKUs whose available stock is at or below MOQ × conversion factor (D36) */
         LowStock: 0 | 1;
+        /** @description Bucket size (default day); weeks start on Saturday (D58) */
+        ReportGrouping: components["schemas"]["SalesGrouping"];
+        /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+        ReportCategory: number;
+        /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+        ReportCustomerGroup: number;
+        ReportPerPage: number;
         From: string;
         To: string;
         CategoryId: number;
@@ -2712,7 +4904,11 @@ export interface components {
         OptionId: number;
         ProductId: number;
         SkuId: number;
+        /** @description A SKU unit id (V2 Task 13, D91) */
+        SkuUnitId: number;
         CustomerId: number;
+        CustomerGroupId: number;
+        PromotionId: number;
         UserId: number;
     };
     requestBodies: {
@@ -2855,6 +5051,36 @@ export interface operations {
             401: components["responses"]["Error"];
         };
     };
+    storeUpdatePreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    order_notifications: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The customer, as GET /me answers it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Customer"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
     storeCategories: {
         parameters: {
             query?: never;
@@ -2882,7 +5108,7 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -2912,11 +5138,13 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
                 sort?: "name" | "-created_at" | "price" | "-price";
+                /** @description Only the products on a live promotion (BR-PR15, V2 Task 12), the storefront's «عروض» */
+                on_offer?: boolean;
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -2972,7 +5200,7 @@ export interface operations {
             query?: {
                 /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
                 category?: components["parameters"]["Category"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -2995,6 +5223,36 @@ export interface operations {
                     };
                 };
             };
+            422: components["responses"]["Error"];
+        };
+    };
+    storePriceListExport: {
+        parameters: {
+            query?: {
+                /** @description Category slug; its descendants are included. An unknown slug lists nothing. */
+                category?: components["parameters"]["Category"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                format?: "xlsx";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The XLSX file (attachment price-list-YYYY-MM-DD.xlsx) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };
@@ -3325,8 +5583,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    sku_id: number;
+                    sku_unit_id?: number | null;
+                    sku_id?: number | null;
                     quantity: number;
+                    kind?: components["schemas"]["CartLineKind"];
                 };
             };
         };
@@ -3340,10 +5600,14 @@ export interface operations {
     };
     storeRemoveCartItem: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The order line (default) or the pre-order line of the SKU (BR-O14) */
+                kind?: components["schemas"]["CartLineKind"];
+            };
             header?: never;
             path: {
-                sku: number;
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -3360,7 +5624,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                sku: number;
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -3368,6 +5633,7 @@ export interface operations {
             content: {
                 "application/json": {
                     quantity: number;
+                    kind?: components["schemas"]["CartLineKind"];
                 };
             };
         };
@@ -3413,7 +5679,53 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             409: components["responses"]["Error"];
-            /** @description checkout_failed with `items` (CheckoutProblem) and, for the minimum order value, `details.mov`; cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key. */
+            /** @description checkout_failed with `items` (CheckoutProblem), `details.mov` for the minimum order value and `details.credit { limit, exposure, order_total }` past the credit limit (BR-C05, D78); cart_empty; validation_failed on address_id; idempotency_key_reused / invalid_idempotency_key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            503: components["responses"]["Error"];
+        };
+    };
+    storePreorderCheckout: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    address_id: number;
+                    customer_note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Placed; the cart's pre-order lines are emptied */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            order: components["schemas"]["OrderDetail"];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            /** @description checkout_failed with `items` (preorder_unavailable, below_moq, preorder_limit with `requested` and `remaining`) and `details.credit` past the credit limit; cart_empty; validation_failed on address_id. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -3429,6 +5741,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["OrderStatus"];
+                kind?: components["schemas"]["OrderKind"];
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -3517,6 +5830,38 @@ export interface operations {
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    storeAccountStatement: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of ledger rows with the opening and closing balance and the summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LedgerRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["LedgerMeta"];
+                        summary: components["schemas"]["StoreStatementSummary"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };
@@ -3765,6 +6110,11 @@ export interface operations {
                     /** Format: email */
                     email: string;
                     password: string;
+                    /**
+                     * @description BR-T06, D82; owner when left out
+                     * @enum {string}
+                     */
+                    role?: "owner" | "manager" | "sales" | "warehouse" | "accountant";
                 };
             };
         };
@@ -3800,6 +6150,11 @@ export interface operations {
                     /** @enum {string} */
                     status?: "active" | "disabled";
                     password?: string;
+                    /**
+                     * @description D82; the last active owner cannot be demoted or disabled (409 last_owner)
+                     * @enum {string}
+                     */
+                    role?: "owner" | "manager" | "sales" | "warehouse" | "accountant";
                 };
             };
         };
@@ -4219,7 +6574,7 @@ export interface operations {
             query?: {
                 /** @description Category id; its descendants are included */
                 category?: components["parameters"]["CategoryIdFilter"];
-                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). */
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
                 f?: components["parameters"]["Facets"];
                 /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
                 q?: components["parameters"]["Search"];
@@ -4277,6 +6632,73 @@ export interface operations {
             422: components["responses"]["Error"];
         };
     };
+    dashboardCreateBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleRequest"] & {
+                    /** @enum {string} */
+                    status?: "active" | "inactive";
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardGenerateBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    filter: components["schemas"]["ProductFilter"];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BundleRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardProduct"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
     dashboardBulkProductStatus: {
         parameters: {
             query?: never;
@@ -4307,6 +6729,200 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardExportProducts: {
+        parameters: {
+            query?: {
+                /** @description Category id; its descendants are included */
+                category?: components["parameters"]["CategoryIdFilter"];
+                /** @description `f[<field key>]=<option id | true | false | raw value>`, AND-combined, at most 20 (BR-P08). A variant option facet (BR-P14, V2 Task 14) is `f[o:<folded option name>]=<folded value>`, the key and id its facet carries. */
+                f?: components["parameters"]["Facets"];
+                /** @description Every word must match the folded name, a SKU code or a select option label (D32). */
+                q?: components["parameters"]["Search"];
+                status?: components["schemas"]["ProductStatus"];
+                /** @description xlsx (default) or csv (V2 Task 06) */
+                format?: components["parameters"]["SpreadsheetFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (attachment products-YYYY-MM-DD.xlsx|csv), first sheet products_v1 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            /** @description Too large to stream; a job writes the file behind the signed link */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["QueuedExport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardDownloadExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    dashboardImportTemplate: {
+        parameters: {
+            query?: {
+                /** @description xlsx (default) or csv (V2 Task 06) */
+                format?: components["parameters"]["SpreadsheetFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (attachment products-template-YYYY-MM-DD.xlsx|csv) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreviewImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The counts, the first row errors and the token to import with */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ImportPreview"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRunImport: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The queued run */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CatalogImport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CatalogImport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     dashboardProduct: {
@@ -4366,10 +6982,123 @@ export interface operations {
             };
         };
         responses: {
-            200: components["responses"]["DashboardProduct"];
+            /** @description The product, with `meta.preorder_demand` (what customers pre-ordered, BR-O14) so going active shows it; converting stays an explicit step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardProduct"];
+                        meta: {
+                            preorder_demand: components["schemas"]["PreorderDemandCounts"];
+                        };
+                    };
+                };
+            };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreorderDemand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open pre-ordered quantity, customers and pre-orders, with the product's pre-order settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PreorderDemand"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardConvertPreorders: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                product: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The merchant's summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PreorderConversion"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description product_not_active (details.status) while the product is not active; idempotency_in_progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreorders: {
+        parameters: {
+            query?: {
+                product_id?: number;
+                status?: components["schemas"]["PreorderState"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of pre-orders in the dashboard order shape, with `items` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardPreorder"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };
@@ -4592,6 +7321,8 @@ export interface operations {
             header?: never;
             path: {
                 product: components["parameters"]["ProductId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
             };
             cookie?: never;
         };
@@ -4625,7 +7356,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["SkuPricing"];
+            /** @description Every active unit's price set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SkuPricing"][];
+                    };
+                };
+            };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
@@ -4764,7 +7505,11 @@ export interface operations {
             content: {
                 "application/json": {
                     new_on_hand: number;
-                    reason: string;
+                    reason: components["schemas"]["MerchantAdjustmentReason"];
+                    /** @description Required when reason is other (D97) */
+                    note?: string | null;
+                    /** @description The on hand shown when the count began (D99 a): on hand then moves by new_on_hand − expected_on_hand from where it is now */
+                    expected_on_hand?: number | null;
                 };
             };
         };
@@ -4773,6 +7518,15 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            /** @description count_outdated (D99 b) with details { expected_on_hand, counted, on_hand } */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             /** @description inventory_below_reserved with `details` as BelowReservedDetails and the Arabic message listing the holding orders (BR-INV08); or validation_failed. */
             422: {
                 headers: {
@@ -4782,6 +7536,84 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+        };
+    };
+    dashboardReceiveStock: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Whole units of sku_unit_id (the base unit when left out) */
+                    quantity: number;
+                    /** @description The price paid per one unit of sku_unit_id */
+                    unit_cost: components["schemas"]["Money"];
+                    /** @description Any unit of this SKU, archived too */
+                    sku_unit_id?: number | null;
+                    /** @description e.g. the supplier */
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["InventoryRow"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description is_bundle (a bundle has no stock of its own, D93 b) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardSetStockCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: components["parameters"]["SkuId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The cost per one unit of sku_unit_id */
+                    unit_cost: components["schemas"]["Money"];
+                    sku_unit_id?: number | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["InventoryRow"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description is_bundle */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
         };
     };
     dashboardStockMovements: {
@@ -4822,6 +7654,8 @@ export interface operations {
             query?: {
                 q?: string;
                 status?: components["schemas"]["CustomerStatus"];
+                /** @description Only the members of this customer group (V2 Task 11) */
+                group?: number;
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -4862,6 +7696,12 @@ export interface operations {
                     name: string;
                     phone: string;
                     addresses?: components["schemas"]["AddressRequest"][];
+                    /** @description BR-C05; not sent = the store default */
+                    credit_limit?: string | null;
+                    /** @description BR-C06; not sent = the store default */
+                    payment_terms_days?: number | null;
+                    /** @description BR-PR12; an active group; needs pricing.customers */
+                    customer_group_id?: number | null;
                 };
             };
         };
@@ -4869,7 +7709,7 @@ export interface operations {
             201: components["responses"]["DashboardCustomer"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
-            /** @description phone_taken */
+            /** @description phone_taken, group_archived */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4911,6 +7751,12 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /** @description BR-C05; not sent = unchanged, null = no limit */
+                    credit_limit?: string | null;
+                    /** @description BR-C06; not sent = unchanged, null = due on delivery */
+                    payment_terms_days?: number | null;
+                    /** @description BR-PR12; not sent = unchanged, null = no group; needs pricing.customers */
+                    customer_group_id?: number | null;
                     addresses?: (components["schemas"]["AddressRequest"] & {
                         id?: number;
                     })[];
@@ -4922,7 +7768,442 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            /** @description group_archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardPromotions: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["PromotionStatus"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of promotions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Promotion"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCreatePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionRequest"];
+            };
+        };
+        responses: {
+            201: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPreviewPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    filter?: components["schemas"]["ProductFilter"];
+                    sku_ids?: number[];
+                    discount_percent?: string | number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PromotionPreview"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdatePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionPatch"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description promotion_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCancelPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion: components["parameters"]["PromotionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Promotion"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description promotion_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardCustomerGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every group, archived included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerGroup"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardCreateCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @description % off the base price, 0–90 (D89) */
+                    discount_percent: string | number;
+                    sort_order?: number;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["CustomerGroup"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description duplicate_name */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardUpdateCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    discount_percent?: string | number;
+                    sort_order?: number;
+                    /** @enum {string} */
+                    status?: "active";
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["CustomerGroup"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description duplicate_name */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardArchiveCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["CustomerGroup"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardAssignCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: components["parameters"]["CustomerGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    customer_ids?: number[];
+                    filter?: {
+                        q?: string | null;
+                        status?: components["schemas"]["CustomerStatus"];
+                        group?: number;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description How many customers moved into the group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            assigned: number;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description group_archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomerPrices: {
+        parameters: {
+            query?: {
+                q?: string;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the customer's prices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerSkuPrice"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardSetCustomerPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description In that unit, at least 0.01 */
+                    unit_price: string | number;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The customer's price, replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerSkuPrice"];
+                    };
+                };
+            };
+            /** @description The customer's new price */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerSkuPrice"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRemoveCustomerPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+                /** @description A SKU unit id (V2 Task 13, D91) */
+                skuUnit: components["parameters"]["SkuUnitId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     dashboardInviteCustomer: {
@@ -5020,6 +8301,8 @@ export interface operations {
     dashboardCustomerStatement: {
         parameters: {
             query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -5031,16 +8314,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description A page of the customer's non-cancelled orders with balances, plus the summary */
+            /** @description A page of ledger rows, the opening and closing balance, the customer and the summary */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["StatementOrder"][];
+                        data: components["schemas"]["LedgerRow"][];
                         links: components["schemas"]["PaginationLinks"];
-                        meta: components["schemas"]["PaginationMeta"];
+                        meta: components["schemas"]["LedgerMeta"];
                         customer: components["schemas"]["CustomerRef"];
                         summary: components["schemas"]["StatementSummary"];
                     };
@@ -5049,6 +8332,125 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardCustomerCredits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The credits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerCredit"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardApplyCredit: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    credit_id: number;
+                    amount: components["schemas"]["Money"];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["Collection"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description The order */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description credit_voided or order_cancelled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description exceeds_credit (details.remaining), exceeds_balance or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardVoidCredit: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                customerCredit: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            /** @description The voided credit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerCredit"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description credit_voided or credit_applied (details.applied) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             422: components["responses"]["Error"];
         };
     };
@@ -5062,6 +8464,8 @@ export interface operations {
                 to?: components["parameters"]["To"];
                 q?: string;
                 stale?: 0 | 1;
+                /** @description Normal orders or pre-orders only (BR-O14) */
+                kind?: components["schemas"]["OrderKind"];
                 sort?: "placed_at" | "-placed_at" | "number" | "-number" | "order_total" | "-order_total";
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
@@ -5088,6 +8492,100 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardPlaceOrder: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MerchantOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Placed; the order page shape. No new_order notification; the customer gets the `placed` message when notify_customer is true. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardOrderDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            /** @description forbidden (no orders.create, or override_mov without orders.override_mov, D84) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description customer_blocked or customer_not_active with details.status; idempotency_in_progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description checkout_failed as at checkout (items, details.mov unless override_mov, details.credit); validation_failed on customer_id, address_id or lines.N.sku_id when they are not this store's; idempotency_key_reused / invalid_idempotency_key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardQuoteOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderQuote"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            /** @description validation_failed (also on customer_id or lines.N.sku_id that are not this store's, or order that is not one of the customer's) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardOrder: {
@@ -5128,6 +8626,11 @@ export interface operations {
                     to: "confirmed" | "preparing" | "out_for_delivery" | "delivered";
                     note?: string | null;
                     collect_full_amount?: boolean;
+                    /** @description BR-O13, D86: with to=delivered, what each line actually delivered (selling units, 0..ordered); a line left out went out in full. The rest is released and the order is charged for what was delivered. Ignored for other targets. */
+                    delivered_quantities?: {
+                        order_item_id: number;
+                        quantity: number;
+                    }[] | null;
                 };
             };
         };
@@ -5136,7 +8639,7 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
-            /** @description invalid_transition with details.from and details.to */
+            /** @description invalid_transition with details.from and details.to; below_collected when a partial delivery leaves the total under what was collected */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5145,7 +8648,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            422: components["responses"]["Error"];
+            /** @description validation_failed (also delivered_quantities.N.quantity above the ordered quantity, a line not of this order, or nothing delivered at all) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardCancelOrder: {
@@ -5217,6 +8728,278 @@ export interface operations {
                 };
             };
             422: components["responses"]["Error"];
+        };
+    };
+    dashboardApplyOrderDiscount: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderDiscountRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DashboardOrderDetail"];
+            401: components["responses"]["Error"];
+            /** @description forbidden (no orders.discount) or discount_over_limit (details.max_percent) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            404: components["responses"]["Error"];
+            /** @description order_locked (preparing or later) or below_collected (the new total is under what was collected) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description discount_too_large (a unit or the order below 0.01) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardEditOrderLines: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderLinesRequest"];
+            };
+        };
+        responses: {
+            /** @description The order, and the minimum order value shortfall of its new total (allowed, BR-MOV02) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardOrderDetail"];
+                        meta: {
+                            below_mov: {
+                                required: components["schemas"]["Money"];
+                                current: components["schemas"]["Money"];
+                            } | null;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description order_locked (preparing or later) or below_collected (the new total is under what was collected) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description checkout_failed (items for the added or changed lines; details.credit when a higher total passes the credit limit); discount_too_large when an EGP order discount no longer fits; validation_failed (also lines.N.order_item_id not a live line of the order, lines.N.sku_id changed or not this store's) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardOrderReturns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The returns and the returnable quantities */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderReturn"][];
+                        returnable: components["schemas"]["ReturnableLine"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    dashboardRecordReturn: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The per-tenant order number (BR-O09) */
+                order: components["parameters"]["OrderNumber"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    /** Format: date-time */
+                    returned_at?: string;
+                    /** @description Confirms paying back what was collected beyond the new net total */
+                    refund?: boolean;
+                    /**
+                     * @description How it goes back: paid back by a method (cash by default, BR-C10) or kept as customer credit (BR-C07)
+                     * @enum {string}
+                     */
+                    refund_to?: "cash" | "instapay" | "wallet" | "bank_transfer" | "credit";
+                    /** @description The transfer or wallet transaction number (BR-C10); not with credit */
+                    refund_reference?: string | null;
+                    items: {
+                        order_item_id: number;
+                        quantity: number;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["OrderReturn"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description return_not_allowed (the order is not delivered) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description return_exceeds_delivered (items: order_item_id, requested, returnable), refund_required (details.refund_amount) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboardReturns: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                customer_id?: number;
+                /** @description Order number (#1024 too) or customer name */
+                q?: string;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of returns, newest first, voided included */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["OrderReturn"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardVoidReturn: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                orderReturn: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Reason"];
+        responses: {
+            200: components["responses"]["OrderReturn"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            /** @description already_voided or return_has_refund */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description insufficient_stock (D76) or validation_failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     dashboardNotifications: {
@@ -5295,6 +9078,8 @@ export interface operations {
                 customer_id?: number;
                 /** @description Order number */
                 order?: number;
+                /** @description How the money moved (D103 e) */
+                method?: components["schemas"]["CollectionMethod"];
                 page?: components["parameters"]["Page"];
                 per_page?: components["parameters"]["PerPage"];
             };
@@ -5322,6 +9107,147 @@ export interface operations {
             422: components["responses"]["Error"];
         };
     };
+    dashboardExpenses: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                category?: components["schemas"]["ExpenseCategory"];
+                voided?: boolean;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of expenses */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Expense"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"] & {
+                            total_amount: components["schemas"]["Money"];
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardRecordExpense: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date
+                     * @description A business day, not after today in the store zone (D60)
+                     */
+                    spent_on: string;
+                    /** @description 0.01..10,000,000.00 */
+                    amount: components["schemas"]["Money"];
+                    category: components["schemas"]["ExpenseCategory"];
+                    /** @description Required for other */
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The expense recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Expense"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardExpenseCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The fixed categories in order (D100 b) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ExpenseCategoryOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    dashboardVoidExpense: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Retry-safe writes (D55); the same key with another body is idempotency_key_reused */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                expense: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The expense, voided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Expense"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
     dashboardRecordCollection: {
         parameters: {
             query?: never;
@@ -5342,6 +9268,13 @@ export interface operations {
                     /** Format: date-time */
                     collected_at?: string;
                     note?: string | null;
+                    /**
+                     * @description cash by default (older clients); credit is the system's (D103 a)
+                     * @enum {string}
+                     */
+                    method?: "cash" | "instapay" | "wallet" | "bank_transfer";
+                    /** @description The transfer or wallet transaction number */
+                    reference?: string | null;
                 };
             };
         };
@@ -5453,6 +9386,34 @@ export interface operations {
             422: components["responses"]["Error"];
         };
     };
+    dashboardReportBundles: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bundle sales and component consumption */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["BundleReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
     dashboardReportOutstanding: {
         parameters: {
             query?: {
@@ -5510,6 +9471,280 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportSalesAnalytics: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description Bucket size (default day); weeks start on Saturday (D58) */
+                group?: components["parameters"]["ReportGrouping"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sales analytics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesAnalyticsReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportProducts: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+                sort?: components["schemas"]["ProductReportSort"];
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["ReportPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of SKUs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProductPerformanceRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        sort: components["schemas"]["ProductReportSort"];
+                        /**
+                         * Format: date-time
+                         * @description When the cached figures were computed (D94)
+                         */
+                        generated_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportCustomers: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+                view?: components["schemas"]["CustomerReportView"];
+                /** @description A customer with no order for more than this many days is dormant (default 45) */
+                dormant_days?: number;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["ReportPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of customers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerPatternRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        view: components["schemas"]["CustomerReportView"];
+                        dormant_days: number;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportInventory: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description Stock on hand with no sale for more than this many days is dead (default 60) */
+                dead_days?: number;
+                dead_only?: 0 | 1;
+                page?: components["parameters"]["Page"];
+                per_page?: components["parameters"]["ReportPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of SKUs and the summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryAnalyticsRow"][];
+                        links: components["schemas"]["PaginationLinks"];
+                        meta: components["schemas"]["PaginationMeta"];
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        dead_days: number;
+                        summary: components["schemas"]["InventorySummary"];
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportCollections: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description Bucket size (default day); weeks start on Saturday (D58) */
+                group?: components["parameters"]["ReportGrouping"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The collections report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CollectionsReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportProfitAndLoss: {
+        parameters: {
+            query?: {
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profit and loss statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProfitAndLossReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+        };
+    };
+    dashboardReportExport: {
+        parameters: {
+            query?: {
+                /** @description xlsx (default) or csv (V2 Task 06) */
+                format?: components["parameters"]["SpreadsheetFormat"];
+                from?: components["parameters"]["From"];
+                to?: components["parameters"]["To"];
+                /** @description Bucket size (default day); weeks start on Saturday (D58) */
+                group?: components["parameters"]["ReportGrouping"];
+                /** @description V2 Task 16: a category id; its sub-categories are included (BR-P06). An unknown id matches nothing */
+                category_id?: components["parameters"]["ReportCategory"];
+                /** @description V2 Task 16: the customers currently in this group (BR-PR12) */
+                customer_group_id?: components["parameters"]["ReportCustomerGroup"];
+                sort?: components["schemas"]["ProductReportSort"];
+                view?: components["schemas"]["CustomerReportView"];
+                dormant_days?: number;
+                dead_days?: number;
+                dead_only?: 0 | 1;
+            };
+            header?: never;
+            path: {
+                report: components["schemas"]["ReportName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
             422: components["responses"]["Error"];
         };
     };

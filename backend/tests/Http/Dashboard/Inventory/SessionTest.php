@@ -6,12 +6,12 @@ use App\Modules\Catalog\Models\Product;
 
 test('a dashboard session from one tenant host cannot adjust stock on another tenant host', function (): void {
     $other = $this->otherTenant();
-    $foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->sku()->sole(), $other);
+    $foreign = $this->inTenant(fn () => Product::factory()->withSku(onHand: 7)->create()->skus()->sole(), $other);
     $this->makeOwner(attributes: ['email' => 'owner@alnoor.test', 'password' => 'secret123']);
 
     $this->tenantJson('POST', '/api/dashboard/auth/login', ['email' => 'owner@alnoor.test', 'password' => 'secret123'])->assertOk();
 
-    $this->tenantJson('POST', "/api/dashboard/inventory/{$foreign->id}/adjust", ['new_on_hand' => 0, 'reason' => 'جرد'], $other)
+    $this->tenantJson('POST', "/api/dashboard/inventory/{$foreign->id}/adjust", ['new_on_hand' => 0, 'reason' => 'stocktake'], $other)
         ->assertUnauthorized()
         ->assertJsonPath('error.code', 'unauthenticated');
 

@@ -24,7 +24,7 @@ test('BR-CU08 the customer is invited, has no password, keeps who created them, 
     expect($customer->refresh()->only(['name', 'phone', 'status', 'password', 'created_by']))
         ->toBe(['name' => 'مكتبة', 'phone' => '+201012345678', 'status' => CustomerStatus::Invited, 'password' => null, 'created_by' => $owner->id])
         ->and(AuditLog::query()->sole()->only(['action', 'entity_id', 'new_values']))
-        ->toBe(['action' => 'customer.created', 'entity_id' => $customer->id, 'new_values' => ['name' => 'مكتبة', 'phone' => '+201012345678', 'status' => 'invited']]);
+        ->toBe(['action' => 'customer.created', 'entity_id' => $customer->id, 'new_values' => ['name' => 'مكتبة', 'phone' => '+201012345678', 'status' => 'invited', 'credit_limit' => null, 'payment_terms_days' => null]]);
 });
 
 test('BR-CU03 the addresses are created with it, the first is the default', function (): void {
@@ -42,4 +42,12 @@ test('BR-CU04 a duplicate phone is refused and nothing is written', function ():
     expect(fn () => app(CreateCustomerByMerchant::class)->handle(new CustomerData('مكتبة', '+201012345678', [])))->toThrow(PhoneTaken::class);
 
     expect(AuditLog::query()->count())->toBe(0);
+});
+
+test('BR-C05 BR-C06 credit terms not sent come from the store defaults, sent ones win, null included', function (): void {
+    $this->tenant->settings->update(['default_payment_terms_days' => 30, 'default_credit_limit' => '2000.00']);
+
+    $customer = app(CreateCustomerByMerchant::class)->handle(new CustomerData('مكتبة', '+201012345678', [], null, 10, ['credit_limit', 'payment_terms_days']));
+
+    expect($customer->refresh()->only(['credit_limit', 'payment_terms_days']))->toBe(['credit_limit' => null, 'payment_terms_days' => 10]);
 });

@@ -12,7 +12,13 @@ import {
   subtreeIds,
 } from "@/lib/dashboard/category-tree";
 import { customFieldProblems, customFieldsBody, visibleDefinitions } from "@/lib/dashboard/custom-fields";
-import { productBody, productDefaults } from "@/lib/dashboard/product-form";
+import {
+  productBody,
+  productDefaults,
+  productSchema,
+  serverFields,
+  serverTierProblems,
+} from "@/lib/dashboard/product-form";
 
 import { category, dashboardProduct, selectField } from "../../dashboard-fixtures";
 
@@ -200,13 +206,115 @@ describe("product form", () => {
   it("BR-PR10 starts from the product with the price as it was entered: percent stays percent", () => {
     const values = productDefaults(dashboardProduct());
 
-    expect(values).toMatchObject({
-      base_mode: "percent",
-      base_value: "25.00",
-      cover_price: "120.00",
-      custom: { grade: "11" },
+    expect(values).toMatchObject({ custom: { grade: "11" }, base_unit_id: "1", default_unit: 0 });
+    expect(values.units).toEqual([
+      {
+        id: "5",
+        unit_id: "2",
+        conversion_factor: "20",
+        cover_price: "120.00",
+        base_mode: "percent",
+        base_value: "25.00",
+        moq: "5",
+        tiers: [{ min_quantity: "10", mode: "percent", value: "30.00" }],
+      },
+    ]);
+  });
+
+  it("D91 starts a new product with one blank unit and sends every unit with the one default", () => {
+    expect(productDefaults(null).units).toEqual([
+      {
+        id: "",
+        unit_id: "",
+        conversion_factor: "1",
+        cover_price: "",
+        base_mode: "price",
+        base_value: "",
+        moq: "1",
+        tiers: [],
+      },
+    ]);
+
+    const values = {
+      ...productDefaults(dashboardProduct()),
+      units: [
+        ...productDefaults(dashboardProduct()).units,
+        {
+          id: "",
+          unit_id: "4",
+          conversion_factor: "12",
+          cover_price: "",
+          base_mode: "price" as const,
+          base_value: "1000",
+          moq: "1",
+          tiers: [],
+        },
+      ],
+      default_unit: 1,
+    };
+
+    expect(productBody(values, [selectField()], false, "books").sku).toEqual({
+      code: "ADW-SCI-1",
+      base_unit_id: 1,
+      units: [
+        {
+          id: 5,
+          unit_id: 2,
+          conversion_factor: 20,
+          cover_price: "120.00",
+          base_price: null,
+          base_price_percent: "25.00",
+          moq: 5,
+          tiers: [{ min_quantity: 10, discount_percent: "30.00" }],
+          is_default: false,
+        },
+        {
+          unit_id: 4,
+          conversion_factor: 12,
+          cover_price: null,
+          base_price: "1000",
+          base_price_percent: null,
+          moq: 1,
+          tiers: [],
+          is_default: true,
+        },
+      ],
     });
-    expect(values.tiers).toEqual([{ min_quantity: "10", mode: "percent", value: "30.00" }]);
+  });
+
+  it("D91 refuses the same unit twice and a missing price per unit", () => {
+    const base = productDefaults(dashboardProduct());
+    const twice = productSchema.safeParse({ ...base, units: [base.units[0], base.units[0]] });
+    const unpriced = productSchema.safeParse({
+      ...base,
+      units: [{ ...base.units[0], base_mode: "price", base_value: "" }],
+    });
+
+    expect(twice.success).toBe(false);
+    expect(twice.error?.issues.map((issue) => issue.path.join("."))).toContain("units.1.unit_id");
+    expect(unpriced.error?.issues.map((issue) => issue.path.join("."))).toContain("units.0.base_value");
+  });
+
+  it("D91 maps the server's per-unit keys and tier problems to the unit", () => {
+    expect(serverFields(2)).toContainEqual(["units.1.base_value", "sku.units.1.base_price"]);
+    expect(serverTierProblems({ "sku.units.1.tiers": ["مكرر"] }, "x")).toEqual({ 1: ["مكرر"] });
+    expect(serverTierProblems(null, "شرائح غير صحيحة")).toEqual({ 0: ["شرائح غير صحيحة"] });
+  });
+
+  it("D88 starts from the product's pre-order settings and sends them, an empty day or cap as none", () => {
+    const values = productDefaults(
+      dashboardProduct({ preorder: { enabled: true, expected_at: "2026-12-01", limit: 40 } }),
+    );
+
+    expect(values).toMatchObject({ preorder_enabled: true, expected_at: "2026-12-01", preorder_limit: "40" });
+    expect(
+      productBody({ ...values, expected_at: "", preorder_limit: "" }, [selectField()], false, "books").preorder,
+    ).toEqual({
+      enabled: true,
+      expected_at: null,
+      limit: null,
+    });
+    expect(productDefaults(null)).toMatchObject({ preorder_enabled: false, expected_at: "", preorder_limit: "" });
   });
 
   it("sends status and opening stock on create only", () => {
@@ -214,7 +322,7 @@ describe("product form", () => {
 
     expect(productBody(values, [selectField()], true, "books")).toMatchObject({ status: "active", opening_stock: 100 });
     expect(productBody(values, [selectField()], false, "books")).not.toHaveProperty("opening_stock");
-    expect(productBody(values, [selectField()], false, "books").sku).toMatchObject({
+    expect(productBody(values, [selectField()], false, "books").sku?.units[0]).toMatchObject({
       base_price: null,
       base_price_percent: "25.00",
       tiers: [{ min_quantity: 10, discount_percent: "30.00" }],

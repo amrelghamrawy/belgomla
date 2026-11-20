@@ -8,6 +8,9 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
+use App\Modules\Catalog\Models\ProductOption;
+use App\Modules\Catalog\Models\ProductOptionValue;
+use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Queries\FacetQuery;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -100,3 +103,67 @@ test('cached counts are separate per tenant', function (): void {
 
     expect($facets)->toBe([]);
 });
+
+test('BR-P14 variant options follow the fields as one facet per folded name, values folded and counted per product', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود'], code: 'PEN');
+    $this->variantProduct(colours: ['أزرق', 'أحمر'], name: 'قلم رصاص', code: 'PCL');
+    $marker = $this->variantProduct(colours: ['ازرق'], name: 'ماركر', code: 'MRK');
+    $marker->options()->sole()->update(['name' => 'اللوْن']);
+
+    $facets = app(FacetQuery::class)->get(new ProductFilterData);
+
+    expect(array_column($facets, 'key'))->toBe(['colored', 'grade', 'o:اللون'])
+        ->and($facets[2])->toBe(['key' => 'o:اللون', 'label' => 'اللون', 'type' => 'option', 'options' => [
+            ['id' => 'ازرق', 'label' => 'أزرق', 'count' => 3],
+            ['id' => 'احمر', 'label' => 'أحمر', 'count' => 1],
+            ['id' => 'اسود', 'label' => 'أسود', 'count' => 1],
+        ]]);
+});
+
+test('BR-P14 an inactive variant is not counted in the option facet', function (): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود']);
+    Sku::query()->where('code', 'PEN-2')->update(['status' => 'inactive']);
+
+    $facets = app(FacetQuery::class)->get(new ProductFilterData);
+
+    expect($facets[2]['options'])->toBe([['id' => 'ازرق', 'label' => 'أزرق', 'count' => 1]]);
+});
+
+test('BR-P14 BR-P08 an option facet ignores its own selection and narrows the field facets', function (): void {
+    $pen = $this->variantProduct(colours: ['أزرق', 'أسود'], code: 'PEN');
+    $this->variantProduct(colours: ['أحمر'], name: 'قلم رصاص', code: 'PCL');
+    $pen->update(['custom_fields' => ['grade' => $this->first->id]]);
+
+    $facets = app(FacetQuery::class)->get(new ProductFilterData(fields: ['o:اللون' => 'أحمر']));
+
+    expect(array_column($facets, 'key'))->toBe(['o:اللون'])
+        ->and(array_column($facets[0]['options'], 'count', 'id'))->toBe(['احمر' => 1, 'ازرق' => 1, 'اسود' => 1]);
+});
+
+test('BR-P14 BR-P08 a field selection narrows the option facet counts', function (): void {
+    $pen = $this->variantProduct(colours: ['أزرق', 'أسود'], code: 'PEN');
+    $this->variantProduct(colours: ['أحمر'], name: 'قلم رصاص', code: 'PCL');
+    $pen->update(['custom_fields' => ['grade' => $this->first->id]]);
+
+    $facets = app(FacetQuery::class)->get(new ProductFilterData(fields: ['grade' => (string) $this->first->id]));
+
+    expect($facets[2]['options'])->toBe([
+        ['id' => 'ازرق', 'label' => 'أزرق', 'count' => 1],
+        ['id' => 'اسود', 'label' => 'أسود', 'count' => 1],
+    ]);
+});
+
+test('Tech §9b a variant option, value or sku change invalidates the cached counts', function (Closure $change): void {
+    $this->variantProduct(colours: ['أزرق', 'أسود']);
+    app(FacetQuery::class)->get(new ProductFilterData);
+
+    $change();
+    DB::enableQueryLog();
+    app(FacetQuery::class)->get(new ProductFilterData);
+
+    expect(DB::getQueryLog())->not->toBe([]);
+})->with([
+    'option renamed' => [fn () => ProductOption::query()->firstOrFail()->update(['name' => 'لون'])],
+    'value renamed' => [fn () => ProductOptionValue::query()->firstOrFail()->update(['value' => 'كحلي'])],
+    'variant deactivated' => [fn () => Sku::query()->where('code', 'PEN-2')->firstOrFail()->update(['status' => 'inactive'])],
+]);

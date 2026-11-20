@@ -25,6 +25,9 @@ erDiagram
   categories ||--o{ products : contains
   products ||--o{ product_images : has
   products ||--o{ skus : has
+  products ||--o{ product_options : has
+  product_options ||--o{ product_option_values : has
+  skus ||--o{ sku_option_values : names
   products ||--o{ product_relations : relates
   skus ||--o{ sku_price_tiers : has
   skus ||--|| sku_inventory : has
@@ -72,6 +75,12 @@ erDiagram
 | require_customer_approval      | boolean       | default false (D2)    |
 | stale_pending_hours            | int           | default 24 (BR-INV07) |
 | invitation_message             | text          | nullable; null = default text (BR-CU08, D72) |
+| default_payment_terms_days     | smallint      | V2: nullable, 0–365, given to new customers (BR-C06) |
+| default_credit_limit           | numeric(12,2) | V2: nullable, ≥ 0, given to new customers (BR-C05) |
+| order_notify_statuses          | jsonb         | V2: list of statuses customers are told about, plus `discount` (D85) and `edited` (D87); default `["confirmed","out_for_delivery","delivered","cancelled","edited"]` (BR-N03) |
+| order_status_messages          | jsonb         | V2: nullable map status → merchant wording; a missing entry = platform default (BR-N03) |
+| pending_expiry_hours           | smallint      | V2: nullable = off; CHECK 1–720; unconfirmed orders cancel themselves after it (BR-INV07, D81) |
+| max_discount_percent_sales     | numeric(5,2)  | V2 Task 08: nullable = sales users cannot discount; CHECK > 0 and < 100 (BR-PR08, D85) |
 
 ### `tenant_users`
 
@@ -82,7 +91,7 @@ erDiagram
 | name          | varchar(100) |                               |
 | email         | varchar(190) | **unique (tenant_id, email)** |
 | password_hash | varchar      |                               |
-| role          | enum         | `owner` only in V1 (BR-T06)   |
+| role          | enum         | `owner`, `manager`, `sales`, `warehouse`, `accountant`; CHECK (V2, BR-T06, D82) |
 | status        | enum         | `active`, `disabled`          |
 | last_login_at | timestamptz  |                               |
 
@@ -156,6 +165,10 @@ erDiagram
 | status        | enum            | `active`, `coming_soon`, `inactive` (BR-P04)                                                            |
 | custom_fields | jsonb           | `{ "grade": 12, "subject": 40, "brand": "..." }` — select values store the **option id**; **GIN index** |
 | created_by    | FK tenant_users | nullable (seeded)                                                                                       |
+| preorder_enabled | boolean      | V2 Task 10: default false; a Coming Soon product takes pre-orders (BR-P04, BR-O14, D88)                  |
+| expected_at   | date            | V2 Task 10: nullable; the day the product is expected, shown on the storefront                          |
+| preorder_limit | int            | V2 Task 10: nullable, **check ≥ 1**; cap in selling units over every open pre-order (null = none)       |
+| type          | varchar(10)     | V2 Task 15: `simple` (default) \| `bundle` (check); a bundle has one SKU made of components (BR-P15, D93) |
 
 Search: `pg_trgm` GIN index on `name`; option labels are joined at query time for search (BR-P08).
 
@@ -181,7 +194,7 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 | type               | enum      | `revision_of`, `companion`                        |
 | —                  |           | **unique (product_id, related_product_id, type)** |
 
-### `skus` (BR-P02, BR-U02, BR-PR01, BR-PR10)
+### `skus` (BR-P02, BR-P14, BR-U02, BR-PR01, BR-PR10)
 
 | Column             | Type          | Notes                                                 |
 | ------------------ | ------------- | ----------------------------------------------------- |
@@ -189,16 +202,92 @@ Search: `pg_trgm` GIN index on `name`; option labels are joined at query time fo
 | tenant_id          | FK            |                                                       |
 | product_id         | FK            |                                                       |
 | code               | varchar(60)   | **unique (tenant_id, code)** (BR-P03)                 |
-| name               | varchar(200)  | nullable; V1 = product name                           |
-| selling_unit_id    | FK units      | BR-U02                                                |
-| base_unit_id       | FK units      |                                                       |
-| conversion_factor  | int           | **check ≥ 1**; base units per selling unit            |
-| cover_price        | numeric(12,2) | nullable; the reference price: سعر الغلاف for `books`, سعر القطاعي otherwise (D68) |
-| base_price         | numeric(12,2) | **check > 0**, per selling unit                       |
-| base_price_percent | numeric(5,2)  | nullable; % off cover price used to derive base_price |
-| moq                | int           | **check ≥ 1**, default 1 (BR-MOQ01)                   |
+| name               | varchar(200)  | nullable; the variant label («أزرق / M», V2 Task 14), null without options; snapshot as `order_items.sku_name` |
+| base_unit_id       | FK units      | the unit stock is kept in (BR-U03)                    |
+| status             | varchar(10)   | V2 Task 14: `active` \| `inactive` (check), default active; an inactive variant is hidden and cannot be ordered (BR-P14) |
+| sort_order         | int           | V2 Task 14: the product form's order (backfilled by id within the product) |
 
-V1 invariant (app-enforced): exactly one SKU per product. V2 lifts it.
+V2 Task 13 (D91) moved `selling_unit_id, conversion_factor, cover_price, base_price, base_price_percent, moq` to `sku_units` (backfilled as each SKU's default unit, then dropped in a second migration).
+
+A product without options has exactly one SKU; with options (V2 Task 14, BR-P14, D92) one SKU per combination it sells. A variant removed from the form is deleted, or set inactive when it has history.
+
+### `product_options` (V2 Task 14, BR-P14, D92)
+
+| Column     | Type        | Notes                                                   |
+| ---------- | ----------- | ------------------------------------------------------- |
+| id         | bigint PK   |                                                         |
+| tenant_id  | FK          |                                                         |
+| product_id | FK products | cascade; **unique (product_id, name)**; at most 2 per product (request) |
+| name       | varchar(50) | «اللون», «المقاس»                                        |
+| sort_order | int         |                                                         |
+
+### `product_option_values`
+
+| Column            | Type                | Notes                                              |
+| ----------------- | ------------------- | -------------------------------------------------- |
+| id                | bigint PK           |                                                    |
+| tenant_id         | FK                  |                                                    |
+| product_option_id | FK product_options  | cascade; **unique (product_option_id, value)**; up to 20 per option (request) |
+| value             | varchar(50)         | «أزرق»                                             |
+| sort_order        | int                 |                                                    |
+| image_id          | FK product_images   | nullable, null on delete; the storefront swatch    |
+
+### `sku_option_values`
+
+| Column                  | Type                      | Notes                                               |
+| ----------------------- | ------------------------- | --------------------------------------------------- |
+| tenant_id               | FK                        |                                                     |
+| sku_id                  | FK skus                   | cascade                                             |
+| product_option_id       | FK product_options        | cascade; **PK (sku_id, product_option_id)**: one value per option |
+| product_option_value_id | FK product_option_values  | cascade                                             |
+
+The combination of a product's SKUs is unique per product (checked in the request and action, folded).
+
+### `sku_units` (V2 Task 13, BR-U02, BR-U04, D91)
+
+| Column             | Type          | Notes                                                 |
+| ------------------ | ------------- | ----------------------------------------------------- |
+| id                 | bigint PK     |                                                       |
+| tenant_id          | FK            |                                                       |
+| sku_id             | FK skus       | cascade; **unique (sku_id, unit_id)**                 |
+| unit_id            | FK units      | the selling unit (BR-U01)                             |
+| conversion_factor  | int           | **check ≥ 1**; base units in one of this unit (BR-U03) |
+| base_price         | numeric(12,2) | **check > 0**, per this unit (BR-PR01)                |
+| base_price_percent | numeric(5,2)  | nullable; % off cover price used to derive base_price (BR-PR10) |
+| cover_price        | numeric(12,2) | nullable; the reference price: سعر الغلاف for `books`, سعر القطاعي otherwise (D68) |
+| moq                | int           | **check ≥ 1**, default 1 (BR-MOQ01)                   |
+| is_default         | boolean       | **partial unique (sku_id) where is_default**; **check** a default is active |
+| sort_order         | int           | the form's order                                      |
+| status             | varchar(10)   | `active` \| `archived` (check); a unit left out of the form is archived, never deleted |
+
+### `bundle_items` (V2 Task 15, BR-P15, D93)
+
+`id, tenant_id, bundle_sku_id FK skus (cascade), component_sku_unit_id FK sku_units (no action: a unit in a bundle is archived, never deleted; a SKU whose unit is a component counts as having history), quantity int (check ≥ 1), sort_order` with **unique (bundle_sku_id, component_sku_unit_id)**. Replaced as a whole when the bundle is saved. Model `Catalog\Models\BundleItem`; `Sku::bundleItems()`.
+
+### `bundle_pricing` (V2 Task 15, Pricing)
+
+`bundle_sku_id PK FK skus (cascade), tenant_id, mode varchar(16) (check `fixed` \| `percent_off_sum`), value numeric(12,2)` (check: fixed > 0, percent 0 ≤ value < 100). The price it gives is stored as the bundle unit's `base_price` (BundlePricer) and recomputed when a component's base price changes (RepriceBundles). Model `Pricing\Models\BundlePricing`. A bundle SKU has no `sku_inventory` row.
+
+### `imports` (V2 Task 06)
+
+One run of the catalog import (model `Catalog\Models\CatalogImport`).
+
+| Column      | Type         | Notes                                                                 |
+| ----------- | ------------ | --------------------------------------------------------------------- |
+| id          | bigint PK    |                                                                       |
+| tenant_id   | FK           |                                                                       |
+| uuid        | uuid         | the preview token of the uploaded file; **unique (tenant_id, uuid)** (one run per token) |
+| file_name   | varchar(255) | as uploaded                                                           |
+| status      | varchar(20)  | **check** `queued`, `running`, `done`, `failed`                       |
+| total       | int          | data rows of the file (counted when the run starts)                   |
+| processed   | int          | rows read so far (progress)                                           |
+| created / updated / skipped / failed | int | **check ≥ 0**; skipped = rows with errors, failed = rows the database refused unexpectedly |
+| errors      | jsonb        | the first 500 `{ row, column, label, message }` (row 0 = the whole file) |
+| batch_id    | uuid         | the audit batch of every change of the run                            |
+| created_by  | FK tenant_users | nullable                                                          |
+| started_at / finished_at | timestamp | nullable                                                |
+
+The uploaded file waits in `storage/app/private/imports/{tenant}/{uuid}.{xlsx|csv}` for 24 h; queued exports are written to `.../exports/{tenant}/`.
 
 ---
 
@@ -210,20 +299,70 @@ V1 invariant (app-enforced): exactly one SKU per product. V2 lifts it.
 | ---------------- | ------------- | ------------------------------------------------ |
 | id               | bigint PK     |                                                  |
 | tenant_id        | FK            |                                                  |
-| sku_id           | FK            |                                                  |
-| min_quantity     | int           | **check ≥ 1**; **unique (sku_id, min_quantity)** |
+| sku_unit_id      | FK sku_units  | cascade; the unit the tier belongs to (V2 Task 13; `sku_id` until then) |
+| min_quantity     | int           | **check ≥ 1**; **unique (sku_unit_id, min_quantity)** |
 | unit_price       | numeric(12,2) | **check > 0**                                    |
 | discount_percent | numeric(5,2)  | nullable, **check > 0 and < 100**, display only  |
 
 **Price resolution** (pure function, used by cart display and checkout):
 
 ```
-resolve(sku, qty):
+resolve(unit, qty, context = null):        # unit: the SKU unit (V2 Task 13, D91)          # context: the customer's group % and negotiated prices (V2 Task 11)
+                                             #          + the live promotion of each SKU priced (V2 Task 12)
+  if context has a negotiated price for unit: return it           (source customer, BR-PR13; per unit, D91)
   tier = max(min_quantity) among tiers where min_quantity <= qty
-  return tier ? tier.unit_price : sku.base_price
+  normal = tier ? tier.unit_price : unit.base_price              (source tier | base, BR-PR04)
+  group = context.group% ? round_half_up(unit.base_price × (100 − group%) / 100) : null
+  promo = context.promotion(unit.sku) ? round_half_up(unit.base_price × (100 − promo%) / 100) : null
+  return the lowest of normal, group, promo (ties: that order)   (source group | promotion, BR-PR12, BR-PR15)
 ```
 
+### `customer_groups` (V2 Task 11, BR-PR12, D89)
+
+| Column           | Type          | Notes                                            |
+| ---------------- | ------------- | ------------------------------------------------ |
+| id               | bigint PK     |                                                  |
+| tenant_id        | FK            | **unique (tenant_id, name)**                     |
+| name             | varchar(100)  |                                                  |
+| discount_percent | numeric(5,2)  | default 0, **check 0–90**; % off the base price  |
+| status           | varchar(10)   | `active` \| `archived` (check); archived = no discount, members keep it |
+| sort_order       | int           | default 0                                        |
+
+### `customer_sku_prices` (V2 Task 11, BR-PR13, D89)
+
+| Column      | Type          | Notes                                              |
+| ----------- | ------------- | -------------------------------------------------- |
+| id          | bigint PK     |                                                    |
+| tenant_id   | FK            | index (tenant_id, sku_id)                          |
+| customer_id | FK            | **unique (customer_id, sku_unit_id)** (V2 Task 13; was (customer_id, sku_id)) |
+| sku_id      | FK            |                                                    |
+| sku_unit_id | FK sku_units  | V2 Task 13, D91: the price is negotiated per unit (backfilled to the default unit) |
+| unit_price  | numeric(12,2) | **check > 0**; in that unit, may be above the normal price |
+| note        | varchar(300)  | nullable                                           |
+
 ---
+
+### `promotions` (V2 Task 12, BR-PR15, D90)
+
+| Column           | Type          | Notes                                            |
+| ---------------- | ------------- | ------------------------------------------------ |
+| id               | bigint PK     |                                                  |
+| tenant_id        | FK            | index (tenant_id, status, ends_at)               |
+| name             | varchar(100)  |                                                  |
+| discount_percent | numeric(5,2)  | **check > 0 and < 90**; % off the base price     |
+| starts_at        | timestamp     | UTC, like every timestamp here                   |
+| ends_at          | timestamp     | **check ends_at > starts_at**                    |
+| filter           | jsonb         | nullable; the dashboard product filter `{category, f, q, status}`; null = an explicit SKU list |
+| status           | varchar(10)   | `draft` \| `scheduled` \| `active` \| `ended` \| `cancelled` (check); scheduled → active → ended moved by `pricing:promotions-tick`; prices read the times, not this column |
+| created_by       | FK tenant_users | nullable                                       |
+| cancelled_at     | timestamp     | nullable                                         |
+
+### `promotion_skus` (V2 Task 12)
+
+| Column       | Type   | Notes                                                        |
+| ------------ | ------ | ------------------------------------------------------------ |
+| promotion_id | FK     | cascade on delete; **PK (promotion_id, sku_id)**             |
+| sku_id       | FK     | index (sku_id); the SKUs the filter or list selected when the promotion was last saved |
 
 ## 5. Inventory
 
@@ -234,6 +373,7 @@ resolve(sku, qty):
 | tenant_id | FK   |                                                  |
 | on_hand   | int  | base units, **check ≥ 0**                        |
 | reserved  | int  | base units, **check ≥ 0 and reserved ≤ on_hand** |
+| avg_cost  | numeric(14,4) | V2 costing (BR-INV09, D96): the weighted average cost per base unit, null = not known yet, check ≥ 0. Moves only on goods coming in at a known cost, under this row's lock |
 
 `available = on_hand - reserved` (computed, BR-INV02). This row is the lock target in checkout (`SELECT … FOR UPDATE`).
 
@@ -246,11 +386,13 @@ The `reserved ≤ on_hand` check is deliberate: an adjustment that would drop On
 | id            | bigint PK    |                                                                                               |
 | tenant_id     | FK           |                                                                                               |
 | sku_id        | FK           |                                                                                               |
-| type          | enum         | `opening`, `adjustment`, `sale`, `return` (**`return` reserved for V2, never written in V1**) |
-| quantity      | int          | signed, base units (`sale` is negative)                                                       |
+| type          | enum         | `opening`, `adjustment`, `sale`, `return` (V2: a customer return, BR-R03/R06), `receive` (goods bought, BR-INV09) |
+| quantity      | int          | signed, base units (`sale` and a voided `return` are negative)                                |
 | on_hand_after | int          | snapshot for traceability                                                                     |
-| order_id      | FK           | nullable; set for `sale`                                                                      |
-| reason        | varchar(200) | required for `adjustment`                                                                     |
+| order_id      | FK           | nullable; set for `sale` and `return`                                                         |
+| reason        | varchar(200) | required for `adjustment` (the reason's label, then the note, D97); the merchant's note on a `receive` |
+| unit_cost     | numeric(14,4) | nullable: the cost per base unit it moved at (D96 e); required on `receive` (check, with quantity > 0) |
+| reason_code   | varchar(20)  | nullable: an adjustment's reason (D97: `stocktake`, `damaged`, `expired`, `recording_error`, `found`, `other`, `import`); only on `adjustment` (check); null on adjustments made before D97 |
 | actor_type    | enum         | `tenant_user`, `system`                                                                       |
 | actor_id      | bigint       | nullable                                                                                      |
 
@@ -277,6 +419,10 @@ Reservation changes are **not** movements (BR-INV06).
 | blocked_at        | timestamptz     | nullable (BR-CU05)                                                                   |
 | blocked_reason    | varchar(300)    | nullable; the merchant's reason                                                     |
 | status_before_block | enum          | nullable; restored on unblock (07 §11)                                               |
+| credit_limit      | numeric(12,2)   | V2: nullable = no limit, check ≥ 0 (BR-C05)                                           |
+| payment_terms_days | smallint       | V2: nullable = due on delivery, check 0–365 (BR-C06)                                  |
+| order_notifications_opt_out | boolean | V2: default false; true = no order status messages (BR-N03)                     |
+| customer_group_id | FK customer_groups | V2 Task 11: nullable; the customer's wholesale level (BR-PR12), kept when the group is archived |
 
 ### `customer_addresses` (BR-CU03)
 
@@ -327,7 +473,7 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 
 `carts`: `id, tenant_id, customer_id` with **unique (customer_id)**.
 
-`cart_items`: `id, tenant_id, cart_id, sku_id, quantity (check ≥ 1)` with **unique (cart_id, sku_id)**. No prices are stored in the cart; they are resolved on read (BR-PR06).
+`cart_items`: `id, tenant_id, cart_id, sku_id, sku_unit_id (V2 Task 13, D91; the unit the line is in), quantity (check ≥ 1, in that unit), kind varchar(10) default 'order' (check `order` | `preorder`, V2 Task 10)` with **unique (cart_id, sku_unit_id, kind)** (was (cart_id, sku_id, kind) before V2 Task 13, (cart_id, sku_id) before V2 Task 10). A SKU may be in the cart in two units. No prices are stored in the cart; they are resolved on read (BR-PR06). Pre-order lines (BR-O14) are confirmed apart from the order lines.
 
 ---
 
@@ -343,7 +489,12 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | customer_id                                         | FK            |                                                                                   |
 | status                                              | enum          | `pending`, `confirmed`, `preparing`, `out_for_delivery`, `delivered`, `cancelled` |
 | items_total                                         | numeric(12,2) | Σ line_total                                                                      |
-| order_total                                         | numeric(12,2) | = items_total in V1 (BR-O08)                                                      |
+| discount_type                                       | varchar(8)    | V2 Task 08: `amount` or `percent`, null = no order discount (BR-PR08, D85)        |
+| discount_value                                      | numeric(12,2) | nullable; EGP off or % off the items total; set with the type                     |
+| discount_amount                                     | numeric(12,2) | default 0; what the order discount takes off; **check 0 ≤ discount_amount ≤ items_total**, 0 without a type |
+| discount_reason                                     | varchar(300)  | nullable; required with an order discount (dashboard only)                         |
+| order_total                                         | numeric(12,2) | = items_total − discount_amount, **CHECK** (BR-O08; = items_total in V1)          |
+| returned_total                                      | numeric(12,2) | V2: Σ live returns, default 0, **check 0 ≤ returned_total ≤ order_total** (BR-R04) |
 | collected_amount                                    | numeric(12,2) | denormalized Σ non-voided collections, default 0                                  |
 | collection_status                                   | enum          | `unpaid`, `partially_collected`, `collected` (derived, BR-C03)                    |
 | delivery_name                                       | varchar(150)  | snapshot (BR-O10)                                                                 |
@@ -351,8 +502,14 @@ Rate limiting (5 sends / phone / hour) is enforced in Redis, not in this table. 
 | delivery_address                                    | jsonb         | snapshot of the chosen address                                                    |
 | customer_note                                       | text          | nullable                                                                          |
 | cancel_reason                                       | varchar(300)  | nullable                                                                          |
-| cancelled_by_type                                   | enum          | `customer`, `tenant_user`, nullable                                               |
+| cancelled_by_type                                   | enum          | `customer`, `tenant_user`, `system` (V2 expiry, D81), nullable                    |
 | placed_at, confirmed_at, delivered_at, cancelled_at | timestamptz   | nullable except placed_at                                                         |
+| due_at                                              | timestamptz   | V2: set on delivery = delivered_at + the customer's terms (BR-C06)                |
+| placed_by_type                                      | varchar(12)   | V2 Task 07: `customer` (default) or `tenant_user` (BR-O11); CHECK on the two values |
+| placed_by_id                                        | bigint        | nullable; the customer or dashboard user id, by `placed_by_type` (backfilled with `customer_id`) |
+| kind                                                | varchar(10)   | V2 Task 10: `order` (default) or `preorder` (BR-O14, D88), CHECK                    |
+| converted_from_id                                   | FK orders     | V2 Task 10: nullable; the pre-order a normal order was converted from; **check** only on `kind = order`; indexed |
+| converted_at                                        | timestamptz   | V2 Task 10: nullable; a pre-order with nothing left to convert (state `converted`); **check** only on `kind = preorder` |
 
 ### `tenant_order_counters` (`tenant_id` PK, `next_number int`)
 
@@ -368,27 +525,62 @@ Foreign keys from `orders.customer_id`, `order_items.sku_id/product_id` and `inv
 | tenant_id         | FK            |                                        |
 | order_id          | FK            |                                        |
 | sku_id            | FK            | reference only; never used to re-price |
+| sku_unit_id       | FK sku_units  | V2 Task 13: nullable, reference only; the unit ordered in (backfilled to the default unit) |
 | product_id        | FK            | reference only                         |
 | product_name      | varchar(200)  | snapshot                               |
 | sku_code          | varchar(60)   | snapshot                               |
-| sku_name          | varchar(200)  | snapshot                               |
-| unit_name         | varchar(50)   | snapshot of selling unit               |
-| conversion_factor | int           | snapshot                               |
+| sku_name          | varchar(200)  | snapshot: the variant label (V2 Task 14) or the product name |
+| unit_name         | varchar(50)   | snapshot of the line's selling unit (D91) |
+| conversion_factor | int           | snapshot of the unit's factor          |
 | quantity          | int           | selling units, **check ≥ 1**           |
 | quantity_base     | int           | = quantity × conversion_factor         |
 | cover_price       | numeric(12,2) | snapshot, nullable                     |
-| unit_price        | numeric(12,2) | applied price                          |
-| discount_percent  | numeric(5,2)  | nullable, display                      |
+| list_unit_price   | numeric(12,2) | V2 Task 08: the price before the manual discount (backfilled from unit_price) |
+| manual_discount_type | varchar(8) | V2 Task 08: `amount` or `percent` per unit, null = none (BR-PR08) |
+| manual_discount_value | numeric(12,2) | nullable, > 0, set with the type    |
+| unit_price        | numeric(12,2) | applied price = list_unit_price less the manual discount; **check 0.01 ≤ unit_price ≤ list_unit_price**, = list_unit_price without a discount |
+| discount_percent  | numeric(5,2)  | nullable, **display only**: the tier margin off the cover price (BR-PR10), not the manual discount |
 | tier_min_quantity | int           | nullable; which tier applied           |
-| line_total        | numeric(12,2) | = quantity × unit_price                |
+| price_source      | varchar(10)   | V2 Task 11: `base` \| `tier` \| `group` \| `customer` \| `promotion` (V2 Task 12) (check), where the list price came from (BR-PR14, BR-PR15); backfilled `tier` / `base` |
+| promotion_id      | FK promotions | V2 Task 12: nullable; the promotion that set the list price (set exactly when `price_source = promotion`, check) |
+| line_total        | numeric(12,2) | = quantity × unit_price; once delivered = delivered_quantity × unit_price (BR-O13) |
+| delivered_quantity | int          | V2 Task 09: selling units that went out, set on delivery (backfilled = quantity for orders delivered before); **check 0 ≤ delivered_quantity ≤ quantity**; null until delivered (BR-O13) |
+| removed_at        | timestamp     | V2 Task 09: the merchant removed the line (BR-O12); kept for history, out of totals, stock moves and returns; **check** a removed line has no delivered_quantity |
+| reserved          | boolean       | V2 Task 10: default true; false on a pre-order line, which holds no stock; transitions and cancel release reserved lines only (BR-O14) |
+| converted_quantity | int          | V2 Task 10: default 0, **check 0 ≤ converted_quantity ≤ quantity** and 0 on a reserved line; selling units of a pre-order line already in a normal order; a pre-order line's line_total = unit_price × (quantity − converted_quantity) |
+| is_bundle         | boolean       | V2 Task 15: default false; the line of a bundle (BR-P15, D93): priced and totalled, holds no stock (**check** not reserved, top level) |
+| parent_item_id    | FK order_items | V2 Task 15: nullable; a component line of the bundle line it names: carries the quantity (bundles × component quantity), the reservation, the delivery and its allocated share (`line_total` = share × bundles, **not** in items_total; `unit_price` = share per unit) |
+| unit_cost         | numeric(14,4)  | V2 costing (D96 f): nullable; the cost per base unit frozen when the line left the stock (loose and component lines); null before costing, when unknown, and on a bundle line |
 
 ### `order_status_history` (BR-O04)
 
 `id, tenant_id, order_id, from_status, to_status, actor_type (customer|tenant_user|system), actor_id, note, created_at`.
 
-### `order_returns` — **reserved for V2** (D20)
+### `order_item_changes` (V2 Task 09, BR-O12, BR-O13)
 
-Not created in V1. Name and the `return` movement type are reserved so V2 adds it without touching existing rows.
+`id, tenant_id, order_id FK, order_item_id FK nullable, change varchar(16) (added | removed | quantity | delivered_short | converted (V2 Task 10), CHECK), old_quantity int nullable, new_quantity int nullable, unit_price_before numeric(12,2) nullable, unit_price_after numeric(12,2) nullable, actor_id FK tenant_users nullable (null = system), created_at`. Append-only, index `(order_id, id)`. `added` has only the new quantity and price, `removed` only the old ones, `quantity` both, `delivered_short` the ordered (old) and delivered (new) quantities at the line's price, `converted` what was left to convert of a pre-order line before and after (the pre-order price before, the new order's price after). Written by `EditOrderLines`, `ApplyTransition` and `ConvertPreorders`; model `Orders\Models\OrderItemChange`. Shown as `changes[]` on both order details (the dashboard adds `actor_id`).
+
+### `order_returns` (V2 Task 01, BR-R01..R06)
+
+| Column        | Type            | Notes                                                    |
+| ------------- | --------------- | -------------------------------------------------------- |
+| id            | bigint PK       |                                                          |
+| tenant_id     | FK              |                                                          |
+| order_id      | FK              | a delivered order                                        |
+| number        | int             | per order 1, 2, …; **unique (order_id, number)**         |
+| total         | numeric(12,2)   | Σ line_total, **check > 0**                              |
+| refund_amount | numeric(12,2)   | paid back (BR-R04), default 0, check ≥ 0                 |
+| refund_method | varchar(20)     | `cash`, `instapay`, `wallet`, `bank_transfer` (BR-C10) or `credit` (BR-C07), null when nothing went back |
+| reason        | varchar(300)    | required                                                 |
+| returned_at   | timestamptz     | defaults to now, never in the future                     |
+| recorded_by   | FK tenant_users | nullable (system)                                        |
+| voided_at, void_reason, voided_by | | set together (BR-R06), never deleted                  |
+
+No status: a return is live or voided. Model `Orders\Models\OrderReturn`.
+
+### `order_return_items`
+
+`id, tenant_id, order_return_id FK, order_item_id FK, quantity int (check ≥ 1), quantity_base int, unit_price numeric(12,2) (the line's snapshot, D74, less the order discount's share, D85), line_total numeric(12,2)` (the last return of an order absorbs the rounding). `quantity_base = quantity × order_items.conversion_factor` is kept by `RecordReturn`, since the factor lives on the order line. Model `OrderReturnItem`.
 
 ---
 
@@ -401,8 +593,12 @@ Not created in V1. Name and the `return` movement type are reserved so V2 adds i
 | id           | bigint PK       |                   |
 | tenant_id    | FK              |                   |
 | order_id     | FK              |                   |
+| kind         | enum            | `payment` (default), `refund` (V2, BR-R04) |
+| order_return_id | FK order_returns | set exactly for a refund (the return it pays back) |
 | amount       | numeric(12,2)   | **check > 0**     |
-| method       | enum            | `cash` only in V1 |
+| method       | varchar(20)     | `cash`, `instapay`, `wallet`, `bank_transfer` (V2 Task 20, BR-C10), or `credit` (V2, BR-C07) |
+| reference    | varchar(60)     | nullable: the transfer or wallet transaction number (BR-C10); never on `credit` |
+| customer_credit_id | FK customer_credits | set exactly for method `credit`: the credit drawn from (payment) or created (refund) |
 | collected_at | timestamptz     |                   |
 | recorded_by  | FK tenant_users | nullable (system, e.g. a transition without a user) |
 | note         | varchar(300)    | nullable          |
@@ -410,17 +606,38 @@ Not created in V1. Name and the `return` movement type are reserved so V2 adds i
 | void_reason  | varchar(300)    | nullable          |
 | voided_by    | FK tenant_users | nullable          |
 
-Invariant (app, inside a transaction with the order row locked): `Σ non-voided amount ≤ order_total`. After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method = 'cash'`, `voided_at` and `void_reason` set together.
+Invariant (app, inside a transaction with the order row locked): `Σ live payments − Σ live refunds ≤ net total` (order_total − returned_total), except transiently between voiding a return's refund and voiding the return (BR-R06). After every insert/void, `orders.collected_amount` and `collection_status` are recomputed (Orders' `ApplyCollectedAmount`, called by Collections' `RecordCollection` / `VoidCollection`). Model `Collections\Models\CashCollection` (named apart from Laravel's `Collection`). CHECKs: `amount > 0`, `method in (cash, instapay, wallet, bank_transfer, credit)` (`collections_method_known`), `method = credit` iff `customer_credit_id` is set, no `reference` on `credit` (`collections_credit_has_no_reference`), `kind in (payment, refund)`, `order_return_id` set iff `kind = refund`, `voided_at` and `void_reason` set together.
+
+### `customer_credits` (V2 Task 02, BR-C07)
+
+`id, tenant_id, customer_id FK, source_return_id FK order_returns (nullable), amount numeric(12,2) (check > 0), remaining numeric(12,2) (check 0 ≤ remaining ≤ amount), note varchar(300), created_by FK tenant_users, voided_at, void_reason, voided_by, timestamps`. Model `Collections\Models\CustomerCredit`. `remaining` changes only under the credit's row lock (ApplyCustomerCredit, VoidCollection).
 
 ---
+
+### `expenses` (V2 Task 19, D100)
+
+| Column      | Type          | Notes |
+| ----------- | ------------- | ----- |
+| id          | bigint PK     | |
+| tenant_id   | FK            | index `(tenant_id, spent_on)` |
+| spent_on    | date          | a business day (D60) |
+| amount      | numeric(12,2) | check 0 < amount ≤ 10,000,000 |
+| category    | varchar(20)   | check: `rent`, `salaries`, `transport`, `utilities`, `maintenance`, `packaging`, `marketing`, `fees`, `other` |
+| note        | varchar(200)  | nullable; check: not null for `other` |
+| created_by  | FK tenant_users | nullable |
+| voided_at   | timestamp     | nullable; check: set exactly with `void_reason` |
+| void_reason | varchar(300)  | nullable |
+| voided_by   | FK tenant_users | nullable |
+
+Never edited or deleted (D100 c). Module `Expenses` (model `Expense`).
 
 ## 9. Notifications and Messaging
 
 ### `notifications` (BR-N02)
 
-`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled), data jsonb, read_at`.
+`id, tenant_id, tenant_user_id (nullable = all owners), type (new_order|customer_cancelled|whatsapp_dropped|order_expired|new_preorder), data jsonb, read_at`. `new_preorder` (V2 Task 10): a customer's pre-order (BR-O14).
 
-Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57).
+Our own table, not Laravel's notifications table; the model is `Orders\Models\MerchantNotification` (named apart from Laravel's `Notification`) and rows are written by the `NotifyMerchants` action inside the order transaction. A row for all owners has one shared `read_at` (D57). `whatsapp_dropped` (V2 Task 03) has no order: `data` holds `phone` and `reason`. `permission` varchar(40) (V2 Task 05, D82): who may see the row (`orders.manage` for order notifications, `settings.manage` for `whatsapp_dropped`).
 
 ### `outbound_messages` (Tech §13)
 
@@ -430,7 +647,8 @@ Our own table, not Laravel's notifications table; the model is `Orders\Models\Me
 | tenant_id           | FK           |                                                                                             |
 | uuid                | uuid unique  | our reference; sent to Hypersender SMS as `request_id`                                      |
 | to_phone            | varchar(20)  | E.164 (`App\Support\PhoneNumber`)                                                           |
-| purpose             | enum         | `otp`, `invitation`, `system_alert`                                                         |
+| purpose             | enum         | `otp`, `invitation`, `system_alert`, `order_status` (V2, BR-N03)                            |
+| order_id            | FK orders    | V2: nullable; the order an `order_status` message is about (order page message log)         |
 | channel             | enum         | `whatsapp`, `sms`                                                                           |
 | provider            | varchar(30)  | `hypersender` (platform number), `wa_gateway` (store number, D70), `meta_cloud` reserved, `log` (development) |
 | provider_request_id | varchar      | nullable, indexed; Hypersender `queued_request_uuid` polled for the final result            |
@@ -508,6 +726,7 @@ pending ──► confirmed ──► preparing ──► out_for_delivery ─�
 - `cancelled` allowed from any non-terminal status. Customer only from `pending`.
 - Guard on cancel: `collected_amount = 0` (BR-O03).
 - Side effects (same transaction): `delivered` → inventory deduction + `sale` movement; `cancelled` → reservation release.
+- A pre-order (`kind = preorder`, V2 Task 10) only goes `pending → cancelled` (it reserved nothing, so nothing is released), and not once it is converted in full (`converted_at`). Its derived state: `open` (pending, something left), `converted`, `cancelled` (D88).
 
 ### Collection status (derived)
 
@@ -542,10 +761,10 @@ BEGIN
   lock sku_inventory rows FOR UPDATE (ordered by sku_id to avoid deadlocks)
   for each item:
     assert product.status = active                      → else error "المنتج غير متاح"
-    unit_price = resolve(sku, qty)                      (section 4)
-    assert qty ≥ sku.moq                                → "الحد الأدنى للطلب"
-    qty_base = qty × conversion_factor
-    assert available ≥ qty_base                         → "الكمية غير متوفرة"
+    unit_price = resolve(unit, qty)                     (section 4; each line is a SKU unit, D91)
+    assert qty ≥ unit.moq                               → "الحد الأدنى للطلب"
+    qty_base = qty × unit.conversion_factor
+    assert available − base taken by earlier lines of the SKU ≥ qty_base → "الكمية غير متوفرة"
     line_total = qty × unit_price
   items_total = Σ line_total
   if settings.mov_enabled: assert items_total ≥ mov_amount
@@ -562,6 +781,8 @@ COMMIT
 
 Any assertion failure rolls back and returns a 422 listing the offending SKU(s).
 
+V2 Task 07: everything after loading the cart is `Orders\Actions\PlaceOrder`, shared with the merchant-placed order (BR-O11): the lines come from the merchant's form instead of the cart, the actor is the dashboard user, the MOV step may be waived (D84), the cart is not touched and no `new_order` notification is written. `POST /api/dashboard/orders/quote` runs the same checks on unlocked stock and writes nothing.
+
 ---
 
 ## 13. Indexes Worth Naming
@@ -576,6 +797,8 @@ Any assertion failure rolls back and returns a 422 listing the offending SKU(s).
 | orders            | `(tenant_id, status, placed_at desc)`             | dashboard lists    |
 | orders            | `(tenant_id, customer_id, placed_at desc)`        | customer history   |
 | orders            | `(tenant_id, collection_status)`                  | outstanding report |
+| orders            | `(tenant_id, status, delivered_at)`               | V2 Task 16 reports (D94) |
+| inventory_movements | `(tenant_id, type, created_at)`                 | V2 Task 16 inventory analytics |
 | collections       | `(order_id) where voided_at is null`              | balance            |
 | customers         | `(tenant_id, phone)` unique                       | login              |
 | audit_logs        | `(tenant_id, entity_type, entity_id, created_at)` | entity timeline    |
@@ -607,10 +830,8 @@ Each module exposes services; cross-module calls go through those services, neve
 
 | V2 feature             | Hook already present                                   |
 | ---------------------- | ------------------------------------------------------ |
-| Returns                | `return` movement type, `order_returns` name reserved  |
-| Variants               | products 1:N skus                                      |
-| Multiple selling units | `selling_unit_id` on SKU → becomes a `sku_units` table |
-| Credit terms           | `collected_amount` / `collection_status` on orders     |
+| Variants               | Built in V2 Task 14: `product_options`, `product_option_values`, `sku_option_values`, `skus.status` / `sort_order` (BR-P14, D92) |
 | Roles                  | `tenant_users.role` enum                               |
-| Pre-orders             | `coming_soon` product status                           |
+| Bundles                | Built in V2 Task 15: `products.type`, `bundle_items`, `bundle_pricing`, `order_items.is_bundle` / `parent_item_id` (BR-P15, D93) |
+| Pre-orders             | Built in V2 Task 10: `products.preorder_*`, `orders.kind` / `converted_from_id` / `converted_at`, `order_items.reserved` / `converted_quantity`, `cart_items.kind` (BR-O14, D88) |
 | Order notifications    | `outbound_messages.purpose` enum                       |

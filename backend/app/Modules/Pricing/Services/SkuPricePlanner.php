@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pricing\Services;
 
-use App\Modules\Catalog\Models\Sku;
+use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Pricing\Data\SkuPricingData;
 use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Exceptions\InvalidPricingInput;
@@ -14,7 +14,7 @@ use App\Support\Money;
 use InvalidArgumentException;
 
 /**
- * Turns entered pricing into the concrete values a SKU stores, and checks them, without writing:
+ * Turns entered pricing into the concrete values a SKU unit stores (D91), and checks them, without writing:
  * percentages become absolute prices off the reference price (`cover_price`: the cover price of a book,
  * the retail price otherwise, BR-PR10), thresholds are unique (BR-PR05),
  * every price is above zero (BR-PR01, BR-PR05) and no tier costs more than the base price (D28).
@@ -28,48 +28,48 @@ final readonly class SkuPricePlanner
     public function __construct(private PercentPricing $percent) {}
 
     /**
-     * What the SKU stores now. A SKU not saved yet has no tiers.
+     * What the unit stores now. A unit not saved yet has no tiers.
      *
      * @return PricingState
      */
-    public function current(Sku $sku): array
+    public function current(SkuUnit $unit): array
     {
         $tiers = [];
 
-        if ($sku->exists) {
-            foreach ($sku->loadMissing('tiers')->tiers->sortBy('min_quantity') as $tier) {
+        if ($unit->exists) {
+            foreach ($unit->loadMissing('tiers')->tiers->sortBy('min_quantity') as $tier) {
                 $tiers[] = ['min_quantity' => $tier->min_quantity, 'unit_price' => $tier->unit_price, 'discount_percent' => $tier->discount_percent];
             }
         }
 
         return [
-            'cover_price' => $sku->cover_price,
-            'base_price' => $sku->base_price,
-            'base_price_percent' => $sku->base_price_percent,
-            'moq' => $sku->moq,
+            'cover_price' => $unit->cover_price,
+            'base_price' => $unit->base_price,
+            'base_price_percent' => $unit->base_price_percent,
+            'moq' => $unit->moq,
             'tiers' => $tiers,
         ];
     }
 
     /**
-     * What the SKU will store once `$data` is applied.
+     * What the unit will store once `$data` is applied.
      *
      * @return PricingState
      */
-    public function plan(Sku $sku, SkuPricingData $data): array
+    public function plan(SkuUnit $unit, SkuPricingData $data): array
     {
-        $cover = $data->coverPriceGiven ? $data->coverPrice : $sku->cover_price;
-        $basePrice = $data->basePrice ?? $this->fromPercent($sku, $cover, $data->basePricePercent);
+        $cover = $data->coverPriceGiven ? $data->coverPrice : $unit->cover_price;
+        $basePrice = $data->basePrice ?? $this->fromPercent($unit, $cover, $data->basePricePercent);
 
         if (Money::compare($basePrice, '0') <= 0) {
             throw InvalidPricingInput::basePriceNotPositive();
         }
 
         $tiers = $data->tiers === null
-            ? ($sku->exists ? $this->current($sku)['tiers'] : [])
+            ? ($unit->exists ? $this->current($unit)['tiers'] : [])
             : array_map(fn (TierData $tier): array => [
                 'min_quantity' => $tier->minQuantity,
-                'unit_price' => $tier->unitPrice ?? $this->fromPercent($sku, $cover, $tier->discountPercent),
+                'unit_price' => $tier->unitPrice ?? $this->fromPercent($unit, $cover, $tier->discountPercent),
                 'discount_percent' => $tier->discountPercent,
             ], $data->tiers);
 
@@ -86,17 +86,17 @@ final readonly class SkuPricePlanner
     }
 
     /**
-     * The section kind is read only on the failure path, through the SKU's product and category
+     * The section kind is read only on the failure path, through the unit's SKU, product and category
      * (a relation walk, not a Catalog model dependency), so the message names the price correctly (D68).
      */
-    private function fromPercent(Sku $sku, ?string $cover, ?string $percent): string
+    private function fromPercent(SkuUnit $unit, ?string $cover, ?string $percent): string
     {
         if ($percent === null) {
             throw new InvalidArgumentException('A price needs an absolute amount or a discount percent.');
         }
 
         if ($cover === null) {
-            throw MissingCoverPrice::for($sku->product->category->kind);
+            throw MissingCoverPrice::for($unit->sku->product->category->kind);
         }
 
         return $this->percent->priceFromPercent($cover, $percent);
