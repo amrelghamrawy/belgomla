@@ -81,13 +81,24 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 
 ### BR-T07 — Tenant Lifecycle
 
-Tenants are created, activated and suspended by an internal CLI command (no Platform Admin UI in V1).
+Tenants are created, activated and suspended by the platform: from the platform admin dashboard (V3, BR-T09) **or** the CLI on the server (`tenant:create`, `tenant:suspend`, `tenant:activate`). Both call the same Actions, so the guards, audit and side effects are identical. V1 and V2 had the CLI only.
 
 A `Suspended` tenant:
 
 - Storefront returns a "store unavailable" page.
 - Dashboard login is refused.
 - Data is retained.
+
+### BR-T09 — Platform Admin (V3, D111)
+
+The platform admin is the BelGomla operator, not a merchant. Their dashboard manages every tenant and the store verticals (BR-P16).
+
+- Platform admins are separate accounts (`platform_admins`, guard `platform_admin`), not tenant users. They log in only on `admin.{base_domain}`. A tenant user cannot log in there, and an admin session is never accepted on a tenant host (and the other way round).
+- Admins are created only on the server (`platform:admin-create`); there is no sign-up and no "invite an admin" screen.
+- Login is a password with throttling, with an optional IP allow-list on the VM. Two-factor login is deferred.
+- Per tenant an admin sees: identity (name, subdomain, status, vertical, created at), the owner's contact, and counts (products, orders in the last 30 days, last dashboard login). An admin sees **no** customer, order, price or collection details of a tenant.
+- An admin creates, suspends and activates tenants (BR-T07) and changes a tenant's vertical only while the tenant has no products (D108 d).
+- Every admin write, and every `tenant:*` command, writes a `platform_audit_logs` row (actor, action, target, old/new values). These rows are separate from the tenant's `audit_logs` (BR-L).
 
 ---
 
@@ -157,7 +168,7 @@ Categories are a tree of unlimited depth. Any category can have sub-categories (
 
 A product belongs to exactly one category (any level). Listing a category shows products of that category and all its descendants.
 
-Every root category belongs to a **section** (`kind`, D68): `books` (كتب خارجية), `stationery` (أدوات دراسية), `toys` (ألعاب) or `general`. The merchant sets it when creating or editing a root; sub-categories inherit it and cannot carry their own (`422`), and moving a subtree under another root re-kinds it. A product's kind is its category's kind; it decides what the SKU's reference price is called (BR-PR10) and which custom fields apply (BR-P08).
+Every root category belongs to one of the tenant's **sections** (`section_id`, BR-P16, D109; until V3 Task 02 ships this is the fixed `kind` enum of D68: `books`, `stationery`, `toys`, `general`). The merchant picks an active section when creating or editing a root; without one the root goes to the tenant's «عام» section. Sub-categories inherit it and cannot carry their own (`422`), and moving a subtree under another root moves it to that root's section. A product's section is its category's section; it decides what the SKU's reference price is called (BR-PR10) and which custom fields apply (BR-P08).
 
 ### BR-P08 — Custom Product Fields
 
@@ -175,7 +186,7 @@ A custom field definition has:
 
 Rules:
 
-- Definitions are tenant-scoped. A definition is bound to one section (`kind`, D69) or to none (null = every section). It applies to a product when its kind is null or equals the kind of the product's category: only applicable fields are shown on the form and the storefront, required, or offered as facets inside a category (outside any category every filterable field is a facet). A value sent for a non-applicable field is rejected (`422 validation_failed`, "هذا الحقل لا ينطبق على قسم هذا المنتج") unless it is the stored value; stored values of non-applicable fields are kept and hidden, like archived ones, so a product moved to another section loses nothing.
+- Definitions are tenant-scoped. A definition is bound to one section of the tenant (`section_id`, D109; `kind` until V3 Task 02, D69) or to none (null = every section). It applies to a product when its section is null or equals the section of the product's category: only applicable fields are shown on the form and the storefront, required, or offered as facets inside a category (outside any category every filterable field is a facet). A value sent for a non-applicable field is rejected (`422 validation_failed`, "هذا الحقل لا ينطبق على قسم هذا المنتج") unless it is the stored value; stored values of non-applicable fields are kept and hidden, like archived ones, so a product moved to another section loses nothing.
 - Values are stored per product as `{ key: value }` (JSONB), validated against the definition on save.
 - Deleting a definition is soft (archive); existing values are kept but hidden.
 - Changing a field's type after values exist is not allowed in V1.
@@ -192,9 +203,14 @@ Storefront behavior:
 
 ### BR-P09 — Vertical Templates
 
-The platform ships predefined custom-field templates per vertical. A template is applied once at tenant creation (`tenant:create --vertical=school-books`) and simply inserts field definitions and options; after that the merchant owns and edits them freely.
+Field templates are **platform data** owned by a store vertical (BR-P16, D108, D110), edited by the platform admin, never code. A template belongs to its vertical and optionally to one of the vertical's sections (none = every section). It has the same shape as a tenant field definition (key, label, type, required, filterable, filter order, sort order, `select` options).
 
-`school-books` template:
+- **At tenant creation** (`tenant:create --vertical=libraries`, or the admin dashboard) the tenant gets a copy of its vertical's active sections and active templates with their options. Each copy keeps a link to its template (`template_id`). From then on the merchant owns the copy: they edit, archive and add freely.
+- **Copy, not live inheritance (D110 b):** a later change to a template never overwrites a tenant's copy.
+- **New defaults reach existing stores** in two ways: the merchant takes them from «إضافة من القوالب», or the admin pushes them to the vertical's tenants. A push **only adds** what is missing (sections, fields, options). It skips what the tenant archived, and it reports, without touching, a field the tenant made itself with the same key.
+- Applying the copy twice adds nothing (matched by key, and by label for options).
+
+Until V3 Task 01 the templates were PHP files per vertical (`school-books`, `stationery`, `hardware`). Task 01 moves all three into the «مكتبات» vertical. The `school-books` fields go to its section كتب خارجية:
 
 | Key             | Label (ar)     | Type   | Filterable | Options (initial)                                                                   |
 | --------------- | -------------- | ------ | ---------- | ----------------------------------------------------------------------------------- |
@@ -206,9 +222,7 @@ The platform ships predefined custom-field templates per vertical. A template is
 | `edition_type`  | نوع النسخة     | select | yes        | الكتاب الأساسي، المراجعة النهائية، كتاب الامتحانات، ملحق المراجعة والامتحانات       |
 | `academic_year` | العام الدراسي  | select | yes        | 2025/2026، 2026/2027                                                                |
 
-Other initial templates: `stationery` (brand, color, size), `hardware` (brand, material, size). A tenant can also start with no template.
-
-Templates carry the section their fields belong to (D69): every school-books field is bound to `books`, every stationery field to `stationery`, hardware fields to no section. A store that sells several sections applies several templates (the demo seeder applies school-books and stationery and adds a toys-only `age` field).
+The `stationery` fields (brand, color, size) go to the section أدوات مكتبية. The one `hardware` field whose key is not taken (`material`) goes to no section. Its `brand` and `size` collide with the stationery ones by key, so the stationery ones are kept; fields already copied into hardware tenants are tenant rows and stay as they are. The demo seeder adds a toys-only `age` field to its own store, not to the vertical.
 
 ### BR-P10 — Product Relations
 
@@ -261,6 +275,29 @@ A **bundle** (باقة) is a sellable product made of component SKU units with f
 - Ordering a bundle reserves, deducts and returns its components. The order keeps the bundle line (price, total) and one line per component with the price allocated to it; a partial delivery counts whole bundles; a return brings back components at their allocated price.
 - The merchant can generate a draft «طقم» from a facet selection (grade + term + publisher) in one step and review it before activating it.
 - Bundles are exported in the catalog file (second sheet) but not imported (D93).
+
+### BR-P16 — Store Verticals and Sections (V3, D108–D110)
+
+A **vertical** (نشاط المتجر) is the kind of trade a store is in. A **section** (قسم) is a part of one store's catalog: كتب خارجية, أدوات مكتبية, ألعاب.
+
+Verticals (D108):
+
+- Verticals are platform data (`verticals`) managed by the platform admin (BR-T09). Adding one (ملابس، أحذية، إكسسوارات موبايل) needs no deploy.
+- A vertical has a key (a slug, fixed once created), an Arabic name, a status (`active` | `archived`) and a sort order.
+- Every tenant belongs to **exactly one** vertical. The first and only vertical at V3 launch is «مكتبات» (`libraries`); every tenant that existed before V3 moves to it.
+- Only the platform admin changes a tenant's vertical, and only while the tenant has no products.
+- An archived vertical is not offered to new tenants; its tenants keep it.
+
+Sections (D109):
+
+- A vertical has **default sections** (`vertical_sections`). «مكتبات» has كتب خارجية (`books`), أدوات مكتبية (`stationery`) and ألعاب (`toys`).
+- Each tenant has its own sections (`sections`). They are copied from its vertical at creation (BR-P09), and the merchant can add sections of their own, rename any section and change its icon.
+- Every tenant also has one fallback section «عام». It is created with the tenant, it cannot be archived, and a root category without a chosen section goes to it.
+- A section carries the label of its reference price (BR-PR10): «سعر الغلاف» for كتب خارجية, «سعر القطاعي» by default. It also carries an optional icon from the category icon set (D73).
+- Sections are archived, never deleted. Archiving is refused (`409`) while an active root category uses the section. An archived section is not offered for new root categories.
+- A section's name is unique within the tenant (folded, D32). A section copied from the vertical keeps its link to the default section (`vertical_section_id`); a section the merchant created has none.
+
+Field templates and how stores inherit them are BR-P09 (D110).
 
 ### BR-P07 — Product Images
 
@@ -430,7 +467,7 @@ Later catalog changes must not modify historical orders.
 
 In the school-book trade every book has a printed **cover price** (سعر الغلاف), and wholesale prices are negotiated as a **discount percentage off the cover price** ("الأضواء بخصم 25%"). The model supports this without changing the pricing engine:
 
-- A SKU has an optional reference price, stored and sent as `cover_price`. For products of the `books` section it is the printed cover price (سعر الغلاف); for every other section it is the retail price (سعر القطاعي), also optional (D68). The name follows the product's category kind everywhere it is shown (storefront, dashboard form, price list, the `cover_price_required` message); the column, the API field and the mechanics below do not change. When set, the storefront shows the reference price, the wholesale price and the implied discount.
+- A SKU has an optional reference price, stored and sent as `cover_price`. What it is called comes from the product's section (`reference_price_label`, BR-P16, D109): «سعر الغلاف» (the printed cover price) for كتب خارجية, «سعر القطاعي» (the retail price) by default; it is optional in every section, as before (D68). Until V3 Task 02 ships the label is fixed by `kind = books`. The name follows the product's section everywhere it is shown (storefront, dashboard form, price list, the `cover_price_required` message); the column, the API field and the mechanics below do not change. When set, the storefront shows the reference price, the wholesale price and the implied discount.
 - `base_price` and tier prices can be entered **either** as an absolute unit price **or** as a discount percentage off `cover_price`. The dashboard converts the percentage to an absolute `unit_price` at save time; the stored and snapshotted value is always the absolute price, plus the percentage used, for display.
 - Changing `cover_price` later does not silently recompute prices; the dashboard offers "recompute from percentages" as an explicit action (audited). It re-derives the base price and every tier that has a stored percentage from the current cover price; absolute prices stay.
 - Pricing resolution (BR-PR04) is unchanged.

@@ -381,7 +381,7 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | POST   | `/api/dashboard/categories`              | `name, parent_id?, kind?, icon?, image?, sort_order?`; `kind` (D68) for roots only, default `general`; sent with a `parent_id` → `422` on `kind`; `icon` (D73) one of `CategoryIcon` or null |
 | PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `kind?` (roots only; absent = keep), `icon?` (absent = keep, null = none, D73), `sort_order?`; move = change `parent_id` (the subtree takes the new root's kind); cycle → `422 category_cycle` |
 
-Category shapes (store and dashboard) carry `kind`; product shapes carry `category: { id, name, kind }` (`CategoryRef`).
+Category shapes (store and dashboard) carry `kind`; product shapes carry `category: { id, name, kind }` (`CategoryRef`). V3 (D109): Task 02 adds `section: { id, name, reference_price_label, icon }` next to `kind` in the same payloads, and Task 03 removes `kind`.
 | POST   | `/api/dashboard/categories/{id}/archive` | allowed with products (BR-P06); products stay linked |
 | POST   | `/api/dashboard/categories/{id}/restore` |                                                      |
 | POST   | `/api/dashboard/categories/reorder`      | `[ {id, sort_order} ]`                               |
@@ -826,10 +826,12 @@ Webhooks are platform-level (not tenant hosts): they are served only on `https:/
 ## 14. Platform CLI (not HTTP, Tech §18)
 
 ```
-php artisan tenant:create alnoor "مكتبة النور" --owner-email=... --owner-password=... --vertical=school-books
+php artisan tenant:create alnoor "مكتبة النور" --owner-email=... --owner-password=... --vertical=libraries   # V3 Task 01: key from `verticals` (was school-books|stationery|hardware|none)
 php artisan tenant:suspend alnoor
 php artisan tenant:activate alnoor
 php artisan tenant:list
+php artisan platform:admin-create admin@example.com --name=...  # V3 Task 04, D111 b: the only way to create a platform admin (asks for the password)
+php artisan platform:admin-disable admin@example.com          # V3 Task 04
 php artisan api:openapi          # compile backend/openapi/openapi.yaml → backend/openapi.json (Task 8)
 php artisan messaging:wa-reconcile  # D70: start connected store numbers on wa-gateway, remove stray sessions (every 5 min)
 php artisan orders:expire-pending   # D81: cancel unconfirmed orders past their store's pending_expiry_hours (every 15 min)
@@ -849,6 +851,8 @@ php artisan pricing:promotions-tick # D90: move promotions scheduled → active 
 | Webhooks       |         2 |
 | **Total**      |   **150** |
 
+The platform admin API (§17, V3) is counted here as each of V3 Tasks 04–06 lands.
+
 ---
 
 ## 16. Build Order
@@ -861,3 +865,21 @@ php artisan pricing:promotions-tick # D90: move promotions scheduled → active 
 6. Orders: checkout transaction, transitions, cancel, history, notifications.
 7. Collections and reports.
 8. Storefront UI, then dashboard UI (both Next.js, RTL, mobile-first).
+9. V3 (platform admin, store verticals and sections): `tasks/v3/README.md`, tasks 00–09 in its dependency order.
+
+---
+
+## 17. Platform Admin (V3, BR-T09, D111)
+
+Host `admin.{base_domain}` only. `ResolveTenant` never runs here: `/api/admin/*` on a tenant host is `404`, and `/api/store/*` or `/api/dashboard/*` on the admin host is `404`. Guard `platform_admin`; its session cookie is scoped to the admin host, so a tenant session never reaches it and an admin session never reaches a tenant host. Every write is logged in `platform_audit_logs` (D111 e). An admin never sees a tenant's customers, orders, prices or collections (D111 c).
+
+The request and response shapes are written into this section and `openapi.yaml` by the task that builds each group:
+
+| Group | Endpoints | Task |
+| ----- | --------- | ---- |
+| Session | `POST /api/admin/session` (login: password, throttle 5/min per email+IP), `DELETE /api/admin/session`, `GET /api/admin/me` | V3 Task 04 |
+| Tenants | `GET /api/admin/tenants` (search, `status`, `vertical`; counts only), `GET /api/admin/tenants/{id}`, `POST /api/admin/tenants`, `POST /api/admin/tenants/{id}/suspend`, `POST /api/admin/tenants/{id}/activate`, `PUT /api/admin/tenants/{id}/vertical` (only while the tenant has no products, D108 d) | V3 Task 05 |
+| Verticals, sections, field templates | CRUD + archive/restore + reorder under `/api/admin/verticals`, `/api/admin/sections`, `/api/admin/fields`, `/api/admin/field-options` | V3 Task 06 |
+| Push defaults | `POST /api/admin/verticals/{id}/push?dry_run=1` (what would be added per tenant, plus conflicts), `POST /api/admin/verticals/{id}/push` (queued per tenant; additive only, D110 c) | V3 Task 06 |
+
+The merchant side of sections (`/api/dashboard/sections`, «إضافة من القوالب») is V3 Task 07 and goes in §6.

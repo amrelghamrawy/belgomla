@@ -6,7 +6,7 @@ One task = one session (or a few). Execute in order unless the dependency list s
 
 | #  | Task                                                                  | Module(s)                              | Status  | Commit |
 | -- | --------------------------------------------------------------------- | -------------------------------------- | ------- | ------ |
-| 00 | [Decisions and documents](00-decisions-and-docs.md)                   | docs                                   | planned |        |
+| 00 | [Decisions and documents](00-decisions-and-docs.md)                   | docs                                   | done    | see log |
 | 01 | [Platform verticals, sections and field templates](01-platform-verticals.md) | Platform, Tenancy, Catalog      | planned |        |
 | 02 | [Tenant sections replace `CategoryKind` (backend)](02-tenant-sections-backend.md) | Catalog, Pricing, Reports, Tenancy | planned |        |
 | 03 | [Tenant sections in the frontend](03-tenant-sections-frontend.md)     | frontend, Catalog resources            | planned |        |

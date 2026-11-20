@@ -1,6 +1,6 @@
 # V3 Task 00 — Decisions and documents
 
-Status: **planned**. Docs only, one commit. Read `CLAUDE.md`, `rules/*.md`, `tasks/v3/README.md`.
+Status: **done** (2026-11-20): D108–D111 confirmed by the product owner as proposed, no changes. Docs only, one commit. Read `CLAUDE.md`, `rules/*.md`, `tasks/v3/README.md`.
 
 ## Why
 
@@ -24,3 +24,11 @@ The platform admin was a "Later" item and V1/V2 documents say in several places 
 ## Definition of done
 
 Documents consistent with each other (grep `kind`, `Platform Admin`, `no Platform Admin UI`, `CLI only`), commit `V3 Task 00: platform admin and store verticals decided (D108–D111)`.
+
+## Outcome
+
+- D108–D111 marked decided (2026-11-20); D68 and D69 point to D109.
+- `02`: BR-T07 rewritten, BR-T09 and BR-P16 added, BR-P06, BR-P08, BR-P09 and BR-PR10 follow sections. BR-T08 is left to `tasks/v2/21`, which claims it.
+- `07`: new §2b Platform (`verticals`, `vertical_sections`, `vertical_field_templates`, `vertical_field_template_options`, `platform_admins`), `sections` in §3, `platform_audit_logs` in §10, `tenants.vertical_id`, `categories.section_id`, `product_field_definitions.section_id` + `template_id`, ER lines.
+- `01` §5, `03` §Later, `04` §5, §9 and §18, `05` §Later, `08` §14, §15, §16 and a new §17 Platform Admin (endpoint groups; shapes filled by tasks 04–06).
+- Fixed `tasks/v3/02`: it said `cover_price` is required in the `books` section. It is optional everywhere; only pricing by % needs it (`backend/app/Modules/Pricing/Exceptions/MissingCoverPrice.php:18`).

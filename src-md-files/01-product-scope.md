@@ -81,7 +81,7 @@ The first release should solve:
 
 The following are not part of V1:
 
-- Platform Admin UI (tenants are created and suspended by an internal CLI command, see Technical Constraints §18).
+- Platform Admin UI (tenants are created and suspended by an internal CLI command, see Technical Constraints §18). Added in V3 (`tasks/v3/`, BR-T09, D111).
 - Marketplace / cross-store browsing.
 - Cross-tenant product discovery.
 - Online payment gateways.

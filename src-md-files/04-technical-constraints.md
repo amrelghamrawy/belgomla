@@ -103,7 +103,7 @@ Reason: if the API lived on `api.gomalecommerce.app`, the client would have to t
 
 The same Next.js app and the same Laravel app serve storefront and dashboard; the path decides which UI is shown, the host decides the tenant.
 
-There is no V1 platform-admin UI.
+There is no V1 or V2 platform-admin UI. V3 adds one on its own host, `admin.{base_domain}` (BR-T09, D111): the same Laravel and Next.js apps, `/api/admin/*` routes that never resolve a tenant, a separate `platform_admin` guard and a session cookie scoped to that host only.
 
 ## 6. Authentication
 
@@ -146,7 +146,7 @@ All primary flows should be designed for Arabic mobile use.
 
 - Categories: adjacency list (`parent_id`) with unlimited depth. Descendant queries use a recursive CTE or a cached materialized `path`; cycles are rejected on save.
 - Custom product fields: `product_field_definitions` and `product_field_options` tables per tenant plus a JSONB `custom_fields` column on `products` (`{ "grade": "<option_id>", "subject": "<option_id>" }`), validated in the application against the definitions. A GIN index on `custom_fields` supports faceted filtering. Facet counts are computed with one grouped query per facet, cached per tenant and invalidated on product change; a school-book tenant with a few thousand products stays well within PostgreSQL on a single node.
-- Vertical templates are code-defined seeders (`database/verticals/school-books.php`), not database rows, so they can evolve without migrations.
+- Vertical templates were code-defined seeders (`database/verticals/*.php`) through V2. From V3 Task 01 they are platform rows (`verticals`, `vertical_sections`, `vertical_field_templates`, D108, D110), edited from the admin dashboard without a deploy and copied into each tenant (BR-P09).
 - Product relations: `product_relations (tenant_id, product_id, related_product_id, type)` with a unique constraint on the triple.
 
 ## 10. Pricing Integrity
@@ -236,15 +236,17 @@ Do not split into Go services or microservices unless actual scale or a concrete
 
 The codebase should still have clear modules/bounded areas (see `05-module-scope.md`) so future extraction remains possible.
 
-## 18. Tenant Provisioning (No Platform Admin)
+## 18. Tenant Provisioning (CLI and Platform Admin Dashboard)
 
-Tenants are managed through artisan commands run by the platform operator:
+Tenants are managed by the platform operator in two ways that call the same Actions (BR-T07):
 
-- `tenant:create {subdomain} {name} --owner-email= --owner-password= --vertical=school-books|stationery|hardware|none`
-- `tenant:suspend {subdomain}` / `tenant:activate {subdomain}`
-- `tenant:list`
+- the platform admin dashboard on `admin.{base_domain}` (V3, BR-T09, D111; `/api/admin/tenants`, `08-api-contract.md` §17);
+- artisan commands on the server:
+  - `tenant:create {subdomain} {name} --owner-email= --owner-password= --vertical=libraries` (the vertical key comes from the `verticals` table since V3 Task 01; before it the enum `school-books|stationery|hardware|none`)
+  - `tenant:suspend {subdomain}` / `tenant:activate {subdomain}`
+  - `tenant:list`
 
-These commands are the only way to create a tenant in V1.
+Every write from either path is logged in `platform_audit_logs` (D111 e). Platform admins themselves are created only by `platform:admin-create` on the server (D111 b). In V1 and V2 the commands were the only way to create a tenant.
 
 ## 19. Resolved Decisions
 

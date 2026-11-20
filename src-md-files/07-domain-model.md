@@ -17,6 +17,17 @@ Conventions:
 erDiagram
   tenants ||--|| tenant_settings : has
   tenants ||--o{ tenant_users : has
+  verticals ||--o{ tenants : groups
+  verticals ||--o{ vertical_sections : has
+  verticals ||--o{ vertical_field_templates : has
+  vertical_sections |o--o{ vertical_field_templates : scopes
+  vertical_field_templates ||--o{ vertical_field_template_options : has
+  platform_admins ||--o{ platform_audit_logs : writes
+  tenants ||--o{ sections : owns
+  vertical_sections |o--o{ sections : copied_to
+  sections ||--o{ categories : groups
+  sections |o--o{ product_field_definitions : scopes
+  vertical_field_templates |o--o{ product_field_definitions : copied_to
   tenants ||--o{ categories : owns
   tenants ||--o{ units : owns
   tenants ||--o{ product_field_definitions : owns
@@ -57,7 +68,7 @@ erDiagram
 | subdomain | varchar(63)  | **unique**, lowercase, `[a-z0-9-]`               |
 | name      | varchar(150) | Arabic store name                                |
 | status    | enum         | `active`, `suspended` (BR-T07)                   |
-| vertical  | varchar(30)  | `school-books`, `stationery`, `hardware`, `none` |
+| vertical_id | FK verticals | **not null** (V3, D108); changed only while the tenant has no products. Replaces `vertical` varchar(30) (`school-books`, `stationery`, `hardware`, `none`), backfilled to `libraries` and dropped by V3 Task 01 |
 
 ### `tenant_settings` (1:1 with tenants, `tenant_id` PK)
 
@@ -97,7 +108,84 @@ erDiagram
 
 ---
 
+## 2b. Platform (V3, BR-T09, BR-P16)
+
+Platform tables have **no** `tenant_id` and no `BelongsToTenant`. Models live in the Platform module. Other modules read verticals only through `Platform\Queries\VerticalTemplateQuery`, which returns DTOs.
+
+### `verticals` (D108)
+
+| Column     | Type        | Notes                                              |
+| ---------- | ----------- | -------------------------------------------------- |
+| id         | bigint PK   |                                                    |
+| key        | varchar(40) | **unique**, slug, immutable once created (`libraries`) |
+| name       | varchar(80) | Arabic («مكتبات»)                                  |
+| status     | enum        | `active`, `archived` (archived = not offered to new tenants) |
+| sort_order | int         |                                                    |
+
+### `vertical_sections` (D109 a)
+
+| Column                | Type         | Notes                                                    |
+| --------------------- | ------------ | -------------------------------------------------------- |
+| id                    | bigint PK    |                                                          |
+| vertical_id           | FK verticals |                                                          |
+| key                   | varchar(40)  | **unique (vertical_id, key)**, immutable (`books`, `stationery`, `toys`) |
+| name                  | varchar(80)  | default name copied to tenants                           |
+| reference_price_label | varchar(40)  | default «سعر القطاعي»; «سعر الغلاف» for `books` (BR-PR10) |
+| icon                  | varchar(40)  | nullable; a `CategoryIcon` value (D73)                   |
+| status                | enum         | `active`, `archived`                                     |
+| sort_order            | int          |                                                          |
+
+### `vertical_field_templates` (D110 a, BR-P09)
+
+| Column              | Type                 | Notes                                                       |
+| ------------------- | -------------------- | ----------------------------------------------------------- |
+| id                  | bigint PK            |                                                             |
+| vertical_id         | FK verticals         |                                                             |
+| vertical_section_id | FK vertical_sections | nullable; null = every section of the vertical              |
+| key                 | varchar(40)          | **unique (vertical_id, key)**; same key rules as `product_field_definitions.key` |
+| label               | varchar(100)         | Arabic                                                      |
+| type                | enum                 | `FieldType`; immutable after create                         |
+| is_required, is_filterable | boolean       |                                                             |
+| filter_order, sort_order   | int           |                                                             |
+| status              | enum                 | `active`, `archived`                                        |
+
+### `vertical_field_template_options`
+
+`id, template_id FK vertical_field_templates, label, sort_order`, **unique (template_id, label)**.
+
+### `platform_admins` (D111 a, b)
+
+| Column         | Type         | Notes                                         |
+| -------------- | ------------ | --------------------------------------------- |
+| id             | bigint PK    |                                               |
+| name           | varchar(100) |                                               |
+| email          | varchar(190) | **unique**, lower-cased                       |
+| password       | varchar      | hash; created only by `platform:admin-create` |
+| status         | enum         | `active`, `disabled`                          |
+| last_login_at  | timestamptz  | nullable                                      |
+| remember_token | varchar      | nullable                                      |
+
+`platform_audit_logs` is in §10.
+
+---
+
 ## 3. Catalog
+
+### `sections` (V3 Task 02, BR-P16, D109)
+
+Tenant-owned (`BelongsToTenant`). Replaces the fixed `CategoryKind` enum (D68).
+
+| Column                | Type                 | Notes                                                        |
+| --------------------- | -------------------- | ------------------------------------------------------------ |
+| id                    | bigint PK            |                                                              |
+| tenant_id             | FK                   |                                                              |
+| vertical_section_id   | FK vertical_sections | nullable; null = created by the tenant; **unique (tenant_id, vertical_section_id)** where not null |
+| name                  | varchar(80)          | **unique per tenant** (folded, D32)                          |
+| reference_price_label | varchar(40)          | what `skus.cover_price` is called (BR-PR10)                  |
+| icon                  | varchar(40)          | nullable; `CategoryIcon` (D73)                               |
+| is_fallback           | boolean              | exactly one per tenant: «عام», cannot be archived (D109 c)   |
+| status                | enum                 | `active`, `archived`; archive refused while an active root category uses it |
+| sort_order            | int                  |                                                              |
 
 ### `categories`
 
@@ -111,7 +199,7 @@ erDiagram
 | path       | varchar(500) | materialized `/1/7/23/`, rebuilt on move (Tech §9b)     |
 | sort_order | int          |                                                         |
 | image_path | varchar      | nullable                                                |
-| kind       | varchar(20)  | `books`, `stationery`, `toys`, `general` (default); set on roots, copied to the subtree like `path` (D68) |
+| section_id | FK sections  | **not null** (V3 Task 02, D109); set on roots (default: the tenant's fallback section), copied to the subtree like `path`. Replaces `kind` varchar(20) (`books`, `stationery`, `toys`, `general`, D68), which Task 02 backfills and drops |
 | icon       | varchar(40)  | nullable; `CategoryIcon` value for the storefront tile, null = guessed from the name (D73) |
 | status     | enum         | `active`, `archived` (BR-P06)                           |
 
@@ -136,7 +224,8 @@ erDiagram
 | is_required        | boolean      |                                         |
 | show_on_storefront | boolean      |                                         |
 | is_filterable      | boolean      | app check: only for `select`/`boolean`  |
-| kind               | varchar(20)  | nullable; the section the field applies to, null = every section (D69) |
+| section_id         | FK sections  | nullable; the section the field applies to, null = every section (V3 Task 02, D109; replaces `kind` varchar(20), D69) |
+| template_id        | FK vertical_field_templates | nullable; the template this field was copied from (D110 b); null = made by the tenant |
 | filter_order       | int          | facet order on storefront               |
 | sort_order         | int          | order on product page / form            |
 | status             | enum         | `active`, `archived`                    |
@@ -709,6 +798,22 @@ Not tenant-owned. One row per Hypersender SMS phone, upserted by every `phone.he
 | ip          | inet        | nullable                                           |
 | user_agent  | varchar     | nullable                                           |
 | created_at  | timestamptz | append-only: no update/delete grants               |
+
+### `platform_audit_logs` (V3, BR-T09, D111 e)
+
+Not tenant-owned: `audit_logs.tenant_id` is not null, so platform actions get their own table. Every admin write and every `tenant:*` command writes one row.
+
+| Column            | Type        | Notes                                                    |
+| ----------------- | ----------- | -------------------------------------------------------- |
+| id                | bigint PK   |                                                          |
+| platform_admin_id | FK          | nullable; null = a CLI command                           |
+| action            | varchar(60) | `admin.login`, `tenant.created`, `tenant.suspended`, …   |
+| tenant_id         | FK tenants  | nullable, set null on delete; the tenant acted on        |
+| entity_type       | varchar(40) |                                                          |
+| entity_id         | bigint      | nullable                                                 |
+| changes           | jsonb       | nullable; old/new values                                 |
+| ip                | inet        | nullable                                                 |
+| created_at        | timestamptz | append-only. Indexes (tenant_id, created_at), (action, created_at) |
 
 ---
 

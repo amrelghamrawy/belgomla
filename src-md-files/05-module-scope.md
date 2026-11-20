@@ -157,7 +157,7 @@ Potential V2 modules:
 
 Potential later modules:
 
-- Platform Admin.
+- ~~Platform Admin.~~ → V3 (`tasks/v3/`): a `Platform` module (verticals, platform admins, platform audit) and the admin API/UI (BR-T09, BR-P16).
 - Marketplace.
 - Warehouses.
 - Procurement.

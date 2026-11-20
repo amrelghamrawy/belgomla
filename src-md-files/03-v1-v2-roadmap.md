@@ -232,10 +232,10 @@ These should not be designed into V1 unless a concrete requirement appears.
 
 ## Platform Capabilities
 
-- Platform Admin UI.
+- ~~Platform Admin UI.~~ → V3, `tasks/v3/` (BR-T09, D111), together with store verticals and sections (BR-P16, D108–D110).
 - Merchant self-onboarding.
 - Merchant approval.
-- Platform-wide tenant management.
+- ~~Platform-wide tenant management.~~ → V3, `tasks/v3/` (create, suspend, activate, change vertical from the admin dashboard; BR-T07).
 - Subscription management.
 - Platform billing.
 - Platform analytics.

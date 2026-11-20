@@ -30,7 +30,7 @@ D109: a section is tenant data (renamable, hideable, tenant-owned sections), not
 - `Category::section()` / `ProductFieldDefinition::section()`; `appliesTo(Section $section)` = `section_id === null || section_id === $section->id`.
 - Requests take `section_id` (exists in the tenant, active; only on roots: `prohibited_unless:parent_id,null`), default the fallback section. Keep accepting `kind` for one release **only if** task 03 does not ship in the same deploy; otherwise drop it (decide at the start of the task, record it here).
 - Moving a root to another section re-sections its subtree (same as the D68 "move re-kinds").
-- `MissingCoverPrice` and the price list use `section.reference_price_label`; the BR-PR10 "required" rule follows the section (D109 d: required when the section's `vertical_section` key is `books`; keep the exact behaviour).
+- `MissingCoverPrice` and the price list use `section.reference_price_label`; `cover_price` stays optional in every section (D109 d). The only place it is "required" is a price given as a % off it (`Pricing/Exceptions/MissingCoverPrice.php:18`), and that check does not depend on the section, only on the message label. Keep the exact behaviour.
 - `SalesAnalyticsQuery` groups by `section_id` with the section name.
 - Resources: replace `kind` with `section: { id, name, reference_price_label, icon }`; keep `kind` (the vertical section key, or `general`) in the same payloads until task 03 removes it, so the frontend keeps working between the two commits.
 - Provisioning: `ApplyVerticalTemplate` → `ProvisionTenantCatalog`: creates the sections, then the fields (with `section_id`, `template_id`) and options. Idempotent (by `vertical_section_id`, by key, by option label).
