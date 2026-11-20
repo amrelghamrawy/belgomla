@@ -17,7 +17,7 @@ npm run build && WA_GATEWAY_TOKEN=dev WA_GATEWAY_WEBHOOK_SECRET=dev npm start
 | `WA_GATEWAY_HOST` / `_PORT`  | `127.0.0.1:3100`  |
 | `WA_GATEWAY_TOKEN`           | empty, so every request is refused |
 | `WA_GATEWAY_WEBHOOK_URL`     | empty, so events are dropped |
-| `WA_GATEWAY_WEBHOOK_HOST`    | Host header override, e.g. `hooks.belgomla.com` when posting to 127.0.0.1 |
+| `WA_GATEWAY_WEBHOOK_HOST`    | Host header override, e.g. `hooks.belgomla.app` when posting to 127.0.0.1 |
 | `WA_GATEWAY_WEBHOOK_SECRET`  | empty, so Laravel refuses the events |
 | `WA_GATEWAY_DATA_DIR`        | `./data/sessions` (credentials, mode 700) |
 | `WA_GATEWAY_MAX_SESSIONS`    | `50`              |
