@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Models\Vertical;
 use App\Modules\Tenancy\Enums\TenantStatus;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 
 test('tenant:create provisions the tenant, its settings and the first owner', function (): void {
@@ -12,12 +12,12 @@ test('tenant:create provisions the tenant, its settings and the first owner', fu
         'name' => 'مكتبة الهدايا',
         '--owner-email' => 'Owner@Hadaya.test',
         '--owner-password' => 'secret123',
-        '--vertical' => 'stationery',
+        '--vertical' => 'libraries',
     ])->expectsOutputToContain('https://hadaya.gomal.test')->assertSuccessful();
 
     $tenant = Tenant::query()->where('subdomain', 'hadaya')->firstOrFail();
 
-    expect($tenant->vertical)->toBe(Vertical::Stationery)
+    expect($tenant->vertical_id)->toBe(Vertical::query()->where('key', 'libraries')->value('id'))
         ->and($tenant->status)->toBe(TenantStatus::Active);
 
     $this->assertDatabaseHas('tenant_settings', ['tenant_id' => $tenant->id, 'currency' => 'EGP']);
@@ -62,8 +62,8 @@ test('tenant:list shows every tenant with its user count', function (): void {
         ->expectsTable(
             ['ID', 'Subdomain', 'Name', 'Status', 'Vertical', 'Users', 'Created'],
             [
-                [$this->tenant->id, 'alnoor', 'مكتبة النور', 'active', 'school-books', 2, now()->toDateString()],
-                [$this->tenant->id + 1, 'empty', 'متجر آخر', 'active', 'school-books', 0, now()->toDateString()],
+                [$this->tenant->id, 'alnoor', 'مكتبة النور', 'active', 'libraries', 2, now()->toDateString()],
+                [$this->tenant->id + 1, 'empty', 'متجر آخر', 'active', 'libraries', 0, now()->toDateString()],
             ],
         )
         ->assertSuccessful();

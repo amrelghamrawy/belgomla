@@ -40,6 +40,10 @@ use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Orders\Models\OrderReturnItem;
 use App\Modules\Orders\Models\OrderStatusHistory;
 use App\Modules\Orders\Models\TenantOrderCounter;
+use App\Modules\Platform\Models\Vertical;
+use App\Modules\Platform\Models\VerticalFieldTemplate;
+use App\Modules\Platform\Models\VerticalFieldTemplateOption;
+use App\Modules\Platform\Models\VerticalSection;
 use App\Modules\Pricing\Models\BundlePricing;
 use App\Modules\Pricing\Models\Promotion;
 use App\Modules\Pricing\Models\SkuPriceTier;
@@ -62,7 +66,7 @@ use Illuminate\Support\Facades\Schema;
 const MODELS_WITHOUT_FACTORY = [TenantSetting::class, AuditLog::class];
 
 /** Platform-level models that are not tenant-owned. */
-const PLATFORM_MODELS = [Tenant::class, TenantSetting::class, SmsPhoneHeartbeat::class];
+const PLATFORM_MODELS = [Tenant::class, TenantSetting::class, SmsPhoneHeartbeat::class, Vertical::class, VerticalSection::class, VerticalFieldTemplate::class, VerticalFieldTemplateOption::class];
 
 /**
  * Columns of a model's table whose name ends with one of the suffixes, minus the timestamps.
@@ -122,6 +126,10 @@ test('the module model list is explicit so new models are reviewed', function ()
         OrderReturnItem::class,
         OrderStatusHistory::class,
         TenantOrderCounter::class,
+        Vertical::class,
+        VerticalFieldTemplate::class,
+        VerticalFieldTemplateOption::class,
+        VerticalSection::class,
         BundlePricing::class,
         Promotion::class,
         SkuPriceTier::class,

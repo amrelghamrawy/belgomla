@@ -12,12 +12,11 @@ use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductRelation;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Inventory\Models\SkuInventory;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\TenantSetting;
 use Database\Seeders\StorefrontDemoSeeder;
 
 beforeEach(function (): void {
-    $this->inTenant(fn (): array => app(ApplyVerticalTemplate::class)->handle(Vertical::SchoolBooks));
+    $this->inTenant(fn (): array => app(ApplyVerticalTemplate::class)->handle($this->tenant->vertical_id));
 });
 
 test('the demo catalog seeds books, supplies, toys, categories, stock and the store settings', function (): void {
@@ -58,7 +57,7 @@ test('D69 the demo fields are bound to their sections, so a toys category offers
 
     expect($kinds)->toBe([
         'academic_year' => 'books', 'age' => 'toys', 'brand' => 'stationery', 'color' => 'stationery', 'edition_type' => 'books',
-        'grade' => 'books', 'publisher' => 'books', 'size' => 'stationery', 'subject' => 'books', 'term' => 'books', 'track' => 'books',
+        'grade' => 'books', 'material' => null, 'publisher' => 'books', 'size' => 'stationery', 'subject' => 'books', 'term' => 'books', 'track' => 'books',
     ])
         ->and($this->tenantJson('GET', "/api/store/filters?category={$toys->slug}")->assertOk()->json('data.*.key'))->toBe(['age']);
 });
@@ -104,7 +103,7 @@ test('seeding twice changes nothing', function (): void {
 
     $this->seed(StorefrontDemoSeeder::class);
 
-    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([46, 11, 11]);
+    expect($this->inTenant(fn (): array => [Product::query()->count(), Category::query()->count(), ProductFieldDefinition::query()->count()]))->toBe([46, 11, 12]); // 12 fields: the 11 libraries templates (BR-P09) + the toys-only age field
 });
 
 test('the books read like the publisher describes them, the revision edition as an exam review', function (): void {

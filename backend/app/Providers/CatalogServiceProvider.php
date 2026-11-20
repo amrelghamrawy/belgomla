@@ -10,7 +10,7 @@ use App\Modules\Tenancy\Services\TenantCreatedHooks;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Catalog wiring: a new tenant gets its vertical's custom-field template (BR-P09), inside the
+ * Catalog wiring: a new tenant gets its vertical's custom-field templates (BR-P09, D110), inside the
  * CreateTenant transaction and tenant context.
  */
 final class CatalogServiceProvider extends ServiceProvider
@@ -18,7 +18,7 @@ final class CatalogServiceProvider extends ServiceProvider
     public function boot(TenantCreatedHooks $hooks): void
     {
         $hooks->register(function (Tenant $tenant): void {
-            $this->app->make(ApplyVerticalTemplate::class)->handle($tenant->vertical);
+            $this->app->make(ApplyVerticalTemplate::class)->handle($tenant->vertical_id);
         });
     }
 }

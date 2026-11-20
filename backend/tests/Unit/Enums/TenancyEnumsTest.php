@@ -7,7 +7,6 @@ use App\Modules\Tenancy\Enums\BrandingImageKind;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Enums\TenantUserRole;
 use App\Modules\Tenancy\Enums\TenantUserStatus;
-use App\Modules\Tenancy\Enums\Vertical;
 
 test('every enum exposes labels for all cases', function (string $enum): void {
     $labels = $enum::toArray();
@@ -18,7 +17,7 @@ test('every enum exposes labels for all cases', function (string $enum): void {
         expect($label)->toBeString()->not->toBe('');
     }
 })->with([
-    TenantStatus::class, TenantUserStatus::class, TenantUserRole::class, Vertical::class, BrandingImageKind::class, ActorType::class,
+    TenantStatus::class, TenantUserStatus::class, TenantUserRole::class, BrandingImageKind::class, ActorType::class,
 ]);
 
 test('branding image kinds map to their settings column', function (): void {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Exceptions;
 
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Support\ApiException;
 
 /** Provisioning input problems (CLI only in V1, so messages are English). */
@@ -25,9 +24,12 @@ final class InvalidTenantInput extends ApiException
         return new self(409, 'subdomain_taken', "Subdomain \"{$subdomain}\" already exists.");
     }
 
-    public static function vertical(): self
+    /**
+     * @param  list<string>  $activeKeys
+     */
+    public static function vertical(array $activeKeys): self
     {
-        return new self(422, 'invalid_vertical', 'Vertical must be one of: '.implode(', ', array_keys(Vertical::toArray())));
+        return new self(422, 'invalid_vertical', 'Vertical must be one of: '.implode(', ', $activeKeys));
     }
 
     public static function unknownTenant(string $subdomain): self

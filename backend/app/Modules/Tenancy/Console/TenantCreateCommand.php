@@ -6,8 +6,6 @@ namespace App\Modules\Tenancy\Console;
 
 use App\Modules\Tenancy\Actions\CreateTenant;
 use App\Modules\Tenancy\Data\NewTenantData;
-use App\Modules\Tenancy\Enums\Vertical;
-use App\Modules\Tenancy\Exceptions\InvalidTenantInput;
 use App\Support\ApiException;
 use App\Support\Console\TypedInput;
 use Illuminate\Console\Command;
@@ -22,7 +20,7 @@ final class TenantCreateCommand extends Command
         {name : Store name (Arabic)}
         {--owner-email= : First owner email}
         {--owner-password= : First owner password}
-        {--vertical=none : school-books | stationery | hardware | none}';
+        {--vertical=libraries : Key of an active store vertical (D108); an unknown key lists the active ones}';
 
     protected $description = 'Create a new tenant with its settings and first owner user';
 
@@ -37,7 +35,7 @@ final class TenantCreateCommand extends Command
                 name: $this->stringArgument('name'),
                 ownerEmail: $email,
                 ownerPassword: $password,
-                vertical: Vertical::tryFrom($this->stringOption('vertical', 'none') ?? 'none') ?? throw InvalidTenantInput::vertical(),
+                verticalKey: $this->stringOption('vertical', 'libraries') ?? 'libraries',
             ));
         } catch (ApiException|InvalidArgumentException $e) {
             $this->error($e->getMessage());

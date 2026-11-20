@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Models\Order;
-use App\Modules\Tenancy\Enums\Vertical;
+use App\Modules\Platform\Models\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
 
@@ -13,7 +13,7 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 13:00:00', 'Africa/Cairo'));
 });
 
-test('tenant:demo creates a school-books store with its owner, the demo catalog and two months of activity', function (): void {
+test('tenant:demo creates a libraries store with its owner, the demo catalog and two months of activity', function (): void {
     $this->artisan('tenant:demo', ['subdomain' => 'Showroom', '--owner-email' => 'Owner@Showroom.test', '--owner-password' => 'secret123'])
         ->expectsOutputToContain('https://showroom.gomal.test')
         ->assertSuccessful();
@@ -21,7 +21,7 @@ test('tenant:demo creates a school-books store with its owner, the demo catalog 
     $tenant = Tenant::query()->where('subdomain', 'showroom')->sole();
     [$products, $customers, $orders] = $this->inTenant(fn (): array => [Product::query()->count(), Customer::query()->count(), Order::query()->count()], $tenant);
 
-    expect($tenant->vertical)->toBe(Vertical::SchoolBooks)
+    expect($tenant->vertical_id)->toBe(Vertical::query()->where('key', 'libraries')->value('id'))
         ->and($tenant->name)->toBe('مكتبة النور')
         ->and($products)->toBe(46)
         ->and($customers)->toBe(14)

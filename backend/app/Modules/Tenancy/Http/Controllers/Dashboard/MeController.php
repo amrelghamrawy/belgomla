@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers\Dashboard;
 
+use App\Modules\Platform\Queries\VerticalTemplateQuery;
 use App\Modules\Tenancy\Actions\AuthenticateTenantUser;
 use App\Modules\Tenancy\Enums\Permission;
 use App\Modules\Tenancy\Http\Resources\TenantResource;
@@ -17,7 +18,7 @@ use Illuminate\Http\Request;
 final readonly class MeController
 {
     /** GET /api/dashboard/me — the signed-in user, their tenant and what their role may do (D82). */
-    public function show(Request $request, TenantContext $context): JsonResponse
+    public function show(Request $request, TenantContext $context, VerticalTemplateQuery $verticals): JsonResponse
     {
         $user = $request->user(AuthenticateTenantUser::GUARD);
 
@@ -25,9 +26,11 @@ final readonly class MeController
             throw new AuthenticationException;
         }
 
+        $tenant = $context->get();
+
         return response()->json(['data' => [
             'user' => new TenantUserResource($user)->resolve($request),
-            'tenant' => new TenantResource($context->get())->resolve($request),
+            'tenant' => new TenantResource($tenant, $verticals->find($tenant->vertical_id))->resolve($request),
             'permissions' => array_map(fn (Permission $permission): string => $permission->value, $user->role->permissions()),
         ]]);
     }

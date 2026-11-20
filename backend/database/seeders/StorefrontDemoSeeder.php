@@ -39,7 +39,6 @@ use App\Modules\Pricing\Data\TierData;
 use App\Modules\Pricing\Enums\BundlePriceMode;
 use App\Modules\Tenancy\Actions\UpdateTenantSettings;
 use App\Modules\Tenancy\Data\TenantSettingsData;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\TenantContext;
@@ -100,7 +99,7 @@ final class StorefrontDemoSeeder extends Seeder
                 return;
             }
 
-            $this->sectionFields($fields, $templates, $fieldDefinitions, $fieldOptions);
+            $this->sectionFields($tenant->vertical_id, $fields, $templates, $fieldDefinitions, $fieldOptions);
             $settings->handle($tenant, TenantSetting::query()->whereKey($tenant->id)->firstOrFail(), $this->storeSettings());
 
             $known = [];
@@ -176,12 +175,12 @@ final class StorefrontDemoSeeder extends Seeder
     }
 
     /**
-     * BR-P09, D69: the school-books template is applied at tenant creation; the stationery one is added
-     * here (bound to the stationery section), its empty brand/size options filled, and a toys-only age field created.
+     * BR-P09, D69: the vertical's templates (books and stationery fields) are applied at tenant creation and again
+     * here (idempotent, for a store made without CreateTenant), its empty brand/size options filled, and a toys-only age field created.
      */
-    private function sectionFields(FieldDefinitionsQuery $fields, ApplyVerticalTemplate $templates, CreateFieldDefinition $fieldDefinitions, CreateFieldOption $fieldOptions): void
+    private function sectionFields(int $verticalId, FieldDefinitionsQuery $fields, ApplyVerticalTemplate $templates, CreateFieldDefinition $fieldDefinitions, CreateFieldOption $fieldOptions): void
     {
-        $templates->handle(Vertical::Stationery);
+        $templates->handle($verticalId);
 
         $definitions = $fields->get()->keyBy('key');
 

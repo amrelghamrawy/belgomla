@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Actions;
 
+use App\Modules\Platform\Queries\VerticalTemplateQuery;
 use App\Modules\Tenancy\Data\NewTenantData;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Enums\TenantUserRole;
@@ -22,6 +23,7 @@ final readonly class CreateTenant
     public function __construct(
         private TenantContext $context,
         private TenantCreatedHooks $hooks,
+        private VerticalTemplateQuery $verticals,
     ) {}
 
     public function handle(NewTenantData $data): Tenant
@@ -40,12 +42,16 @@ final readonly class CreateTenant
             throw InvalidTenantInput::duplicate($subdomain);
         }
 
-        return DB::transaction(function () use ($subdomain, $data): Tenant {
+        // D108 e: only an active vertical is offered to a new tenant.
+        $vertical = $this->verticals->activeByKey($data->verticalKey)
+            ?? throw InvalidTenantInput::vertical($this->verticals->activeKeys());
+
+        return DB::transaction(function () use ($subdomain, $data, $vertical): Tenant {
             $tenant = Tenant::query()->create([
                 'subdomain' => $subdomain,
                 'name' => $data->name,
                 'status' => TenantStatus::Active,
-                'vertical' => $data->vertical,
+                'vertical_id' => $vertical->id,
             ]);
 
             $tenant->settings()->create([]);

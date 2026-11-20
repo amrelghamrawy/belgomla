@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Platform\Models\Vertical;
 use App\Modules\Tenancy\Enums\TenantStatus;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -23,7 +23,9 @@ final class TenantFactory extends Factory
             'subdomain' => 'store'.fake()->unique()->numberBetween(1000, 999999),
             'name' => 'مكتبة '.fake()->lastName(),
             'status' => TenantStatus::Active,
-            'vertical' => Vertical::SchoolBooks,
+            // D108 c: every tenant is in «مكتبات» (created by the V3 Task 01 migration) until another vertical exists.
+            'vertical_id' => fn (): int => (Vertical::query()->where('key', 'libraries')->first()
+                ?? VerticalFactory::new()->createOne(['key' => 'libraries', 'name' => 'مكتبات']))->id,
         ];
     }
 

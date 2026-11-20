@@ -3094,8 +3094,13 @@ export interface components {
             subdomain: string;
             /** @enum {string} */
             status: "active" | "suspended";
-            /** @enum {string} */
-            vertical: "school-books" | "stationery" | "hardware" | "none";
+            /** @description The store vertical (D108, V3 Task 01); platform data, so the key is not a fixed list. */
+            vertical: {
+                /** @example libraries */
+                key: string;
+                /** @example مكتبات */
+                name: string;
+            };
         };
         DashboardMe: {
             user: components["schemas"]["TenantUser"];

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Models\Vertical;
 use App\Modules\Tenancy\Actions\CreateTenant;
 use App\Modules\Tenancy\Data\NewTenantData;
 use App\Modules\Tenancy\Enums\TenantStatus;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Exceptions\InvalidTenantInput;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
@@ -13,7 +13,7 @@ use App\Modules\Tenancy\Services\TenantCreatedHooks;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Hash;
 
-function newTenant(string $subdomain = 'newstore', Vertical $vertical = Vertical::Hardware): NewTenantData
+function newTenant(string $subdomain = 'newstore', string $vertical = 'libraries'): NewTenantData
 {
     return new NewTenantData($subdomain, 'متجر', 'Owner@X.test', 'secret', $vertical);
 }
@@ -28,7 +28,7 @@ test('creates the tenant, its settings and the owner in one transaction and runs
 
     expect($tenant->subdomain)->toBe('newstore')
         ->and($tenant->status)->toBe(TenantStatus::Active)
-        ->and($tenant->vertical)->toBe(Vertical::Hardware)
+        ->and($tenant->vertical_id)->toBe(Vertical::query()->where('key', 'libraries')->value('id'))
         ->and($seen)->toBe($tenant->id)
         ->and(app(TenantContext::class)->has())->toBeFalse()
         ->and($tenant->settings)->not->toBeNull();
@@ -62,3 +62,27 @@ test('invalid subdomains and duplicates are rejected before touching the databas
     'too long' => [str_repeat('a', 64), 'invalid_subdomain'],
     'duplicate' => ['alnoor', 'subdomain_taken'],
 ]);
+
+test('D108 e an unknown or archived vertical is refused before touching the database, listing the active keys', function (string $key): void {
+    Vertical::factory()->archived()->create(['key' => 'clothes']);
+
+    try {
+        app(CreateTenant::class)->handle(newTenant('fresh', $key));
+        $this->fail('Expected InvalidTenantInput');
+    } catch (InvalidTenantInput $e) {
+        expect($e->errorCode)->toBe('invalid_vertical')
+            ->and($e->status)->toBe(422)
+            ->and($e->getMessage())->toBe('Vertical must be one of: libraries');
+    }
+
+    expect(Tenant::query()->count())->toBe(1);
+})->with([
+    'unknown' => ['pharmacy'],
+    'archived' => ['clothes'],
+]);
+
+test('D108 a new tenant is created in the vertical it names', function (): void {
+    $clothes = Vertical::factory()->create(['key' => 'clothes']);
+
+    expect(app(CreateTenant::class)->handle(newTenant('wear', 'clothes'))->vertical_id)->toBe($clothes->id);
+});

@@ -31,7 +31,6 @@ use App\Modules\Orders\Models\OrderReturn;
 use App\Modules\Pricing\Enums\PriceSource;
 use App\Modules\Pricing\Enums\PromotionStatus;
 use App\Modules\Pricing\Models\Promotion;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\TenantUser;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoActivitySeeder;
@@ -40,7 +39,7 @@ use Illuminate\Support\Facades\Hash;
 
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 13:00:00', 'Africa/Cairo'));
-    $this->inTenant(fn (): array => app(ApplyVerticalTemplate::class)->handle(Vertical::SchoolBooks));
+    $this->inTenant(fn (): array => app(ApplyVerticalTemplate::class)->handle($this->tenant->vertical_id));
     $this->seed(StorefrontDemoSeeder::class);
 });
 

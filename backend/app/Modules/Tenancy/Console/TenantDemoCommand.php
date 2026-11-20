@@ -6,7 +6,6 @@ namespace App\Modules\Tenancy\Console;
 
 use App\Modules\Tenancy\Actions\CreateTenant;
 use App\Modules\Tenancy\Data\NewTenantData;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Support\ApiException;
 use App\Support\Console\TypedInput;
@@ -17,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * A store to show BelGomla with, on any machine: a school-books tenant holding what `db:seed` gives the local
+ * A store to show BelGomla with, on any machine: a «مكتبات» tenant holding what `db:seed` gives the local
  * `alnoor` store, the demo catalog (StorefrontDemoSeeder) and two months of bookshops, orders and collections
  * (DemoActivitySeeder). Nothing reaches a phone: the demo customers are created without an invitation. The four staff
  * users the activity adds (manager@, sales@, warehouse@, accountant@{subdomain}.test) get a random password nobody
@@ -44,7 +43,7 @@ final class TenantDemoCommand extends Command
                 name: $this->stringOption('name', 'مكتبة النور') ?? 'مكتبة النور',
                 ownerEmail: $this->stringOption('owner-email') ?? $this->askString('Owner email'),
                 ownerPassword: $this->stringOption('owner-password') ?? $this->askString('Owner password', secret: true),
-                vertical: Vertical::SchoolBooks,
+                verticalKey: 'libraries',
             );
 
             $tenant = DB::transaction(function () use ($createTenant, $catalog, $activity, $data): Tenant {

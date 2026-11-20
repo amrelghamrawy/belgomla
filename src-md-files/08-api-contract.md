@@ -349,7 +349,7 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | ------ | ---------------------------- | ----------------- | ------ |
 | POST   | `/api/dashboard/auth/login`  | `email, password` | `{ data: { id, name, email, role, status, last_login_at } }` |
 | POST   | `/api/dashboard/auth/logout` |                   | `204`  |
-| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, role_label, status, last_login_at }, tenant: { name, subdomain, status, vertical }, permissions: [...] } }` (V2: the role's permissions, BR-T06) |
+| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, role_label, status, last_login_at }, tenant: { name, subdomain, status, vertical: { key, name } }, permissions: [...] } }` (V2: the role's permissions, BR-T06; V3 Task 01: `vertical` is the store vertical `{ key, name }`, D108, was a fixed string) |
 
 `login` errors: `422 invalid_credentials`, `403 user_disabled`, `429 rate_limited` after 5 failures per tenant+email+IP per minute, `400 stateful_request_required` without a SPA origin. Suspended tenant → `403 tenant_suspended`. The email is matched case-insensitively.
 
@@ -858,7 +858,7 @@ The platform admin API (§17, V3) is counted here as each of V3 Tasks 04–06 la
 ## 16. Build Order
 
 1. Tenancy: host middleware, settings, tenant users, CLI, Sanctum guards.
-2. Catalog: units, categories, fields + vertical seeders, products + SKU, images, relations.
+2. Catalog: units, categories, fields + vertical templates (database rows since V3 Task 01), products + SKU, images, relations.
 3. Pricing: resolver, tiers, bulk pricing.
 4. Inventory: adjust (incl. BR-INV08), movements.
 5. Messaging (Hypersender WhatsApp + SMS, Task 4), then Customers: OTP, register/login, invitations, addresses, cart.

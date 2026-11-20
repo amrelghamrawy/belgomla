@@ -33,6 +33,28 @@ arch('tenancy and audit do not depend on the business modules')
     ->expect(['App\Modules\Tenancy', 'App\Modules\Audit'])
     ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports']);
 
+/*
+| Platform verticals (V3 Task 01, D108, D110): platform data, not tenant-owned. Other modules read them only through
+| Platform's VerticalTemplateQuery and its DTOs; the models stay inside Platform (factories and seeders aside).
+*/
+
+arch('D108 platform vertical models are only used inside platform')
+    ->expect('App\Modules\Platform\Models')
+    ->toOnlyBeUsedIn(['App\Modules\Platform', 'Database\Factories', 'Database\Seeders']);
+
+arch('D108 platform vertical models are not tenant-scoped')
+    ->expect('App\Modules\Platform\Models')
+    ->not->toUse(App\Modules\Tenancy\Concerns\BelongsToTenant::class);
+
+arch('D108 other modules reach the verticals only through the platform query and its data')
+    ->expect(['App\Modules\Tenancy', 'App\Modules\Catalog'])
+    ->not->toUse([
+        'App\Modules\Platform\Models',
+        'App\Modules\Platform\Actions',
+        'App\Modules\Platform\Services',
+        'App\Modules\Platform\Console',
+    ]);
+
 // tenant:demo is the one way into the demo seeders from app code (they write through the business modules' actions).
 arch('only tenant:demo runs the demo seeders')
     ->expect('Database\Seeders')

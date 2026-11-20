@@ -1,6 +1,6 @@
 # V3 Task 01 — Platform verticals, sections and field templates
 
-Status: **planned**. Requires V3 Task 00. Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
+Status: **done** (2026-11-20). Requires V3 Task 00. Read `CLAUDE.md`, `rules/*.md` (incl. `04-business-truth.md`), then this file.
 
 ## Why
 
@@ -50,3 +50,16 @@ Models in the Platform module (`Platform\Models\Vertical`, `VerticalSection`, `V
 ## Definition of done
 
 rules/00 DoD; `composer test` green; smoke `tenant:create` + `tenant:list` on `php artisan serve`.
+
+## Outcome (2026-11-20)
+
+- Migration `2026_11_20_100000_create_verticals.php` creates the four platform tables, seeds «مكتبات» (sections books «كتب خارجية» / stationery «أدوات مكتبية» / toys «ألعاب», icons `book-open` / `pencil` / `puzzle` as the frontend's D73 fallback by kind) and the 11 templates, moves every tenant to it and drops `tenants.vertical`. `down()` restores the column as `none` (schema only).
+- Platform module: models `Vertical`, `VerticalSection`, `VerticalFieldTemplate`, `VerticalFieldTemplateOption`, enum `VerticalStatus`, DTOs `VerticalData` / `FieldTemplateData`, `VerticalTemplateQuery` (`activeByKey`, `activeKeys`, `find`, `findMany`, `fieldsFor`). Arch: Platform models used only in Platform (+ factories/seeders), not tenant-scoped; Tenancy and Catalog never import them.
+- `TenantResource` takes the `VerticalData` from the controller (`MeController`), since Tenancy may not read Platform models: `/api/dashboard/me` → `tenant.vertical: { key, name }` (openapi + `schema.d.ts` regenerated, frontend fixture updated).
+- Removed: `Tenancy\Enums\Vertical`, `Catalog\Services\VerticalTemplates` (+ its test), `database/verticals/` (+ its PHPStan path).
+
+Deviations from the plan above, on purpose:
+
+- **"A new tenant gets exactly the same definitions as before, per old vertical" cannot hold:** with one vertical, every new store gets the union of the three files (7 books + brand/color/size + material = 11 fields). Before, `tenant:create` defaulted to `none` (0 fields) and `school-books` gave 7. The tests assert the union, hand-written from BR-P09. The demo store has 12 fields (11 + `age`); `material` has no options, so it is not a facet anywhere (`/api/store/filters` in a toys category is still `['age']`).
+- **`tenant:create --help` does not list the keys from the DB**: the signature is built when artisan boots, and a query there would run on every command and fail on a fresh DB. An unknown or archived key fails with `Vertical must be one of: <active keys>`.
+- A template whose section key is not a `CategoryKind` value gets `kind = null` (every section) until Task 02 replaces kinds with tenant sections. Only future verticals can have such keys.

@@ -86,7 +86,7 @@ export function dashboardMe(overrides: Partial<TenantUser> = {}): DashboardMe {
 
   return {
     user,
-    tenant: { name: "مكتبة النور", subdomain: "alnoor", status: "active", vertical: "school-books" },
+    tenant: { name: "مكتبة النور", subdomain: "alnoor", status: "active", vertical: { key: "libraries", name: "مكتبات" } },
     permissions: ROLE_PERMISSIONS[user.role],
   };
 }

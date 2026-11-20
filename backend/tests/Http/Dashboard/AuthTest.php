@@ -27,7 +27,7 @@ test('an owner logs in and reads their profile and tenant', function (): void {
     $this->tenantJson('GET', '/api/dashboard/me')
         ->assertOk()
         ->assertJsonPath('data.tenant.subdomain', 'alnoor')
-        ->assertJsonPath('data.tenant.vertical', 'school-books')
+        ->assertJsonPath('data.tenant.vertical', ['key' => 'libraries', 'name' => 'مكتبات'])
         ->assertJsonPath('data.user.email', 'owner@alnoor.test');
 
     expect(TenantUser::withoutTenantScope()->first()?->last_login_at)->not->toBeNull();

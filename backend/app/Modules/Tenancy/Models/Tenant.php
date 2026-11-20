@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Enums\TenantStatus;
-use App\Modules\Tenancy\Enums\Vertical;
 use Carbon\CarbonImmutable;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $subdomain
  * @property string $name
  * @property TenantStatus $status
- * @property Vertical $vertical
+ * @property int $vertical_id the store vertical (D108); read through Platform's VerticalTemplateQuery
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read TenantSetting|null $settings
@@ -72,7 +71,7 @@ final class Tenant extends Model
     {
         return [
             'status' => TenantStatus::class,
-            'vertical' => Vertical::class,
+            'vertical_id' => 'integer',
         ];
     }
 }

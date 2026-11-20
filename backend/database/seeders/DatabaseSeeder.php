@@ -6,16 +6,14 @@ namespace Database\Seeders;
 
 use App\Modules\Tenancy\Actions\CreateTenant;
 use App\Modules\Tenancy\Data\NewTenantData;
-use App\Modules\Tenancy\Enums\Vertical;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Database\Seeder;
 
 final class DatabaseSeeder extends Seeder
 {
     /**
-     * Local development seed: one tenant created as school-books (its template is applied at creation) with a demo
-     * catalog of books, school supplies and toys (StorefrontDemoSeeder, which adds the stationery template and a
-     * toys field) and two months of customers, orders and collections (DemoActivitySeeder).
+     * Local development seed: one «مكتبات» tenant (its vertical's field templates are applied at creation, BR-P09) with
+     * a demo catalog of books, school supplies and toys (StorefrontDemoSeeder, which adds a toys field) and two months of customers, orders and collections (DemoActivitySeeder).
      * Dashboard: owner@alnoor.test / password, and one user per staff role (manager@, sales@, warehouse@,
      * accountant@alnoor.test) with the same password.
      */
@@ -27,7 +25,7 @@ final class DatabaseSeeder extends Seeder
                 name: 'مكتبة النور',
                 ownerEmail: 'owner@alnoor.test',
                 ownerPassword: 'password',
-                vertical: Vertical::SchoolBooks,
+                verticalKey: 'libraries',
             ));
         }
 
