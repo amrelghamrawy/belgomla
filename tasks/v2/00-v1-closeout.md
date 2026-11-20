@@ -10,7 +10,7 @@ V2 work starts on a live V1. This task does not specify new behaviour. It collec
 
 ### Task 11 — go-live (`tasks/11-release.md`, "Go-live checklist")
 
-- [ ] D44: choose the provider, create the VM and the bucket, set up DNS for the apex + wildcard.
+- [ ] D44: choose the provider, create the VM and the bucket, set up DNS for the apex + wildcard. *2026-11-20: DigitalOcean VM and DNS for `belgomla.app` + `*.belgomla.app` done; the bucket is not recorded.*
 - [ ] `deploy/provision.sh`, nginx, wildcard TLS (certbot DNS plugin).
 - [ ] `/etc/belgomla/*.env` filled; `deploy.sh` green with its post-deploy assertions.
 - [ ] `composer test` and `npm run typecheck && npm run lint && npm test` green on the release commit.

@@ -23,7 +23,7 @@
 
 ## Production (tasks/11, `deploy/README.md`)
 
-- One Ubuntu 24.04 VM (D44, provider not chosen yet). App in `/srv/belgomla` as user `belgomla`; secrets only in `/etc/belgomla/*.env`, `~belgomla/.pgpass` and the rclone config, never in git.
+- One Ubuntu 24.04 VM at DigitalOcean (D44). Platform domain `belgomla.app`: stores on `{subdomain}.belgomla.app`, webhooks on `hooks.belgomla.app`. App in `/srv/belgomla` as user `belgomla`; secrets only in `/etc/belgomla/*.env`, `~belgomla/.pgpass` and the rclone config, never in git.
 - Deploy: `sudo -u belgomla /srv/belgomla/deploy/deploy.sh` (ends with post-deploy assertions). Tenants: `php artisan tenant:*` in `/srv/belgomla/backend`.
 - Store WhatsApp numbers (D70): `belgomla-wa-gateway` on `127.0.0.1:3100`, built and restarted by `deploy.sh`, sessions in `/var/lib/belgomla-wa-gateway`.
 - Logs: `backend/storage/logs/laravel-*.log`, `monitor-*.log`; `journalctl -u 'belgomla-*'`. Alerts reach the operator on WhatsApp (D65).

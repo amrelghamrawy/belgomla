@@ -8,8 +8,8 @@ Each merchant operates an independent online wholesale store under its own subdo
 
 Example:
 
-- `alnoor.gomalecommerce.app` → مكتبة النور
-- `anotherstore.gomalecommerce.app` → another merchant
+- `alnoor.belgomla.app` → مكتبة النور
+- `anotherstore.belgomla.app` → another merchant
 
 The customer enters one specific merchant store and can see **only that merchant's products**.
 

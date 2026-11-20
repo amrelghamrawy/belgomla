@@ -12,7 +12,7 @@ The tenant is identified from the current domain/subdomain.
 
 Example:
 
-`alnoor.gomalecommerce.app` → Tenant: مكتبة النور
+`alnoor.belgomla.app` → Tenant: مكتبة النور
 
 ### BR-T03 — Strict Tenant Isolation
 

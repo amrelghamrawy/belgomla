@@ -7,7 +7,7 @@ set -uo pipefail
 
 set -a; . /etc/belgomla/ops.env; set +a
 APP_DIR="${APP_DIR:-/srv/belgomla}"
-BASE_DOMAIN="${BASE_DOMAIN:-gomalecommerce.app}"
+BASE_DOMAIN="${BASE_DOMAIN:-belgomla.app}"
 SMOKE_TENANT="${SMOKE_TENANT:-alnoor}"
 
 cd "${APP_DIR}/backend" || exit 1

@@ -34,8 +34,8 @@ systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belg
 ## First install
 
 1. **DNS** (at the provider chosen in D44): create
-   - `A gomalecommerce.app` → the VM IP;
-   - `A *.gomalecommerce.app` → the VM IP.
+   - `A belgomla.app` → the VM IP;
+   - `A *.belgomla.app` → the VM IP.
 
    The wildcard also covers `hooks.`.
 2. **SSH in as a sudo user**, clone the repo anywhere, and create `/etc/belgomla/ops.env` from `env/ops.env.example`.
@@ -79,9 +79,9 @@ systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belg
 8. **Hypersender** (tasks/4 live check):
    - Pair the WhatsApp instance to the platform number (D48).
    - Install the SMS app on the platform Android phone (D49).
-   - On both instances, set the webhook URL to `https://hooks.gomalecommerce.app/api/webhooks/hypersender/whatsapp` (or `/sms`), with the custom header `Authorization: <MESSAGING_WEBHOOK_SECRET>`.
+   - On both instances, set the webhook URL to `https://hooks.belgomla.app/api/webhooks/hypersender/whatsapp` (or `/sms`), with the custom header `Authorization: <MESSAGING_WEBHOOK_SECRET>`.
    - The SMS app's heartbeat then shows up in `sms_phone_heartbeats` within minutes.
-9. **External uptime check:** watch `https://alnoor.gomalecommerce.app/up` from outside with an uptime service (UptimeRobot, Better Stack, …), alerting the operator. `monitor.sh` runs on the VM itself, so it cannot report the VM being down.
+9. **External uptime check:** watch `https://alnoor.belgomla.app/up` from outside with an uptime service (UptimeRobot, Better Stack, …), alerting the operator. `monitor.sh` runs on the VM itself, so it cannot report the VM being down.
 
 ## Deploy
 

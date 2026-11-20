@@ -31,9 +31,9 @@ test('status helpers', function (): void {
 });
 
 test('host is built from the configured base domain', function (): void {
-    config(['tenancy.base_domain' => 'gomalecommerce.app']);
+    config(['tenancy.base_domain' => 'belgomla.app']);
 
-    expect($this->tenant->host())->toBe('alnoor.gomalecommerce.app');
+    expect($this->tenant->host())->toBe('alnoor.belgomla.app');
 });
 
 test('the factory creates the settings row', function (): void {

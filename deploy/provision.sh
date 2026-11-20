@@ -19,7 +19,7 @@ fi
 
 APP_USER="${APP_USER:-belgomla}"
 APP_DIR="${APP_DIR:-/srv/belgomla}"
-BASE_DOMAIN="${BASE_DOMAIN:-gomalecommerce.app}"
+BASE_DOMAIN="${BASE_DOMAIN:-belgomla.app}"
 PHP_VERSION="${PHP_VERSION:-8.5}"          # D66: same PHP as the test suite
 NODE_MAJOR="${NODE_MAJOR:-24}"             # frontend/package.json engines; wa-gateway needs >= 22
 DB_NAME="${PGDATABASE:-belgomla}"
@@ -182,8 +182,8 @@ if [[ "${BROTLI}" == 1 ]]; then
 else
     rm -f /etc/nginx/snippets/belgomla-brotli.conf
 fi
-sed "s/gomalecommerce\.app/${BASE_DOMAIN//./\\.}/g; s#/srv/belgomla#${APP_DIR}#g" "${DEPLOY_SRC}/nginx/belgomla.conf" > /etc/nginx/sites-available/belgomla.conf
-sed -i "s/gomalecommerce\.app/${BASE_DOMAIN//./\\.}/g" /etc/nginx/snippets/belgomla-tls.conf
+sed "s/belgomla\.app/${BASE_DOMAIN//./\\.}/g; s#/srv/belgomla#${APP_DIR}#g" "${DEPLOY_SRC}/nginx/belgomla.conf" > /etc/nginx/sites-available/belgomla.conf
+sed -i "s/belgomla\.app/${BASE_DOMAIN//./\\.}/g" /etc/nginx/snippets/belgomla-tls.conf
 sed -i "s#/srv/belgomla#${APP_DIR}#g" /etc/nginx/snippets/belgomla-php.conf
 ln -sfn /etc/nginx/sites-available/belgomla.conf /etc/nginx/sites-enabled/belgomla.conf
 rm -f /etc/nginx/sites-enabled/default

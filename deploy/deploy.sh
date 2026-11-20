@@ -10,7 +10,7 @@ set -euo pipefail
 
 set -a; . /etc/belgomla/ops.env; set +a
 APP_DIR="${APP_DIR:-/srv/belgomla}"
-BASE_DOMAIN="${BASE_DOMAIN:-gomalecommerce.app}"
+BASE_DOMAIN="${BASE_DOMAIN:-belgomla.app}"
 SMOKE_TENANT="${SMOKE_TENANT:-alnoor}"
 DEPLOY_REF="${DEPLOY_REF:-main}"
 PHP_VERSION="${PHP_VERSION:-8.5}"

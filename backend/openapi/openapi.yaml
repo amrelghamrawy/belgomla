@@ -7,7 +7,7 @@ info:
   title: BelGomla API
   version: 1.0.0
   description: >
-    Every tenant lives on its own host ({tenant}.gomalecommerce.app); the host decides the tenant, never a
+    Every tenant lives on its own host ({tenant}.belgomla.app); the host decides the tenant, never a
     header or payload. Auth is a Sanctum SPA cookie session: GET /sanctum/csrf-cookie first, then send the
     XSRF-TOKEN cookie back as the X-XSRF-TOKEN header. All text is Arabic, dates are ISO-8601 UTC and money is a
     "150.00" string.

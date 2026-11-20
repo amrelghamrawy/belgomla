@@ -1,6 +1,6 @@
 # BelGomla E-commerce — API Contract (V1)
 
-REST API served by Laravel under the tenant host: `https://{tenant}.gomalecommerce.app/api/...` (Tech §5). Tenant is resolved from `Host` only.
+REST API served by Laravel under the tenant host: `https://{tenant}.belgomla.app/api/...` (Tech §5). Tenant is resolved from `Host` only.
 
 Machine-readable twin: `backend/openapi/openapi.yaml` (OpenAPI 3.1, hand-written), compiled to `backend/openapi.json` by `php artisan api:openapi`, from which the frontend generates its types (Task 8). It covers the endpoints the UI uses so far; Tasks 9 and 10 extend it. Tests keep it honest: every documented path is a registered route, its `ErrorCode` enum equals the codes the backend throws, and documented response keys match real responses.
 

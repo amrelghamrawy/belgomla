@@ -1,6 +1,6 @@
 # Task 11 — Release (infrastructure, seed data, go-live checklist)
 
-Status: **repo side done (2026-10-10), go-live pending.** Everything that lives in git is built and tested. The go-live checklist below is executed on the production VM, which does not exist yet (D44). Requires Tasks 1–10. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **repo side done (2026-10-10), go-live pending.** Everything that lives in git is built and tested. The go-live checklist below is executed on the production VM (DigitalOcean, `belgomla.app`, created 2026-11-20, D44). Requires Tasks 1–10. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Goal
 
@@ -19,12 +19,12 @@ A reproducible production deployment on one Linux VM without Docker, the first r
    - `provision.sh` (Ubuntu 24.04 LTS), covering:
      - PHP **8.5** FPM from the ondrej PPA (D66, the version the tests run on), with pgsql, gd, intl, bcmath, mbstring, xml, zip, curl and opcache; Redis goes through predis, so no extension is needed;
      - Nginx, PostgreSQL 16 (+ `pg_trgm`), Redis on localhost, Node 24;
-     - Certbot with a DNS challenge for `*.gomalecommerce.app` and the apex;
+     - Certbot with a DNS challenge for `*.belgomla.app` and the apex;
      - ufw 22/80/443 and unattended security updates;
      - the `belgomla` user, `/etc/belgomla` for secrets, and a sudoers entry limited to BelGomla's services.
    - `nginx/belgomla.conf` + `nginx/snippets/` route traffic as follows:
-     - `server_name *.gomalecommerce.app`: `/up`, `/api/` and `/sanctum/` go to PHP-FPM, and `/storage/` is served from `backend/storage/app/public` (D61). Both come before the Next.js `location /` (port 3000). `Host` is kept: fastcgi passes the request's Host as `HTTP_HOST`.
-     - `hooks.gomalecommerce.app` goes to Laravel only.
+     - `server_name *.belgomla.app`: `/up`, `/api/` and `/sanctum/` go to PHP-FPM, and `/storage/` is served from `backend/storage/app/public` (D61). Both come before the Next.js `location /` (port 3000). `Host` is kept: fastcgi passes the request's Host as `HTTP_HOST`.
+     - `hooks.belgomla.app` goes to Laravel only.
      - The apex returns 404.
      - An internal `127.0.0.1:8081` listener serves Next's server-side prefetch (`BACKEND_HOST=127.0.0.1 BACKEND_PORT=8081`).
      - HTTP redirects to HTTPS; security headers, 4 MB bodies, gzip, and brotli when it is packaged.
@@ -51,7 +51,7 @@ A reproducible production deployment on one Linux VM without Docker, the first r
 2. Backend production settings are in `deploy/env/backend.env.example`:
    - `APP_ENV=production`, `APP_DEBUG=false`;
    - `SESSION_SECURE_COOKIE=true`, `SESSION_DOMAIN` empty (host-only, Tech §6);
-   - `SANCTUM_STATEFUL_DOMAINS=*.gomalecommerce.app`, `TENANT_BASE_DOMAIN=gomalecommerce.app`;
+   - `SANCTUM_STATEFUL_DOMAINS=*.belgomla.app`, `TENANT_BASE_DOMAIN=belgomla.app`;
    - `REDIS_CLIENT=predis`;
    - product images on the local `public` disk with `PUBLIC_DISK_URL=/storage`, backed up to S3 (**D64**; the old "FILESYSTEM_DISK=s3" line was never read by the code);
    - logging to daily files, with no Sentry in V1 (D66);
@@ -110,15 +110,17 @@ The backend additions are covered by Pest tests:
 
 ## Go-live checklist (tick on the VM; record dates and evidence)
 
-- [ ] D44 decided: provider, VM, bucket, DNS provider; VM created (2 vCPU / 4 GB, Ubuntu 24.04)
-- [ ] DNS: `A gomalecommerce.app` and `A *.gomalecommerce.app` → VM IP
-- [ ] `provision.sh` ran clean; `nginx -t` ok; TLS issued for the apex + wildcard (`certbot certificates`); `certbot renew --dry-run` ok
+2026-11-20: the product owner deployed on DigitalOcean under `belgomla.app` (D44). Checked from outside only: `https://alnoor.belgomla.app/up`, `/api/store/tenant` and `https://hooks.belgomla.app/up` answer 200; the apex answers 404 (no landing page); the certificate is `CN=belgomla.app`, SAN `belgomla.app` + `*.belgomla.app`, valid to 2027-01-15. A box is ticked only when it was checked.
+
+- [ ] D44 decided: provider, VM, bucket, DNS provider; VM created (2 vCPU / 4 GB, Ubuntu 24.04). *Provider DigitalOcean and VM created (2026-11-20); size, bucket and DNS provider not recorded.*
+- [x] DNS: `A belgomla.app` and `A *.belgomla.app` → VM IP (2026-11-20: apex, `alnoor` and `hooks` resolve and answer)
+- [ ] `provision.sh` ran clean; `nginx -t` ok; TLS issued for the apex + wildcard (`certbot certificates`); `certbot renew --dry-run` ok. *Certificate issued (seen from outside, 2026-11-20); the renew dry-run not checked.*
 - [ ] `/etc/belgomla/*.env` filled (APP_KEY, DB, webhook secret, Hypersender, MONITOR_*); nothing secret in git
 - [ ] `deploy.sh` green on the release commit (post-deploy assertions pass)
 - [ ] `composer test` green on the release commit (`npm run typecheck && npm run lint && npm test` too)
 - [ ] Hypersender paid plan active (the trial is 14 days, D47); WhatsApp instance paired to the dedicated platform number (D48)
 - [ ] Platform Android phone with its SIM running the Hypersender SMS app, charged, on Wi-Fi, heartbeat visible in the Hypersender dashboard **and** in `sms_phone_heartbeats` (D49); where it lives is recorded (D45)
-- [ ] Webhook URLs on `https://hooks.gomalecommerce.app/api/webhooks/hypersender/{whatsapp,sms}` registered in Hypersender with the `Authorization` header
+- [ ] Webhook URLs on `https://hooks.belgomla.app/api/webhooks/hypersender/{whatsapp,sms}` registered in Hypersender with the `Authorization` header
 - [ ] tasks/4 live check: one real OTP over WhatsApp and one over SMS, delays recorded in `tasks/4-messaging.md`
 - [ ] Smoke test of every flow on production with a test tenant, suspended afterwards:
   - [ ] register (OTP), login;
@@ -126,7 +128,7 @@ The backend additions are covered by Pest tests:
   - [ ] dashboard login, order transitions, collection, reports;
   - [ ] invite a customer.
 - [ ] Monitor: an alert received on WhatsApp (e.g. `platform:monitor --report=test=go-live check`) and its recovery message
-- [ ] External uptime service watching `https://alnoor.gomalecommerce.app/up`
+- [ ] External uptime service watching `https://alnoor.belgomla.app/up`
 - [ ] Backup ran (`systemctl start belgomla-backup`), files visible in the bucket; restore drill done (`restore.sh latest`, counts match)
 - [ ] First tenant `alnoor` created; data-entry session with the merchant held; storefront checked on a phone
 - [ ] Lighthouse mobile on `/c/[slug]` re-measured on the production stack (tasks/9 open item, target ≥ 90)
@@ -134,7 +136,7 @@ The backend additions are covered by Pest tests:
 
 ## Definition of done
 
-- Production serves `https://alnoor.gomalecommerce.app` end-to-end.
+- Production serves `https://alnoor.belgomla.app` end-to-end.
 - The checklist is fully ticked.
 - Secrets are stored outside git.
 - This file is marked done with the release commit hash and date.

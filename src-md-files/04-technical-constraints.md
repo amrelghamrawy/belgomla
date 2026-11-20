@@ -44,7 +44,7 @@ Tenant resolution happens from the request host.
 
 Example:
 
-`alnoor.gomalecommerce.app`
+`alnoor.belgomla.app`
 
 resolves:
 
@@ -92,14 +92,14 @@ Everything for a tenant lives under its own subdomain. There is no separate API 
 
 | Surface          | URL                                                 |
 | ---------------- | --------------------------------------------------- |
-| Storefront       | `https://{tenant}.gomalecommerce.app/`              |
-| Customer account | `https://{tenant}.gomalecommerce.app/account/...`   |
-| Dashboard        | `https://{tenant}.gomalecommerce.app/dashboard/...` |
-| API              | `https://{tenant}.gomalecommerce.app/api/...`       |
+| Storefront       | `https://{tenant}.belgomla.app/`              |
+| Customer account | `https://{tenant}.belgomla.app/account/...`   |
+| Dashboard        | `https://{tenant}.belgomla.app/dashboard/...` |
+| API              | `https://{tenant}.belgomla.app/api/...`       |
 
 In production Nginx sends `/api/*`, `/sanctum/*` and `/up` to PHP-FPM and serves `/storage/*` from disk, before everything else goes to Next.js (`deploy/nginx/belgomla.conf`); in development the Next.js route handlers proxy the same paths. Both keep the original `Host` header, because Laravel resolves the tenant **only** from it.
 
-Reason: if the API lived on `api.gomalecommerce.app`, the client would have to tell the API which tenant it wants, which violates §2.
+Reason: if the API lived on `api.belgomla.app`, the client would have to tell the API which tenant it wants, which violates §2.
 
 The same Next.js app and the same Laravel app serve storefront and dashboard; the path decides which UI is shown, the host decides the tenant.
 
@@ -112,7 +112,7 @@ Two separate guards:
 - `customer` guard: storefront customers (phone + password, tenant-scoped, OTP-verified phone).
 - `tenant_user` guard: merchant dashboard users (email + password, tenant-scoped).
 
-Sanctum SPA cookie authentication is used. The session cookie domain must be the **tenant host** (e.g. `alnoor.gomalecommerce.app`), never the wildcard `.gomalecommerce.app`, so a session from one tenant is never sent to another.
+Sanctum SPA cookie authentication is used. The session cookie domain must be the **tenant host** (e.g. `alnoor.belgomla.app`), never the wildcard `.belgomla.app`, so a session from one tenant is never sent to another.
 
 Every authenticated session additionally stores `tenant_id`; a request whose resolved host tenant differs from the session tenant is rejected (401).
 
@@ -120,13 +120,13 @@ Every authenticated session additionally stores `tenant_id`; a request whose res
 
 Initial domain:
 
-`{tenant}.gomalecommerce.app`
+`{tenant}.belgomla.app`
 
 Example:
 
-`alnoor.gomalecommerce.app`
+`alnoor.belgomla.app`
 
-Custom domains are not V1. A wildcard TLS certificate for `*.gomalecommerce.app` is required.
+Custom domains are not V1. A wildcard TLS certificate for `*.belgomla.app` is required.
 
 ## 8. Arabic / RTL
 
