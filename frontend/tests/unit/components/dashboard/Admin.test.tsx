@@ -99,10 +99,12 @@ describe("SettingsForm", () => {
     const { client } = renderWithQuery(<SettingsForm settings={settings()} />);
     const invalidate = vi.spyOn(client, "invalidateQueries");
 
-    await user.type(screen.getByLabelText("الهاتف"), "01001234567");
+    // fireEvent.change, not user.type: typing key by key re-renders the whole form per key and
+    // pushed this test past the 5s timeout under the coverage run.
+    fireEvent.change(screen.getByLabelText("الهاتف"), { target: { value: "01001234567" } });
     await user.click(within(screen.getByTestId("hours-6")).getByRole("checkbox"));
     await user.click(screen.getByLabelText("حد أدنى لقيمة الطلب"));
-    await user.type(screen.getByLabelText("الحد الأدنى (ج.م)"), "500");
+    fireEvent.change(screen.getByLabelText("الحد الأدنى (ج.م)"), { target: { value: "500" } });
     await user.click(screen.getByLabelText("مراجعة العملاء الجدد قبل تفعيلهم"));
     await user.click(screen.getAllByRole("button", { name: "حفظ" })[0]!);
 
