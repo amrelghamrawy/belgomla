@@ -20,6 +20,7 @@ export type PaginationMeta = Schemas["PaginationMeta"];
 export type CategoryKind = Schemas["CategoryKind"];
 export type CategoryIcon = Schemas["CategoryIcon"];
 export type CategoryRef = Schemas["CategoryRef"];
+export type Section = Schemas["Section"];
 export type Category = Schemas["Category"];
 export type Facet = Schemas["Facet"];
 export type FacetOption = Schemas["FacetOption"];

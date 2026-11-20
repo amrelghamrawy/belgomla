@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\SpreadsheetFormat;
 use App\Modules\Collections\Models\CashCollection;
 use App\Modules\Tenancy\Enums\TenantUserRole;
@@ -18,7 +17,7 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 12:00:00', 'UTC'));
     $this->owner = $this->actingAsOwner();
     $this->book = $this->reportSku('BK-1', onHand: 10);
-    $this->pen = $this->reportSku('PN-1', CategoryKind::Stationery, '50.00', onHand: 4);
+    $this->pen = $this->reportSku('PN-1', 'stationery', '50.00', onHand: 4);
     $this->customer = $this->makeCustomer(['name' => 'مكتبة النور']);
     $this->order = $this->reportOrder([[$this->book, 2, '100.00', 'list' => '120.00'], [$this->pen, 1, '50.00']], '2026-10-09 10:00:00', $this->customer, '25.00', order: ['collected_amount' => '100.00', 'collection_status' => 'partially_collected']);
     $this->inTenant(fn () => CashCollection::factory()->create(['order_id' => $this->order->id, 'amount' => '100.00', 'collected_at' => '2026-10-09 11:00:00']));

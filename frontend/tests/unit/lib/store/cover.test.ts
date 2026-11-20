@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { COVER_LAYOUTS, COVER_TONES, coverFor, hashText, monogram } from "@/lib/store/cover";
 
-import { storeProduct } from "../../fixtures";
+import { section, storeProduct } from "../../fixtures";
 
 const book = (subject: string, publisher: string) =>
   storeProduct({
@@ -56,7 +56,7 @@ describe("coverFor", () => {
       storeProduct({
         name: "كشكول 100 ورقة",
         custom_fields: [],
-        category: { id: 9, name: "كشاكيل", kind: "stationery" },
+        category: { id: 9, name: "كشاكيل", kind: "stationery", section: section("stationery") },
       }),
     );
 

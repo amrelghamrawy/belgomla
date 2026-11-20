@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Data\ProductFilterData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -49,10 +48,10 @@ test('archived, non-filterable and text fields are never facets', function (): v
 });
 
 test('D69 inside a category only the facets of its section and the section-less ones are offered', function (): void {
-    $toys = Category::factory()->kind(CategoryKind::Toys)->create();
-    $age = ProductFieldDefinition::factory()->select()->filterable()->forKind(CategoryKind::Toys)->create(['key' => 'age', 'filter_order' => 0]);
+    $toys = Category::factory()->inSection('toys')->create();
+    $age = ProductFieldDefinition::factory()->select()->filterable()->forSection('toys')->create(['key' => 'age', 'filter_order' => 0]);
     $three = ProductFieldOption::factory()->for($age, 'definition')->create();
-    $this->grade->update(['kind' => CategoryKind::Books]);
+    $this->grade->update(['section_id' => Database\Factories\CategoryFactory::sectionId('books')]);
     Product::factory()->create(['category_id' => $toys->id, 'custom_fields' => ['age' => $three->id, 'grade' => $this->first->id, 'colored' => true]]);
 
     $facets = app(FacetQuery::class)->get(new ProductFilterData(categorySlug: $toys->slug));
@@ -61,7 +60,7 @@ test('D69 inside a category only the facets of its section and the section-less 
 });
 
 test('D69 without a category every section offers its facets', function (): void {
-    $this->grade->update(['kind' => CategoryKind::Books]);
+    $this->grade->update(['section_id' => Database\Factories\CategoryFactory::sectionId('books')]);
 
     expect(array_column(app(FacetQuery::class)->get(new ProductFilterData), 'key'))->toBe(['colored', 'grade']);
 });

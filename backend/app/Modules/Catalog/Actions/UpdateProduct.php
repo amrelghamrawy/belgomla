@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  * Replaces product fields (not status, not stock), its options and SKUs (BR-P14, through SaveProductSkus: a SKU left out
  * is deleted, or set inactive when it has history, BR-P05; a new SKU gets its opening stock), and the pre-order settings
  * when sent (D88). Values of archived custom fields, and of
- * fields bound to another section than the (new) category's kind, are carried over (BR-P08, D69). The `product.updated` audit record holds only what changed in product and SKU
+ * fields bound to another section than the (new) category's section, are carried over (BR-P08, D69). The `product.updated` audit record holds only what changed in product and SKU
  * identity fields and its units (`sku.units`: which units, factors, default; D91); each unit's prices, MOQ and tiers go
  * through SaveSkuUnits and Pricing's UpdateSkuPricing, which audits them per unit as `sku.price_changed` /
  * `sku.moq_changed` / `sku.tiers_changed` (BR-L). A unit's tiers not sent are kept; a unit not sent is archived.
@@ -45,7 +45,7 @@ final readonly class UpdateProduct
         $product->load(ProductSnapshot::RELATIONS);
         $category = $this->references->check($data, $product);
         $matches = $this->references->matches($data, $product);
-        $customFields = $this->fields->validate($data->customFields, $category->kind, $product->custom_fields);
+        $customFields = $this->fields->validate($data->customFields, $category->section_id, $product->custom_fields);
         $old = $this->snapshot->of($product, withPricing: false);
 
         return DB::transaction(function () use ($product, $data, $customFields, $matches, $old, $batchId): Product {

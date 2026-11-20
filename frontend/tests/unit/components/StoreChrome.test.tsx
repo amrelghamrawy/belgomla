@@ -10,7 +10,7 @@ import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHome } from "@/components/store/StoreHome";
 import type { Category, CategoryIcon } from "@/lib/api/types";
 
-import { cart, cartItem, customer, page, storeProduct, tenantSettings } from "../fixtures";
+import { cart, cartItem, customer, page, section, storeProduct, tenantSettings } from "../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../http";
 import { pathname, renderWithQuery } from "../render";
 
@@ -20,13 +20,32 @@ const tree: Category[] = [
     name: "المرحلة الإعدادية",
     slug: "prep",
     kind: "books",
+    section: section("books"),
     icon: null,
     image_url: null,
     children: [
-      { id: 2, name: "أولى إعدادي", slug: "prep-1", kind: "books", icon: null, image_url: null, children: [] },
+      {
+        id: 2,
+        name: "أولى إعدادي",
+        slug: "prep-1",
+        kind: "books",
+        section: section("books"),
+        icon: null,
+        image_url: null,
+        children: [],
+      },
     ],
   },
-  { id: 3, name: "المرحلة الثانوية", slug: "secondary", kind: "books", icon: null, image_url: null, children: [] },
+  {
+    id: 3,
+    name: "المرحلة الثانوية",
+    slug: "secondary",
+    kind: "books",
+    section: section("books"),
+    icon: null,
+    image_url: null,
+    children: [],
+  },
 ];
 const storeWithMinimum = tenantSettings({
   whatsapp: "+201001234567",
@@ -292,7 +311,16 @@ describe("CategoryGrid (D67)", () => {
       <CategoryGrid
         categories={[
           { ...tree[0]!, icon: "backpack" },
-          { id: 5, name: "أدوات دراسية", slug: "tools", kind: "stationery", icon: null, image_url: null, children: [] },
+          {
+            id: 5,
+            name: "أدوات دراسية",
+            slug: "tools",
+            kind: "stationery",
+            section: section("stationery"),
+            icon: null,
+            image_url: null,
+            children: [],
+          },
         ]}
       />,
     );

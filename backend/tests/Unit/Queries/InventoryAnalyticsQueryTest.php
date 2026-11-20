@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Inventory\Enums\MovementType;
@@ -26,13 +25,13 @@ use Carbon\CarbonImmutable;
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 12:00:00', 'UTC'));
     app(TenantContext::class)->set($this->tenant);
-    $this->books = Category::factory()->kind(CategoryKind::Books)->create();
+    $this->books = Category::factory()->inSection('books')->create();
     $this->book = $this->reportSku('BK-1', category: $this->books, onHand: 100);
     SkuInventory::query()->where('sku_id', $this->book->id)->update(['reserved' => 40]);
-    $this->pen = $this->reportSku('PN-1', CategoryKind::Stationery, '50.00', onHand: 20);
-    $this->old = $this->reportSku('OLD-1', CategoryKind::Stationery, '10.00', onHand: 5);
-    $this->recent = $this->reportSku('NEW-1', CategoryKind::Stationery, '10.00', onHand: 5);
-    $this->reportSku('NIL-1', CategoryKind::Stationery, '10.00');
+    $this->pen = $this->reportSku('PN-1', 'stationery', '50.00', onHand: 20);
+    $this->old = $this->reportSku('OLD-1', 'stationery', '10.00', onHand: 5);
+    $this->recent = $this->reportSku('NEW-1', 'stationery', '10.00', onHand: 5);
+    $this->reportSku('NIL-1', 'stationery', '10.00');
     $this->customer = $this->makeCustomer();
     $this->reportOrder([[$this->book, 6, '100.00']], '2026-10-08 10:00:00', $this->customer);
     $this->reportOrder([[$this->old, 1, '10.00']], '2026-08-01 10:00:00', $this->customer);

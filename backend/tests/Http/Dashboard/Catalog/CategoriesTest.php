@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\CategoryIcon;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\Section;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-const DASHBOARD_CATEGORY_KEYS = ['id', 'name', 'slug', 'kind', 'icon', 'image_url', 'parent_id', 'sort_order', 'status', 'children'];
+const DASHBOARD_CATEGORY_KEYS = ['id', 'name', 'slug', 'kind', 'section' => ['id', 'name', 'reference_price_label', 'icon'], 'icon', 'image_url', 'parent_id', 'sort_order', 'status', 'children'];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -68,6 +68,7 @@ test('an owner creates a root category with an arabic slug, audited', function (
         ->assertJsonPath('data.slug', 'كتب-إعدادي')
         ->assertJsonPath('data.parent_id', null)
         ->assertJsonPath('data.kind', 'general')
+        ->assertJsonPath('data.section.name', 'عام')
         ->assertJsonPath('data.icon', null)
         ->assertJsonPath('data.sort_order', 3)
         ->assertJsonPath('data.status', 'active');
@@ -80,12 +81,43 @@ test('an owner creates a root category with an arabic slug, audited', function (
     ]);
 });
 
-test('D68 an owner creates a root category of a given kind', function (): void {
+test('D68 an owner creates a root category of a given kind, read as the section key until V3 Task 03', function (): void {
     $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'ألعاب', 'kind' => 'toys'])
         ->assertCreated()
         ->assertJsonPath('data.kind', 'toys');
 
-    $this->assertDatabaseHas('categories', ['tenant_id' => $this->tenant->id, 'name' => 'ألعاب', 'kind' => 'toys']);
+    $this->assertDatabaseHas('categories', ['tenant_id' => $this->tenant->id, 'name' => 'ألعاب', 'section_id' => $this->sectionId('toys')]);
+});
+
+test('D109 an owner creates a root category in a section by id and gets the section back', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'كتب خارجية', 'section_id' => $this->sectionId('books')])
+        ->assertCreated()
+        ->assertJsonPath('data.kind', 'books')
+        ->assertJsonPath('data.section', ['id' => $this->sectionId('books'), 'name' => 'كتب خارجية', 'reference_price_label' => 'سعر الغلاف', 'icon' => 'book-open']);
+});
+
+test('BR-T04 D109 a section of another store is unknown, and nothing is created', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'x', 'section_id' => $this->sectionId('books', $this->otherTenant())])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.section_id.0', 'العنصر المختار غير موجود');
+
+    $this->assertDatabaseMissing('categories', ['name' => 'x']);
+});
+
+test('D109 an archived section cannot be chosen', function (): void {
+    $archived = $this->inTenant(fn () => Section::factory()->archived()->create());
+
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'x', 'section_id' => $archived->id])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.section_id.0', 'العنصر المختار مؤرشف');
+});
+
+test('D109 a section sent for a sub-category is rejected', function (): void {
+    $parent = $this->inTenant(fn () => Category::factory()->books()->create());
+
+    $this->tenantJson('POST', '/api/dashboard/categories', ['name' => 'x', 'parent_id' => $parent->id, 'section_id' => $this->sectionId('toys')])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.section_id.0', 'القسم الفرعي يرث نوع القسم الرئيسي.');
 });
 
 test('D68 a sub-category inherits the kind of its parent and may send kind only as null', function (): void {
@@ -141,6 +173,9 @@ test('category creation validation', function (array $body, string $field): void
     'negative sort order' => [['name' => 'x', 'sort_order' => -1], 'sort_order'],
     'image is not an image' => [['name' => 'x', 'image' => 'not-a-file'], 'image'],
     'unknown kind' => [['name' => 'x', 'kind' => 'furniture'], 'kind'],
+    'kind too long' => [['name' => 'x', 'kind' => str_repeat('a', 41)], 'kind'],
+    'unknown section' => [['name' => 'x', 'section_id' => 999_999], 'section_id'],
+    'section not an integer' => [['name' => 'x', 'section_id' => 'books'], 'section_id'],
     'unknown icon' => [['name' => 'x', 'icon' => 'rocket'], 'icon'],
 ]);
 
@@ -198,10 +233,10 @@ test('D68 changing the kind of a root re-kinds its whole subtree, audited', func
         ->assertOk()
         ->assertJsonPath('data.kind', 'stationery');
 
-    $this->assertDatabaseHas('categories', ['id' => $child->id, 'kind' => 'stationery']);
+    $this->assertDatabaseHas('categories', ['id' => $child->id, 'section_id' => $this->sectionId('stationery')]);
     $this->assertDatabaseHas('audit_logs', [
         'tenant_id' => $this->tenant->id, 'action' => 'category.updated', 'entity_id' => $root->id,
-        'old_values' => json_encode(['kind' => 'books']), 'new_values' => json_encode(['kind' => 'stationery']),
+        'old_values' => json_encode(['section_id' => $this->sectionId('books')]), 'new_values' => json_encode(['section_id' => $this->sectionId('stationery')]),
     ]);
 });
 
@@ -210,14 +245,14 @@ test('D68 a subtree moved under a root of another kind takes that kind', functio
         $books = Category::factory()->books()->create();
         $child = Category::factory()->childOf($books)->create();
 
-        return [Category::factory()->kind(CategoryKind::Toys)->create(), $child, Category::factory()->childOf($child)->create()];
+        return [Category::factory()->inSection('toys')->create(), $child, Category::factory()->childOf($child)->create()];
     });
 
     $this->tenantJson('PUT', "/api/dashboard/categories/{$child->id}", ['name' => $child->name, 'parent_id' => $toys->id])
         ->assertOk()
         ->assertJsonPath('data.kind', 'toys');
 
-    $this->assertDatabaseHas('categories', ['id' => $grandchild->id, 'kind' => 'toys']);
+    $this->assertDatabaseHas('categories', ['id' => $grandchild->id, 'section_id' => $this->sectionId('toys')]);
 });
 
 test('BR-P06 a category cannot be moved under its own descendant', function (): void {
@@ -253,6 +288,7 @@ test('category update validation', function (array $body, string $field): void {
     'parent_id must be present' => [['name' => 'x'], 'parent_id'],
     'sort order not an integer' => [['name' => 'x', 'parent_id' => null, 'sort_order' => 'first'], 'sort_order'],
     'unknown kind' => [['name' => 'x', 'parent_id' => null, 'kind' => 'furniture'], 'kind'],
+    'unknown section' => [['name' => 'x', 'parent_id' => null, 'section_id' => 999_999], 'section_id'],
     'unknown icon' => [['name' => 'x', 'parent_id' => null, 'icon' => 'rocket'], 'icon'],
 ]);
 

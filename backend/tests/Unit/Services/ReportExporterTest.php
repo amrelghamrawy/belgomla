@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\SpreadsheetFormat;
 use App\Modules\Reports\Data\ReportFiltersData;
 use App\Modules\Reports\Data\ReportOptionsData;
@@ -23,7 +22,7 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 12:00:00', 'UTC'));
     app(TenantContext::class)->set($this->tenant);
     $this->book = $this->reportSku('BK-1', onHand: 10);
-    $this->pen = $this->reportSku('PN-1', CategoryKind::Stationery, '50.00');
+    $this->pen = $this->reportSku('PN-1', 'stationery', '50.00');
     $this->customer = $this->makeCustomer(['name' => 'مكتبة النور', 'phone' => '+201000000001']);
     $this->reportOrder([[$this->book, 2, '100.00'], [$this->pen, 1, '50.00']], '2026-10-09 21:30:00', $this->customer);
 

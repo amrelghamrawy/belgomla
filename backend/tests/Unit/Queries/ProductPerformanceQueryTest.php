@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Models\CustomerGroup;
@@ -30,9 +29,9 @@ use Carbon\CarbonImmutable;
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 12:00:00', 'UTC'));
     app(TenantContext::class)->set($this->tenant);
-    $this->books = Category::factory()->kind(CategoryKind::Books)->create();
+    $this->books = Category::factory()->inSection('books')->create();
     $this->book = $this->reportSku('BK-1', category: $this->books);
-    $this->pen = $this->reportSku('PN-1', CategoryKind::Stationery, '50.00');
+    $this->pen = $this->reportSku('PN-1', 'stationery', '50.00');
     $this->set = Product::factory()->bundle()->withSku(['code' => 'SET-1', 'conversion_factor' => 1])->create(['name' => 'طقم'])->skus()->sole();
     $this->group = CustomerGroup::factory()->create(['name' => 'جملة']);
     $this->x = $this->makeCustomer(['customer_group_id' => $this->group->id]);

@@ -1,6 +1,6 @@
 # V3 Task 02 — Tenant sections replace `CategoryKind` (backend)
 
-Status: **planned**. Requires V3 Task 01. The riskiest task of the board: **no behaviour change** for existing stores. Read `CLAUDE.md`, `rules/*.md`, then this file.
+Status: **done** (2026-11-20). Requires V3 Task 01. The riskiest task of the board: **no behaviour change** for existing stores. Read `CLAUDE.md`, `rules/*.md`, then this file.
 
 ## Why
 
@@ -46,3 +46,24 @@ D109: a section is tenant data (renamable, hideable, tenant-owned sections), not
 ## Definition of done
 
 rules/00 DoD; `composer test` green; smoke on `tenant:demo`: storefront facets inside a books category, product form, price list export identical to before.
+
+## Outcome (2026-11-20)
+
+- Migration `2026_11_20_100100_create_sections.php`: `sections` (with the checks: status known, the fallback active, one fallback per store, one row per vertical section), `categories.section_id` (not null), `product_field_definitions.section_id` / `template_id`; the per-store backfill of the plan (a kind with no such section, and `general`, → the fallback); the `kind` columns and their checks dropped. `down()` writes the keys back into `kind`.
+- Catalog: model `Section`, `ProvisionSections` (the vertical's active sections + the fallback, idempotent by `vertical_section_id`, key and name), `SectionResolver` (by `section_id`, else by the old `kind`; `422` unknown / archived on the field that named it), `SectionsQuery`, `SectionResource`. `Category` and `ProductFieldDefinition` eager-load `section` (`$with`); `appliesTo(int $sectionId)`. The observer puts a root without a section in the fallback.
+- Every former `CategoryKind` reader moved to the section: create/update category and field, products and bundles, the grade-set generator, `CustomFieldValidator`, `FacetQuery`, `CatalogRowMapper`, the price list (file column = the section name), `MissingCoverPrice` (label = `section.reference_price_label`), the sales report (by section key, labelled with the store's section name). `CategoryKind` deleted (test: the class is gone).
+- Test stores get their sections from `TenantFactory` (the same `ProvisionSections` a real store runs); `CategoryFactory::inSection()` / `ProductFieldDefinitionFactory::forSection()` replace `kind()`; `TenantTestCase::sectionId()`.
+- OpenAPI: `Section` schema; `section` on `Category`, `DashboardCategory`, `CategoryRef`, `FieldDefinition`, `PriceListRow`; `section_id` on the category and field requests. `schema.d.ts` regenerated, frontend fixtures carry `section` (no app code change).
+
+Decisions taken at the start of the task (recorded in 06 D109 g–i):
+
+- **`kind` is kept in this release** (task 03 ships separately): requests still read it as a section key (`section_id` wins), responses still send it (= `section.key`) next to `section`. The OpenAPI `CategoryKind` keeps its four values until task 03, since no store can make its own section before task 07.
+- **`sections.key`** (not in the schema above): the machine name, copied from the vertical section key, `general` for the fallback. Reports, factories and the old `kind` input match on it, never on a name the store can edit. A vertical section must not use `general` (guard for task 06).
+- **`ApplyVerticalTemplate` keeps its name** (it now provisions the sections first, then the fields with `section_id` and `template_id`); an existing field of the same key is linked to its template, nothing else of it is touched.
+
+Deviations, on purpose:
+
+- The sales report label of stationery is now «أدوات مكتبية» (the store's section name, D109 e), not «أدوات دراسية»; the price-list file's section column follows the same name.
+- The store category tree is two queries (the categories, then their sections in one go), not one.
+- `sections.name` is unique per store exactly, not folded (D32): the folded check comes with the section endpoints (task 07), the first place a store names a section.
+

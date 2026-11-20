@@ -10,7 +10,6 @@ use App\Modules\Catalog\Data\ProductData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
 use App\Modules\Catalog\Enums\ArchiveStatus;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\SkuStatus;
@@ -393,8 +392,8 @@ final readonly class CatalogRowMapper
         $errors = [];
         $productErrors = [];
         $category = $this->category($head['category_path'] ?? '', $lookups, $existing?->category_id, $productErrors);
-        $kind = $category->kind ?? $existing?->category->kind;
-        $customFields = $this->customFields($head, $lookups, $kind, $existing, $productErrors);
+        $sectionId = $category->section_id ?? $existing?->category->section_id;
+        $customFields = $this->customFields($head, $lookups, $sectionId, $existing, $productErrors);
         $errors = $productErrors === [] ? [] : [$first => $productErrors];
 
         $stored = array_map(fn (array $skuRows): ?Sku => $this->storedSku($existing, $skuRows[array_key_first($skuRows)]['sku_code'] ?? ''), $skus);
@@ -1231,11 +1230,11 @@ final readonly class CatalogRowMapper
      * The custom field map to send: the stored values, then each field column of the file on top of them.
      *
      * @param  array<string, string>  $row
-     * @param  CategoryKind|null  $kind  null while the row's category is unknown (that is its error already)
+     * @param  int|null  $sectionId  the section of the row's category; null while it is unknown (that is its error already)
      * @param  array<string, list<string>>  $errors
      * @return array<string, int|float|string|bool>
      */
-    private function customFields(array $row, CatalogLookups $lookups, ?CategoryKind $kind, ?Product $existing, array &$errors): array
+    private function customFields(array $row, CatalogLookups $lookups, ?int $sectionId, ?Product $existing, array &$errors): array
     {
         $values = $existing->custom_fields ?? [];
 
@@ -1247,7 +1246,7 @@ final readonly class CatalogRowMapper
                 continue;
             }
 
-            $applies = ! $kind instanceof CategoryKind || $definition->appliesTo($kind);
+            $applies = $sectionId === null || $definition->appliesTo($sectionId);
 
             if ($cell === '') {
                 if ($applies) {

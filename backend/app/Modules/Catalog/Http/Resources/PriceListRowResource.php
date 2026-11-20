@@ -84,7 +84,8 @@ final class PriceListRowResource extends JsonResource
             'sku_unit_id' => $unit?->id,
             'name' => $this->resource->name,
             'slug' => $this->resource->slug,
-            'kind' => $category instanceof Category ? $category->kind->value : null,
+            'kind' => $category instanceof Category ? $category->section->key : null, // until V3 Task 03 (D109)
+            'section' => $category instanceof Category ? new SectionResource($category->section)->toArray($request) : null,
             'code' => $sku?->code,
             'unit' => $unit?->relationLoaded('unit') === true ? $unit->unit->name : null,
             'conversion_factor' => $unit?->conversion_factor,

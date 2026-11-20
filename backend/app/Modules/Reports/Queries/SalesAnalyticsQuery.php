@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Reports\Queries;
 
-use App\Modules\Catalog\Enums\CategoryKind;
+use App\Modules\Catalog\Queries\SectionsQuery;
 use App\Modules\Customers\Queries\CustomerGroupsQuery;
 use App\Modules\Reports\Data\ReportFiltersData;
 use App\Modules\Reports\Enums\ReportName;
@@ -43,6 +43,7 @@ final readonly class SalesAnalyticsQuery
         private SalesFactsQuery $facts,
         private ReportCache $cache,
         private CustomerGroupsQuery $groups,
+        private SectionsQuery $storeSections,
     ) {}
 
     /**
@@ -128,11 +129,13 @@ final readonly class SalesAnalyticsQuery
     {
         $sales = $this->figures($this->facts->scoped($this->facts->lines($start, $end), $filters), 'f.kind');
         $returns = $this->returned($this->facts->scoped($this->facts->returns($start, $end), $filters), 'f.kind');
+        $names = $this->storeSections->namesByKey();
         $sections = [];
 
+        // Grouped by the section key (the old `kind`, D109), labelled with the store's own name for the section.
         foreach (array_unique([...array_keys($sales), ...array_keys($returns)]) as $kind) {
             $kind = (string) $kind;
-            $sections[] = ['kind' => $kind, 'label' => CategoryKind::tryFrom($kind)?->label() ?? $kind, ...$this->net($sales[$kind] ?? $this->zero(), $returns[$kind] ?? '0.00')];
+            $sections[] = ['kind' => $kind, 'label' => $names[$kind] ?? $kind, ...$this->net($sales[$kind] ?? $this->zero(), $returns[$kind] ?? '0.00')];
         }
 
         usort($sections, fn (array $a, array $b): int => Money::compare($b['net'], $a['net']) ?: strcmp($a['kind'], $b['kind']));

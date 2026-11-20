@@ -47,7 +47,7 @@ final readonly class UpdateBundle
 
         $product->load(ProductSnapshot::RELATIONS);
         [$category, $units] = $this->references->check($data, $product);
-        $customFields = $this->fields->validate($data->customFields, $category->kind, $product->custom_fields, required: false);
+        $customFields = $this->fields->validate($data->customFields, $category->section_id, $product->custom_fields, required: false);
         $old = $this->snapshot->ofBundle($product);
 
         return DB::transaction(function () use ($product, $data, $units, $customFields, $old): Product {

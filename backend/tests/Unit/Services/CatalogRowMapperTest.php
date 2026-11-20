@@ -7,7 +7,6 @@ use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Exceptions\CatalogConflict;
@@ -661,7 +660,7 @@ test('D91 the export rows hold the product as the import reads it, one per unit,
 });
 
 test('the export row writes yes or no for a boolean field and nothing for an empty one', function (): void {
-    ProductFieldDefinition::factory()->boolean()->forKind(CategoryKind::Books)->create(['key' => 'colored']);
+    ProductFieldDefinition::factory()->boolean()->forSection('books')->create(['key' => 'colored']);
     $product = $this->importedProduct();
     $product->update(['custom_fields' => ['colored' => false]]);
 

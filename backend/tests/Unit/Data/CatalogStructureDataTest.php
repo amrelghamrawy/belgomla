@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Data\FieldDefinitionData;
 use App\Modules\Catalog\Enums\CategoryIcon;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Http\Requests\StoreCategoryRequest;
 use App\Modules\Catalog\Http\Requests\StoreFieldRequest;
@@ -51,7 +50,16 @@ test('category data leaves unsent optional fields null', function (): void {
         ->and($data->sortOrder)->toBeNull()
         ->and($data->icon)->toBeNull()
         ->and($data->iconGiven)->toBeFalse()
+        ->and($data->sectionId)->toBeNull()
+        ->and($data->kind)->toBeNull()
         ->and($data->image)->toBeNull();
+});
+
+test('D109 category data carries the section id as an integer and the old kind as a string', function (): void {
+    $data = CategoryData::fromRequest(validatedRequest(StoreCategoryRequest::class, 'POST', ['name' => 'x', 'section_id' => '4', 'kind' => 'toys']));
+
+    expect($data->sectionId)->toBe(4)
+        ->and($data->kind)->toBe('toys');
 });
 
 test('category data from an update request never carries an image and keeps an explicit null parent', function (): void {
@@ -75,8 +83,9 @@ test('field data from a create request carries key, typed flags and trimmed opti
         ->and($data->isRequired)->toBeFalse()
         ->and($data->showOnStorefront)->toBeNull()
         ->and($data->filterOrder)->toBe(2)
+        ->and($data->sectionId)->toBeNull()
         ->and($data->kind)->toBeNull()
-        ->and($data->kindGiven)->toBeFalse()
+        ->and($data->sectionGiven)->toBeFalse()
         ->and($data->sortOrder)->toBeNull()
         ->and($data->options)->toBe(['أولى', 'ثانية']);
 });
@@ -90,16 +99,24 @@ test('field data from an update request has no key and no options', function ():
         ->and($data->options)->toBe([])
         ->and($data->type)->toBe(FieldType::Boolean)
         ->and($data->showOnStorefront)->toBeFalse()
-        ->and($data->kind)->toBe(CategoryKind::Toys)
-        ->and($data->kindGiven)->toBeTrue()
+        ->and($data->kind)->toBe('toys')
+        ->and($data->sectionGiven)->toBeTrue()
         ->and($data->isFilterable)->toBeNull();
 });
 
-test('D69 FieldDefinitionData tells a kind sent as null apart from a kind not sent', function (): void {
-    $data = FieldDefinitionData::fromRequest(validatedRequest(UpdateFieldRequest::class, 'PUT', ['label' => 'x', 'type' => 'text', 'kind' => null]));
+test('D69 FieldDefinitionData tells a section sent as null apart from a section not sent', function (string $input): void {
+    $data = FieldDefinitionData::fromRequest(validatedRequest(UpdateFieldRequest::class, 'PUT', ['label' => 'x', 'type' => 'text', $input => null]));
 
-    expect($data->kind)->toBeNull()
-        ->and($data->kindGiven)->toBeTrue();
+    expect($data->sectionId)->toBeNull()
+        ->and($data->kind)->toBeNull()
+        ->and($data->sectionGiven)->toBeTrue();
+})->with(['section_id', 'kind']);
+
+test('D109 FieldDefinitionData reads the section id as an integer', function (): void {
+    $data = FieldDefinitionData::fromRequest(validatedRequest(StoreFieldRequest::class, 'POST', ['key' => 'age', 'label' => 'x', 'type' => 'text', 'section_id' => '7']));
+
+    expect($data->sectionId)->toBe(7)
+        ->and($data->sectionGiven)->toBeTrue();
 });
 
 test('D73 CategoryData tells an icon sent as null apart from an icon not sent', function (): void {

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ProductListing } from "@/components/store/ProductListing";
 import type { Category } from "@/lib/api/types";
 
-import { facet, page, storeProduct } from "../fixtures";
+import { facet, page, section, storeProduct } from "../fixtures";
 import { callsTo, json, stubApi } from "../http";
 import { pathname, renderWithQuery, router, searchParams } from "../render";
 
@@ -15,6 +15,7 @@ const tree: Category[] = [
     name: "المرحلة الإعدادية",
     slug: "prep",
     kind: "books",
+    section: section("books"),
     icon: null,
     image_url: null,
     children: [
@@ -23,10 +24,20 @@ const tree: Category[] = [
         name: "أولى إعدادي",
         slug: "first-prep",
         kind: "books",
+        section: section("books"),
         icon: null,
         image_url: null,
         children: [
-          { id: 3, name: "الترم الأول", slug: "first-term", kind: "books", icon: null, image_url: null, children: [] },
+          {
+            id: 3,
+            name: "الترم الأول",
+            slug: "first-term",
+            kind: "books",
+            section: section("books"),
+            icon: null,
+            image_url: null,
+            children: [],
+          },
         ],
       },
     ],

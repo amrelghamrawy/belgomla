@@ -10,7 +10,7 @@ import { useAddToCart, useRemoveCartItem, useUpdateCartItem } from "@/lib/store/
 import { useVerifyOtp } from "@/lib/store/auth";
 import { forgetReset, pendingReset, rememberReset } from "@/lib/store/reset-flow";
 
-import { cart, customer, order, page, storeProduct } from "../../fixtures";
+import { cart, customer, order, page, section, storeProduct } from "../../fixtures";
 import { callsTo, envelopeError, json, stubApi } from "../../http";
 import { renderHookWithQuery } from "../../render";
 
@@ -21,9 +21,21 @@ describe("findCategory", () => {
       name: "إعدادي",
       slug: "prep",
       kind: "general",
+      section: section("general"),
       icon: null,
       image_url: null,
-      children: [{ id: 2, name: "أولى", slug: "first", kind: "general", icon: null, image_url: null, children: [] }],
+      children: [
+        {
+          id: 2,
+          name: "أولى",
+          slug: "first",
+          kind: "general",
+          section: section("general"),
+          icon: null,
+          image_url: null,
+          children: [],
+        },
+      ],
     },
   ];
 
@@ -43,6 +55,7 @@ describe("categoryPath", () => {
       name: "ابتدائي",
       slug: "primary",
       kind: "general",
+      section: section("general"),
       icon: null,
       image_url: null,
       children: [
@@ -51,15 +64,34 @@ describe("categoryPath", () => {
           name: "رابعة ابتدائي",
           slug: "fourth",
           kind: "general",
+          section: section("general"),
           icon: null,
           image_url: null,
           children: [
-            { id: 3, name: "الترم الأول", slug: "term-1", kind: "general", icon: null, image_url: null, children: [] },
+            {
+              id: 3,
+              name: "الترم الأول",
+              slug: "term-1",
+              kind: "general",
+              section: section("general"),
+              icon: null,
+              image_url: null,
+              children: [],
+            },
           ],
         },
       ],
     },
-    { id: 4, name: "إعدادي", slug: "prep", kind: "general", icon: null, image_url: null, children: [] },
+    {
+      id: 4,
+      name: "إعدادي",
+      slug: "prep",
+      kind: "general",
+      section: section("general"),
+      icon: null,
+      image_url: null,
+      children: [],
+    },
   ];
 
   it("lists every parent from the root down, ending with the category itself", () => {
@@ -83,11 +115,32 @@ describe("categoryOptions", () => {
         name: "إعدادي",
         slug: "prep",
         kind: "general",
+        section: section("general"),
         icon: null,
         image_url: null,
-        children: [{ id: 2, name: "أولى", slug: "first", kind: "general", icon: null, image_url: null, children: [] }],
+        children: [
+          {
+            id: 2,
+            name: "أولى",
+            slug: "first",
+            kind: "general",
+            section: section("general"),
+            icon: null,
+            image_url: null,
+            children: [],
+          },
+        ],
       },
-      { id: 3, name: "ثانوي", slug: "sec", kind: "general", icon: null, image_url: null, children: [] },
+      {
+        id: 3,
+        name: "ثانوي",
+        slug: "sec",
+        kind: "general",
+        section: section("general"),
+        icon: null,
+        image_url: null,
+        children: [],
+      },
     ];
 
     expect(categoryOptions(tree)).toEqual([

@@ -27,7 +27,8 @@ final class CategoryResource extends JsonResource
             'id' => $this->resource->id,
             'name' => $this->resource->name,
             'slug' => $this->resource->slug,
-            'kind' => $this->resource->kind->value,
+            'kind' => $this->resource->section->key, // the old section kind, until V3 Task 03 (D109)
+            'section' => new SectionResource($this->resource->section)->toArray($request),
             'icon' => $this->resource->icon?->value,
             'image_url' => $this->resource->imageUrl(),
             'parent_id' => $this->when($dashboard, $this->resource->parent_id),

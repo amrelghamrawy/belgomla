@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Orders\Models\Order;
@@ -26,9 +25,9 @@ use Carbon\CarbonImmutable;
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-10 12:00:00', 'UTC'));
     app(TenantContext::class)->set($this->tenant);
-    $this->books = Category::factory()->kind(CategoryKind::Books)->create(['name' => 'كتب']);
+    $this->books = Category::factory()->inSection('books')->create(['name' => 'كتب']);
     $this->book = $this->reportSku('BK-1', category: $this->books);
-    $this->pen = $this->reportSku('PN-1', CategoryKind::Stationery, '50.00');
+    $this->pen = $this->reportSku('PN-1', 'stationery', '50.00');
     $this->group = CustomerGroup::factory()->create(['name' => 'جملة']);
     $this->wholesaler = $this->makeCustomer(['customer_group_id' => $this->group->id]);
     $this->shop = $this->makeCustomer();
@@ -85,10 +84,10 @@ test('the period of the same length just before is given for comparison', functi
     ]);
 });
 
-test('D68 the sales are split by section, the order discount shared over the lines', function (): void {
+test('D68 D109 e the sales are split by section under the store section names, the order discount shared over the lines', function (): void {
     expect(($this->analytics)()['by_section'])->toBe([
         ['kind' => 'books', 'label' => 'كتب خارجية', 'orders' => 2, 'gross' => '300.00', 'discounts' => '38.00', 'returns' => '81.00', 'net' => '181.00'],
-        ['kind' => 'stationery', 'label' => 'أدوات دراسية', 'orders' => 1, 'gross' => '50.00', 'discounts' => '5.00', 'returns' => '0.00', 'net' => '45.00'],
+        ['kind' => 'stationery', 'label' => 'أدوات مكتبية', 'orders' => 1, 'gross' => '50.00', 'discounts' => '5.00', 'returns' => '0.00', 'net' => '45.00'],
     ]);
 });
 
@@ -104,7 +103,7 @@ test('a customer group filter keeps that group\'s customers only', function (): 
 });
 
 test('BR-P06 a category filter keeps the lines of that category and its sub-categories', function (): void {
-    $child = Category::factory()->create(['parent_id' => $this->books->id, 'path' => $this->books->path.'99/', 'kind' => CategoryKind::Books]);
+    $child = Category::factory()->create(['parent_id' => $this->books->id, 'path' => $this->books->path.'99/', 'section_id' => Database\Factories\CategoryFactory::sectionId('books')]);
     $novel = $this->reportSku('BK-2', category: $child);
     $this->reportOrder([[$novel, 1, '40.00'], [$this->pen, 1, '50.00']], '2026-10-09 11:00:00', $this->shop);
 
@@ -116,7 +115,7 @@ test('an unknown category matches nothing', function (): void {
 });
 
 test('D93 a bundle counts once, at the bundle line: its component lines add nothing', function (): void {
-    $set = $this->reportSku('SET-1', CategoryKind::Books, '300.00');
+    $set = $this->reportSku('SET-1', 'books', '300.00');
     $order = $this->bundleOrder($set, [$this->defaultUnitId($this->book) => 1, $this->defaultUnitId($this->pen) => 2], bundles: 2, price: '150.00', delivered: 2, deliveredAt: '2026-10-09 12:00:00');
 
     expect(($this->analytics)('2026-10-09', '2026-10-09')['totals'])->toBe(['orders' => 2, 'gross' => '400.00', 'discounts' => '0.00', 'returns' => '0.00', 'net' => '400.00', 'average_order' => '200.00'])
@@ -124,7 +123,7 @@ test('D93 a bundle counts once, at the bundle line: its component lines add noth
 });
 
 test('D93 a returned component lowers the bundle\'s section', function (): void {
-    $set = $this->reportSku('SET-1', CategoryKind::Toys, '300.00');
+    $set = $this->reportSku('SET-1', 'toys', '300.00');
     $order = $this->bundleOrder($set, [$this->defaultUnitId($this->book) => 1], bundles: 1, price: '150.00', delivered: 1, deliveredAt: '2026-10-09 12:00:00');
     $this->reportReturn($order, [[$order->items()->whereNotNull('parent_item_id')->sole(), 1, '150.00']], '2026-10-10 10:00:00');
 

@@ -14,6 +14,13 @@ function verticalsMigration(): Migration
     return $migration instanceof Migration ? $migration : throw new RuntimeException('not a migration');
 }
 
+/** V3 Task 02: the sections migration points at vertical_field_templates, so it is rolled back first. */
+function verticalsMigrationDown(): void
+{
+    (require database_path('migrations/2026_11_20_100100_create_sections.php'))->down();
+    verticalsMigration()->down();
+}
+
 /**
  * @return list<string> option labels of a libraries template, in order
  */
@@ -28,7 +35,7 @@ function templateOptions(string $key): array
 }
 
 test('D108 c every tenant, whatever its old vertical, ends in libraries and the old column is gone', function (): void {
-    verticalsMigration()->down();
+    verticalsMigrationDown();
     foreach (['school-books', 'stationery', 'hardware', 'none'] as $index => $old) {
         DB::table('tenants')->insert(['subdomain' => "old{$index}", 'name' => 'متجر', 'status' => 'active', 'vertical' => $old, 'created_at' => now(), 'updated_at' => now()]);
     }
@@ -102,7 +109,7 @@ test('BR-P09 the template options are the old files\' options, in order', functi
 ]);
 
 test('the rollback restores tenants.vertical as none and drops the platform tables', function (): void {
-    verticalsMigration()->down();
+    verticalsMigrationDown();
 
     expect(DB::table('tenants')->where('id', $this->tenant->id)->value('vertical'))->toBe('none')
         ->and(Schema::hasColumn('tenants', 'vertical_id'))->toBeFalse()

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\UpdateFieldDefinition;
 use App\Modules\Catalog\Data\FieldDefinitionData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Exceptions\FieldTypeLocked;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
@@ -43,15 +42,16 @@ test('BR-P08 UpdateFieldDefinition allows label changes while values exist', fun
     expect(app(UpdateFieldDefinition::class)->handle($field, new FieldDefinitionData('ردمك', FieldType::Text))->label)->toBe('ردمك');
 });
 
-test('D69 UpdateFieldDefinition keeps the kind unless one is given, and null given means every section', function (): void {
-    $field = ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create();
+test('D69 UpdateFieldDefinition keeps the section unless one is given, and null given means every section', function (): void {
+    $field = ProductFieldDefinition::factory()->forSection('books')->create();
+    $books = Database\Factories\CategoryFactory::sectionId('books');
 
-    $kept = app(UpdateFieldDefinition::class)->handle($field, new FieldDefinitionData('x', FieldType::Text))->kind;
-    $cleared = app(UpdateFieldDefinition::class)->handle($field, new FieldDefinitionData('x', FieldType::Text, kindGiven: true))->kind;
+    $kept = app(UpdateFieldDefinition::class)->handle($field, new FieldDefinitionData('x', FieldType::Text))->section_id;
+    $cleared = app(UpdateFieldDefinition::class)->handle($field, new FieldDefinitionData('x', FieldType::Text, sectionGiven: true))->section_id;
 
-    expect($kept)->toBe(CategoryKind::Books)
+    expect($kept)->toBe($books)
         ->and($cleared)->toBeNull()
-        ->and(AuditLog::query()->latest('id')->firstOrFail()->old_values)->toMatchArray(['kind' => 'books']);
+        ->and(AuditLog::query()->latest('id')->firstOrFail()->old_values)->toMatchArray(['section_id' => $books]);
 });
 
 test('UpdateFieldDefinition refuses an explicit filterable text field', function (): void {

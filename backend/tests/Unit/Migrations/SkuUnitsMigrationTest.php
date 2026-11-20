@@ -49,7 +49,7 @@ beforeEach(function (): void {
     $tenant = $this->tenant->id;
     $piece = skuUnitsInsert('units', ['tenant_id' => $tenant, 'name' => 'قطعة']);
     $carton = skuUnitsInsert('units', ['tenant_id' => $tenant, 'name' => 'كرتونة']);
-    $category = skuUnitsInsert('categories', ['tenant_id' => $tenant, 'name' => 'كتب', 'slug' => 'books', 'path' => '/']);
+    $category = skuUnitsInsert('categories', ['tenant_id' => $tenant, 'name' => 'كتب', 'slug' => 'books', 'path' => '/', 'section_id' => $this->sectionId('books')]);
     $product = skuUnitsInsert('products', ['tenant_id' => $tenant, 'category_id' => $category, 'name' => 'الأضواء علوم', 'slug' => 'adwaa', 'custom_fields' => '{}']);
 
     $this->sku = skuUnitsInsert('skus', [

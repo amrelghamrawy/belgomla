@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Pricing\Models\SkuPriceTier;
@@ -44,9 +43,9 @@ test('D91 recompute answers every unit of the product, each off its own cover pr
         ->assertJsonPath('data.1.base_price', '1344.00');
 });
 
-test('BR-PR10 recompute without a reference price is refused with cover_price_required, named after the section', function (CategoryKind $kind, string $message): void {
+test('BR-PR10 recompute without a reference price is refused with cover_price_required, named after the section', function (string $section, string $message): void {
     $product = $this->inTenant(fn () => Product::factory()
-        ->for(Category::factory()->kind($kind))
+        ->for(Category::factory()->inSection($section))
         ->withSku(['cover_price' => null, 'base_price' => '90.00', 'base_price_percent' => '25.00'])
         ->create());
 
@@ -54,8 +53,8 @@ test('BR-PR10 recompute without a reference price is refused with cover_price_re
         ->assertUnprocessable()
         ->assertExactJson(['error' => ['code' => 'cover_price_required', 'message' => $message]]);
 })->with([
-    'books say cover price' => [CategoryKind::Books, 'أدخل سعر الغلاف أولًا لحساب السعر بنسبة الخصم'],
-    'toys say retail price' => [CategoryKind::Toys, 'أدخل سعر القطاعي أولًا لحساب السعر بنسبة الخصم'],
+    'books say cover price' => ['books', 'أدخل سعر الغلاف أولًا لحساب السعر بنسبة الخصم'],
+    'toys say retail price' => ['toys', 'أدخل سعر القطاعي أولًا لحساب السعر بنسبة الخصم'],
 ]);
 
 test('BR-T04 recomputing another tenant product is 404 and changes nothing', function (): void {

@@ -6,7 +6,6 @@ use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\CreateCategory;
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Enums\CategoryIcon;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Tenancy\TenantContext;
@@ -26,15 +25,28 @@ test('CreateCategory creates a root category with sort order 0 and a system audi
         ->and($category->path)->toBe("/{$category->id}/")
         ->and($log->action)->toBe('category.created')
         ->and($log->actor_type->value)->toBe('system')
-        ->and($log->new_values)->toEqual(['name' => 'أقلام', 'parent_id' => null, 'kind' => 'general', 'icon' => null, 'sort_order' => 0, 'image_path' => null]);
+        ->and($log->new_values)->toEqual(['name' => 'أقلام', 'parent_id' => null, 'section_id' => $this->sectionId('general'), 'icon' => null, 'sort_order' => 0, 'image_path' => null]);
 });
 
 test('D68 CreateCategory gives a root the requested kind and a child the kind of its parent', function (): void {
-    $root = app(CreateCategory::class)->handle(new CategoryData('ألعاب', null, kind: CategoryKind::Toys));
-    $child = app(CreateCategory::class)->handle(new CategoryData('مكعبات', $root->id, kind: CategoryKind::Books));
+    $root = app(CreateCategory::class)->handle(new CategoryData('ألعاب', null, kind: 'toys'));
+    $child = app(CreateCategory::class)->handle(new CategoryData('مكعبات', $root->id, kind: 'books'));
 
-    expect($root->kind)->toBe(CategoryKind::Toys)
-        ->and($child->kind)->toBe(CategoryKind::Toys);
+    expect($root->section->key)->toBe('toys')
+        ->and($child->section->key)->toBe('toys');
+});
+
+test('D109 c CreateCategory puts a root without a chosen section in the fallback «عام»', function (): void {
+    $category = app(CreateCategory::class)->handle(new CategoryData('متنوع', null));
+
+    expect($category->section->name)->toBe('عام')
+        ->and($category->section->is_fallback)->toBeTrue();
+});
+
+test('D109 CreateCategory takes a section by id before a kind', function (): void {
+    $category = app(CreateCategory::class)->handle(new CategoryData('ألعاب', null, sectionId: $this->sectionId('toys'), kind: 'books'));
+
+    expect($category->section->key)->toBe('toys');
 });
 
 test('CreateCategory stores the image on the public disk', function (): void {

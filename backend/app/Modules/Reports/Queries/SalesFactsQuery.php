@@ -50,11 +50,12 @@ final readonly class SalesFactsQuery
             ->whereNull('order_items.parent_item_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('sections', 'sections.id', '=', 'categories.section_id')
             ->select([
                 'order_items.id', 'order_items.order_id', 'orders.customer_id', 'customers.customer_group_id', 'order_items.sku_id', 'order_items.product_id', 'order_items.is_bundle',
                 'orders.delivered_at as at', 'categories.path as category_path',
             ])
-            ->selectRaw("coalesce(categories.kind, 'general') as kind")
+            ->selectRaw("coalesce(sections.key, 'general') as kind")
             ->selectRaw(self::WENT_OUT.' as quantity')
             ->selectRaw(self::WENT_OUT.' * order_items.conversion_factor as quantity_base')
             ->selectRaw('order_items.list_unit_price * '.self::WENT_OUT.' as gross')
@@ -69,9 +70,10 @@ final readonly class SalesFactsQuery
             ->leftJoin('order_items as parent', 'parent.id', '=', 'order_items.parent_item_id')
             ->join('products', 'products.id', '=', new Expression('coalesce(parent.product_id, order_items.product_id)'))
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('sections', 'sections.id', '=', 'categories.section_id')
             ->select(['order_items.id', 'order_items.order_id', 'orders.customer_id', 'customers.customer_group_id', 'orders.delivered_at as at', 'categories.path as category_path'])
             ->selectRaw('coalesce(parent.sku_id, order_items.sku_id) as top_sku_id')
-            ->selectRaw("coalesce(categories.kind, 'general') as kind")
+            ->selectRaw("coalesce(sections.key, 'general') as kind")
             ->selectRaw('coalesce(order_items.unit_cost, 0) * '.self::WENT_OUT.' * order_items.conversion_factor as cost')
             ->selectRaw('case when order_items.unit_cost is null then 1 else 0 end as uncosted');
     }
@@ -106,6 +108,7 @@ final readonly class SalesFactsQuery
             ->join('customers', 'customers.id', '=', 'orders.customer_id')
             ->join('products', 'products.id', '=', 'top.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('sections', 'sections.id', '=', 'categories.section_id')
             ->whereNull('order_returns.voided_at')
             ->whereBetween('order_returns.returned_at', [$start, $end])
             ->select([
@@ -113,7 +116,7 @@ final readonly class SalesFactsQuery
                 'returned.sku_id', 'returned.product_id', 'top.sku_id as top_sku_id', 'top.product_id as top_product_id',
                 'order_returns.returned_at as at', 'order_return_items.quantity_base', 'order_return_items.line_total as amount', 'categories.path as category_path',
             ])
-            ->selectRaw("coalesce(categories.kind, 'general') as kind");
+            ->selectRaw("coalesce(sections.key, 'general') as kind");
     }
 
     /**
@@ -136,7 +139,7 @@ final readonly class SalesFactsQuery
     /** The materialised path of a category of the tenant (BR-P06), null when it has none. */
     public function categoryPath(int $categoryId): ?string
     {
-        $path = Category::query()->whereKey($categoryId)->value('path');
+        $path = Category::query()->without('section')->whereKey($categoryId)->value('path');
 
         return is_string($path) ? $path : null;
     }

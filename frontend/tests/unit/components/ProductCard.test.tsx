@@ -11,6 +11,7 @@ import {
   customer,
   hiddenPriceSku,
   penProduct,
+  section,
   storeProduct,
   storeSku,
   storeSkuUnit,
@@ -55,7 +56,11 @@ describe("ProductCard", () => {
   });
   it("D68 calls the reference price the retail price outside the books section", () => {
     stubApi(guest);
-    renderWithQuery(<ProductCard product={storeProduct({ category: { id: 9, name: "ألعاب", kind: "toys" } })} />);
+    renderWithQuery(
+      <ProductCard
+        product={storeProduct({ category: { id: 9, name: "ألعاب", kind: "toys", section: section("toys") } })}
+      />,
+    );
 
     expect(screen.getByText(/سعر القطاعي:/)).toBeInTheDocument();
     expect(screen.queryByText(/سعر الغلاف/)).not.toBeInTheDocument();

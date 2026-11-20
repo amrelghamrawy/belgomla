@@ -66,7 +66,7 @@ final readonly class FacetQuery
             ->where('is_filterable', true)
             ->whereIn('type', [FieldType::Select, FieldType::Boolean])
             ->when($category instanceof Category, fn (Builder $query): Builder => $query->where(
-                fn (Builder $query): Builder => $query->whereNull('kind')->orWhere('kind', $category?->kind),
+                fn (Builder $query): Builder => $query->whereNull('section_id')->orWhere('section_id', $category?->section_id),
             ))
             ->orderBy('filter_order')
             ->orderBy('id')

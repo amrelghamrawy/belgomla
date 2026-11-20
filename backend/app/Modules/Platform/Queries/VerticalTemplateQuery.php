@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Platform\Queries;
 
 use App\Modules\Platform\Data\FieldTemplateData;
+use App\Modules\Platform\Data\SectionTemplateData;
 use App\Modules\Platform\Data\VerticalData;
 use App\Modules\Platform\Enums\VerticalStatus;
 use App\Modules\Platform\Models\Vertical;
 use App\Modules\Platform\Models\VerticalFieldTemplate;
 use App\Modules\Platform\Models\VerticalFieldTemplateOption;
+use App\Modules\Platform\Models\VerticalSection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use RuntimeException;
 
@@ -57,6 +59,25 @@ final readonly class VerticalTemplateQuery
         return Vertical::query()->whereIn('id', $ids)->get()
             ->mapWithKeys(fn (Vertical $vertical): array => [$vertical->id => $this->toData($vertical)])
             ->all();
+    }
+
+    /**
+     * D109 a: the active default sections of a vertical, in display order.
+     *
+     * @return list<SectionTemplateData>
+     */
+    public function sectionsFor(int $verticalId): array
+    {
+        return array_values(VerticalSection::query()
+            ->where('vertical_id', $verticalId)
+            ->where('status', VerticalStatus::Active)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (VerticalSection $section): SectionTemplateData => new SectionTemplateData(
+                $section->id, $section->key, $section->name, $section->reference_price_label, $section->icon, $section->sort_order,
+            ))
+            ->all());
     }
 
     /**

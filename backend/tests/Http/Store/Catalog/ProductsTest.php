@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
@@ -17,7 +16,7 @@ const STORE_SKU_KEYS = [
 ];
 
 const STORE_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'type', 'main_image_url', 'category' => ['id', 'name', 'kind'],
+    'id', 'name', 'slug', 'description', 'status', 'type', 'main_image_url', 'category' => ['id', 'name', 'kind', 'section' => ['id', 'name', 'reference_price_label', 'icon']],
     'sku' => STORE_SKU_KEYS,
     'skus' => ['*' => STORE_SKU_KEYS],
     'options',
@@ -114,9 +113,9 @@ test('BR-P08 custom fields not shown on the storefront and archived fields are l
 
 test('D69 a store product shows only the custom fields of its section and the section-less ones', function (): void {
     $this->inTenant(function (): void {
-        $toys = Category::factory()->kind(CategoryKind::Toys)->create();
-        ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create(['key' => 'publisher', 'label' => 'الشركة']);
-        ProductFieldDefinition::factory()->forKind(CategoryKind::Toys)->create(['key' => 'age', 'label' => 'العمر']);
+        $toys = Category::factory()->inSection('toys')->create();
+        ProductFieldDefinition::factory()->forSection('books')->create(['key' => 'publisher', 'label' => 'الشركة']);
+        ProductFieldDefinition::factory()->forSection('toys')->create(['key' => 'age', 'label' => 'العمر']);
         ProductFieldDefinition::factory()->create(['key' => 'origin', 'label' => 'بلد المنشأ']);
         Product::factory()->withSku()->create(['category_id' => $toys->id, 'custom_fields' => ['publisher' => 'X', 'age' => '3+', 'origin' => 'مصر']]);
     });

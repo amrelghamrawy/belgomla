@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Data;
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Http\Requests\StoreFieldRequest;
 use App\Modules\Catalog\Http\Requests\UpdateFieldRequest;
 
 /**
  * A custom field definition (BR-P08). Nullable flags/orders mean "not sent": defaults on create,
- * keep the current value on update. `key` and `options` are create-only. `kind` null means "every
- * section" (D69), so `kindGiven` says whether it was sent at all.
+ * keep the current value on update. `key` and `options` are create-only. The section (`sectionId`, or the
+ * old `kind` = a section key until V3 Task 03) null means "every section" (D69, D109), so `sectionGiven` says whether
+ * either was sent at all.
  */
 final readonly class FieldDefinitionData
 {
@@ -29,8 +29,9 @@ final readonly class FieldDefinitionData
         public ?int $filterOrder = null,
         public ?int $sortOrder = null,
         public array $options = [],
-        public ?CategoryKind $kind = null,
-        public bool $kindGiven = false,
+        public ?int $sectionId = null,
+        public ?string $kind = null,
+        public bool $sectionGiven = false,
     ) {}
 
     public static function fromRequest(StoreFieldRequest|UpdateFieldRequest $request): self
@@ -47,8 +48,9 @@ final readonly class FieldDefinitionData
             filterOrder: $request->order('filter_order'),
             sortOrder: $request->order('sort_order'),
             options: $creating ? $request->options() : [],
+            sectionId: $request->sectionId(),
             kind: $request->kind(),
-            kindGiven: $request->has('kind'),
+            sectionGiven: $request->has('section_id') || $request->has('kind'),
         );
     }
 }

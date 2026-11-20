@@ -13,7 +13,6 @@ use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
@@ -43,6 +42,7 @@ use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\TenantContext;
 use App\Support\Money;
+use Database\Factories\CategoryFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
@@ -97,7 +97,7 @@ abstract class TenantTestCase extends TestCase
     {
         return $this->importBasics ??= $this->inTenant(function (): array {
             $root = Category::factory()->books()->create(['name' => 'كتب خارجية']);
-            $publisher = ProductFieldDefinition::factory()->select()->forKind(CategoryKind::Books)->create(['key' => 'publisher', 'label' => 'الشركة', 'sort_order' => 1]);
+            $publisher = ProductFieldDefinition::factory()->select()->forSection('books')->create(['key' => 'publisher', 'label' => 'الشركة', 'sort_order' => 1]);
 
             return [
                 'root' => $root,
@@ -107,7 +107,7 @@ abstract class TenantTestCase extends TestCase
                 'publisher' => $publisher,
                 'adwaa' => ProductFieldOption::factory()->create(['definition_id' => $publisher->id, 'label' => 'الأضواء']),
                 'moallem' => ProductFieldOption::factory()->create(['definition_id' => $publisher->id, 'label' => 'المعلم']),
-                'brand' => ProductFieldDefinition::factory()->forKind(CategoryKind::Stationery)->create(['key' => 'brand', 'label' => 'الماركة', 'sort_order' => 2]),
+                'brand' => ProductFieldDefinition::factory()->forSection('stationery')->create(['key' => 'brand', 'label' => 'الماركة', 'sort_order' => 2]),
             ];
         });
     }
@@ -277,10 +277,10 @@ abstract class TenantTestCase extends TestCase
      * V2 Task 16: a SKU sold by the piece at `$price` in a new category of `$kind` (or in `$category`), with `$onHand`
      * pieces, for the report datasets.
      */
-    protected function reportSku(string $code, CategoryKind $kind = CategoryKind::Books, string $price = '100.00', ?Category $category = null, int $onHand = 0, ?Tenant $tenant = null): Sku
+    protected function reportSku(string $code, string $section = 'books', string $price = '100.00', ?Category $category = null, int $onHand = 0, ?Tenant $tenant = null): Sku
     {
-        return $this->asTenant($tenant ?? $this->tenant, function () use ($code, $kind, $price, $category, $onHand): Sku {
-            $category ??= Category::factory()->kind($kind)->create();
+        return $this->asTenant($tenant ?? $this->tenant, function () use ($code, $section, $price, $category, $onHand): Sku {
+            $category ??= Category::factory()->inSection($section)->create();
 
             return Product::factory()
                 ->withSku(['code' => $code, 'conversion_factor' => 1, 'base_price' => $price, 'moq' => 1], onHand: $onHand)
@@ -485,6 +485,12 @@ abstract class TenantTestCase extends TestCase
         return $this->asTenant($tenant ?? $this->tenant, $callback);
     }
 
+    /** D109: the id of the store's section with this key (`books`, `stationery`, `toys`, `general`). */
+    protected function sectionId(string $key, ?Tenant $tenant = null): int
+    {
+        return $this->asTenant($tenant ?? $this->tenant, fn (): int => CategoryFactory::sectionId($key));
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
@@ -587,7 +593,7 @@ abstract class TenantTestCase extends TestCase
     {
         return $this->asTenant($tenant ?? $this->tenant, function () use ($colours, $sizes, $prices, $stock, $name, $code): Product {
             $piece = Unit::query()->firstOrCreate(['name' => 'قطعة']);
-            $category = Category::factory()->kind(CategoryKind::Stationery)->create(['name' => 'أدوات']);
+            $category = Category::factory()->inSection('stationery')->create(['name' => 'أدوات']);
             $options = [new ProductOptionData(null, 'اللون', array_map(fn (string $value): ProductOptionValueData => new ProductOptionValueData(null, $value), $colours))];
 
             if ($sizes !== []) {

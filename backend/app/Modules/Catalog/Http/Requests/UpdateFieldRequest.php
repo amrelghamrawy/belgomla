@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Http\Requests;
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -25,7 +24,8 @@ final class UpdateFieldRequest extends FormRequest
             'options' => ['prohibited'],
             'label' => ['required', 'string', 'max:100'],
             'type' => ['required', Rule::enum(FieldType::class)],
-            'kind' => ['sometimes', 'nullable', Rule::enum(CategoryKind::class)],
+            'section_id' => ['sometimes', 'nullable', 'integer'],
+            'kind' => ['sometimes', 'nullable', 'string', 'max:40'],
             'is_required' => ['sometimes', 'boolean'],
             'show_on_storefront' => ['sometimes', 'boolean'],
             'is_filterable' => ['sometimes', 'boolean'],
@@ -44,10 +44,16 @@ final class UpdateFieldRequest extends FormRequest
         return $this->enum('type', FieldType::class) ?? FieldType::Text;
     }
 
-    /** Null = every section (D69); whether it was sent at all is `has('kind')`. */
-    public function kind(): ?CategoryKind
+    /** Null = every section (D69); whether it was sent at all is `has('section_id')` or `has('kind')`. */
+    public function sectionId(): ?int
     {
-        return $this->filled('kind') ? $this->enum('kind', CategoryKind::class) : null;
+        return $this->filled('section_id') ? $this->integer('section_id') : null;
+    }
+
+    /** The old section kind, read as a section key (V3 Task 02 until Task 03). */
+    public function kind(): ?string
+    {
+        return $this->filled('kind') ? $this->string('kind')->value() : null;
     }
 
     public function flag(string $name): ?bool

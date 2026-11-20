@@ -163,7 +163,7 @@ final readonly class GenerateGradeSet
         }
 
         try {
-            return $this->fields->validate($shared ?? [], $category->kind, required: false);
+            return $this->fields->validate($shared ?? [], $category->section_id, required: false);
         } catch (InvalidCustomFields) {
             return [];
         }

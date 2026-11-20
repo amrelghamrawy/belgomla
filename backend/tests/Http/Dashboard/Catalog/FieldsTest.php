@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
 
-const FIELD_KEYS = ['id', 'key', 'label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status', 'options'];
+const FIELD_KEYS = ['id', 'key', 'label', 'type', 'kind', 'section', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status', 'options'];
 
 beforeEach(function (): void {
     $this->me = $this->actingAsOwner();
@@ -25,7 +24,7 @@ test('owners list their custom fields with options, archived included', function
     $this->tenantJson('GET', '/api/dashboard/fields')
         ->assertOk()
         ->assertExactJsonStructure(['data' => ['*' => [
-            'id', 'key', 'label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status',
+            'id', 'key', 'label', 'type', 'kind', 'section', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status',
             'options' => ['*' => ['id', 'label', 'sort_order', 'status']],
         ]]])
         ->assertJsonCount(2, 'data')
@@ -64,7 +63,22 @@ test('D69 an owner binds a new field to a section', function (): void {
         ->assertCreated()
         ->assertJsonPath('data.kind', 'toys');
 
-    $this->assertDatabaseHas('product_field_definitions', ['tenant_id' => $this->tenant->id, 'key' => 'age', 'kind' => 'toys']);
+    $this->assertDatabaseHas('product_field_definitions', ['tenant_id' => $this->tenant->id, 'key' => 'age', 'section_id' => $this->sectionId('toys')]);
+});
+
+test('D109 an owner binds a new field to a section by id and gets the section back', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/fields', ['key' => 'age', 'label' => 'العمر', 'type' => 'text', 'section_id' => $this->sectionId('toys')])
+        ->assertCreated()
+        ->assertJsonPath('data.kind', 'toys')
+        ->assertJsonPath('data.section.name', 'ألعاب');
+});
+
+test('BR-T04 D109 a field cannot be bound to a section of another store', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/fields', ['key' => 'age', 'label' => 'العمر', 'type' => 'text', 'section_id' => $this->sectionId('toys', $this->otherTenant())])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.section_id.0', 'العنصر المختار غير موجود');
+
+    $this->assertDatabaseMissing('product_field_definitions', ['key' => 'age']);
 });
 
 test('D69 an owner re-binds a field to a section and back to every section, audited', function (): void {
@@ -73,15 +87,16 @@ test('D69 an owner re-binds a field to a section and back to every section, audi
     $this->tenantJson('PUT', "/api/dashboard/fields/{$field->id}", ['label' => 'x', 'type' => 'text', 'kind' => 'stationery'])
         ->assertOk()
         ->assertJsonPath('data.kind', 'stationery');
-    $this->assertDatabaseHas('audit_logs', ['action' => 'field.updated', 'entity_id' => $field->id, 'new_values->kind' => 'stationery']);
+    $this->assertDatabaseHas('audit_logs', ['action' => 'field.updated', 'entity_id' => $field->id, 'new_values->section_id' => $this->sectionId('stationery')]);
 
-    $this->tenantJson('PUT', "/api/dashboard/fields/{$field->id}", ['label' => 'x', 'type' => 'text', 'kind' => null])
+    $this->tenantJson('PUT', "/api/dashboard/fields/{$field->id}", ['label' => 'x', 'type' => 'text', 'section_id' => null])
         ->assertOk()
-        ->assertJsonPath('data.kind', null);
+        ->assertJsonPath('data.kind', null)
+        ->assertJsonPath('data.section', null);
 });
 
 test('D69 a field update without kind keeps the binding', function (): void {
-    $field = $this->inTenant(fn () => ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create(['key' => 'publisher']));
+    $field = $this->inTenant(fn () => ProductFieldDefinition::factory()->forSection('books')->create(['key' => 'publisher']));
 
     $this->tenantJson('PUT', "/api/dashboard/fields/{$field->id}", ['label' => 'الناشر', 'type' => 'text'])
         ->assertOk()
@@ -103,6 +118,8 @@ test('field creation validation', function (array $body, string $field): void {
     'label too long' => [['label' => str_repeat('a', 101)], 'label'],
     'unknown type' => [['type' => 'date'], 'type'],
     'unknown kind' => [['kind' => 'furniture'], 'kind'],
+    'unknown section' => [['section_id' => 999_999], 'section_id'],
+    'section not an integer' => [['section_id' => 'toys'], 'section_id'],
     'is_required not boolean' => [['is_required' => 'maybe'], 'is_required'],
     'show_on_storefront not boolean' => [['show_on_storefront' => 'maybe'], 'show_on_storefront'],
     'is_filterable not boolean' => [['is_filterable' => 'maybe'], 'is_filterable'],
@@ -217,6 +234,7 @@ test('field update validation', function (array $body, string $field): void {
     'missing type' => [['label' => 'x'], 'type'],
     'unknown type' => [['label' => 'x', 'type' => 'date'], 'type'],
     'unknown kind' => [['label' => 'x', 'type' => 'text', 'kind' => 'furniture'], 'kind'],
+    'unknown section' => [['label' => 'x', 'type' => 'text', 'section_id' => 999_999], 'section_id'],
     'filterable text' => [['label' => 'x', 'type' => 'text', 'is_filterable' => true], 'is_filterable'],
 ]);
 

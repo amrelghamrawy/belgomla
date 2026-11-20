@@ -673,7 +673,7 @@ export interface paths {
         /** The whole category tree, archived nodes included unless filtered */
         get: operations["dashboardCategories"];
         put?: never;
-        /** Creates a category; `kind` is accepted for roots only (children inherit it, default general) */
+        /** Creates a category; `section_id` (or the old `kind`) is accepted for roots only (children inherit it, default the fallback «عام») */
         post: operations["dashboardCreateCategory"];
         delete?: never;
         options?: never;
@@ -2586,10 +2586,17 @@ export interface components {
             total: number;
         };
         /**
-         * @description The section of a root category, inherited by its subtree and products (D68). Decides what cover_price means: the printed cover price for books, the retail price otherwise
+         * @description Deprecated, removed in V3 Task 03: the key of the store section (D109); general = the fallback «عام». Until a store can make its own sections (V3 Task 07) the keys are the libraries ones. Use section instead
          * @enum {string}
          */
         CategoryKind: "books" | "stationery" | "toys" | "general";
+        /** @description A section of the store catalog (BR-P16, D109), inherited by the subtree and products of a root category. reference_price_label names what cover_price means (BR-PR10) */
+        Section: {
+            id: number;
+            name: string;
+            reference_price_label: string;
+            icon: components["schemas"]["CategoryIcon"] | null;
+        };
         /**
          * @description The icon of a category tile on the storefront, chosen by the merchant (D73); a lucide icon name
          * @enum {string}
@@ -2599,12 +2606,14 @@ export interface components {
             id: number;
             name: string;
             kind: components["schemas"]["CategoryKind"];
+            section: components["schemas"]["Section"];
         };
         Category: {
             id: number;
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"];
+            section: components["schemas"]["Section"];
             /** @description Null when the merchant chose none; the storefront then picks one from the name */
             icon: components["schemas"]["CategoryIcon"] | null;
             image_url: string | null;
@@ -2782,6 +2791,7 @@ export interface components {
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"] | null;
+            section?: components["schemas"]["Section"] | null;
             code: string | null;
             unit: string | null;
             moq: number | null;
@@ -3194,6 +3204,7 @@ export interface components {
             name: string;
             slug: string;
             kind: components["schemas"]["CategoryKind"];
+            section: components["schemas"]["Section"];
             /** @description Null when the merchant chose none; the storefront then picks one from the name */
             icon: components["schemas"]["CategoryIcon"] | null;
             image_url: string | null;
@@ -3220,8 +3231,10 @@ export interface components {
             key: string;
             label: string;
             type: components["schemas"]["FieldType"];
-            /** @description The section this field applies to; null = every section (D69) */
+            /** @description Deprecated (V3 Task 03): the key of the section this field applies to; null = every section (D69) */
             kind: components["schemas"]["CategoryKind"] | null;
+            /** @description The section this field applies to; null = every section (D69, D109) */
+            section: components["schemas"]["Section"] | null;
             is_required: boolean;
             show_on_storefront: boolean;
             is_filterable: boolean;
@@ -3233,7 +3246,9 @@ export interface components {
         FieldRequest: {
             label: string;
             type: components["schemas"]["FieldType"];
-            /** @description Bind the field to one section; null or absent = every section (D69) */
+            /** @description Bind the field to one section of the store; null = every section; absent = unchanged on update (D69, D109). Wins over kind */
+            section_id?: number | null;
+            /** @description Deprecated (V3 Task 03): the section key; null = every section (D69) */
             kind?: components["schemas"]["CategoryKind"] | null;
             is_required?: boolean;
             show_on_storefront?: boolean;
@@ -4419,7 +4434,7 @@ export interface components {
                     net: components["schemas"]["Money"];
                 }[];
             };
-            /** @description Per section kind (D68), most net first */
+            /** @description Per store section (D68, D109), most net first; kind is the section key, label the section name */
             by_section: (components["schemas"]["SalesFigures"] & {
                 kind: components["schemas"]["CategoryKind"];
                 label: string;
@@ -6207,6 +6222,9 @@ export interface operations {
                 "application/json": {
                     name: string;
                     parent_id?: number | null;
+                    /** @description The section of a root (D109); wins over kind. Roots only: a sub-category takes its parent section */
+                    section_id?: number | null;
+                    /** @description Deprecated (V3 Task 03): the section key; general = the fallback «عام» */
                     kind?: components["schemas"]["CategoryKind"] | null;
                     icon?: components["schemas"]["CategoryIcon"] | null;
                     sort_order?: number;
@@ -6214,6 +6232,7 @@ export interface operations {
                 "multipart/form-data": {
                     name: string;
                     parent_id?: number;
+                    section_id?: number;
                     kind?: components["schemas"]["CategoryKind"];
                     icon?: components["schemas"]["CategoryIcon"];
                     sort_order?: number;
@@ -6266,6 +6285,9 @@ export interface operations {
                 "application/json": {
                     name: string;
                     parent_id: number | null;
+                    /** @description The section of a root (D109); wins over kind. Roots only: a sub-category takes its parent section */
+                    section_id?: number | null;
+                    /** @description Deprecated (V3 Task 03): the section key; general = the fallback «عام» */
                     kind?: components["schemas"]["CategoryKind"] | null;
                     icon?: components["schemas"]["CategoryIcon"] | null;
                     sort_order?: number;

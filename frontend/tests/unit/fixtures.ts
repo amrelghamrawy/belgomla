@@ -6,11 +6,24 @@ import type {
   Facet,
   OrderDetail,
   PaginationMeta,
+  Section,
   StoreProductDetail,
   StoreSku,
   StoreSkuUnit,
   TenantSettings,
 } from "@/lib/api/types";
+
+const SECTIONS = {
+  books: { id: 1, name: "كتب خارجية", reference_price_label: "سعر الغلاف", icon: "book-open" },
+  stationery: { id: 2, name: "أدوات مكتبية", reference_price_label: "سعر القطاعي", icon: "pencil" },
+  toys: { id: 3, name: "ألعاب", reference_price_label: "سعر القطاعي", icon: "puzzle" },
+  general: { id: 4, name: "عام", reference_price_label: "سعر القطاعي", icon: "package" },
+} satisfies Record<string, Section>;
+
+/** A section of the seeded libraries store (D109), by its key (the old `kind`). */
+export function section(key: keyof typeof SECTIONS = "general"): Section {
+  return { ...SECTIONS[key] };
+}
 
 /** GET /api/store/tenant data for the seeded tenant. */
 export function tenantSettings(overrides: Partial<TenantSettings> = {}): TenantSettings {
@@ -121,7 +134,7 @@ export function storeProduct(overrides: Partial<StoreProductDetail> = {}): Store
     status: "active",
     type: "simple",
     main_image_url: null,
-    category: { id: 3, name: "أولى إعدادي", kind: "books" },
+    category: { id: 3, name: "أولى إعدادي", kind: "books", section: section("books") },
     custom_fields: [{ key: "grade", label: "السنة الدراسية", value: "أولى إعدادي" }],
     sku,
     skus: sku === null ? [] : [sku],
@@ -337,7 +350,7 @@ export function penProduct(overrides: Partial<StoreProductDetail> = {}): StorePr
     id: 40,
     name: "قلم جاف",
     slug: "pen",
-    category: { id: 5, name: "أقلام", kind: "stationery" },
+    category: { id: 5, name: "أقلام", kind: "stationery", section: section("stationery") },
     custom_fields: [],
     sku: skus[0],
     skus,

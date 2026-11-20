@@ -44,12 +44,12 @@ test('BR-P06 the store prunes archived categories with their subtree', function 
     expect($roots->pluck('id')->all())->toBe([$kept->id]);
 });
 
-test('the tree is built in a single query', function (): void {
+test('the tree is built in one query, plus one for the sections of all its categories', function (): void {
     $root = Category::factory()->create();
     Category::factory()->childOf(Category::factory()->childOf($root)->create())->create();
 
     Illuminate\Support\Facades\DB::enableQueryLog();
     app(CategoryTreeQuery::class)->forStore()->first()->children->first()->children->first()->children->all();
 
-    expect(Illuminate\Support\Facades\DB::getQueryLog())->toHaveCount(1);
+    expect(Illuminate\Support\Facades\DB::getQueryLog())->toHaveCount(2);
 });

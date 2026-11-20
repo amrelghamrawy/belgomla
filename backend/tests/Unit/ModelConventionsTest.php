@@ -13,6 +13,7 @@ use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Catalog\Models\ProductOptionValue;
 use App\Modules\Catalog\Models\ProductRelation;
+use App\Modules\Catalog\Models\Section;
 use App\Modules\Catalog\Models\Sku;
 use App\Modules\Catalog\Models\SkuUnit;
 use App\Modules\Catalog\Models\Unit;
@@ -99,6 +100,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         ProductOption::class,
         ProductOptionValue::class,
         ProductRelation::class,
+        Section::class,
         Sku::class,
         SkuUnit::class,
         Unit::class,

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
@@ -18,21 +17,21 @@ test('to array', function (): void {
 
     expect(array_keys($definition->toArray()))->toBe([
         'id', 'tenant_id', 'key', 'label', 'type', 'is_required', 'show_on_storefront', 'is_filterable',
-        'filter_order', 'sort_order', 'status', 'created_at', 'updated_at', 'kind',
+        'filter_order', 'sort_order', 'status', 'created_at', 'updated_at', 'section_id', 'template_id', 'section',
     ]);
 });
 
 test('D69 a field applies to its own section or, without a kind, to every section', function (): void {
     [$books, $any] = $this->inTenant(fn (): array => [
-        ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create()->fresh(),
+        ProductFieldDefinition::factory()->forSection('books')->create()->fresh(),
         ProductFieldDefinition::factory()->create()->fresh(),
     ]);
 
-    expect($books->kind)->toBe(CategoryKind::Books)
-        ->and($books->appliesTo(CategoryKind::Books))->toBeTrue()
-        ->and($books->appliesTo(CategoryKind::Toys))->toBeFalse()
-        ->and($any->kind)->toBeNull()
-        ->and($any->appliesTo(CategoryKind::Toys))->toBeTrue();
+    expect($books->section->key)->toBe('books')
+        ->and($books->appliesTo(Database\Factories\CategoryFactory::sectionId('books')))->toBeTrue()
+        ->and($books->appliesTo(Database\Factories\CategoryFactory::sectionId('toys')))->toBeFalse()
+        ->and($any->section)->toBeNull()
+        ->and($any->appliesTo(Database\Factories\CategoryFactory::sectionId('toys')))->toBeTrue();
 });
 
 test('casts and defaults', function (): void {

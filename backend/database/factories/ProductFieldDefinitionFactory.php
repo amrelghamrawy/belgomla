@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -53,9 +52,10 @@ final class ProductFieldDefinitionFactory extends Factory
         return $this->state(['is_filterable' => true]);
     }
 
-    public function forKind(CategoryKind $kind): static
+    /** D69, D109: bound to the store's section with this key; without it the field applies to every section. */
+    public function forSection(string $key): static
     {
-        return $this->state(['kind' => $kind]);
+        return $this->state(['section_id' => fn (): int => CategoryFactory::sectionId($key)]);
     }
 
     public function required(): static

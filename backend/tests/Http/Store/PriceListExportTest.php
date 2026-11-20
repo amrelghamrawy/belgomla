@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\SpreadsheetFormat;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
@@ -17,7 +16,7 @@ use App\Modules\Catalog\Models\Unit;
 test('BR-P13 the price list file has the visible products of the selection by name, with their prices', function (): void {
     $this->inTenant(function (): void {
         $carton = Unit::factory()->create(['name' => 'كرتونة']);
-        $books = Category::factory()->kind(CategoryKind::Books)->create();
+        $books = Category::factory()->inSection('books')->create();
         Product::factory()->withSku(['code' => 'B-1', 'cover_price' => '120', 'base_price' => '90', 'moq' => 5, 'selling_unit_id' => $carton->id])->create(['name' => 'ب كتاب', 'category_id' => $books->id]);
         Product::factory()->withSku(['code' => 'A-1', 'base_price' => '7.58', 'selling_unit_id' => $carton->id])->comingSoon()->create(['name' => 'أ قلم']);
         Product::factory()->withSku()->inactive()->create(['name' => 'ج مخفي']);

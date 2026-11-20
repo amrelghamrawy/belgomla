@@ -125,8 +125,9 @@ test('BR-P13 the price list row key set, with and without prices', function (): 
     $visible = rendered(new PriceListRowResource($product, $product->activeSkus->first()?->activeUnits->first(), false), storeRequest());
     $hidden = rendered(new PriceListRowResource($product, $product->activeSkus->first()?->activeUnits->first(), true), storeRequest());
 
-    expect(array_keys($visible))->toBe(['id', 'sku_id', 'variant', 'sku_unit_id', 'name', 'slug', 'kind', 'code', 'unit', 'conversion_factor', 'is_default', 'moq', 'cover_price', 'base_price', 'availability'])
+    expect(array_keys($visible))->toBe(['id', 'sku_id', 'variant', 'sku_unit_id', 'name', 'slug', 'kind', 'section', 'code', 'unit', 'conversion_factor', 'is_default', 'moq', 'cover_price', 'base_price', 'availability'])
         ->and($visible['kind'])->toBe('general')
+        ->and($visible['section'])->toBe(['id' => $this->sectionId('general'), 'name' => 'عام', 'reference_price_label' => 'سعر القطاعي', 'icon' => 'package'])
         ->and($visible['availability'])->toBe('available')
         ->and($hidden)->not->toHaveKeys(['cover_price', 'base_price']);
 });

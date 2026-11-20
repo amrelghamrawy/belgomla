@@ -2185,7 +2185,7 @@
                 "tags": [
                     "dashboard-catalog"
                 ],
-                "summary": "Creates a category; `kind` is accepted for roots only (children inherit it, default general)",
+                "summary": "Creates a category; `section_id` (or the old `kind`) is accepted for roots only (children inherit it, default the fallback «عام»)",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2206,7 +2206,15 @@
                                             "null"
                                         ]
                                     },
+                                    "section_id": {
+                                        "description": "The section of a root (D109); wins over kind. Roots only: a sub-category takes its parent section",
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
                                     "kind": {
+                                        "description": "Deprecated (V3 Task 03): the section key; general = the fallback «عام»",
                                         "oneOf": [
                                             {
                                                 "$ref": "#/components/schemas/CategoryKind"
@@ -2246,6 +2254,9 @@
                                         "maxLength": 100
                                     },
                                     "parent_id": {
+                                        "type": "integer"
+                                    },
+                                    "section_id": {
                                         "type": "integer"
                                     },
                                     "kind": {
@@ -2367,7 +2378,15 @@
                                             "null"
                                         ]
                                     },
+                                    "section_id": {
+                                        "description": "The section of a root (D109); wins over kind. Roots only: a sub-category takes its parent section",
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
                                     "kind": {
+                                        "description": "Deprecated (V3 Task 03): the section key; general = the fallback «عام»",
                                         "oneOf": [
                                             {
                                                 "$ref": "#/components/schemas/CategoryKind"
@@ -10130,13 +10149,44 @@
             },
             "CategoryKind": {
                 "type": "string",
-                "description": "The section of a root category, inherited by its subtree and products (D68). Decides what cover_price means: the printed cover price for books, the retail price otherwise",
+                "description": "Deprecated, removed in V3 Task 03: the key of the store section (D109); general = the fallback «عام». Until a store can make its own sections (V3 Task 07) the keys are the libraries ones. Use section instead",
                 "enum": [
                     "books",
                     "stationery",
                     "toys",
                     "general"
                 ]
+            },
+            "Section": {
+                "type": "object",
+                "description": "A section of the store catalog (BR-P16, D109), inherited by the subtree and products of a root category. reference_price_label names what cover_price means (BR-PR10)",
+                "required": [
+                    "id",
+                    "name",
+                    "reference_price_label",
+                    "icon"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "reference_price_label": {
+                        "type": "string"
+                    },
+                    "icon": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CategoryIcon"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                }
             },
             "CategoryIcon": {
                 "type": "string",
@@ -10179,7 +10229,8 @@
                 "required": [
                     "id",
                     "name",
-                    "kind"
+                    "kind",
+                    "section"
                 ],
                 "properties": {
                     "id": {
@@ -10190,6 +10241,9 @@
                     },
                     "kind": {
                         "$ref": "#/components/schemas/CategoryKind"
+                    },
+                    "section": {
+                        "$ref": "#/components/schemas/Section"
                     }
                 }
             },
@@ -10200,6 +10254,7 @@
                     "name",
                     "slug",
                     "kind",
+                    "section",
                     "icon",
                     "image_url",
                     "children"
@@ -10216,6 +10271,9 @@
                     },
                     "kind": {
                         "$ref": "#/components/schemas/CategoryKind"
+                    },
+                    "section": {
+                        "$ref": "#/components/schemas/Section"
                     },
                     "icon": {
                         "description": "Null when the merchant chose none; the storefront then picks one from the name",
@@ -10930,6 +10988,16 @@
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/CategoryKind"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "section": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Section"
                             },
                             {
                                 "type": "null"
@@ -12568,6 +12636,7 @@
                     "name",
                     "slug",
                     "kind",
+                    "section",
                     "icon",
                     "image_url",
                     "parent_id",
@@ -12587,6 +12656,9 @@
                     },
                     "kind": {
                         "$ref": "#/components/schemas/CategoryKind"
+                    },
+                    "section": {
+                        "$ref": "#/components/schemas/Section"
                     },
                     "icon": {
                         "description": "Null when the merchant chose none; the storefront then picks one from the name",
@@ -12684,6 +12756,7 @@
                     "label",
                     "type",
                     "kind",
+                    "section",
                     "is_required",
                     "show_on_storefront",
                     "is_filterable",
@@ -12706,10 +12779,21 @@
                         "$ref": "#/components/schemas/FieldType"
                     },
                     "kind": {
-                        "description": "The section this field applies to; null = every section (D69)",
+                        "description": "Deprecated (V3 Task 03): the key of the section this field applies to; null = every section (D69)",
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/CategoryKind"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "section": {
+                        "description": "The section this field applies to; null = every section (D69, D109)",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Section"
                             },
                             {
                                 "type": "null"
@@ -12756,8 +12840,15 @@
                     "type": {
                         "$ref": "#/components/schemas/FieldType"
                     },
+                    "section_id": {
+                        "description": "Bind the field to one section of the store; null = every section; absent = unchanged on update (D69, D109). Wins over kind",
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
                     "kind": {
-                        "description": "Bind the field to one section; null or absent = every section (D69)",
+                        "description": "Deprecated (V3 Task 03): the section key; null = every section (D69)",
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/CategoryKind"
@@ -17539,7 +17630,7 @@
                     },
                     "by_section": {
                         "type": "array",
-                        "description": "Per section kind (D68), most net first",
+                        "description": "Per store section (D68, D109), most net first; kind is the section key, label the section name",
                         "items": {
                             "allOf": [
                                 {

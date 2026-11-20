@@ -10,13 +10,17 @@ use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Exceptions\CatalogConflict;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Services\SectionResolver;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /** BR-P08: creates a tenant-defined custom field with its initial select options. Owns its transaction. */
 final readonly class CreateFieldDefinition
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(
+        private AuditLogger $audit,
+        private SectionResolver $sections,
+    ) {}
 
     public function handle(FieldDefinitionData $data): ProductFieldDefinition
     {
@@ -34,12 +38,14 @@ final readonly class CreateFieldDefinition
             throw InvalidCatalogInput::optionsNotAllowed();
         }
 
-        return DB::transaction(function () use ($data, $key): ProductFieldDefinition {
+        $section = $this->sections->chosen($data->sectionId, $data->kind);
+
+        return DB::transaction(function () use ($data, $key, $section): ProductFieldDefinition {
             $definition = ProductFieldDefinition::query()->create([
                 'key' => $key,
                 'label' => $data->label,
                 'type' => $data->type,
-                'kind' => $data->kind,
+                'section_id' => $section?->id,
                 'is_required' => $data->isRequired ?? false,
                 'show_on_storefront' => $data->showOnStorefront ?? true,
                 'is_filterable' => $data->isFilterable ?? false,
@@ -52,7 +58,7 @@ final readonly class CreateFieldDefinition
             }
 
             $this->audit->log('field.created', $definition, null, $definition->only([
-                'key', 'label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order',
+                'key', 'label', 'type', 'section_id', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order',
             ]) + ['options' => $data->options]);
 
             return $definition->refresh()->load('options');

@@ -111,7 +111,7 @@ Suspended tenant → `503 store_unavailable`.
 
 ### `GET /api/store/categories`
 
-Full active tree: `[{ id, name, slug, kind, icon, image_url, children: [...] }]`. `icon` is null unless the merchant picked one (D73).
+Full active tree: `[{ id, name, slug, kind, section, icon, image_url, children: [...] }]` (`section` = `{ id, name, reference_price_label, icon }`, D109). `icon` is null unless the merchant picked one (D73).
 
 ### `GET /api/store/filters`
 
@@ -187,7 +187,7 @@ Detail notes (Task 1): `gallery` items are `{ id, url, is_main, sort_order }`; `
 
 Same filters as the product list; returns all matching products (no pagination, max 2000) in a compact shape for the printable page (BR-P13).
 
-Row: `{ id, sku_unit_id, name, slug, kind, code, unit, conversion_factor, is_default, moq, cover_price, base_price, availability: "available"|"coming_soon" }`, one row per unit the product is sold in, the default first (V2 Task 13, D91); `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `kind` is the product's section (D68) so the page can name the `cover_price` column.
+Row: `{ id, sku_unit_id, name, slug, kind, section, code, unit, conversion_factor, is_default, moq, cover_price, base_price, availability: "available"|"coming_soon" }`, one row per unit the product is sold in, the default first (V2 Task 13, D91); `meta: { count, truncated, prices_hidden }`. Prices follow the same visibility rule as the product list. `section` is the product's section (D109; `kind` its key until V3 Task 03) so the page can name the `cover_price` column from `section.reference_price_label`.
 
 ### `GET /api/store/price-list/export` (V2 Task 06)
 
@@ -381,7 +381,7 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | POST   | `/api/dashboard/categories`              | `name, parent_id?, kind?, icon?, image?, sort_order?`; `kind` (D68) for roots only, default `general`; sent with a `parent_id` → `422` on `kind`; `icon` (D73) one of `CategoryIcon` or null |
 | PUT    | `/api/dashboard/categories/{id}`         | `name, parent_id` (present, null = root), `kind?` (roots only; absent = keep), `icon?` (absent = keep, null = none, D73), `sort_order?`; move = change `parent_id` (the subtree takes the new root's kind); cycle → `422 category_cycle` |
 
-Category shapes (store and dashboard) carry `kind`; product shapes carry `category: { id, name, kind }` (`CategoryRef`). V3 (D109): Task 02 adds `section: { id, name, reference_price_label, icon }` next to `kind` in the same payloads, and Task 03 removes `kind`.
+Category shapes (store and dashboard) carry `kind`; product shapes carry `category: { id, name, kind }` (`CategoryRef`). V3 (D109): Task 02 added `section: { id, name, reference_price_label, icon }` next to `kind` (now the section key) in the same payloads (`section` null on a field of every section), and Task 03 removes `kind`. Category create/update and the field requests take `section_id` (an active section of the store; another store's or an unknown one = `422` «العنصر المختار غير موجود», an archived one «العنصر المختار مؤرشف»; roots only for categories); the old `kind` is still read as a section key, and `section_id` wins.
 | POST   | `/api/dashboard/categories/{id}/archive` | allowed with products (BR-P06); products stay linked |
 | POST   | `/api/dashboard/categories/{id}/restore` |                                                      |
 | POST   | `/api/dashboard/categories/reorder`      | `[ {id, sort_order} ]`                               |
@@ -396,7 +396,7 @@ Category shapes (store and dashboard) carry `kind`; product shapes carry `catego
 | ------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | GET    | `/api/dashboard/fields`                                 | definitions + options                                                                                    |
 | POST   | `/api/dashboard/fields`                                 | `key, label, type, kind?, is_required, show_on_storefront, is_filterable, filter_order, sort_order, options[]?`; `kind` null/absent = every section (D69) |
-| PUT    | `/api/dashboard/fields/{id}`                            | `type` change rejected when values exist (`409`); `kind` absent = keep, null = every section              |
+| PUT    | `/api/dashboard/fields/{id}`                            | `type` change rejected when values exist (`409`); `section_id` (or the old `kind`) absent = keep, null = every section              |
 | POST   | `/api/dashboard/fields/{id}/archive`                    |                                                                                                          |
 | POST   | `/api/dashboard/fields/{id}/options`                    | `label, sort_order`                                                                                      |
 | PUT    | `/api/dashboard/fields/{id}/options/{optionId}`         | rename / reorder                                                                                         |

@@ -33,7 +33,7 @@ test('the dashboard product resource key set without detail relations', function
         ->and($data['sku']['selling_unit'])->toBe(['id' => $product->skus->first()?->activeUnits->sole()->unit_id, 'name' => $product->skus->first()?->activeUnits->sole()->unit->name])
         ->and(array_keys($data['sku']['units'][0]))->toBe(['id', 'unit', 'conversion_factor', 'cover_price', 'base_price', 'base_price_percent', 'moq', 'is_default'])
         ->and($data['custom_fields'])->toBe(['brand' => 'Bic'])
-        ->and($data['category'])->toBe(['id' => $product->category->id, 'name' => $product->category->name, 'kind' => 'general'])
+        ->and($data['category'])->toBe(['id' => $product->category->id, 'name' => $product->category->name, 'kind' => 'general', 'section' => ['id' => $this->sectionId('general'), 'name' => 'عام', 'reference_price_label' => 'سعر القطاعي', 'icon' => 'package']])
         ->and($data['created_at'])->toBe($product->created_at->toIso8601String());
 });
 

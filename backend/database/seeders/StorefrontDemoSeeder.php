@@ -23,12 +23,12 @@ use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\RelationType;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Models\Section;
 use App\Modules\Catalog\Queries\CategoryTreeQuery;
 use App\Modules\Catalog\Queries\FieldDefinitionsQuery;
 use App\Modules\Catalog\Queries\UnitsQuery;
@@ -186,7 +186,7 @@ final class StorefrontDemoSeeder extends Seeder
 
         if (! $definitions->has('age')) {
             $fieldDefinitions->handle(new FieldDefinitionData(
-                'الفئة العمرية', FieldType::Select, key: 'age', isFilterable: true, filterOrder: 10, sortOrder: 10, options: self::AGES, kind: CategoryKind::Toys,
+                'الفئة العمرية', FieldType::Select, key: 'age', isFilterable: true, filterOrder: 10, sortOrder: 10, options: self::AGES, sectionId: $this->sectionId('toys'),
             ));
         }
 
@@ -215,7 +215,7 @@ final class StorefrontDemoSeeder extends Seeder
 
     private function books(CreateCategory $categories, CreateProduct $products, AddProductRelation $relations, CreateBundle $bundles, int $copy, int $carton): void
     {
-        $books = $categories->handle(new CategoryData('كتب خارجية', null, 1, kind: CategoryKind::Books));
+        $books = $categories->handle(new CategoryData('كتب خارجية', null, 1, sectionId: $this->sectionId('books')));
         $primary = $categories->handle(new CategoryData('المرحلة الابتدائية', $books->id, 1));
         $prep = $categories->handle(new CategoryData('المرحلة الإعدادية', $books->id, 2));
         $categories->handle(new CategoryData('المرحلة الثانوية', $books->id, 3));
@@ -287,7 +287,7 @@ final class StorefrontDemoSeeder extends Seeder
     /** Pens sell by the carton of 12 (one carton MOQ), notebooks by the piece (10 MOQ); every item has a retail price. */
     private function supplies(CreateCategory $categories, CreateProduct $products, int $piece, int $carton): void
     {
-        $root = $categories->handle(new CategoryData('أدوات دراسية', null, 2, kind: CategoryKind::Stationery));
+        $root = $categories->handle(new CategoryData('أدوات دراسية', null, 2, sectionId: $this->sectionId('stationery')));
         $pens = $categories->handle(new CategoryData('أقلام', $root->id, 1))->id;
         $notebooks = $categories->handle(new CategoryData('كراسات', $root->id, 2))->id;
 
@@ -372,7 +372,7 @@ final class StorefrontDemoSeeder extends Seeder
     /** Toys sell by the piece (3 MOQ); the first two carry a retail price, the last two none (D68). */
     private function toys(CreateCategory $categories, CreateProduct $products, int $piece): void
     {
-        $root = $categories->handle(new CategoryData('ألعاب', null, 3, kind: CategoryKind::Toys))->id;
+        $root = $categories->handle(new CategoryData('ألعاب', null, 3, sectionId: $this->sectionId('toys')))->id;
 
         $items = [
             ['مكعبات تركيب 100 قطعة', '3+', 120],
@@ -556,5 +556,11 @@ final class StorefrontDemoSeeder extends Seeder
     private function option(string $key, string $label): int
     {
         return $this->options[$key][$label] ?? throw new RuntimeException("The templates have no {$key} option {$label}.");
+    }
+
+    /** D109: the store's section with this key, created with the store from its vertical. */
+    private function sectionId(string $key): int
+    {
+        return Section::query()->where('key', $key)->firstOrFail()->id;
     }
 }

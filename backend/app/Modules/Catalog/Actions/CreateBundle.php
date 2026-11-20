@@ -43,7 +43,7 @@ final readonly class CreateBundle
     public function handle(BundleData $data, ?int $createdBy = null): Product
     {
         [$category, $units] = $this->references->check($data);
-        $customFields = $this->fields->validate($data->customFields, $category->kind, required: false);
+        $customFields = $this->fields->validate($data->customFields, $category->section_id, required: false);
 
         return DB::transaction(function () use ($data, $units, $customFields, $createdBy): Product {
             $product = Product::query()->create([

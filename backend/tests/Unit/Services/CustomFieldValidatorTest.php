@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\InvalidCustomFields;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
@@ -28,10 +27,10 @@ beforeEach(function (): void {
  * @param  array<string, mixed>  $current
  * @return array<string, string>
  */
-function customFieldErrors(CustomFieldValidator $validator, array $input, array $current = [], CategoryKind $kind = CategoryKind::General): array
+function customFieldErrors(CustomFieldValidator $validator, array $input, array $current = [], string $section = 'general'): array
 {
     try {
-        $validator->validate($input, $kind, $current);
+        $validator->validate($input, Database\Factories\CategoryFactory::sectionId($section), $current);
     } catch (InvalidCustomFields $e) {
         return array_map(fn (array $messages): string => $messages[0], $e->details ?? []);
     }
@@ -42,17 +41,17 @@ function customFieldErrors(CustomFieldValidator $validator, array $input, array 
 test('BR-P08 values are normalised per type and sorted by key', function (): void {
     $values = $this->validator->validate([
         'pages' => '120', 'grade' => (string) $this->first->id, 'isbn' => '  978-1 ', 'colored' => 'true',
-    ], CategoryKind::General);
+    ], Database\Factories\CategoryFactory::sectionId('general'));
 
     expect($values)->toBe(['colored' => true, 'grade' => $this->first->id, 'isbn' => '978-1', 'pages' => 120]);
 });
 
 test('BR-P08 a select stores the option id', function (): void {
-    expect($this->validator->validate(['grade' => $this->first->id], CategoryKind::General))->toBe(['grade' => $this->first->id]);
+    expect($this->validator->validate(['grade' => $this->first->id], Database\Factories\CategoryFactory::sectionId('general')))->toBe(['grade' => $this->first->id]);
 });
 
 test('numbers keep decimals and whole floats become integers', function (mixed $input, int|float $expected): void {
-    expect($this->validator->validate(['pages' => $input], CategoryKind::General)['pages'])->toBe($expected);
+    expect($this->validator->validate(['pages' => $input], Database\Factories\CategoryFactory::sectionId('general'))['pages'])->toBe($expected);
 })->with([
     'decimal string' => ['12.5', 12.5],
     'whole float' => [12.0, 12],
@@ -61,14 +60,14 @@ test('numbers keep decimals and whole floats become integers', function (mixed $
 ]);
 
 test('booleans accept the usual encodings', function (mixed $input, bool $expected): void {
-    expect($this->validator->validate(['colored' => $input], CategoryKind::General)['colored'])->toBe($expected);
+    expect($this->validator->validate(['colored' => $input], Database\Factories\CategoryFactory::sectionId('general'))['colored'])->toBe($expected);
 })->with([
     'true' => [true, true], '1' => ['1', true], 'int 1' => [1, true], 'string true' => ['true', true],
     'false' => [false, false], '0' => ['0', false], 'int 0' => [0, false], 'string false' => ['false', false],
 ]);
 
 test('null and empty values clear the field', function (): void {
-    expect($this->validator->validate(['isbn' => '', 'pages' => null], CategoryKind::General))->toBe([]);
+    expect($this->validator->validate(['isbn' => '', 'pages' => null], Database\Factories\CategoryFactory::sectionId('general')))->toBe([]);
 });
 
 test('BR-P08 invalid values are reported per key', function (array $input, string $key, string $message): void {
@@ -95,7 +94,7 @@ test('BR-P08 an archived option cannot be newly chosen', function (): void {
 });
 
 test('BR-P08 an archived option the product already holds is kept', function (): void {
-    expect($this->validator->validate(['grade' => $this->retired->id], CategoryKind::General, ['grade' => $this->retired->id]))->toBe(['grade' => $this->retired->id]);
+    expect($this->validator->validate(['grade' => $this->retired->id], Database\Factories\CategoryFactory::sectionId('general'), ['grade' => $this->retired->id]))->toBe(['grade' => $this->retired->id]);
 });
 
 test('BR-P08 a required field must be present', function (): void {
@@ -107,51 +106,51 @@ test('BR-P08 a required field must be present', function (): void {
 test('a required field that is archived is not required', function (): void {
     ProductFieldDefinition::factory()->required()->archived()->create(['key' => 'publisher']);
 
-    expect($this->validator->validate([], CategoryKind::General))->toBe([]);
+    expect($this->validator->validate([], Database\Factories\CategoryFactory::sectionId('general')))->toBe([]);
 });
 
 test('BR-P08 values of archived fields are carried over from the stored map', function (): void {
-    expect($this->validator->validate(['isbn' => '1'], CategoryKind::General, ['old_code' => 'X-1', 'isbn' => '0']))->toBe(['isbn' => '1', 'old_code' => 'X-1']);
+    expect($this->validator->validate(['isbn' => '1'], Database\Factories\CategoryFactory::sectionId('general'), ['old_code' => 'X-1', 'isbn' => '0']))->toBe(['isbn' => '1', 'old_code' => 'X-1']);
 });
 
 test('an archived field may be resent with its unchanged value', function (): void {
-    expect($this->validator->validate(['old_code' => 'X-1'], CategoryKind::General, ['old_code' => 'X-1']))->toBe(['old_code' => 'X-1']);
+    expect($this->validator->validate(['old_code' => 'X-1'], Database\Factories\CategoryFactory::sectionId('general'), ['old_code' => 'X-1']))->toBe(['old_code' => 'X-1']);
 });
 
 test('D69 a field bound to another section cannot be sent for the product', function (): void {
-    ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create(['key' => 'publisher']);
+    ProductFieldDefinition::factory()->forSection('books')->create(['key' => 'publisher']);
 
     expect(customFieldErrors($this->validator, ['publisher' => 'x']))->toBe(['custom_fields.publisher' => 'هذا الحقل لا ينطبق على قسم هذا المنتج']);
 });
 
 test('D69 a field bound to the product section is accepted and a section-less field always is', function (): void {
-    ProductFieldDefinition::factory()->forKind(CategoryKind::Toys)->create(['key' => 'age']);
+    ProductFieldDefinition::factory()->forSection('toys')->create(['key' => 'age']);
 
-    expect($this->validator->validate(['age' => '3+', 'isbn' => '1'], CategoryKind::Toys))->toBe(['age' => '3+', 'isbn' => '1']);
+    expect($this->validator->validate(['age' => '3+', 'isbn' => '1'], Database\Factories\CategoryFactory::sectionId('toys')))->toBe(['age' => '3+', 'isbn' => '1']);
 });
 
 test('D69 a required field of another section is not required', function (): void {
-    ProductFieldDefinition::factory()->required()->forKind(CategoryKind::Books)->create(['key' => 'publisher']);
+    ProductFieldDefinition::factory()->required()->forSection('books')->create(['key' => 'publisher']);
 
-    expect($this->validator->validate([], CategoryKind::Toys))->toBe([]);
+    expect($this->validator->validate([], Database\Factories\CategoryFactory::sectionId('toys')))->toBe([]);
 });
 
 test('D69 a required field of the product section is required', function (): void {
-    ProductFieldDefinition::factory()->required()->forKind(CategoryKind::Toys)->create(['key' => 'age']);
+    ProductFieldDefinition::factory()->required()->forSection('toys')->create(['key' => 'age']);
 
-    expect(customFieldErrors($this->validator, [], kind: CategoryKind::Toys))->toBe(['custom_fields.age' => 'هذا الحقل مطلوب']);
+    expect(customFieldErrors($this->validator, [], section: 'toys'))->toBe(['custom_fields.age' => 'هذا الحقل مطلوب']);
 });
 
 test('D69 values of fields of another section are carried over when a product moves', function (): void {
-    ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create(['key' => 'publisher']);
+    ProductFieldDefinition::factory()->forSection('books')->create(['key' => 'publisher']);
 
-    expect($this->validator->validate(['isbn' => '1'], CategoryKind::Toys, ['publisher' => 'الأضواء']))->toBe(['isbn' => '1', 'publisher' => 'الأضواء']);
+    expect($this->validator->validate(['isbn' => '1'], Database\Factories\CategoryFactory::sectionId('toys'), ['publisher' => 'الأضواء']))->toBe(['isbn' => '1', 'publisher' => 'الأضواء']);
 });
 
 test('D69 a field of another section may be resent with its unchanged value', function (): void {
-    ProductFieldDefinition::factory()->forKind(CategoryKind::Books)->create(['key' => 'publisher']);
+    ProductFieldDefinition::factory()->forSection('books')->create(['key' => 'publisher']);
 
-    expect($this->validator->validate(['publisher' => 'الأضواء'], CategoryKind::Toys, ['publisher' => 'الأضواء']))->toBe(['publisher' => 'الأضواء']);
+    expect($this->validator->validate(['publisher' => 'الأضواء'], Database\Factories\CategoryFactory::sectionId('toys'), ['publisher' => 'الأضواء']))->toBe(['publisher' => 'الأضواء']);
 });
 
 test('every error is reported at once', function (): void {

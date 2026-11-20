@@ -55,7 +55,7 @@ final class DashboardProductResource extends JsonResource
             'description' => $product->description,
             'status' => $product->status->value,
             'type' => $product->type->value,
-            'category' => $this->category(),
+            'category' => $this->category($request),
             'custom_fields' => (object) $product->custom_fields,
             'preorder' => ['enabled' => $product->preorder_enabled, 'expected_at' => $product->expected_at?->toDateString(), 'limit' => $product->preorder_limit],
             'sku' => $this->primary(),
@@ -121,13 +121,18 @@ final class DashboardProductResource extends JsonResource
     }
 
     /**
-     * @return array{id: int, name: string, kind: string}|null
+     * @return array{id: int, name: string, kind: string, section: array{id: int, name: string, reference_price_label: string, icon: string|null}}|null
      */
-    private function category(): ?array
+    private function category(Request $request): ?array
     {
         $category = $this->resource->relationLoaded('category') ? $this->resource->category : null;
 
-        return $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null;
+        return $category instanceof Category ? [
+            'id' => $category->id,
+            'name' => $category->name,
+            'kind' => $category->section->key, // until V3 Task 03 (D109)
+            'section' => new SectionResource($category->section)->toArray($request),
+        ] : null;
     }
 
     private function mainImage(): ?ProductImage

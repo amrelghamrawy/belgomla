@@ -6,7 +6,6 @@ use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\UpdateCategory;
 use App\Modules\Catalog\Data\CategoryData;
 use App\Modules\Catalog\Enums\CategoryIcon;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\CategoryCycle;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Category;
@@ -74,11 +73,11 @@ test('D68 UpdateCategory changes the kind of a root and of its whole subtree', f
     $child = Category::factory()->childOf($root)->create();
     $grandchild = Category::factory()->childOf($child)->create();
 
-    app(UpdateCategory::class)->handle($root, new CategoryData($root->name, null, kind: CategoryKind::Toys));
+    app(UpdateCategory::class)->handle($root, new CategoryData($root->name, null, kind: 'toys'));
 
-    expect($root->kind)->toBe(CategoryKind::Toys)
-        ->and($child->refresh()->kind)->toBe(CategoryKind::Toys)
-        ->and($grandchild->refresh()->kind)->toBe(CategoryKind::Toys);
+    expect($root->section->key)->toBe('toys')
+        ->and($child->refresh()->section->key)->toBe('toys')
+        ->and($grandchild->refresh()->section->key)->toBe('toys');
 });
 
 test('D68 UpdateCategory keeps the kind of a root when none is sent', function (): void {
@@ -86,19 +85,19 @@ test('D68 UpdateCategory keeps the kind of a root when none is sent', function (
 
     app(UpdateCategory::class)->handle($root, new CategoryData('جديد', null));
 
-    expect($root->kind)->toBe(CategoryKind::Books);
+    expect($root->section->key)->toBe('books');
 });
 
 test('D68 a subtree moved under another root takes that root kind', function (): void {
     $books = Category::factory()->books()->create();
-    $toys = Category::factory()->kind(CategoryKind::Toys)->create();
+    $toys = Category::factory()->inSection('toys')->create();
     $child = Category::factory()->childOf($books)->create();
     $grandchild = Category::factory()->childOf($child)->create();
 
-    app(UpdateCategory::class)->handle($child, new CategoryData($child->name, $toys->id, kind: CategoryKind::Books));
+    app(UpdateCategory::class)->handle($child, new CategoryData($child->name, $toys->id, kind: 'books'));
 
-    expect($child->kind)->toBe(CategoryKind::Toys)
-        ->and($grandchild->refresh()->kind)->toBe(CategoryKind::Toys)
+    expect($child->section->key)->toBe('toys')
+        ->and($grandchild->refresh()->section->key)->toBe('toys')
         ->and($grandchild->path)->toBe("/{$toys->id}/{$child->id}/{$grandchild->id}/");
 });
 
@@ -108,19 +107,19 @@ test('D68 a child promoted to root keeps its inherited kind', function (): void 
 
     app(UpdateCategory::class)->handle($child, new CategoryData($child->name, null));
 
-    expect($child->kind)->toBe(CategoryKind::Books)
+    expect($child->section->key)->toBe('books')
         ->and($child->path)->toBe("/{$child->id}/");
 });
 
 test('D68 UpdateCategory audits the kind', function (): void {
     $root = Category::factory()->books()->create(['name' => 'كتب']);
 
-    app(UpdateCategory::class)->handle($root, new CategoryData('كتب', null, kind: CategoryKind::General));
+    app(UpdateCategory::class)->handle($root, new CategoryData('كتب', null, kind: 'general'));
 
     $log = AuditLog::query()->sole();
 
-    expect($log->old_values)->toEqual(['kind' => 'books'])
-        ->and($log->new_values)->toEqual(['kind' => 'general']);
+    expect($log->old_values)->toEqual(['section_id' => $this->sectionId('books')])
+        ->and($log->new_values)->toEqual(['section_id' => $this->sectionId('general')]);
 });
 
 test('D73 UpdateCategory sets, keeps and clears the icon', function (?CategoryIcon $icon, bool $given, ?CategoryIcon $expected): void {

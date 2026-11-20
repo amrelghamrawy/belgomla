@@ -19,7 +19,7 @@ import { queryKeys } from "@/lib/api/keys";
 
 import { json, stubApi } from "./http";
 import { testQueryClient } from "./render";
-import { page, tenantSettings } from "./fixtures";
+import { page, section, tenantSettings } from "./fixtures";
 
 // Builders for dashboard API data (tasks/10), shaped like the generated schema so a spec change breaks them.
 
@@ -86,7 +86,12 @@ export function dashboardMe(overrides: Partial<TenantUser> = {}): DashboardMe {
 
   return {
     user,
-    tenant: { name: "مكتبة النور", subdomain: "alnoor", status: "active", vertical: { key: "libraries", name: "مكتبات" } },
+    tenant: {
+      name: "مكتبة النور",
+      subdomain: "alnoor",
+      status: "active",
+      vertical: { key: "libraries", name: "مكتبات" },
+    },
     permissions: ROLE_PERMISSIONS[user.role],
   };
 }
@@ -163,6 +168,7 @@ export function category(overrides: Partial<DashboardCategory> = {}): DashboardC
     name: "المرحلة الابتدائية",
     slug: "primary",
     kind: "books",
+    section: section("books"),
     icon: null,
     image_url: null,
     parent_id: null,
@@ -181,6 +187,7 @@ export function selectField(overrides: Partial<FieldDefinition> = {}): FieldDefi
     label: "الصف",
     type: "select",
     kind: null,
+    section: null,
     is_required: true,
     show_on_storefront: true,
     is_filterable: true,
@@ -261,7 +268,7 @@ export function dashboardProduct(overrides: Partial<DashboardProduct> = {}): Das
     description: null,
     status: "active",
     type: "simple",
-    category: { id: 1, name: "المرحلة الابتدائية", kind: "books" },
+    category: { id: 1, name: "المرحلة الابتدائية", kind: "books", section: section("books") },
     custom_fields: { grade: 11 },
     preorder: { enabled: false, expected_at: null, limit: null },
     sku,

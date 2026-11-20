@@ -18,7 +18,7 @@ const DASHBOARD_SKU_KEYS = [
 ];
 
 const DASHBOARD_PRODUCT_KEYS = [
-    'id', 'name', 'slug', 'description', 'status', 'type', 'category' => ['id', 'name', 'kind'], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
+    'id', 'name', 'slug', 'description', 'status', 'type', 'category' => ['id', 'name', 'kind', 'section' => ['id', 'name', 'reference_price_label', 'icon']], 'custom_fields', 'preorder' => ['enabled', 'expected_at', 'limit'],
     'sku' => DASHBOARD_SKU_KEYS,
     'skus' => ['*' => DASHBOARD_SKU_KEYS],
     'options',

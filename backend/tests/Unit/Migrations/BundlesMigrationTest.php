@@ -22,7 +22,7 @@ function bundlesMigration(): Migration
 beforeEach(function (): void {
     bundlesMigration()->down();
 
-    $category = DB::table('categories')->insertGetId(['tenant_id' => $this->tenant->id, 'name' => 'كتب', 'slug' => 'kotob', 'path' => '/', 'created_at' => now(), 'updated_at' => now()]);
+    $category = DB::table('categories')->insertGetId(['tenant_id' => $this->tenant->id, 'name' => 'كتب', 'slug' => 'kotob', 'path' => '/', 'section_id' => $this->sectionId('books'), 'created_at' => now(), 'updated_at' => now()]);
     $this->product = DB::table('products')->insertGetId(['tenant_id' => $this->tenant->id, 'category_id' => $category, 'name' => 'علوم', 'slug' => 'oloom', 'custom_fields' => '{}', 'created_at' => now(), 'updated_at' => now()]);
 });
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Catalog\Actions\ApplyVerticalTemplate;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Catalog\Models\ProductFieldOption;
@@ -26,7 +25,7 @@ test('BR-P09 the libraries vertical copies its 11 filterable select fields, each
     $created = app(ApplyVerticalTemplate::class)->handle(librariesId());
 
     $kinds = ProductFieldDefinition::query()->orderBy('id')->get()
-        ->mapWithKeys(fn (ProductFieldDefinition $field): array => [$field->key => $field->kind?->value])
+        ->mapWithKeys(fn (ProductFieldDefinition $field): array => [$field->key => $field->section?->key])
         ->all();
 
     expect($created)->toBe(['grade', 'subject', 'publisher', 'term', 'track', 'edition_type', 'academic_year', 'brand', 'color', 'size', 'material'])
@@ -42,7 +41,7 @@ test('BR-P09 the libraries vertical copies its 11 filterable select fields, each
 test('BR-P09 the facet order of the school-book fields is kept: grade, subject, publisher first (D18)', function (): void {
     app(ApplyVerticalTemplate::class)->handle(librariesId());
 
-    expect(ProductFieldDefinition::query()->where('kind', CategoryKind::Books)->orderBy('filter_order')->pluck('key')->all())
+    expect(ProductFieldDefinition::query()->where('section_id', Database\Factories\CategoryFactory::sectionId('books'))->orderBy('filter_order')->pluck('key')->all())
         ->toBe(['grade', 'subject', 'publisher', 'term', 'track', 'edition_type', 'academic_year']);
 });
 
@@ -96,14 +95,26 @@ test('D110 an archived template, and a template of an archived section, are not 
     expect(app(ApplyVerticalTemplate::class)->handle($vertical->id))->toBe(['kept']);
 });
 
-test('D69 a template in a section that is not a category kind applies to every section until V3 Task 02', function (): void {
+test('D109 D110 a template of a new vertical section lands in the store section made from it, linked to the template', function (): void {
     $vertical = Vertical::factory()->create();
-    $shoes = VerticalSection::factory()->for($vertical)->create(['key' => 'shoes']);
-    VerticalFieldTemplate::factory()->for($vertical)->create(['key' => 'shoe_size', 'vertical_section_id' => $shoes->id]);
+    $shoes = VerticalSection::factory()->for($vertical)->create(['key' => 'shoes', 'name' => 'أحذية']);
+    $template = VerticalFieldTemplate::factory()->for($vertical)->create(['key' => 'shoe_size', 'vertical_section_id' => $shoes->id]);
 
     app(ApplyVerticalTemplate::class)->handle($vertical->id);
 
-    expect(ProductFieldDefinition::query()->where('key', 'shoe_size')->sole()->kind)->toBeNull();
+    $field = ProductFieldDefinition::query()->where('key', 'shoe_size')->sole();
+
+    expect($field->section?->name)->toBe('أحذية')
+        ->and($field->section?->vertical_section_id)->toBe($shoes->id)
+        ->and($field->template_id)->toBe($template->id);
+});
+
+test('D110 b a field the store already has is linked to the template of the same key', function (): void {
+    $term = ProductFieldDefinition::factory()->select()->create(['key' => 'term']);
+
+    app(ApplyVerticalTemplate::class)->handle(librariesId());
+
+    expect($term->refresh()->template_id)->toBe(VerticalFieldTemplate::query()->where('vertical_id', librariesId())->where('key', 'term')->sole()->id);
 });
 
 test('a vertical without templates is a no-op', function (): void {

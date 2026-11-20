@@ -6,7 +6,6 @@ namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\CategoryIcon;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Observers\CategoryObserver;
 use App\Modules\Catalog\Observers\FacetCacheObserver;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
@@ -22,7 +21,8 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Category tree of unlimited depth (BR-P06). `path` is the materialized "/1/7/23/" chain, own id last.
- * `kind` is set on roots and copied down the tree like `path` (D68).
+ * `section_id` is set on roots and copied down the tree like `path` (D109, was `kind`, D68). The section is always
+ * loaded with the category: a store has a handful of sections, and every output names it.
  *
  * @property int $id
  * @property int $tenant_id
@@ -30,13 +30,14 @@ use Illuminate\Support\Facades\Storage;
  * @property string $name
  * @property string $slug
  * @property string $path
- * @property CategoryKind $kind
+ * @property int $section_id
  * @property int $sort_order
  * @property string|null $image_path
  * @property CategoryIcon|null $icon
  * @property ArchiveStatus $status
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
+ * @property-read Section $section
  * @property-read Category|null $parent
  * @property-read Collection<int, Category> $children
  * @property-read Collection<int, Product> $products
@@ -53,12 +54,22 @@ final class Category extends Model
         'status' => 'active',
         'sort_order' => 0,
         'path' => '/',
-        'kind' => 'general',
     ];
+
+    /** @var list<string> */
+    protected $with = ['section'];
 
     protected static function newFactory(): CategoryFactory
     {
         return CategoryFactory::new();
+    }
+
+    /**
+     * @return BelongsTo<Section, $this>
+     */
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
     }
 
     /**
@@ -97,7 +108,7 @@ final class Category extends Model
     {
         return [
             'status' => ArchiveStatus::class,
-            'kind' => CategoryKind::class,
+            'section_id' => 'integer',
             'icon' => CategoryIcon::class,
             'sort_order' => 'integer',
         ];

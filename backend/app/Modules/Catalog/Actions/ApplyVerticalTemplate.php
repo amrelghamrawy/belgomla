@@ -5,24 +5,23 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
 use App\Modules\Platform\Data\FieldTemplateData;
 use App\Modules\Platform\Queries\VerticalTemplateQuery;
 use Illuminate\Support\Facades\DB;
 
 /**
- * BR-P09, D110: copies the active field templates of a vertical (platform data, V3 Task 01) and their options into
- * the tenant in context. Idempotent: existing keys and option labels are skipped, so re-running never duplicates
+ * BR-P09, D109, D110: gives the tenant in context its vertical's sections (ProvisionSections), then copies the
+ * vertical's active field templates and their options, each field in the tenant section of its template and linked
+ * to it (`template_id`). Idempotent: existing keys and option labels are skipped, so re-running never duplicates
  * and never touches what the merchant changed.
- * The template's section becomes the field's `kind` (D69) while sections are still the CategoryKind enum; a
- * section key that is not a kind binds the field to no section. V3 Task 02 replaces this with tenant sections.
  * Registered on TenantCreatedHooks (runs inside CreateTenant's transaction, joining it).
  */
 final readonly class ApplyVerticalTemplate
 {
     public function __construct(
         private VerticalTemplateQuery $verticals,
+        private ProvisionSections $sections,
         private AuditLogger $audit,
     ) {}
 
@@ -31,21 +30,19 @@ final readonly class ApplyVerticalTemplate
      */
     public function handle(int $verticalId): array
     {
-        $fields = $this->verticals->fieldsFor($verticalId);
-
-        if ($fields === []) {
-            return [];
-        }
-
-        return DB::transaction(function () use ($fields, $verticalId): array {
+        return DB::transaction(function () use ($verticalId): array {
+            $sections = $this->sections->handle($verticalId);
+            $fields = $this->verticals->fieldsFor($verticalId);
             $created = [];
 
             foreach ($fields as $field) {
                 $definition = ProductFieldDefinition::query()->where('key', $field->key)->first();
 
                 if ($definition === null) {
-                    $definition = ProductFieldDefinition::query()->create($this->attributes($field));
+                    $definition = ProductFieldDefinition::query()->create($this->attributes($field, $sections));
                     $created[] = $field->key;
+                } elseif ($definition->template_id === null) {
+                    $definition->forceFill(['template_id' => $field->id])->save(); // D110 b: the link only, never the merchant's edits
                 }
 
                 $existing = $definition->options()->pluck('label')->all();
@@ -69,15 +66,17 @@ final readonly class ApplyVerticalTemplate
     }
 
     /**
+     * @param  array<string, int>  $sections  the tenant's section ids by key
      * @return array<string, mixed>
      */
-    private function attributes(FieldTemplateData $field): array
+    private function attributes(FieldTemplateData $field, array $sections): array
     {
         return [
             'key' => $field->key,
             'label' => $field->label,
             'type' => $field->type,
-            'kind' => $field->sectionKey === null ? null : CategoryKind::tryFrom($field->sectionKey),
+            'section_id' => $field->sectionKey === null ? null : ($sections[$field->sectionKey] ?? null),
+            'template_id' => $field->id,
             'is_required' => $field->isRequired,
             'is_filterable' => $field->isFilterable,
             'filter_order' => $field->filterOrder,

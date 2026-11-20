@@ -96,7 +96,7 @@ final readonly class PriceListExporter
             foreach ($units === [] ? [null] : $units as $unit) {
                 $rows[] = [
                     'name' => $sku?->name === null ? $product->name : "{$product->name} ({$sku->name})",
-                    'section' => $product->category->kind->label(),
+                    'section' => $product->category->section->name,
                     'code' => $sku?->code,
                     'unit' => $unit?->unit->name,
                     'moq' => $unit?->moq,

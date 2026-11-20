@@ -10,18 +10,22 @@ use App\Modules\Catalog\Exceptions\FieldTypeLocked;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductFieldDefinition;
+use App\Modules\Catalog\Services\SectionResolver;
 
 /**
- * BR-P08: label, kind, flags and ordering can change freely; the type only while no product holds a
+ * BR-P08: label, section, flags and ordering can change freely; the type only while no product holds a
  * value for the field. A field that becomes text/number silently stops being filterable unless the
- * request explicitly asks for it to be filterable (then 422). Re-binding the kind keeps the values
+ * request explicitly asks for it to be filterable (then 422). Re-binding the section keeps the values
  * products of other sections already hold; they are hidden like archived values (D69).
  */
 final readonly class UpdateFieldDefinition
 {
-    private const array AUDITED = ['label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order'];
+    private const array AUDITED = ['label', 'type', 'section_id', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order'];
 
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(
+        private AuditLogger $audit,
+        private SectionResolver $sections,
+    ) {}
 
     public function handle(ProductFieldDefinition $definition, FieldDefinitionData $data): ProductFieldDefinition
     {
@@ -33,12 +37,13 @@ final readonly class UpdateFieldDefinition
             throw InvalidCatalogInput::notFilterable();
         }
 
+        $sectionId = $data->sectionGiven ? $this->sections->chosen($data->sectionId, $data->kind)?->id : $definition->section_id;
         $old = $definition->only(self::AUDITED);
 
         $definition->update([
             'label' => $data->label,
             'type' => $data->type,
-            'kind' => $data->kindGiven ? $data->kind : $definition->kind,
+            'section_id' => $sectionId,
             'is_required' => $data->isRequired ?? $definition->is_required,
             'show_on_storefront' => $data->showOnStorefront ?? $definition->show_on_storefront,
             'is_filterable' => $data->type->isFilterable() && ($data->isFilterable ?? $definition->is_filterable),
@@ -48,7 +53,7 @@ final readonly class UpdateFieldDefinition
 
         $this->audit->log('field.updated', $definition, $old, $definition->only(self::AUDITED));
 
-        return $definition->load('options');
+        return $definition->load(['options', 'section']);
     }
 
     /** The key is validated as [a-z0-9_] on create, so it is safe inside the JSON path. */

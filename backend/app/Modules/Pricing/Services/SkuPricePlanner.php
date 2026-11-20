@@ -86,8 +86,8 @@ final readonly class SkuPricePlanner
     }
 
     /**
-     * The section kind is read only on the failure path, through the unit's SKU, product and category
-     * (a relation walk, not a Catalog model dependency), so the message names the price correctly (D68).
+     * The section's reference price label is read only on the failure path, through the unit's SKU, product and category
+     * (a relation walk, not a Catalog model dependency), so the message names the price correctly (D109 d).
      */
     private function fromPercent(SkuUnit $unit, ?string $cover, ?string $percent): string
     {
@@ -96,7 +96,7 @@ final readonly class SkuPricePlanner
         }
 
         if ($cover === null) {
-            throw MissingCoverPrice::for($unit->sku->product->category->kind);
+            throw MissingCoverPrice::for($unit->sku->product->category->section->reference_price_label);
         }
 
         return $this->percent->priceFromPercent($cover, $percent);

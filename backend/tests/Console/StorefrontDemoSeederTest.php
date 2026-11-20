@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Actions\ApplyVerticalTemplate;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\RelationType;
 use App\Modules\Catalog\Models\Category;
@@ -39,21 +38,21 @@ test('the demo catalog seeds books, supplies, toys, categories, stock and the st
         ->and($settings->whatsapp)->toBe('+201001234567');
 });
 
-test('D68 the demo catalog has the three sections as roots, each subtree of its kind', function (): void {
+test('D68 the demo catalog has a root in each of the three sections, each subtree in its section', function (): void {
     $this->seed(StorefrontDemoSeeder::class);
 
-    $roots = $this->inTenant(fn (): array => Category::query()->whereNull('parent_id')->orderBy('sort_order')->get()->map(fn (Category $c): array => [$c->name, $c->kind->value])->all());
+    $roots = $this->inTenant(fn (): array => Category::query()->whereNull('parent_id')->orderBy('sort_order')->get()->map(fn (Category $c): array => [$c->name, $c->section->key])->all());
     $grade = $this->inTenant(fn (): Category => Category::query()->where('name', 'أولى إعدادي')->sole());
 
     expect($roots)->toBe([['كتب خارجية', 'books'], ['أدوات دراسية', 'stationery'], ['ألعاب', 'toys']])
-        ->and($grade->kind)->toBe(CategoryKind::Books);
+        ->and($grade->section->key)->toBe('books');
 });
 
 test('D69 the demo fields are bound to their sections, so a toys category offers only the age facet', function (): void {
     $this->seed(StorefrontDemoSeeder::class);
 
     $toys = $this->inTenant(fn (): Category => Category::query()->where('name', 'ألعاب')->sole());
-    $kinds = $this->inTenant(fn (): array => ProductFieldDefinition::query()->orderBy('key')->pluck('kind', 'key')->map(fn (?CategoryKind $k): ?string => $k?->value)->all());
+    $kinds = $this->inTenant(fn (): array => ProductFieldDefinition::query()->orderBy('key')->get()->mapWithKeys(fn (ProductFieldDefinition $f): array => [$f->key => $f->section?->key])->all());
 
     expect($kinds)->toBe([
         'academic_year' => 'books', 'age' => 'toys', 'brand' => 'stationery', 'color' => 'stationery', 'edition_type' => 'books',

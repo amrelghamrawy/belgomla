@@ -22,8 +22,9 @@ test('the category resource has the store key set and hides dashboard fields on 
 
     $data = rendered(new CategoryResource($category), storeRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'icon', 'image_url', 'children'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'section', 'icon', 'image_url', 'children'])
         ->and($data['kind'])->toBe('general')
+        ->and($data['section'])->toBe(['id' => $this->sectionId('general'), 'name' => 'عام', 'reference_price_label' => 'سعر القطاعي', 'icon' => 'package'])
         ->and($data['icon'])->toBeNull()
         ->and($data['image_url'])->toEndWith('/storage/tenants/1/categories/a.png')
         ->and($data['children'])->toBe([]);
@@ -34,8 +35,9 @@ test('the category resource adds parent, order and status on the dashboard', fun
 
     $data = rendered(new CategoryResource($category), dashboardRequest());
 
-    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'icon', 'image_url', 'parent_id', 'sort_order', 'status', 'children'])
+    expect(array_keys($data))->toBe(['id', 'name', 'slug', 'kind', 'section', 'icon', 'image_url', 'parent_id', 'sort_order', 'status', 'children'])
         ->and($data['kind'])->toBe('books')
+        ->and($data['section']['reference_price_label'])->toBe('سعر الغلاف')
         ->and($data['icon'])->toBe('book-open')
         ->and($data['status'])->toBe('archived')
         ->and($data['sort_order'])->toBe(4);
@@ -65,11 +67,21 @@ test('the field resource key set, options empty when not loaded', function (): v
     $data = rendered(new FieldDefinitionResource($field), dashboardRequest());
 
     expect(array_keys($data))->toBe([
-        'id', 'key', 'label', 'type', 'kind', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status', 'options',
+        'id', 'key', 'label', 'type', 'kind', 'section', 'is_required', 'show_on_storefront', 'is_filterable', 'filter_order', 'sort_order', 'status', 'options',
     ])
         ->and($data['type'])->toBe('select')
         ->and($data['kind'])->toBeNull()
+        ->and($data['section'])->toBeNull()
         ->and($data['options'])->toBe([]);
+});
+
+test('D109 the field resource names the section it is bound to', function (): void {
+    $field = ProductFieldDefinition::factory()->forSection('toys')->create()->refresh();
+
+    $data = rendered(new FieldDefinitionResource($field), dashboardRequest());
+
+    expect($data['kind'])->toBe('toys')
+        ->and($data['section'])->toBe(['id' => $this->sectionId('toys'), 'name' => 'ألعاب', 'reference_price_label' => 'سعر القطاعي', 'icon' => 'puzzle']);
 });
 
 test('the field resource includes loaded options with the option key set', function (): void {

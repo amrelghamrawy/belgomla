@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Enums\ArchiveStatus;
 use App\Modules\Catalog\Enums\CategoryIcon;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\FieldType;
 use App\Modules\Catalog\Enums\ImportRowAction;
 use App\Modules\Catalog\Enums\ImportStatus;
@@ -19,16 +18,7 @@ test('every catalog enum exposes labels for all cases', function (string $enum):
 
     expect(array_keys($labels))->toBe(array_map(fn (BackedEnum $case): string => (string) $case->value, $enum::cases()))
         ->and(array_filter($labels, fn (string $label): bool => $label === ''))->toBe([]);
-})->with([ArchiveStatus::class, ProductStatus::class, FieldType::class, RelationType::class, CategoryKind::class, CategoryIcon::class, SpreadsheetFormat::class, ImportStatus::class, ImportRowAction::class, SkuStatus::class, ProductType::class]);
-
-test('BR-PR10 the reference price is the cover price for books and the retail price for every other kind', function (CategoryKind $kind, string $label): void {
-    expect($kind->referencePriceLabel())->toBe($label);
-})->with([
-    'books' => [CategoryKind::Books, 'سعر الغلاف'],
-    'stationery' => [CategoryKind::Stationery, 'سعر القطاعي'],
-    'toys' => [CategoryKind::Toys, 'سعر القطاعي'],
-    'general' => [CategoryKind::General, 'سعر القطاعي'],
-]);
+})->with([ArchiveStatus::class, ProductStatus::class, FieldType::class, RelationType::class, CategoryIcon::class, SpreadsheetFormat::class, ImportStatus::class, ImportRowAction::class, SkuStatus::class, ProductType::class]);
 
 test('BR-P04 product status transitions', function (ProductStatus $from, ProductStatus $to, bool $allowed): void {
     expect($from->canTransitionTo($to))->toBe($allowed);
@@ -84,4 +74,8 @@ test('an import is finished once done or failed', function (ImportStatus $status
 
 test('BR-P15 a product is simple or a bundle', function (): void {
     expect(ProductType::toArray())->toBe(['simple' => 'منتج', 'bundle' => 'باقة']);
+});
+
+test('D109 the fixed section kind enum is gone: sections are store data', function (): void {
+    expect(class_exists('App\Modules\Catalog\Enums\CategoryKind'))->toBeFalse();
 });

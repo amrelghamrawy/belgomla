@@ -180,10 +180,11 @@ Tenant-owned (`BelongsToTenant`). Replaces the fixed `CategoryKind` enum (D68).
 | id                    | bigint PK            |                                                              |
 | tenant_id             | FK                   |                                                              |
 | vertical_section_id   | FK vertical_sections | nullable; null = created by the tenant; **unique (tenant_id, vertical_section_id)** where not null |
-| name                  | varchar(80)          | **unique per tenant** (folded, D32)                          |
+| key                   | varchar(40)          | machine name, **unique per tenant**: the vertical section's key when copied (`books`, `stationery`, `toys`), `general` for the fallback; never shown. Until V3 Task 03 the API also sends it as the old `kind` |
+| name                  | varchar(80)          | **unique per tenant** (exact in the DB; folded, D32, by the section endpoints of V3 Task 07) |
 | reference_price_label | varchar(40)          | what `skus.cover_price` is called (BR-PR10)                  |
 | icon                  | varchar(40)          | nullable; `CategoryIcon` (D73)                               |
-| is_fallback           | boolean              | exactly one per tenant: «عام», cannot be archived (D109 c)   |
+| is_fallback           | boolean              | exactly one per tenant (partial unique index): «عام», cannot be archived (DB check, D109 c) |
 | status                | enum                 | `active`, `archived`; archive refused while an active root category uses it |
 | sort_order            | int                  |                                                              |
 

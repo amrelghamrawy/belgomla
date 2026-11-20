@@ -12,7 +12,6 @@ use App\Modules\Catalog\Data\ProductOptionData;
 use App\Modules\Catalog\Data\ProductOptionValueData;
 use App\Modules\Catalog\Data\SkuData;
 use App\Modules\Catalog\Data\SkuUnitData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Enums\ProductStatus;
 use App\Modules\Catalog\Enums\SkuStatus;
 use App\Modules\Catalog\Enums\SpreadsheetFormat;
@@ -207,7 +206,7 @@ test('the export follows the dashboard filter', function (): void {
 
 test('D91 D95 BR-P14 export then import of the same file is an update of every product that changes nothing, units and variants included', function (SpreadsheetFormat $format): void {
     Queue::fake();
-    ProductFieldDefinition::factory()->boolean()->forKind(CategoryKind::Books)->create(['key' => 'colored', 'label' => 'ملون']);
+    ProductFieldDefinition::factory()->boolean()->forSection('books')->create(['key' => 'colored', 'label' => 'ملون']);
     $percent = $this->importedProduct(['code' => 'PCT-1', 'base_price' => '88.00', 'base_price_percent' => '25.00']);
     $percent->update(['custom_fields' => ['publisher' => $this->basics['moallem']->id, 'colored' => true, 'brand' => 'قديم']]);
     SkuPriceTier::query()->where('sku_unit_id', $this->defaultUnitId($percent->skus->first()))->update(['discount_percent' => '30.00']);

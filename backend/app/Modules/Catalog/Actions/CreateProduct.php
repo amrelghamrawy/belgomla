@@ -35,7 +35,7 @@ final readonly class CreateProduct
     public function handle(ProductData $data, ?int $createdBy = null, ?string $batchId = null): Product
     {
         $category = $this->references->check($data);
-        $customFields = $this->fields->validate($data->customFields, $category->kind);
+        $customFields = $this->fields->validate($data->customFields, $category->section_id);
 
         return DB::transaction(function () use ($data, $customFields, $createdBy, $batchId): Product {
             $product = Product::query()->create([

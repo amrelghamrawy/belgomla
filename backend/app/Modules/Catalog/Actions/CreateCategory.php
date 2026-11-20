@@ -6,9 +6,9 @@ namespace App\Modules\Catalog\Actions;
 
 use App\Modules\Audit\Services\AuditLogger;
 use App\Modules\Catalog\Data\CategoryData;
-use App\Modules\Catalog\Enums\CategoryKind;
 use App\Modules\Catalog\Exceptions\InvalidCatalogInput;
 use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Services\SectionResolver;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -16,13 +16,15 @@ use RuntimeException;
 
 /**
  * Creates a category at any depth (BR-P06). Slug and path are set by CategoryObserver, which also
- * replaces the kind of a child with its parent's (D68). Owns its transaction.
+ * replaces the section of a child with its parent's (D68). A root goes to the chosen active section of the store, or
+ * to its fallback «عام» (D109 c). Owns its transaction.
  */
 final readonly class CreateCategory
 {
     public function __construct(
         private AuditLogger $audit,
         private TenantContext $context,
+        private SectionResolver $sections,
     ) {}
 
     public function handle(CategoryData $data): Category
@@ -31,11 +33,13 @@ final readonly class CreateCategory
             throw InvalidCatalogInput::unknownReference('parent_id');
         }
 
-        return DB::transaction(function () use ($data): Category {
+        $section = $this->sections->chosen($data->sectionId, $data->kind) ?? $this->sections->fallback();
+
+        return DB::transaction(function () use ($data, $section): Category {
             $category = Category::query()->create([
                 'parent_id' => $data->parentId,
                 'name' => $data->name,
-                'kind' => $data->kind ?? CategoryKind::General,
+                'section_id' => $section->id,
                 'icon' => $data->icon,
                 'sort_order' => $data->sortOrder ?? 0,
             ]);
@@ -44,7 +48,7 @@ final readonly class CreateCategory
                 $category->update(['image_path' => $this->store($data->image)]);
             }
 
-            $this->audit->log('category.created', $category, null, $category->only(['name', 'parent_id', 'kind', 'icon', 'sort_order', 'image_path']));
+            $this->audit->log('category.created', $category, null, $category->only(['name', 'parent_id', 'section_id', 'icon', 'sort_order', 'image_path']));
 
             return $category->refresh();
         });

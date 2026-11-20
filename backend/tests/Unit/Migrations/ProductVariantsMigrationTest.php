@@ -34,7 +34,7 @@ beforeEach(function (): void {
 
     $tenant = $this->tenant->id;
     $piece = productVariantsInsert('units', ['tenant_id' => $tenant, 'name' => 'قطعة']);
-    $category = productVariantsInsert('categories', ['tenant_id' => $tenant, 'name' => 'أدوات', 'slug' => 'adawat', 'path' => '/']);
+    $category = productVariantsInsert('categories', ['tenant_id' => $tenant, 'name' => 'أدوات', 'slug' => 'adawat', 'path' => '/', 'section_id' => $this->sectionId('stationery')]);
     $first = productVariantsInsert('products', ['tenant_id' => $tenant, 'category_id' => $category, 'name' => 'قلم', 'slug' => 'qalam', 'custom_fields' => '{}']);
     $second = productVariantsInsert('products', ['tenant_id' => $tenant, 'category_id' => $category, 'name' => 'كشكول', 'slug' => 'kashkol', 'custom_fields' => '{}']);
 

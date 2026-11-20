@@ -140,7 +140,12 @@ final class StoreProductResource extends JsonResource
             'status' => $product->status->value,
             'type' => $product->type->value,
             'main_image_url' => $mainImage instanceof ProductImage ? $mainImage->url() : null,
-            'category' => $category instanceof Category ? ['id' => $category->id, 'name' => $category->name, 'kind' => $category->kind->value] : null,
+            'category' => $category instanceof Category ? [
+                'id' => $category->id,
+                'name' => $category->name,
+                'kind' => $category->section->key, // until V3 Task 03 (D109)
+                'section' => new SectionResource($category->section)->toArray($request),
+            ] : null,
             'custom_fields' => $this->customFields(),
             'sku' => $sku instanceof Sku ? $this->sku($sku) : null,
             'skus' => $this->skus()->map(fn (Sku $sku): array => $this->sku($sku))->values()->all(),
@@ -198,7 +203,7 @@ final class StoreProductResource extends JsonResource
         $shown = [];
 
         foreach ($this->fields as $key => $definition) {
-            if ($category instanceof Category && ! $definition->appliesTo($category->kind)) {
+            if ($category instanceof Category && ! $definition->appliesTo($category->section_id)) {
                 continue;
             }
 
