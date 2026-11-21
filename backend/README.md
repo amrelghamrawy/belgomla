@@ -42,7 +42,7 @@ Requests without an `Origin`/`Referer` from a tenant host get no session (`400 s
 ## Tenant CLI
 
 ```
-php artisan tenant:create alnoor "مكتبة النور" --owner-email=owner@alnoor.test --owner-password=secret --vertical=school-books
+php artisan tenant:create alnoor "مكتبة النور" --owner-email=owner@alnoor.test --owner-password=secret --owner-phone=01012345678 --vertical=libraries
 php artisan tenant:suspend alnoor
 php artisan tenant:activate alnoor
 php artisan tenant:list

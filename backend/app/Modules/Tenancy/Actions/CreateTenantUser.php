@@ -23,11 +23,12 @@ final readonly class CreateTenantUser
         $user = TenantUser::query()->create([
             'name' => $data->name,
             'email' => $data->email,
+            'phone' => $data->phone,
             'password' => $data->password,
             'role' => $data->role,
         ]);
 
-        $this->audit->log('tenant_user.created', $user, null, ['name' => $user->name, 'email' => $user->email, 'role' => $user->role->value]);
+        $this->audit->log('tenant_user.created', $user, null, ['name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'role' => $user->role->value]);
 
         return $user;
     }

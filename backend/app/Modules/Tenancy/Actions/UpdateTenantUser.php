@@ -12,7 +12,8 @@ use App\Modules\Tenancy\Exceptions\TenantUserConflict;
 use App\Modules\Tenancy\Models\TenantUser;
 
 /**
- * Rename, disable/enable, change the role of (BR-T06, D82), or reset the password of a tenant user. The last active
+ * Rename, disable/enable, change the role of (BR-T06, D82), set or clear the phone of (D112), or reset the password
+ * of a tenant user. The last active
  * owner can be neither demoted nor disabled (`409 last_owner`); a role change is audited `tenant_user.role_changed`.
  */
 final readonly class UpdateTenantUser
@@ -37,6 +38,10 @@ final readonly class UpdateTenantUser
             'password' => $changes->password,
             'role' => $changes->role,
         ], fn (mixed $value): bool => $value !== null);
+
+        if ($changes->phoneSent) {
+            $values['phone'] = $changes->phone;
+        }
 
         $old = $this->snapshot($user);
         $user->fill($values)->save();
@@ -93,6 +98,6 @@ final readonly class UpdateTenantUser
      */
     private function snapshot(TenantUser $user): array
     {
-        return ['name' => $user->name, 'status' => $user->status->value];
+        return ['name' => $user->name, 'phone' => $user->phone, 'status' => $user->status->value];
     }
 }

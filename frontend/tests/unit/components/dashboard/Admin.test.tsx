@@ -543,6 +543,83 @@ describe("UsersPage", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("البريد الإلكتروني مستخدم بالفعل");
   });
+
+  it("D112 adds a user with the mobile the reset code goes to", async () => {
+    const fetchMock = stubApi({ "POST /api/dashboard/users": json(201, { data: tenantUser({ id: 3 }) }) });
+    const user = userEvent.setup();
+    renderWithQuery(<CreateUserDialog onClose={() => undefined} />);
+
+    expect(screen.getByText("يصله كود استعادة كلمة المرور على واتساب.")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("الاسم"), "منى");
+    await user.type(screen.getByLabelText("البريد الإلكتروني"), "mona@alnoor.test");
+    await user.type(screen.getByLabelText("رقم الموبايل (اختياري)"), "01112345678");
+    await user.type(screen.getByLabelText("كلمة المرور"), "secret123");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "POST /api/dashboard/users")[0]?.body).toMatchObject({
+        email: "mona@alnoor.test",
+        phone: "01112345678",
+      }),
+    );
+  });
+
+  it("D112 refuses a mobile that is not Egyptian before asking the API", async () => {
+    const fetchMock = stubApi({});
+    const user = userEvent.setup();
+    renderWithQuery(<CreateUserDialog onClose={() => undefined} />);
+
+    await user.type(screen.getByLabelText("الاسم"), "منى");
+    await user.type(screen.getByLabelText("البريد الإلكتروني"), "mona@alnoor.test");
+    await user.type(screen.getByLabelText("رقم الموبايل (اختياري)"), "0223456789");
+    await user.type(screen.getByLabelText("كلمة المرور"), "secret123");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    expect(await screen.findByText("اكتب رقم هاتف مصري صحيح")).toBeInTheDocument();
+    expect(callsTo(fetchMock, "POST /api/dashboard/users")).toHaveLength(0);
+  });
+
+  it("D112 shows each user's mobile, and asks the logged-in user to add theirs when missing", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/users": json(200, {
+        data: [tenantUser({ phone: null }), tenantUser({ id: 2, name: "سارة", phone: "+201112345678" })],
+      }),
+      "GET /api/dashboard/me": json(200, { data: dashboardMe() }),
+      "PATCH /api/dashboard/users/1": json(200, { data: tenantUser() }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<UsersPage />);
+
+    expect(await within(await screen.findByTestId("user-2")).findByText("01112345678")).toBeInTheDocument();
+    expect(within(screen.getByTestId("user-1")).getByText("غير مسجل")).toBeInTheDocument();
+    expect(await screen.findByText("أضف رقم موبايلك ليصلك كود على واتساب إذا نسيت كلمة المرور.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "أضف رقمي" }));
+    await user.type(screen.getByLabelText("رقم الموبايل"), "01012345678");
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PATCH /api/dashboard/users/1")[0]?.body).toEqual({ phone: "01012345678" }),
+    );
+  });
+
+  it("D112 clears a user's mobile when the field is emptied", async () => {
+    const fetchMock = stubApi({
+      "GET /api/dashboard/users": json(200, { data: [tenantUser(), tenantUser({ id: 2, name: "سارة" })] }),
+      "GET /api/dashboard/me": json(200, { data: dashboardMe() }),
+      "PATCH /api/dashboard/users/2": json(200, { data: tenantUser({ id: 2, phone: null }) }),
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<UsersPage />);
+
+    await user.click(within(await screen.findByTestId("user-2")).getByRole("button", { name: "رقم الموبايل" }));
+    const field = screen.getByLabelText("رقم الموبايل");
+    expect(field).toHaveValue("01012345678");
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: "حفظ" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "PATCH /api/dashboard/users/2")[0]?.body).toEqual({ phone: null }));
+  });
 });
 
 describe("audit", () => {

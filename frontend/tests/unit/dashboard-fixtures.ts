@@ -28,6 +28,7 @@ export function tenantUser(overrides: Partial<TenantUser> = {}): TenantUser {
     id: 1,
     name: "أحمد",
     email: "owner@alnoor.test",
+    phone: "+201012345678",
     role: "owner",
     role_label: "مالك",
     status: "active",

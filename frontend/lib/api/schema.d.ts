@@ -542,6 +542,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends a password reset code on WhatsApp to the phone on the user; the same answer for every email (D112, BR-T10) */
+        post: operations["dashboardForgotPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets a new password with the reset code (otp_invalid, otp_expired, otp_attempts_exceeded); the user then logs in (D112) */
+        post: operations["dashboardResetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard/auth/logout": {
         parameters: {
             query?: never;
@@ -3087,10 +3121,22 @@ export interface components {
             email: string;
             password: string;
         };
+        DashboardForgotPasswordRequest: {
+            /** Format: email */
+            email: string;
+        };
+        DashboardResetPasswordRequest: {
+            /** Format: email */
+            email: string;
+            code: string;
+            password: string;
+        };
         TenantUser: {
             id: number;
             name: string;
             email: string;
+            /** @description E.164; where the password reset code goes (D112) */
+            phone: string | null;
             /** @enum {string} */
             role: "owner" | "manager" | "sales" | "warehouse" | "accountant";
             role_label: string;
@@ -5943,6 +5989,56 @@ export interface operations {
             429: components["responses"]["Error"];
         };
     };
+    dashboardForgotPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardForgotPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered (a code was sent only if the email belongs to an active user with a phone) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    dashboardResetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
     dashboardLogout: {
         parameters: {
             query?: never;
@@ -6129,6 +6225,8 @@ export interface operations {
                     name: string;
                     /** Format: email */
                     email: string;
+                    /** @description D112: Egyptian mobile in any spelling, stored E.164; where the password reset code goes */
+                    phone?: string | null;
                     password: string;
                     /**
                      * @description BR-T06, D82; owner when left out
@@ -6167,6 +6265,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
+                    /** @description D112: Egyptian mobile, stored E.164; null or empty clears it */
+                    phone?: string | null;
                     /** @enum {string} */
                     status?: "active" | "disabled";
                     password?: string;

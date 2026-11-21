@@ -101,10 +101,26 @@ erDiagram
 | tenant_id     | FK           |                               |
 | name          | varchar(100) |                               |
 | email         | varchar(190) | **unique (tenant_id, email)** |
+| phone         | varchar(20)  | nullable, E.164 Egyptian mobile; where a password reset code goes (BR-T10, D112) |
 | password_hash | varchar      |                               |
 | role          | enum         | `owner`, `manager`, `sales`, `warehouse`, `accountant`; CHECK (V2, BR-T06, D82) |
 | status        | enum         | `active`, `disabled`          |
 | last_login_at | timestamptz  |                               |
+
+### `tenant_user_otps` (D112)
+
+A dashboard password reset code (BR-T10), kept like `customer_otps` (BR-CU07). Model `Tenancy\Models\TenantUserOtp`.
+
+| Column         | Type            | Notes                                               |
+| -------------- | --------------- | --------------------------------------------------- |
+| id             | bigint PK       |                                                     |
+| tenant_id      | FK              |                                                     |
+| tenant_user_id | FK tenant_users | cascade on delete; index `(tenant_user_id, id)`     |
+| code_hash      | varchar         | HMAC of the code with the app key, never the code   |
+| expires_at     | timestamptz     | 10 minutes after sending                            |
+| attempts       | smallint        | default 0; the code is dead at 5                    |
+| consumed_at    | timestamptz     | nullable; set when used or replaced by a newer code |
+| created_at, updated_at | timestamptz |                                                 |
 
 ---
 

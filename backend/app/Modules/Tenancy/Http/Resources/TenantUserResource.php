@@ -22,6 +22,7 @@ final class TenantUserResource extends JsonResource
             'id' => $this->resource->id,
             'name' => $this->resource->name,
             'email' => $this->resource->email,
+            'phone' => $this->resource->phone,
             'role' => $this->resource->role->value,
             'role_label' => $this->resource->role->label(),
             'status' => $this->resource->status->value,

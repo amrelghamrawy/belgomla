@@ -242,7 +242,7 @@ Tenants are managed by the platform operator in two ways that call the same Acti
 
 - the platform admin dashboard on `admin.{base_domain}` (V3, BR-T09, D111; `/api/admin/tenants`, `08-api-contract.md` §17);
 - artisan commands on the server:
-  - `tenant:create {subdomain} {name} --owner-email= --owner-password= --vertical=libraries` (the vertical key comes from the `verticals` table since V3 Task 01; before it the enum `school-books|stationery|hardware|none`)
+  - `tenant:create {subdomain} {name} --owner-email= --owner-password= [--owner-phone=] --vertical=libraries` (`--owner-phone`: the owner's Egyptian mobile for the password reset code, D112; the vertical key comes from the `verticals` table since V3 Task 01; before it the enum `school-books|stationery|hardware|none`)
   - `tenant:suspend {subdomain}` / `tenant:activate {subdomain}`
   - `tenant:list`
 

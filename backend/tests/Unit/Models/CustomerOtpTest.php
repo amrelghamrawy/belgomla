@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Customers\Enums\OtpPurpose;
 use App\Modules\Customers\Models\CustomerOtp;
-use App\Modules\Customers\Services\OtpCodes;
+use App\Modules\Tenancy\Services\OtpCodes;
 use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 

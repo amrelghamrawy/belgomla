@@ -15,7 +15,8 @@ arch('tenancy models are not used by other modules')
     ->expect('App\Modules\Tenancy\Models')
     ->not->toBeUsedIn(['App\Modules\Audit', 'App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging', 'App\Modules\Customers', 'App\Modules\Orders', 'App\Modules\Collections', 'App\Modules\Reports']);
 
-arch('catalog, pricing, inventory and messaging reach tenancy only through its context, concern, hooks, enums and queries')
+// D112: Messaging also fills Tenancy's ResetCodeSender contract (ResetCodeMessages); contracts are not in the list.
+arch('catalog, pricing, inventory and messaging reach tenancy only through its context, concern, hooks, contracts, enums and queries')
     ->expect(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Messaging'])
     ->not->toUse([
         'App\Modules\Tenancy\Actions',
@@ -204,6 +205,14 @@ arch('orders fill the connection alerts contract of messaging')
     ->expect(App\Modules\Orders\Services\MerchantConnectionAlerts::class)
     ->toImplement(App\Modules\Messaging\Contracts\ConnectionAlerts::class);
 
+arch('D112 messaging fills the dashboard reset code contract of tenancy')
+    ->expect(App\Modules\Messaging\Services\ResetCodeMessages::class)
+    ->toImplement(App\Modules\Tenancy\Contracts\ResetCodeSender::class);
+
+arch('D112 tenancy contracts are interfaces')
+    ->expect('App\Modules\Tenancy\Contracts')
+    ->toBeInterfaces();
+
 arch('messaging does not depend on catalog, pricing or inventory')
     ->expect('App\Modules\Messaging')
     ->not->toUse(['App\Modules\Catalog', 'App\Modules\Pricing', 'App\Modules\Inventory', 'App\Modules\Customers', 'App\Modules\Orders']);
@@ -215,10 +224,11 @@ arch('D70 messaging reaches audit only through the AuditLogger, for linking and 
 /*
 | Customers (tasks/5-customers.md). Customers reads the catalog Sku/Product of a cart line (through Catalog's
 | CartSkuQuery and the CartItem relation), prices through Pricing's PriceResolver, sends through Messenger and
-| binds sessions with Tenancy's session key. Nothing else depends on Customers until Orders (Task 6).
+| binds sessions with Tenancy's session key. Nothing else depends on Customers until Orders (Task 6). Since D112 its
+| code hashing (OtpCodes) and phone rule (EgyptianPhone) live in Tenancy, which the dashboard reset shares.
 */
 
-arch('customers reach tenancy only through its context, concern, queries and the session tenant key')
+arch('customers reach tenancy only through its context, concern, queries, services, rules and the session tenant key')
     ->expect('App\Modules\Customers')
     ->not->toUse([
         'App\Modules\Tenancy\Actions',

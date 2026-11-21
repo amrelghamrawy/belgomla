@@ -52,6 +52,7 @@ use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantSetting;
 use App\Modules\Tenancy\Models\TenantUser;
+use App\Modules\Tenancy\Models\TenantUserOtp;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
@@ -138,6 +139,7 @@ test('the module model list is explicit so new models are reviewed', function ()
         Tenant::class,
         TenantSetting::class,
         TenantUser::class,
+        TenantUserOtp::class,
     ]);
 });
 

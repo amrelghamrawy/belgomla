@@ -835,6 +835,40 @@ paths:
         '422': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /api/dashboard/auth/forgot-password:
+    post:
+      operationId: dashboardForgotPassword
+      tags: [dashboard-auth]
+      summary: Sends a password reset code on WhatsApp to the phone on the user; the same answer for every email (D112, BR-T10)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DashboardForgotPasswordRequest' }
+      responses:
+        '204':
+          description: Answered (a code was sent only if the email belongs to an active user with a phone)
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /api/dashboard/auth/reset-password:
+    post:
+      operationId: dashboardResetPassword
+      tags: [dashboard-auth]
+      summary: Sets a new password with the reset code (otp_invalid, otp_expired, otp_attempts_exceeded); the user then logs in (D112)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DashboardResetPasswordRequest' }
+      responses:
+        '204':
+          description: Password changed
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
   /api/dashboard/auth/logout:
     post:
       operationId: dashboardLogout
@@ -974,6 +1008,7 @@ paths:
               properties:
                 name: { type: string, maxLength: 100 }
                 email: { type: string, format: email, maxLength: 190 }
+                phone: { type: [string, 'null'], maxLength: 30, description: 'D112: Egyptian mobile in any spelling, stored E.164; where the password reset code goes' }
                 password: { type: string, minLength: 8, maxLength: 200 }
                 role: { type: string, enum: [owner, manager, sales, warehouse, accountant], description: 'BR-T06, D82; owner when left out' }
       responses:
@@ -997,6 +1032,7 @@ paths:
               type: object
               properties:
                 name: { type: string, maxLength: 100 }
+                phone: { type: [string, 'null'], maxLength: 30, description: 'D112: Egyptian mobile, stored E.164; null or empty clears it' }
                 status:
                   type: string
                   enum: [active, disabled]
@@ -5240,13 +5276,28 @@ components:
         email: { type: string, format: email }
         password: { type: string }
 
+    DashboardForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 190 }
+
+    DashboardResetPasswordRequest:
+      type: object
+      required: [email, code, password]
+      properties:
+        email: { type: string, format: email, maxLength: 190 }
+        code: { type: string, pattern: '^\d{6}$' }
+        password: { type: string, minLength: 8, maxLength: 200 }
+
     TenantUser:
       type: object
-      required: [id, name, email, role, role_label, status, last_login_at]
+      required: [id, name, email, phone, role, role_label, status, last_login_at]
       properties:
         id: { type: integer }
         name: { type: string }
         email: { type: string }
+        phone: { type: [string, 'null'], description: 'E.164; where the password reset code goes (D112)' }
         role:
           type: string
           enum: [owner, manager, sales, warehouse, accountant]

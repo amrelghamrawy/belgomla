@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Customers\Rules\EgyptianPhone;
+use App\Modules\Tenancy\Rules\EgyptianPhone;
 
 function phoneFailures(mixed $value): array
 {

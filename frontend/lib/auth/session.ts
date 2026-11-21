@@ -7,7 +7,15 @@ import { useEffect } from "react";
 import { apiFetch, loginPaths, type Surface } from "@/lib/api/client";
 import { isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/keys";
-import type { Customer, CustomerLoginRequest, DashboardLoginRequest, DashboardMe, TenantUser } from "@/lib/api/types";
+import type {
+  Customer,
+  CustomerLoginRequest,
+  DashboardForgotPasswordRequest,
+  DashboardLoginRequest,
+  DashboardMe,
+  DashboardResetPasswordRequest,
+  TenantUser,
+} from "@/lib/api/types";
 
 /** A `me` call where 401 means "nobody is logged in" rather than an error. */
 export async function meOrNull<T>(path: string): Promise<T | null> {
@@ -81,6 +89,22 @@ export function useDashboardLogin() {
     mutationFn: (credentials: DashboardLoginRequest) =>
       apiFetch<TenantUser>("/api/dashboard/auth/login", { method: "POST", body: credentials, redirectOn401: false }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardSession }),
+  });
+}
+
+/** D112: send a reset code on WhatsApp to the phone on the user. 204 for every email, so nothing is revealed. */
+export function useDashboardForgotPassword() {
+  return useMutation({
+    mutationFn: (body: DashboardForgotPasswordRequest) =>
+      apiFetch<void>("/api/dashboard/auth/forgot-password", { method: "POST", body, redirectOn401: false }),
+  });
+}
+
+/** D112: set a new password with the code; the user logs in afterwards. */
+export function useDashboardResetPassword() {
+  return useMutation({
+    mutationFn: (body: DashboardResetPasswordRequest) =>
+      apiFetch<void>("/api/dashboard/auth/reset-password", { method: "POST", body, redirectOn401: false }),
   });
 }
 

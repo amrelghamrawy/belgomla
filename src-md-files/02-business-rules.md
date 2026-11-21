@@ -78,6 +78,7 @@ Each tenant user has one role (V2 Task 05, D82). Roles and their permissions are
 - A user sees only the notifications their role covers: order notifications need `orders.manage`, `whatsapp_dropped` needs `settings.manage`. Read state stays shared (D57).
 - A store always keeps at least one active owner: the last active owner can be neither demoted nor disabled (`409 last_owner`). A role change is audited (`tenant_user.role_changed`).
 - `tenant:create` and `tenant:demo` create an owner; a user added from the dashboard is an owner unless a role is picked.
+- A user's mobile number is where a forgotten-password code goes (BR-T10, D112).
 
 ### BR-T07 — Tenant Lifecycle
 
@@ -99,6 +100,18 @@ The platform admin is the BelGomla operator, not a merchant. Their dashboard man
 - Per tenant an admin sees: identity (name, subdomain, status, vertical, created at), the owner's contact, and counts (products, orders in the last 30 days, last dashboard login). An admin sees **no** customer, order, price or collection details of a tenant.
 - An admin creates, suspends and activates tenants (BR-T07) and changes a tenant's vertical only while the tenant has no products (D108 d).
 - Every admin write, and every `tenant:*` command, writes a `platform_audit_logs` row (actor, action, target, old/new values). These rows are separate from the tenant's `audit_logs` (BR-L).
+
+### BR-T10 — Dashboard Password Reset (D112)
+
+A tenant user who forgot their password resets it themselves with a code on WhatsApp.
+
+- Each tenant user may have a mobile number (`tenant_users.phone`, an Egyptian mobile stored in E.164, optional). An owner or any user with `users.manage` sets it on the users page, their own included; `tenant:create --owner-phone` sets the first owner's.
+- "Forgot password" on the dashboard login takes the **email**. Only an active user with a phone gets a code. Every email gets the same answer, so the page does not reveal which emails have accounts or phones (as D52 does for customers).
+- The code follows BR-CU07: 6 digits, only a keyed hash stored, valid 10 minutes, 5 attempts, single use. A new code replaces the earlier live ones, and an email can ask at most 5 times an hour (`429 rate_limited`).
+- The code goes out through Messenger like a customer OTP: from the store's own WhatsApp number when it is linked (D70), otherwise the platform chain.
+- The code and a new password (8 characters or more) set the password. The remember token is rotated, the change is audited `tenant_user.password_reset`, and the user then logs in.
+- A user without a phone cannot reset alone: someone with `users.manage` changes the password from the users page.
+- A suspended store refuses the reset like the login (BR-T07).
 
 ---
 

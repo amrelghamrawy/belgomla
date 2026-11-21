@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Customers\Services;
+namespace App\Modules\Tenancy\Services;
 
 /**
  * BR-CU07, Tech §13: BelGomla generates and checks its own codes, so the messaging provider stays replaceable.
  * A code is 6 digits; only a keyed hash (HMAC with the app key) is stored, because a plain hash of a 6-digit
- * space is reversed by trying all of them.
+ * space is reversed by trying all of them. Lives in Tenancy because both customer codes (Customers) and dashboard
+ * password reset codes (D112) use it, and Tenancy may not depend on Customers.
  */
 final readonly class OtpCodes
 {

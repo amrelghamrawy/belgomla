@@ -7,11 +7,18 @@ use Illuminate\Support\Facades\Route;
 
 /*
 | BR-T06, D82 (rules/02 §2): a dashboard route is authorised by a `permission:` middleware. Only signing in and out and
-| `me` (which tells the frontend the permissions) are open to every signed-in user.
+| `me` (which tells the frontend the permissions) are open to every signed-in user, and the password reset (D112) to
+| guests.
 */
 
 test('D82 every dashboard route except auth and me requires a permission', function (): void {
-    $open = ['api/dashboard/auth/login', 'api/dashboard/auth/logout', 'api/dashboard/me'];
+    $open = [
+        'api/dashboard/auth/login',
+        'api/dashboard/auth/logout',
+        'api/dashboard/auth/forgot-password',
+        'api/dashboard/auth/reset-password',
+        'api/dashboard/me',
+    ];
 
     $missing = collect(Route::getRoutes()->getRoutes())
         ->filter(fn (RouteDefinition $route): bool => str_starts_with($route->uri(), 'api/dashboard/') && ! in_array($route->uri(), $open, true))

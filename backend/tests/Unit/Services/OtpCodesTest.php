@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Customers\Services\OtpCodes;
+use App\Modules\Tenancy\Services\OtpCodes;
 
 test('BR-CU07 a code is 6 digits', function (): void {
     expect(app(OtpCodes::class)->generate())->toMatch('/^\d{6}$/');

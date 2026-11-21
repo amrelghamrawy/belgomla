@@ -6,7 +6,7 @@ namespace Database\Factories;
 
 use App\Modules\Customers\Enums\OtpPurpose;
 use App\Modules\Customers\Models\CustomerOtp;
-use App\Modules\Customers\Services\OtpCodes;
+use App\Modules\Tenancy\Services\OtpCodes;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<CustomerOtp> */

@@ -16,3 +16,11 @@ export function phoneField() {
     .min(1, ar.validation.required)
     .refine((value) => EGYPTIAN_MOBILE.test(value.replace(/[\s-]/g, "")), ar.validation.phone);
 }
+
+/** The same check for a phone that may be left empty (a dashboard user's mobile, D112); "" means none. */
+export function optionalPhoneField() {
+  return z
+    .string()
+    .trim()
+    .refine((value) => value === "" || EGYPTIAN_MOBILE.test(value.replace(/[\s-]/g, "")), ar.validation.phone);
+}

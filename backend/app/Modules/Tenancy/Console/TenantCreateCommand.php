@@ -20,6 +20,7 @@ final class TenantCreateCommand extends Command
         {name : Store name (Arabic)}
         {--owner-email= : First owner email}
         {--owner-password= : First owner password}
+        {--owner-phone= : First owner Egyptian mobile, where a password reset code goes (D112); optional}
         {--vertical=libraries : Key of an active store vertical (D108); an unknown key lists the active ones}';
 
     protected $description = 'Create a new tenant with its settings and first owner user';
@@ -36,6 +37,7 @@ final class TenantCreateCommand extends Command
                 ownerEmail: $email,
                 ownerPassword: $password,
                 verticalKey: $this->stringOption('vertical', 'libraries') ?? 'libraries',
+                ownerPhone: $this->stringOption('owner-phone'),
             ));
         } catch (ApiException|InvalidArgumentException $e) {
             $this->error($e->getMessage());

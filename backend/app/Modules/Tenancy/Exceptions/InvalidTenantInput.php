@@ -32,6 +32,11 @@ final class InvalidTenantInput extends ApiException
         return new self(422, 'invalid_vertical', 'Vertical must be one of: '.implode(', ', $activeKeys));
     }
 
+    public static function phone(): self
+    {
+        return new self(422, 'invalid_phone', 'Owner phone must be an Egyptian mobile number (010, 011, 012 or 015).');
+    }
+
     public static function unknownTenant(string $subdomain): self
     {
         return new self(404, 'not_found', "Tenant \"{$subdomain}\" not found.");

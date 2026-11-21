@@ -29,6 +29,15 @@ describe("DashboardLoginForm", () => {
     expect(screen.getByLabelText("كلمة المرور")).toHaveAttribute("dir", "ltr");
   });
 
+  it("D112 links to the forgotten-password page", () => {
+    renderWithQuery(<DashboardLoginForm />);
+
+    expect(screen.getByRole("link", { name: "نسيت كلمة المرور؟" })).toHaveAttribute(
+      "href",
+      "/dashboard/forgot-password",
+    );
+  });
+
   it("validates on the client before calling the API", async () => {
     const fetchMock = stubFetch();
     renderWithQuery(<DashboardLoginForm />);

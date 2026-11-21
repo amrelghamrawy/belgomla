@@ -17,6 +17,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property int $tenant_id
  * @property string $name
  * @property string $email
+ * @property string|null $phone E.164 mobile; where a password reset code goes (D112, BR-T10)
  * @property string $password
  * @property TenantUserRole $role
  * @property TenantUserStatus $status

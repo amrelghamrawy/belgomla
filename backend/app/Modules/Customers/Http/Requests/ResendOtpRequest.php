@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Customers\Http\Requests;
 
 use App\Modules\Customers\Enums\OtpPurpose;
-use App\Modules\Customers\Rules\EgyptianPhone;
 use App\Modules\Messaging\Enums\Channel;
+use App\Modules\Tenancy\Rules\EgyptianPhone;
 use App\Support\PhoneNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;

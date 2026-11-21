@@ -32,4 +32,10 @@ final class TenantUserFactory extends Factory
     {
         return $this->state(['status' => TenantUserStatus::Disabled]);
     }
+
+    /** D112: a mobile number for the password reset code. */
+    public function withPhone(string $phone = '+201012345678'): static
+    {
+        return $this->state(['phone' => $phone]);
+    }
 }

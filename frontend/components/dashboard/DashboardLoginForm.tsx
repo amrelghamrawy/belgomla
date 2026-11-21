@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -75,6 +76,13 @@ export function DashboardLoginForm() {
             <Button type="submit" size="lg" className="h-11 w-full" disabled={login.isPending}>
               {login.isPending ? ar.auth.submitting : ar.auth.submitLogin}
             </Button>
+            {/* D112: a code on WhatsApp to the mobile stored on the user. */}
+            <Link
+              href="/dashboard/forgot-password"
+              className="text-primary self-start text-sm underline-offset-4 hover:underline"
+            >
+              {ar.auth.forgot}
+            </Link>
           </FieldGroup>
         </form>
       </CardContent>

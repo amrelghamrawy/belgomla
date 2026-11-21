@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\Services\TenantCreatedHooks;
 use App\Modules\Tenancy\TenantContext;
+use App\Support\PhoneNumber;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -46,7 +47,9 @@ final readonly class CreateTenant
         $vertical = $this->verticals->activeByKey($data->verticalKey)
             ?? throw InvalidTenantInput::vertical($this->verticals->activeKeys());
 
-        return DB::transaction(function () use ($subdomain, $data, $vertical): Tenant {
+        $ownerPhone = $data->ownerPhone === null ? null : (PhoneNumber::toE164($data->ownerPhone) ?? throw InvalidTenantInput::phone());
+
+        return DB::transaction(function () use ($subdomain, $data, $vertical, $ownerPhone): Tenant {
             $tenant = Tenant::query()->create([
                 'subdomain' => $subdomain,
                 'name' => $data->name,
@@ -56,10 +59,11 @@ final readonly class CreateTenant
 
             $tenant->settings()->create([]);
 
-            $this->context->runAs($tenant, function () use ($data, $tenant): void {
+            $this->context->runAs($tenant, function () use ($data, $tenant, $ownerPhone): void {
                 TenantUser::query()->create([
                     'name' => $data->name,
                     'email' => mb_strtolower($data->ownerEmail),
+                    'phone' => $ownerPhone,
                     'password' => $data->ownerPassword,
                     'role' => TenantUserRole::Owner,
                 ]);

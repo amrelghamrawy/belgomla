@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Http\Controllers\Dashboard\BrandingImageController;
 use App\Modules\Tenancy\Http\Controllers\Dashboard\MeController;
+use App\Modules\Tenancy\Http\Controllers\Dashboard\PasswordForgotController;
+use App\Modules\Tenancy\Http\Controllers\Dashboard\PasswordResetController;
 use App\Modules\Tenancy\Http\Controllers\Dashboard\SessionController;
 use App\Modules\Tenancy\Http\Controllers\Dashboard\SettingsController;
 use App\Modules\Tenancy\Http\Controllers\Dashboard\UserController;
@@ -12,6 +14,14 @@ use Illuminate\Support\Facades\Route;
 Route::post('auth/login', [SessionController::class, 'store'])
     ->middleware('throttle:20,1')
     ->name('auth.login');
+
+// D112, BR-T10: a code on WhatsApp to the phone on the user, then a new password.
+Route::post('auth/forgot-password', [PasswordForgotController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('auth.forgot-password');
+Route::post('auth/reset-password', [PasswordResetController::class, 'store'])
+    ->middleware('throttle:20,1')
+    ->name('auth.reset-password');
 
 Route::middleware(['auth:tenant_user', 'session.tenant:tenant_user'])->group(function (): void {
     Route::post('auth/logout', [SessionController::class, 'destroy'])->name('auth.logout');

@@ -14,6 +14,7 @@ final readonly class TenantUserData
         public string $email,
         public string $password,
         public TenantUserRole $role = TenantUserRole::Owner,
+        public ?string $phone = null,
     ) {}
 
     public static function fromRequest(StoreTenantUserRequest $request): self
@@ -23,6 +24,7 @@ final readonly class TenantUserData
             email: $request->email(),
             password: $request->password(),
             role: $request->role(),
+            phone: $request->phone(),
         );
     }
 }

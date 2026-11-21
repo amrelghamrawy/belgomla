@@ -9,7 +9,7 @@ use App\Modules\Customers\Exceptions\OtpAttemptsExceeded;
 use App\Modules\Customers\Exceptions\OtpExpired;
 use App\Modules\Customers\Exceptions\OtpInvalid;
 use App\Modules\Customers\Models\CustomerOtp;
-use App\Modules\Customers\Services\OtpCodes;
+use App\Modules\Tenancy\Services\OtpCodes;
 
 /**
  * BR-CU07: checks a code against the latest live one for the phone and purpose: valid 10 minutes, 5 attempts,

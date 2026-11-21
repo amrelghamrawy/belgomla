@@ -347,11 +347,15 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 
 | Method | Path                         | Body              | Answer |
 | ------ | ---------------------------- | ----------------- | ------ |
-| POST   | `/api/dashboard/auth/login`  | `email, password` | `{ data: { id, name, email, role, status, last_login_at } }` |
+| POST   | `/api/dashboard/auth/login`  | `email, password` | `{ data: { id, name, email, phone, role, status, last_login_at } }` |
+| POST   | `/api/dashboard/auth/forgot-password` | `email` | `204` for every email (D112, BR-T10) |
+| POST   | `/api/dashboard/auth/reset-password`  | `email, code, password` | `204`; the user logs in afterwards |
 | POST   | `/api/dashboard/auth/logout` |                   | `204`  |
-| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, role, role_label, status, last_login_at }, tenant: { name, subdomain, status, vertical: { key, name } }, permissions: [...] } }` (V2: the role's permissions, BR-T06; V3 Task 01: `vertical` is the store vertical `{ key, name }`, D108, was a fixed string) |
+| GET    | `/api/dashboard/me`          |                   | `{ data: { user: { id, name, email, phone, role, role_label, status, last_login_at }, tenant: { name, subdomain, status, vertical: { key, name } }, permissions: [...] } }` (V2: the role's permissions, BR-T06; V3 Task 01: `vertical` is the store vertical `{ key, name }`, D108, was a fixed string) |
 
 `login` errors: `422 invalid_credentials`, `403 user_disabled`, `429 rate_limited` after 5 failures per tenant+email+IP per minute, `400 stateful_request_required` without a SPA origin. Suspended tenant → `403 tenant_suspended`. The email is matched case-insensitively.
+
+Password reset (D112, BR-T10): `forgot-password` sends a 6-digit code on WhatsApp to the user's `phone` only when the email is an active user with a phone; `429 rate_limited` (`details.retry_after`) after 5 requests per email per hour. `reset-password` errors are the customer OTP codes: `422 otp_invalid` (`details.attempts_left` after a wrong code), `422 otp_expired`, `422 otp_attempts_exceeded`; `password` 8–200 characters. The change is audited `tenant_user.password_reset` and rotates the remember token. Both throttled per IP (10 and 20 per minute); suspended tenant → `403 tenant_suspended`.
 
 ---
 
@@ -365,9 +369,9 @@ V2 Task 03: `PATCH /api/store/account/preferences` `{ order_notifications: bool 
 | GET    | `/api/dashboard/settings/whatsapp` | D70 store number: `{ enabled, status, status_label, phone, connected_at, disconnect_reason, qr }`; `qr` (PNG data URL) only while `pairing`, read live from wa-gateway; a scan or an expiry seen there is recorded by this call. Poll every ~3 s while pairing. |
 | POST   | `/api/dashboard/settings/whatsapp` | start linking by QR; audited (`whatsapp.pairing_started`); `409 whatsapp_already_connected`, `503 wa_gateway_unavailable` / `wa_gateway_capacity`, `404` when disabled |
 | DELETE | `/api/dashboard/settings/whatsapp` | unlink (logout from the phone, then delete the session); audited (`whatsapp.unlinked`); adds `logged_out_on_phone` |
-| GET    | `/api/dashboard/users`         | tenant users                                |
-| POST   | `/api/dashboard/users`         | `name, email, password, role?` (owner when left out; V2 D82) |
-| PATCH  | `/api/dashboard/users/{id}`    | `name`, `status`, `password`, `role`; `409 last_owner` when the last active owner would be demoted or disabled; a role change is audited `tenant_user.role_changed` |
+| GET    | `/api/dashboard/users`         | tenant users (with `phone`, E.164 or null, D112) |
+| POST   | `/api/dashboard/users`         | `name, email, password, role?, phone?` (owner when left out; V2 D82; `phone` an Egyptian mobile in any spelling, stored E.164, D112) |
+| PATCH  | `/api/dashboard/users/{id}`    | `name`, `status`, `password`, `role`, `phone` (null or empty clears it, D112); `409 last_owner` when the last active owner would be demoted or disabled; a role change is audited `tenant_user.role_changed` |
 
 ---
 

@@ -20,7 +20,7 @@ function login(string $email = 'owner@alnoor.test', string $password = 'secret12
 test('an owner logs in and reads their profile and tenant', function (): void {
     login()
         ->assertOk()
-        ->assertExactJsonStructure(['data' => ['id', 'name', 'email', 'role', 'role_label', 'status', 'last_login_at']])
+        ->assertExactJsonStructure(['data' => ['id', 'name', 'email', 'phone', 'role', 'role_label', 'status', 'last_login_at']])
         ->assertJsonPath('data.email', 'owner@alnoor.test')
         ->assertJsonPath('data.role', 'owner');
 

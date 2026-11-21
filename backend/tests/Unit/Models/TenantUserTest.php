@@ -13,7 +13,7 @@ test('to array hides the password and remember token', function (): void {
     $user = $this->makeOwner()->fresh();
 
     expect(array_keys($user->toArray()))->toBe([
-        'id', 'tenant_id', 'name', 'email', 'role', 'status', 'last_login_at', 'created_at', 'updated_at',
+        'id', 'tenant_id', 'name', 'email', 'role', 'status', 'last_login_at', 'created_at', 'updated_at', 'phone',
     ]);
 });
 

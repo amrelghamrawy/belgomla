@@ -417,6 +417,14 @@ export const ar = {
     resetTitle: "كلمة مرور جديدة",
     resetSubmit: "حفظ كلمة المرور",
     resetDone: "تم تغيير كلمة المرور، سجل الدخول الآن",
+    // D112: the dashboard reset sends the code on WhatsApp to the mobile stored on the user.
+    dashboardForgotBody: "اكتب بريدك الإلكتروني، وسنرسل كود التحقق على واتساب إلى رقم الموبايل المسجل في حسابك.",
+    dashboardCodeSent: (email: string) =>
+      `إذا كان ${email} مسجلًا وله رقم موبايل، فسيصلك كود من 6 أرقام على واتساب خلال دقيقة.`,
+    dashboardNoPhone:
+      "لا يصلك الكود؟ إذا لم يكن لحسابك رقم موبايل، اطلب من مالك المتجر تغيير كلمة المرور من صفحة المستخدمين.",
+    changeEmail: "تغيير البريد",
+    backToLogin: "العودة لتسجيل الدخول",
     verifyFirst: "أكد رقم هاتفك",
     passwordHint: "8 أحرف على الأقل",
     inviteTitle: "تفعيل حسابك",

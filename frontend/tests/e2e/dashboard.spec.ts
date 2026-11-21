@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { api, loginAsOwner, placeShopperOrder, shopperSession, uniqueSuffix } from "./helpers";
+import { api, freshPhone, lastOtp, loginAsOwner, placeShopperOrder, shopperSession, uniqueSuffix } from "./helpers";
 
 // The merchant dashboard against the real stack (tasks/10). Needs the seeded backend (php artisan
 // migrate:fresh --seed). Every run creates its own names, phones and orders, so runs do not collide, and the
@@ -196,6 +196,41 @@ test("BR-T06 D82 the owner adds a sales user, who sees orders but cannot open th
 
   await sales.goto("/dashboard/settings");
   await expect(sales.getByTestId("forbidden")).toContainText("ليس لديك صلاحية لفتح هذه الصفحة");
+  await context.close();
+});
+
+test("BR-T10 D112 a user with a mobile resets a forgotten password with the WhatsApp code", async ({
+  page,
+  browser,
+}) => {
+  const email = `reset-${uniqueSuffix()}@alnoor.test`;
+  const phone = freshPhone();
+  await loginAsOwner(page);
+  const created = await api(page, "POST", "/api/dashboard/users", {
+    name: "موظف نسي كلمته",
+    email,
+    phone,
+    password: "secret123",
+    role: "sales",
+  });
+  expect(created.status).toBe(201);
+
+  const context = await browser.newContext();
+  const guest = await context.newPage();
+  await guest.goto("/dashboard/login");
+  await guest.getByRole("link", { name: "نسيت كلمة المرور؟" }).click();
+  await expect(guest).toHaveURL(/\/dashboard\/forgot-password$/);
+  await guest.getByLabel("البريد الإلكتروني").fill(email);
+  await guest.getByRole("button", { name: "أرسل الكود" }).click();
+  await expect(guest.getByText(`إذا كان ${email} مسجلًا وله رقم موبايل`)).toBeVisible();
+
+  await guest.getByLabel("كود التحقق").fill(await lastOtp(guest, phone));
+  await guest.getByLabel("كلمة المرور الجديدة").fill("brand-new-1");
+  await guest.getByRole("button", { name: "حفظ كلمة المرور" }).click();
+  await expect(guest).toHaveURL(/\/dashboard\/login$/);
+
+  await loginAsOwner(guest, email, "brand-new-1");
+  await expect(guest.getByTestId("welcome")).toBeVisible();
   await context.close();
 });
 

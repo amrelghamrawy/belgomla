@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatClock, formatDate, formatDateTime, formatDay } from "@/lib/format/date";
 import { formatMoney, formatPercent, formatUnitCost } from "@/lib/format/money";
-import { phoneField } from "@/lib/forms/phone";
+import { optionalPhoneField, phoneField } from "@/lib/forms/phone";
 import { formatPhone, whatsappLink } from "@/lib/format/phone";
 
 describe("formatMoney", () => {
@@ -112,5 +112,15 @@ describe("phoneField", () => {
 
   it.each(["", "0101234567", "01312345678"])("rejects %j", (phone) => {
     expect(phoneField().safeParse(phone).success).toBe(false);
+  });
+});
+
+describe("optionalPhoneField", () => {
+  it.each(["", "  ", "01012345678", "+20 101 234 5678"])("accepts %j", (phone) => {
+    expect(optionalPhoneField().safeParse(phone).success).toBe(true);
+  });
+
+  it.each(["0101234567", "0223456789"])("rejects %j", (phone) => {
+    expect(optionalPhoneField().safeParse(phone).success).toBe(false);
   });
 });

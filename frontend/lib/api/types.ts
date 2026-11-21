@@ -13,6 +13,8 @@ export type Customer = Schemas["Customer"];
 export type CustomerLoginRequest = Schemas["CustomerLoginRequest"];
 export type TenantUser = Schemas["TenantUser"];
 export type DashboardLoginRequest = Schemas["DashboardLoginRequest"];
+export type DashboardForgotPasswordRequest = Schemas["DashboardForgotPasswordRequest"];
+export type DashboardResetPasswordRequest = Schemas["DashboardResetPasswordRequest"];
 export type DashboardMe = Schemas["DashboardMe"];
 
 // Storefront (tasks/9)

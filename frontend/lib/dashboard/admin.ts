@@ -80,13 +80,21 @@ export function useCreateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: { name: string; email: string; password: string; role: TenantUser["role"] }) =>
-      apiFetch<TenantUser>("/api/dashboard/users", { method: "POST", body }),
+    mutationFn: (body: {
+      name: string;
+      email: string;
+      password: string;
+      role: TenantUser["role"];
+      phone?: string | null;
+    }) => apiFetch<TenantUser>("/api/dashboard/users", { method: "POST", body }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardUsers }),
   });
 }
 
-/** Disable/enable or set a password; 409 cannot_disable_self and last_active_user come back as messages. */
+/**
+ * Disable/enable, set a password or the mobile (D112; null clears it); 409 cannot_disable_self and last_active_user
+ * come back as messages.
+ */
 export function useUpdateUser() {
   const queryClient = useQueryClient();
 
@@ -99,6 +107,7 @@ export function useUpdateUser() {
       status?: TenantUser["status"];
       password?: string;
       role?: TenantUser["role"];
+      phone?: string | null;
     }) => apiFetch<TenantUser>(`/api/dashboard/users/${id}`, { method: "PATCH", body }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardUsers }),
   });

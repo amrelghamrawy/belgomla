@@ -29,6 +29,55 @@ test('an owner creates another owner with a lower-cased email', function (): voi
     $this->assertDatabaseHas('audit_logs', ['tenant_id' => $this->tenant->id, 'action' => 'tenant_user.created', 'actor_id' => $this->me->id]);
 });
 
+test('D112 a user is created with a mobile for the password reset code, stored in E.164', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/users', ['name' => 'أحمد', 'email' => 'ahmed@alnoor.test', 'password' => 'secret123', 'phone' => '0101 234 5678'])
+        ->assertCreated()
+        ->assertJsonPath('data.phone', '+201012345678');
+
+    expect(AuditLog::query()->where('action', 'tenant_user.created')->sole()->new_values)->toMatchArray(['phone' => '+201012345678']);
+});
+
+test('D112 a user without a phone has phone null', function (): void {
+    $this->tenantJson('POST', '/api/dashboard/users', ['name' => 'أحمد', 'email' => 'ahmed@alnoor.test', 'password' => 'secret123'])
+        ->assertCreated()
+        ->assertJsonPath('data.phone', null);
+});
+
+test('D112 an owner sets, keeps and clears a user\'s phone, audited', function (): void {
+    $user = $this->makeOwner();
+
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$user->id}", ['phone' => '+20 112 345 6789'])
+        ->assertOk()
+        ->assertJsonPath('data.phone', '+201123456789');
+
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$user->id}", ['name' => 'جديد'])
+        ->assertOk()
+        ->assertJsonPath('data.phone', '+201123456789');
+
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$user->id}", ['phone' => null])
+        ->assertOk()
+        ->assertJsonPath('data.phone', null);
+
+    $log = $this->asTenant($this->tenant, fn () => AuditLog::query()->latest('id')->first());
+
+    expect($log->old_values)->toMatchArray(['phone' => '+201123456789'])
+        ->and($log->new_values)->toMatchArray(['phone' => null]);
+});
+
+test('D112 an owner sets their own phone', function (): void {
+    $this->tenantJson('PATCH', "/api/dashboard/users/{$this->me->id}", ['phone' => '01512345678'])
+        ->assertOk()
+        ->assertJsonPath('data.phone', '+201512345678');
+});
+
+test('D112 a phone that is not an Egyptian mobile is refused', function (string $method): void {
+    $uri = $method === 'POST' ? '/api/dashboard/users' : "/api/dashboard/users/{$this->me->id}";
+
+    $this->tenantJson($method, $uri, ['name' => 'س', 'email' => 's@alnoor.test', 'password' => 'secret123', 'phone' => '0223456789'])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.details.phone.0', 'رقم الهاتف يجب أن يكون رقم موبايل مصري صحيح.');
+})->with(['POST', 'PATCH']);
+
 test('D82 an owner creates a user with a role, audited with it', function (): void {
     $this->tenantJson('POST', '/api/dashboard/users', ['name' => 'سارة', 'email' => 'sara@alnoor.test', 'password' => 'secret123', 'role' => 'accountant'])
         ->assertCreated()

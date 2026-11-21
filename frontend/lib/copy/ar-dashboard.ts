@@ -1478,6 +1478,16 @@ export const dashboard = {
     newPassword: "كلمة المرور الجديدة",
     created: "تمت إضافة المستخدم",
     updated: "تم تحديث المستخدم",
+    // D112: the mobile a forgotten-password code goes to, on WhatsApp.
+    phone: "رقم الموبايل",
+    phoneOptional: "رقم الموبايل (اختياري)",
+    phoneHint: "يصله كود استعادة كلمة المرور على واتساب.",
+    phoneClearHint: "اتركه فارغًا لحذف الرقم.",
+    noPhone: "غير مسجل",
+    editPhone: "رقم الموبايل",
+    phoneOf: (name: string) => `رقم موبايل ${name}`,
+    myPhoneMissing: "أضف رقم موبايلك ليصلك كود على واتساب إذا نسيت كلمة المرور.",
+    addMyPhone: "أضف رقمي",
   },
 
   audit: {

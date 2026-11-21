@@ -6,7 +6,9 @@ namespace App\Providers;
 
 use App\Modules\Messaging\Contracts\ConnectionAlerts;
 use App\Modules\Messaging\Services\NullConnectionAlerts;
+use App\Modules\Messaging\Services\ResetCodeMessages;
 use App\Modules\Platform\Services\HealthProbe;
+use App\Modules\Tenancy\Contracts\ResetCodeSender;
 use App\Modules\Tenancy\Enums\Permission;
 use App\Modules\Tenancy\Models\TenantUser;
 use App\Modules\Tenancy\Services\TenantCreatedHooks;
@@ -28,6 +30,8 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->singleton(TenantCreatedHooks::class);
         // D70: nobody is told about a dropped store number until Orders binds its dashboard notice.
         $this->app->bind(ConnectionAlerts::class, NullConnectionAlerts::class);
+        // D112: Tenancy cannot depend on Messaging, so Messaging delivers the dashboard password reset code.
+        $this->app->bind(ResetCodeSender::class, ResetCodeMessages::class);
     }
 
     public function boot(): void

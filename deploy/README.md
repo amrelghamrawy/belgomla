@@ -69,10 +69,12 @@ systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belg
 
    ```bash
    cd /srv/belgomla/backend
-   sudo -u belgomla php artisan tenant:create alnoor "مكتبة النور" --owner-email=<owner email> --owner-password='<temporary password>' --vertical=school-books
+   sudo -u belgomla php artisan tenant:create alnoor "مكتبة النور" --owner-email=<owner email> --owner-password='<temporary password>' --owner-phone=<owner mobile> --vertical=libraries
    ```
 
-   - Pass both options: without them the command prompts.
+   - Pass the email and password: without them the command prompts.
+   - `--owner-phone` (an Egyptian mobile) is where a forgotten-password code goes on WhatsApp (D112). Without it the owner cannot reset alone; they can add it later on the users page.
+   - `--vertical` is a key from the `verticals` table (`libraries` since V3 Task 01); an unknown key lists the active ones.
    - The owner changes the password at the first login (dashboard → settings → users).
    - Run `deploy.sh` once more to see every check green.
    - **Demo store** (for showing the product, not for a merchant): `sudo -u belgomla php artisan tenant:demo demo --owner-email=<email> --owner-password='<password>'` creates `demo.<domain>` with what `db:seed` gives the local `alnoor` store: the demo catalog (books, supplies, toys) and two months of bookshops, orders and collections. Nothing is sent to the demo customers' phones. Use `SMOKE_TENANT=demo` in `ops.env` if this is the only store.
