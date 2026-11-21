@@ -27,3 +27,8 @@ frontend/.next/
 frontend/.env*.local
 frontend/test-results/
 frontend/playwright-report/
+
+# Agent skills installed per project (taste-skill, D113): the lock file is tracked, the files are not
+.agents/
+.claude/skills/
+**/.taste-skill/

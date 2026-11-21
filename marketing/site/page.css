@@ -1,0 +1,137 @@
+/* Page CSS: only what sits inside a visual and the kit lacks (SKILL.md step 5). */
+
+/* Hero collage pieces: sized in % of the collage, their text in container units. */
+.ly-collage { container-type: inline-size; }
+.ly-collage .ly-piece { background: #fff; color: #111; box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 22px 48px -22px rgb(0 0 0 / .35); padding: 3.4cqw 3.6cqw; display: grid; gap: 1.8cqw; align-content: start; font: 400 max(13px, 2.1cqw)/1.4 var(--font-text); }
+.pc-tag { color: var(--p-muted); font-size: max(12px, 1.7cqw); }
+.pc-title { font: 500 max(15px, 3.4cqw)/1.25 var(--font-display); }
+.pc-tier, .pc-line { display: flex; justify-content: space-between; align-items: baseline; gap: 2cqw; padding-top: 1.6cqw; border-top: 1px solid #ececea; }
+.pc-tier em, .pc-line em { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pc-tier small, .pc-line small, .pc-big small { color: var(--p-muted); font-weight: 400; }
+.pc-tier.is-on { color: var(--p-accent); }
+.pc-add { display: flex; justify-content: space-between; align-items: center; margin-top: 1cqw; }
+.pc-add span { border: 1px solid #e1e1de; border-radius: 99px; padding: .8cqw 2.4cqw; font-family: var(--font-mono); }
+.pc-add i { font-style: normal; background: var(--p-action); color: var(--p-action-ink); border-radius: 1.2cqw; padding: 1.2cqw 3cqw; font-weight: 500; }
+.ly-collage .pc-note { grid-template-columns: auto 1fr; align-items: center; gap: 2.4cqw; }
+.pc-note small, .pc-muted { color: var(--p-muted); display: block; font-size: max(12px, 1.7cqw); }
+.pc-dot { width: 2.4cqw; height: 2.4cqw; border-radius: 50%; background: var(--p-accent); }
+.pc-actions { display: flex; gap: 1.6cqw; margin-top: 1cqw; }
+.pc-actions i { font-style: normal; border: 1px solid #e1e1de; border-radius: 1.2cqw; padding: 1.1cqw 2.6cqw; }
+.pc-actions i.on { background: var(--p-action); color: var(--p-action-ink); border-color: transparent; }
+.ly-collage .pc-chat { background: #e7f6dd; }
+.pc-from { font-weight: 600; color: #1f6b3a; font-size: max(12px, 1.8cqw); }
+.pc-chat p { margin: 0; }
+.pc-chat small { color: #5d7a55; justify-self: end; font-size: max(11px, 1.5cqw); }
+.pc-big { font: 500 max(22px, 6cqw)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.pc-bar { height: 1.4cqw; border-radius: 99px; background: #ececea; overflow: hidden; }
+.pc-bar i { display: block; height: 100%; background: var(--p-accent); }
+@media (max-width: 639px) { .pc-tier:nth-of-type(3), .pc-add { display: none; } }
+
+/* app-frame (sections-library.md), the list pane on the start side in Arabic. */
+.app.ui { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
+.app > .app__pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.app > .app__pane + .app__pane { border-inline-start: 1px solid var(--u-line); }
+.app > .app__pane > .ui-panel { width: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.app > .app__pane::after { content: ""; position: absolute; inset: auto 0 0 0; height: 64px; background: linear-gradient(transparent, var(--u-bg)); pointer-events: none; }
+.ui-win__row.is-sel { background: color-mix(in srgb, var(--p-accent) 7%, transparent); }
+@media (max-width: 1023px) { .app.ui { grid-template-columns: 1fr; } .app__pane--list { display: none; } }
+
+/* the open order */
+.od { padding: 20px 24px; display: grid; gap: 16px; font: 400 14px/1.45 var(--font-text); color: #111; }
+.od__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.od__head b { font: 500 22px/1 var(--font-display); margin-inline-end: 10px; }
+.od__head span { color: var(--p-muted); }
+.od__btns { display: flex; gap: 8px; }
+.od__btn { font-style: normal; border: 1px solid #e1e1de; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+.od__btn--main { background: var(--p-action); color: var(--p-action-ink); border-color: transparent; }
+.od__addr { color: var(--p-muted); font-size: 13px; }
+.od__lines { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.od__lines th { text-align: start; color: var(--p-muted); font-weight: 500; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #ececea; }
+.od__lines td { padding: 10px 6px; border-bottom: 1px solid #f0f0ee; }
+.od__lines em { display: block; font-style: normal; color: #b4530a; font-size: 12px; }
+.od__total { display: flex; justify-content: space-between; font-size: 16px; }
+.od__total small { color: var(--p-muted); font-weight: 400; }
+
+/* the customer prices */
+.pr { --w: 420px; --ay: 56px; }
+.pr__card { padding: 24px; display: grid; gap: 14px; font: 400 15px/1.4 var(--font-text); color: #111; }
+.pr__row { display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #ececea; font-variant-numeric: tabular-nums; }
+.pr__row b small { color: var(--p-muted); font-weight: 400; }
+.pr__row--old { color: var(--p-muted); }
+.pr__note { color: var(--p-accent); font-size: 13px; }
+
+/* WhatsApp from the store's number */
+.wa { --w: 360px; --ay: 48px; }
+.wa__phone { background: #efe7de; color: #111; font: 400 14px/1.5 var(--font-text); }
+.wa__head { display: flex; gap: 10px; align-items: center; background: #075e54; color: #fff; padding: 12px 16px; }
+.wa__head small { display: block; opacity: .8; font-size: 12px; }
+.wa__body { padding: 16px; display: grid; gap: 10px; }
+.wa__msg { margin: 0; background: #fff; border-radius: 10px; padding: 10px 12px; max-width: 88%; box-shadow: 0 1px 1px rgb(0 0 0 / .08); }
+.facts { list-style: none; padding: 0; margin: var(--s-5) 0 0; display: grid; gap: 10px; }
+.facts li { padding-top: 10px; border-top: 1px solid var(--line, #e3e3e0); }
+
+/* credit: the collection methods as a ledger */
+.ledger { display: grid; align-content: start; }
+.ledger__row { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid rgb(255 255 255 / .14); font-size: 18px; }
+.ledger__row span { color: var(--p-inv-muted); }
+.ledger__row--head { font-size: 13px; padding-top: 0; }
+.ledger__foot { margin-top: var(--s-5); color: var(--p-inv-muted); }
+
+/* steps */
+.steps3 .panel.st { --p-h: 200px; display: grid; place-items: center; padding: 24px; }
+.st__url { font: 500 18px/1 var(--font-mono); background: #fff; border-radius: 10px; padding: 14px 18px; box-shadow: 0 10px 30px -18px rgb(0 0 0 / .35); }
+.st__file, .st__invite { background: #fff; border-radius: 10px; padding: 14px 18px; display: grid; gap: 4px; box-shadow: 0 10px 30px -18px rgb(0 0 0 / .35); }
+.st__file span, .st__invite span { color: var(--p-muted); font-size: 13px; }
+
+/* the close: the form beside its heading, the name under them */
+#request .form { background: var(--surface, var(--p-surface)); padding: 32px; border-radius: var(--r-md, 14px); }
+#request input[type="tel"] { text-align: start; }
+
+/* spacing under the split headings, and the price card kept to its rows */
+.t-lead-sm { font-size: 19px; line-height: 1.6; margin-top: var(--s-5); max-width: 34em; }
+.pr__card, .wa__phone { align-content: start; height: auto !important; }
+.tab-panels { margin-top: var(--s-5); max-width: 34em; }
+/* credit: the customer's statement under the words */
+.stmt { margin-top: var(--s-7); background: var(--p-inv-surface); border: 1px solid rgb(255 255 255 / .14); border-radius: var(--r-md, 14px); padding: 20px 24px; display: grid; gap: 12px; max-width: 460px; }
+.stmt__head { display: flex; justify-content: space-between; color: var(--p-inv-muted); font-size: 14px; }
+.stmt__row { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; font-size: 16px; }
+.stmt__bar { height: 8px; border-radius: 99px; background: rgb(255 255 255 / .12); overflow: hidden; }
+.stmt__bar i { display: block; height: 100%; width: 42.5%; background: var(--p-accent); }
+.ledger__row { padding: 22px 0; font-size: 20px; }
+.pr { --w: 520px; }
+.pr__card { padding: 32px; gap: 18px; font-size: 18px; }
+.pr__card .pc-tag { font-size: 15px; }
+
+/* Arabic: the drawn arrow points the way the text reads */
+[dir="rtl"] .m-arrow { transform: scaleX(-1); }
+
+/* the name under the close: present, not shouting (the kit's 216px read too loud next to the links) */
+.close__word { font-size: clamp(48px, 7vw, 112px); letter-spacing: -0.03em; color: var(--p-ink); opacity: .9; }
+@media (max-width: 639px) { .close__word { font-size: clamp(40px, 14vw, 64px); } }
+
+/* photographs in the collage and the steps (stand-ins, listed in the report) */
+.ly-collage .ly-photo { padding: 0; }
+.ly-collage .ly-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st--photo { position: relative; overflow: hidden; }
+.st--photo > .frame__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.st--photo > .st__file { position: relative; }
+
+/* real dashboard screenshots in a plain browser frame */
+.shot { margin: var(--s-7) 0 0; border: 1px solid #e3e3e0; border-radius: var(--r-md, 14px); overflow: hidden; background: #fff; box-shadow: 0 24px 60px -32px rgb(0 0 0 / .35); }
+.shot__bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #ececea; background: #fafaf9; }
+.shot__url { font: 400 13px/1 var(--font-mono); color: var(--p-muted); background: #f0f0ee; border-radius: 6px; padding: 6px 12px; }
+.shot img { display: block; width: 100%; height: auto; }
+#reports .shot img { background: #eef2fb; }
+.acc-frame { overflow: hidden; background: #fff; }
+.acc-frame > .frame__img { object-fit: cover; object-position: 35% 0; }
+.acc-limit { margin-top: var(--s-5); }
+.ly-collage .ly-piece.ly-photo { display: block; }
+
+/* the accounts screenshots: the page's top right (its main figures), the store sidebar and the lower rows cut */
+.acc-frame { position: relative; }
+.acc-frame > .frame__img { position: absolute; top: -12px; right: -262px; width: 1300px; max-width: none; height: auto; object-fit: initial; }
+@media (max-width: 1023px) { .acc-frame > .frame__img { width: 980px; right: -198px; } }
+@media (max-width: 639px) { .acc-frame > .frame__img { width: 720px; right: -146px; } }
+#acc-screen-1, #acc-screen-2 { width: 860px; right: -168px; }
+@media (max-width: 1023px) { #acc-screen-1, #acc-screen-2 { width: 760px; right: -148px; } }
+@media (max-width: 639px) { #acc-screen-1, #acc-screen-2 { width: 620px; right: -121px; } }

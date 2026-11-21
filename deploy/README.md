@@ -11,6 +11,7 @@ Decisions: D44 hosting, D45 phone and accounts, D64 images, D65 alerts, D66 PHP 
 browser ──https──▶ nginx ─┬─ /up, /api/*, /sanctum/* ──fastcgi (Host kept)──▶ php-fpm (backend/public/index.php)
                           ├─ /storage/*  ──▶ backend/storage/app/public (D61)
                           └─ everything else ──▶ next start :3000 ──SSR prefetch──▶ nginx 127.0.0.1:8081 ──▶ php-fpm
+browser ──https──▶ nginx <domain> (the apex) ──▶ marketing/site, static files only (D113)
 Hypersender ──https──▶ nginx hooks.<domain> ──▶ php-fpm only
 Laravel ──bearer──▶ wa-gateway 127.0.0.1:3100 ──signed events──▶ nginx 127.0.0.1:8081 (Host hooks.<domain>) ──▶ php-fpm
 systemd: belgomla-queue@1,2 (queue:work redis --queue=messaging,default) · belgomla-next · belgomla-wa-gateway ·
@@ -183,6 +184,7 @@ On a new VM: provision, fill `/etc/belgomla`, configure rclone, then the command
 | Rotate the webhook secret | new `MESSAGING_WEBHOOK_SECRET` in `backend.env` → `php artisan config:cache` + reload php-fpm → update both Hypersender instances |
 | Renew TLS | automatic (certbot timer, reloads nginx); check with `sudo certbot renew --dry-run` |
 | Production smoke tenant | `tenant:create smoke ...`, run the flows, then `tenant:suspend smoke` (go-live checklist) |
+| Apply a change to `deploy/nginx/belgomla.conf` (deploy.sh does not install it; the apex page of D113 needs this once) | after `deploy.sh`, on the `belgomla.app` VM in `/srv/belgomla`: `sudo cp deploy/nginx/belgomla.conf /etc/nginx/sites-available/belgomla.conf && sudo nginx -t && sudo systemctl reload nginx` (another domain or folder: the `sed` line of `provision.sh`, step "Nginx site"). Check: `curl -sI https://belgomla.app/` answers 200 |
 
 ## First tenant data entry (bulk import is V2)
 
